@@ -1,0 +1,16 @@
+.vs/*
+Debug/*
+!*.cpp
+x64/*
+packages/*
+*.gif
+*.jpg
+*.png
+Src/*
+!Src/*.cpp
+!Src/*.h
+mods/*
+*.vcxproj
+*.vcxproj.filters
+*.sln
+build/
