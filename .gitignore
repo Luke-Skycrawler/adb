@@ -3,14 +3,9 @@ Debug/*
 !*.cpp
 x64/*
 packages/*
-*.gif
-*.jpg
-*.png
 Src/*
+view/x64/
+view/assets/
 !Src/*.cpp
 !Src/*.h
-mods/*
-*.vcxproj
-*.vcxproj.filters
-*.sln
 build/
