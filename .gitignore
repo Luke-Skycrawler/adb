@@ -9,3 +9,5 @@ view/assets/
 !Src/*.cpp
 !Src/*.h
 build/
+*.out
+CMakeFiles/
