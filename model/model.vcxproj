@@ -22,7 +22,7 @@
     <VCProjectVersion>15.0</VCProjectVersion>
     <ProjectGuid>{94E9A72E-2A9C-478E-B23C-44ADA6DDF4F2}</ProjectGuid>
     <Keyword>Win32Proj</Keyword>
-    <RootNamespace>view</RootNamespace>
+    <RootNamespace>model</RootNamespace>
     <WindowsTargetPlatformVersion>10.0</WindowsTargetPlatformVersion>
   </PropertyGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
@@ -160,19 +160,13 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
-    <ClInclude Include="camera.h" />
-    <ClInclude Include="gl1.h" />
-    <ClInclude Include="light.h" />
-    <ClInclude Include="mesh.h" />
-    <ClInclude Include="model.h" />
-    <ClInclude Include="shader.h" />
-    <ClInclude Include="stb_image.h" />
+    <ClInclude Include="cube.h" />
+    <ClInclude Include="othogonal_energy.h" />
+    <ClInclude Include="..\test_cases\tests.h" />
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="gl1.cpp" />
-    <ClCompile Include="utils.cpp" />
-    <ClCompile Include="glad.c" />
-    <ClCompile Include="light.cpp" />
+    <ClCompile Include="othogonal_energy.cpp" />
+    <ClCompile Include="..\test_cases\spinning.cpp" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
