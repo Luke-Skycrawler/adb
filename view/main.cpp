@@ -24,7 +24,7 @@ int main()
 
     // glfw window creation
     // --------------------
-    GLFWwindow *window = glfwCreateWindow(SCR_WIDTH, SCR_HEIGHT, "LearnOpenGL", NULL, NULL);
+    GLFWwindow *window = glfwCreateWindow(SCR_WIDTH, SCR_HEIGHT, "adb viewer", NULL, NULL);
     if (window == NULL)
     {
         std::cout << "Failed to create GLFW window" << std::endl;
@@ -55,12 +55,20 @@ int main()
     // build and compile our shader zprogram
     // ------------------------------------
     // Shader lightingShader("shaders/geom.vert","shaders/geom.frag","shaders/geom_.geom",varyings);
-    Shader lightingShader("shaders/cursor.vert", "shaders/cursor.frag", "shaders/cursor.geom");
+    // cursor shader version 1
+
+    // Shader lightingShader("shaders/cursor.vert", "shaders/cursor.frag", "shaders/cursor.geom");
+    // version 2
+
+    Shader lightingShader("shaders/1.color.vert", "shaders/1.color.frag");
+    // shadow shader
+
+    // Shader lightingShader("shaders/1.color_.vert", "shaders/1.color_.frag","shaders/pass_through.geom");
+    // depth shader? don't use this
+
     unsigned int feedback_vbo = lightingShader.vbo[0], select_xfb = lightingShader.xfb;
     unsigned int select_program = lightingShader.ID;
     // unsigned int select_program=Feedback_Initialize(&feedback_vbo,&select_xfb);
-    // Shader lightingShader("shaders/1.color.vert", "shaders/1.color.frag");
-    // Shader lightingShader("shaders/1.color_.vert", "shaders/1.color_.frag","shaders/pass_through.geom");
     // Shader lightCubeShader("shaders/1.light_cube.vs", "shaders/1.light_cube.fs");
     Shader simpleShader("shaders/1.color.vs", "shaders/simple.fs");
     Shader screenShader("shaders/view.vs", "shaders/core.fs");
@@ -87,14 +95,8 @@ int main()
     // ------------------------------------------------------------------
     // set up vertex data (and buffer(s)) and configure vertex attributes
     // ------------------------------------------------------------------
+    #ifdef FEATURE_POSTRENDER
     unsigned int quadVBO, quadVAO;
-    float corner[] = {
-        0.5f, 1.0f, 0.0f, 1.0f,
-        0.5f, 0.5f, 0.0f, 0.0f,
-        1.0f, 0.5f, 1.0f, 0.0f,
-        0.5f, 1.0f, 0.0f, 1.0f,
-        1.0f, 0.5f, 1.0f, 0.0f,
-        1.0f, 1.0f, 1.0f, 1.0f};
     float quad[] = {
         -1.0f, 1.0f, 0.0f, 1.0f,
         -1.0f, -1.0f, 0.0f, 0.0f,
@@ -112,7 +114,15 @@ int main()
     glEnableVertexAttribArray(0);
     glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 4 * sizeof(float), (void *)(2 * sizeof(float)));
     glEnableVertexAttribArray(1);
+    #endif
 
+    float corner[] = {
+        0.5f, 1.0f, 0.0f, 1.0f,
+        0.5f, 0.5f, 0.0f, 0.0f,
+        1.0f, 0.5f, 1.0f, 0.0f,
+        0.5f, 1.0f, 0.0f, 1.0f,
+        1.0f, 0.5f, 1.0f, 0.0f,
+        1.0f, 1.0f, 1.0f, 1.0f};
     unsigned int cornerVAO, cornerVBO;
     glGenVertexArrays(1, &cornerVAO);
     glGenBuffers(1, &cornerVBO);
@@ -420,7 +430,7 @@ int main()
         glfwSwapBuffers(window);
         glfwPollEvents();
     }
-
+#ifdef FEATURE_POSTRENDER
     // optional: de-allocate all resources once they've outlived their purpose:
     // ------------------------------------------------------------------------
     // glDeleteVertexArrays(1, &cubeVAO);
@@ -431,6 +441,7 @@ int main()
 
     // glfw: terminate, clearing all previously allocated GLFW resources.
     // ------------------------------------------------------------------
+#endif
     glfwTerminate();
     return 0;
 }
