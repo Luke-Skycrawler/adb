@@ -1,7 +1,6 @@
 #include "env.h"
 #define STB_IMAGE_IMPLEMENTATION
 #include "stb_image.h"
-#include "global_variables.h"
 void renderCube(int light){
     static float vertices[] = {
         // positions          // normals           // texture coords
@@ -285,3 +284,25 @@ unsigned int Feedback_Initialize(unsigned int *_vbo, unsigned int *_xfb)
     }
     return sort_prog;
 }
+
+#include "global_variables.h"
+void gen_preview_framebuffer()
+{
+    glGenFramebuffers(1, &globals.depthMapFBO);
+    glGenTextures(1, &globals.depthMap);
+    glBindTexture(GL_TEXTURE_2D, globals.depthMap);
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_DEPTH_COMPONENT,
+                 SHADOW_WIDTH, SHADOW_HEIGHT, 0, GL_DEPTH_COMPONENT, GL_FLOAT, NULL);
+    // glTexImage2D(GL_TEXTURE_2D,0,GL_RGB,SCR_WIDTH,SCR_HEIGHT,0,GL_RGB,GL_UNSIGNED_BYTE,NULL);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
+
+    glBindFramebuffer(GL_FRAMEBUFFER, globals.depthMapFBO);
+    // glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, globals.depthMap, 0);
+    glFramebufferTexture2D(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_TEXTURE_2D, globals.depthMap, 0);
+    glDrawBuffer(GL_NONE);
+    glReadBuffer(GL_NONE);
+}
+

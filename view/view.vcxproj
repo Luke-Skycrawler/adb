@@ -171,6 +171,7 @@
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="main.cpp" />
+    <ClCompile Include="control.cpp" />
     <ClCompile Include="utils.cpp" />
     <ClCompile Include="glad.c" />
     <ClCompile Include="light.cpp" />
