@@ -6,7 +6,7 @@ static const float kappa = 1e4;
 
 namespace othogonal_energy {
 
-    vec3& grad(mat3& q, int i) {
+    vec3 grad(mat3& q, int i) {
         auto ai = q.col(i);
         vec3 ret = 4 * kappa * ai * (ai.dot(ai) - 1);
         for (int j = 0; j < 3; j++) {
@@ -16,7 +16,7 @@ namespace othogonal_energy {
         }
         return ret;
     }
-    mat3& grad(mat3& q) {
+    mat3 grad(mat3& q) {
         mat3 ret;
         for (int i = 0; i < 3; i++) {
             auto gi = grad(q, i);
@@ -25,7 +25,7 @@ namespace othogonal_energy {
         return ret;
     }
 
-    mat3& hessian(mat3& q, int i, int j) {
+    mat3 hessian(mat3& q, int i, int j) {
         mat3 ret;
         auto ai = q.col(i);
         if (i == j) {

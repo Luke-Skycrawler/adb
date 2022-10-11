@@ -156,16 +156,18 @@
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
       <OptimizeReferences>true</OptimizeReferences>
       <GenerateDebugInformation>true</GenerateDebugInformation>
-      <!-- <AdditionalDependencies>assimp-vc141-mt.lib;opengl32.lib;%(AdditionalDependencies)</AdditionalDependencies> -->
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClInclude Include="cube.h" />
+    <ClInclude Include="time_integrator.h" />
     <ClInclude Include="othogonal_energy.h" />
     <ClInclude Include="..\test_cases\tests.h" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="othogonal_energy.cpp" />
+    <ClInclude Include="time_integrator.cpp" />
+    <ClInclude Include="main.cpp" />
     <ClCompile Include="..\test_cases\spinning_cube.cpp" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />

@@ -8,10 +8,8 @@ inline mat3 cross_matrix(vec3 a){
     return ret;
 }
 Cube &spinning_cube(vec3 &omega){
-    auto A = cross_matrix(omega);
+    auto R = cross_matrix(omega);
     auto cube = Cube();
-    for (int i = 0; i< 3; i++){
-        cube.q_dot[i] = A.col(i);
-    }
+    cube.q_dot = R;
     return cube;
 }
