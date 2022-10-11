@@ -2,10 +2,9 @@
 
 using namespace othogonal_energy;
 
-static const float kappa = 1e4;
-
 namespace othogonal_energy {
 
+    static const float kappa = 1e6;
     vec3 grad(mat3& q, int i) {
         auto ai = q.col(i);
         vec3 ret = 4 * kappa * ai * (ai.dot(ai) - 1);
@@ -34,14 +33,18 @@ namespace othogonal_energy {
             for (int j = 0; j < 3; j++) {
                 if (j == i) continue;
                 auto aj = q.col(j);
-                ret += 2 * aj * aj.adjoint();
+                ret += 4 * kappa * aj * aj.adjoint();
             }
         }
         else {
             auto aj = q.col(j);
-            ret = Matrix3f::Identity(3, 3) * aj.dot(ai) + aj * ai.adjoint();
+            ret = 4 * kappa * (Matrix3f::Identity(3, 3) * aj.dot(ai) + aj * ai.adjoint());
         }
         return ret;
     }
 
+    float otho_energy(mat3 &q) {
+        mat3 qqtmi = q * q.adjoint() - Matrix3f::Identity(3,3);
+        return qqtmi.squaredNorm() * kappa;
+    }
 };
