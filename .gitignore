@@ -11,3 +11,4 @@ view/assets/
 build/
 *.out
 CMakeFiles/
+model/x64/

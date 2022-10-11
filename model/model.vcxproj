@@ -20,7 +20,7 @@
   </ItemGroup>
   <PropertyGroup Label="Globals">
     <VCProjectVersion>15.0</VCProjectVersion>
-    <ProjectGuid>{94E9A72E-2A9C-478E-B23C-44ADA6DDF4F2}</ProjectGuid>
+    <ProjectGuid>{A4597605-2BED-4944-A022-A7875AF00529}</ProjectGuid>
     <Keyword>Win32Proj</Keyword>
     <RootNamespace>model</RootNamespace>
     <WindowsTargetPlatformVersion>10.0</WindowsTargetPlatformVersion>
@@ -166,7 +166,7 @@
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="othogonal_energy.cpp" />
-    <ClCompile Include="..\test_cases\spinning.cpp" />
+    <ClCompile Include="..\test_cases\spinning_cube.cpp" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
