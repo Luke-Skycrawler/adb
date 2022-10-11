@@ -5,7 +5,7 @@ using namespace std;
 
 static const float dt = 1e-3;
 int main(void) {
-    vec3 omega(100.0f, 0.0f, 0.0f);
+    vec3 omega(10.0f, 0.0f, 0.0f);
     auto cube = spinning_cube(omega);
     vector<Cube> cubes;
     cubes.push_back(*cube);

@@ -1,49 +1,17 @@
-#include <glad/glad.h>
-#include <GLFW/glfw3.h>
-#include <glm/glm.hpp>
-#include <glm/gtc/matrix_transform.hpp>
-#include <glm/gtc/type_ptr.hpp>
-#include <vector>
-
+#include "env.h"
 #include "shader.h"
-#include "camera.h"
 #include "mesh.h"
 #include "model.h"
-#include "gl1.h"
 #include "light.h"
+#define _MAIN_CPP
+#include "global_variables.h"
 
-unsigned int depthMapFBO, depthMap;
-static const int SHADOW_WIDTH = 800, SHADOW_HEIGHT = 600;
-unsigned int loadCubemap(std::vector<std::string> faces);
-int objectType = 0;
-bool postrender = false, edge = false, skybox = false, model_draw = false,
-     display_corner = true, Motion = false, feedback = false, cursor_hidden = true;
-// settings
-const unsigned int SCR_WIDTH = 800;
-const unsigned int SCR_HEIGHT = 600;
-static const char *varyings[] = {
-    "selected_alias"
-    // "alias"
-    // "TexCoords","selected_alias","a","b","c"
-};
-// camera
-Camera camera(glm::vec3(0.0f, 0.0f, 3.0f));
-float lastX = SCR_WIDTH / 2.0f;
-float lastY = SCR_HEIGHT / 2.0f;
-bool firstMouse = true;
+//------------------ optional features ----------------------------
+// #define FEATURE_MODEL
+// #define FEATURE_EDGE
+// #define FEATURE_POSTRENDER
+//-----------------------------------------------------------------
 
-// timing
-float deltaTime = 0.0f;
-float lastFrame = 0.0f;
-
-// lighting
-glm::vec3 LightPositions[] = {
-    glm::vec3(1.2f, 1.0f, 2.0f),
-    glm::vec3(1.2f, 2.0f, 0.0f),
-    glm::vec3(-1.2f, 2.0f, 2.0f),
-    glm::vec3(-1.2f, 2.0f, 0.0f)};
-// glm::vec3 lightPos(1.2f, 1.0f, 2.0f);
-glm::vec3 &lightPos(LightPositions[0]);
 int main()
 {
     // glfw: initialize and configure
@@ -53,9 +21,6 @@ int main()
     glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 5);
     glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
 
-#ifdef __APPLE__
-    glfwWindowHint(GLFW_OPENGL_FORWARD_COMPAT, GL_TRUE);
-#endif
 
     // glfw window creation
     // --------------------
@@ -159,10 +124,14 @@ int main()
     glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 4 * sizeof(float), (void *)(2 * sizeof(float)));
     glEnableVertexAttribArray(1);
 
+
+    #ifdef FEATURE_MODEL
     // load models
     Model temple("nanosuit/nanosuit.obj");
-    Light lights(LightPositions, 4);
     // Model temple("mods/gallery/gallery.obj");
+    #endif
+    Light lights(LightPositions, 4);
+
     // load textures (we now use a utility function to keep the code more organized)
     // -----------------------------------------------------------------------------
     unsigned int diffuseMap = loadTexture("assets/container2.png");
@@ -180,6 +149,8 @@ int main()
     screenShader.use();
     screenShader.setInt("screenTexture", 0);
     cornerShader.setInt("screenTexture", 0);
+
+    #ifdef FEATURE_POSTRENDER
     unsigned int framebuffer;
     glGenFramebuffers(1, &framebuffer);
     glBindFramebuffer(GL_FRAMEBUFFER, framebuffer);
@@ -200,6 +171,8 @@ int main()
     glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_STENCIL_ATTACHMENT, GL_RENDERBUFFER, rbo);
     if (glCheckFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE)
         std::cout << "error: framebuffer\n";
+    #endif
+
     glBindFramebuffer(GL_FRAMEBUFFER, 0);
 
     gen_preview_framebuffer();
@@ -227,7 +200,12 @@ int main()
 
         processInput(window);
         // glBindFramebuffer(GL_FRAMEBUFFER,framebuffer);
+
+        #ifdef FEATURE_POSTRENDER
         glBindFramebuffer(GL_FRAMEBUFFER, postrender ? framebuffer : 0);
+        #endif
+
+
         // glBindFramebuffer(GL_FRAMEBUFFER,0);
         glClearColor(0.1f, 0.1f, 0.1f, 1.0f);
         glEnable(GL_DEPTH_TEST);
@@ -275,14 +253,19 @@ int main()
             model = glm::translate(model, box2Pos);
             depthShader.setMat4("model", model);
             renderCube();
+
+            #ifdef FEATURE_MODEL
             if (model_draw)
             {
                 depthShader.setMat4("model", glm::translate(glm::mat4(1.0f), glm::vec3(0.0f, -1.1f, 0.0f)));
                 temple.Draw(depthShader);
             }
+            #endif
 
             glBindFramebuffer(GL_FRAMEBUFFER, 0);
+            #ifdef FEATURE_POSTRENDER
             glBindFramebuffer(GL_FRAMEBUFFER, postrender ? framebuffer : 0);
+            #endif
             model = glm::mat4(1.0f);
         }
         // glm::mat4 pick=glm::pickMatrix(glm::vec2(),glm::vec2(),glViewport())
@@ -339,6 +322,7 @@ int main()
         model = glm::translate(model, box2Pos);
         lightingShader.setMat4("model", model);
         glDrawArrays(GL_TRIANGLES, 0, 36);
+        #ifdef FEATURE_MODEL
         if (model_draw)
         {
             // lightingShader.use();
@@ -346,6 +330,7 @@ int main()
             lightingShader.setMat4("model", glm::translate(glm::mat4(1.0f), glm::vec3(0.0f, -1.1f, 0.0f)));
             temple.Draw(lightingShader);
         }
+        #endif
         if (!cursor_hidden && objectType)
         {
             model = glm::mat4(glm::mat3(camera.Right, camera.Up, -camera.Front));
@@ -389,6 +374,7 @@ int main()
             // glDepthMask(GL_TRUE);
             glDepthFunc(GL_LESS);
         }
+        #ifdef FEATURE_EDGE
         if (edge)
         {
             glStencilFunc(GL_NOTEQUAL, 1, 0XFF);
@@ -404,7 +390,8 @@ int main()
             glEnable(GL_DEPTH_TEST);
             glStencilFunc(GL_ALWAYS, 1, 0XFF);
         }
-
+        #endif
+        #ifdef FEATURE_POSTRENDER
         if (postrender)
         {
             glBindFramebuffer(GL_FRAMEBUFFER, 0);
@@ -417,6 +404,7 @@ int main()
             glBindTexture(GL_TEXTURE_2D, texColorBuffer);
             glDrawArrays(GL_TRIANGLES, 0, 6);
         }
+        #endif
         if (display_corner)
         {
             glBindFramebuffer(GL_FRAMEBUFFER, 0);
@@ -445,25 +433,6 @@ int main()
     // ------------------------------------------------------------------
     glfwTerminate();
     return 0;
-}
-void gen_preview_framebuffer()
-{
-    glGenFramebuffers(1, &depthMapFBO);
-    glGenTextures(1, &depthMap);
-    glBindTexture(GL_TEXTURE_2D, depthMap);
-    glTexImage2D(GL_TEXTURE_2D, 0, GL_DEPTH_COMPONENT,
-                 SHADOW_WIDTH, SHADOW_HEIGHT, 0, GL_DEPTH_COMPONENT, GL_FLOAT, NULL);
-    // glTexImage2D(GL_TEXTURE_2D,0,GL_RGB,SCR_WIDTH,SCR_HEIGHT,0,GL_RGB,GL_UNSIGNED_BYTE,NULL);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
-
-    glBindFramebuffer(GL_FRAMEBUFFER, depthMapFBO);
-    // glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, depthMap, 0);
-    glFramebufferTexture2D(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_TEXTURE_2D, depthMap, 0);
-    glDrawBuffer(GL_NONE);
-    glReadBuffer(GL_NONE);
 }
 // process all input: query GLFW whether relevant keys are pressed/released this frame and react accordingly
 // ---------------------------------------------------------------------------------------------------------
@@ -574,143 +543,24 @@ void scroll_callback(GLFWwindow *window, double xoffset, double yoffset)
             objectType = 0;
     }
 }
-unsigned int loadCubemap(std::vector<std::string> faces)
+
+void gen_preview_framebuffer()
 {
-    unsigned int textureID;
-    glGenTextures(1, &textureID);
-    glBindTexture(GL_TEXTURE_CUBE_MAP, textureID);
+    glGenFramebuffers(1, &depthMapFBO);
+    glGenTextures(1, &depthMap);
+    glBindTexture(GL_TEXTURE_2D, depthMap);
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_DEPTH_COMPONENT,
+                 SHADOW_WIDTH, SHADOW_HEIGHT, 0, GL_DEPTH_COMPONENT, GL_FLOAT, NULL);
+    // glTexImage2D(GL_TEXTURE_2D,0,GL_RGB,SCR_WIDTH,SCR_HEIGHT,0,GL_RGB,GL_UNSIGNED_BYTE,NULL);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
 
-    int width, height, nrChannels;
-    for (unsigned int i = 0; i < faces.size(); i++)
-    {
-        unsigned char *data = stbi_load(faces[i].c_str(), &width, &height, &nrChannels, 0);
-        if (data)
-        {
-            glTexImage2D(GL_TEXTURE_CUBE_MAP_POSITIVE_X + i,
-                         0, GL_RGB, width, height, 0, GL_RGB, GL_UNSIGNED_BYTE, data);
-            stbi_image_free(data);
-        }
-        else
-        {
-            std::cout << "Cubemap texture failed to load at path: " << faces[i] << std::endl;
-            stbi_image_free(data);
-        }
-    }
-    glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-    glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-    glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-    glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-    glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_R, GL_CLAMP_TO_EDGE);
-
-    return textureID;
+    glBindFramebuffer(GL_FRAMEBUFFER, depthMapFBO);
+    // glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, depthMap, 0);
+    glFramebufferTexture2D(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_TEXTURE_2D, depthMap, 0);
+    glDrawBuffer(GL_NONE);
+    glReadBuffer(GL_NONE);
 }
-unsigned int Feedback_Initialize(unsigned int *_vbo, unsigned int *_xfb)
-{
-    static unsigned int xfb, sort_prog, geometry, vert, vbo[2];
-    glGenTransformFeedbacks(1, &xfb);
-    glBindTransformFeedback(GL_TRANSFORM_FEEDBACK, xfb);
 
-    sort_prog = glCreateProgram();
-
-    static const char *sort_vs_source =
-        "#version 410\n"
-        "\n"
-        "uniform mat4 model_matrix;\n"
-        "\n"
-        "layout (location = 0) in vec4 position;\n"
-        "layout (location = 1) in vec3 normal;\n"
-        "\n"
-        "out vec3 vs_normal;\n"
-        "\n"
-        "void main(void)\n"
-        "{\n"
-        "    vs_normal = (model_matrix * vec4(normal, 0.0)).xyz;\n"
-        "    gl_Position = model_matrix * position;\n"
-        "}\n";
-
-    static const char *sort_gs_source =
-        "#version 410\n"
-        "\n"
-        "layout (triangles) in;\n"
-        "layout (points, max_vertices = 3) out;\n"
-        "\n"
-        "uniform mat4 projection_matrix;\n"
-        "\n"
-        "in vec3 vs_normal[];\n"
-        "out int selected_alias;\n"
-        "layout (stream = 0) out vec4 rf_position;\n"
-        "layout (stream = 0) out vec3 rf_normal;\n"
-        "\n"
-        "layout (stream = 1) out vec4 lf_position;\n"
-        "layout (stream = 1) out vec3 lf_normal;\n"
-        "\n"
-        "void main(void)\n"
-        "{\n"
-        "    vec4 A = gl_in[0].gl_Position;\n"
-        "    vec4 B = gl_in[1].gl_Position;\n"
-        "    vec4 C = gl_in[2].gl_Position;\n"
-        "    vec3 AB = (B - A).xyz;\n"
-        "    vec3 AC = (C - A).xyz;\n"
-        "    vec3 face_normal = cross(AB, AC);\n"
-        "    int i;\n"
-        "    selected_alias=100;\n"
-        "    if (face_normal.x < 0.0)\n"
-        "    {\n"
-        "        for (i = 0; i < gl_in.length(); i++)\n"
-        "        {\n"
-        "            rf_position = projection_matrix * (gl_in[i].gl_Position - vec4(30.0, 0.0, 0.0, 0.0));\n"
-        "            rf_normal = vs_normal[i];\n"
-        "            EmitStreamVertex(0);\n"
-        "        }\n"
-        "        EndStreamPrimitive(0);\n"
-        "    }\n"
-        "    else\n"
-        "    {\n"
-        "        for (i = 0; i < gl_in.length(); i++)\n"
-        "        {\n"
-        "            lf_position = projection_matrix * (gl_in[i].gl_Position + vec4(30.0, 0.0, 0.0, 0.0));\n"
-        "            lf_normal = vs_normal[i];\n"
-        "            EmitStreamVertex(1);\n"
-        "        }\n"
-        "        EndStreamPrimitive(1);\n"
-        "    }\n"
-        "}\n";
-    // vglAttachShaderSource(sort_prog, GL_VERTEX_SHADER, sort_vs_source);
-    // vglAttachShaderSource(sort_prog, GL_GEOMETRY_SHADER, sort_gs_source);
-    geometry = glCreateShader(GL_GEOMETRY_SHADER);
-    vert = glCreateShader(GL_VERTEX_SHADER);
-    glShaderSource(geometry, 1, &sort_gs_source, NULL);
-    glCompileShader(geometry);
-    glShaderSource(vert, 1, &sort_vs_source, NULL);
-    glCompileShader(vert);
-    glAttachShader(sort_prog, vert);
-    glAttachShader(sort_prog, geometry);
-
-    static const char *varyings[] =
-        {
-            "selected_alias"};
-
-    glTransformFeedbackVaryings(sort_prog, 1, varyings, GL_INTERLEAVED_ATTRIBS);
-
-    glLinkProgram(sort_prog);
-    glUseProgram(sort_prog);
-
-    // model_matrix_pos = glGetUniformLocation(sort_prog, "model");
-    // projection_matrix_pos = glGetUniformLocation(sort_prog, "projection");
-
-    // glGenVertexArrays(2, vao);
-    glGenBuffers(2, vbo);
-
-    for (int i = 0; i < 2; i++)
-    {
-        glBindBuffer(GL_TRANSFORM_FEEDBACK_BUFFER, vbo[i]);
-        glBufferData(GL_TRANSFORM_FEEDBACK_BUFFER, 5 * sizeof(GLfloat), NULL, GL_DYNAMIC_COPY);
-        glBindBufferBase(GL_TRANSFORM_FEEDBACK_BUFFER, i, vbo[i]);
-    }
-    if (_xfb)
-    {
-        *_vbo = vbo[0];
-        *_xfb = xfb;
-    }
-    return sort_prog;
-}
