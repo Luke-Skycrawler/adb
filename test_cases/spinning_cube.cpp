@@ -7,9 +7,9 @@ inline mat3 cross_matrix(vec3 a){
             -a[1], a[0], 0;
     return ret;
 }
-Cube &spinning_cube(vec3 &omega){
+Cube *spinning_cube(vec3 &omega){
     auto R = cross_matrix(omega);
-    auto cube = Cube();
-    cube.q_dot = R;
+    auto *cube = new Cube();
+    cube->q_dot = R;
     return cube;
 }

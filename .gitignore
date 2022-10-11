@@ -12,3 +12,4 @@ build/
 *.out
 CMakeFiles/
 model/x64/
+model/.vs/
