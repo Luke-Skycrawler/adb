@@ -11,6 +11,7 @@
 void framebuffer_size_callback(GLFWwindow *window, int width, int height);
 void mouse_callback(GLFWwindow *window, double xpos, double ypos);
 void scroll_callback(GLFWwindow *window, double xoffset, double yoffset);
+void text_callback(GLFWwindow *window, unsigned int c);
 void processInput(GLFWwindow *window);
 void gen_preview_framebuffer();
 void renderPlane();

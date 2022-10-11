@@ -29,32 +29,37 @@ void processInput(GLFWwindow *window)
     if (glfwGetKey(window, GLFW_KEY_ESCAPE) == GLFW_PRESS)
         glfwSetWindowShouldClose(window, true);
 
-    if (glfwGetKey(window, GLFW_KEY_R) == GLFW_PRESS)
-        globals.postrender = !globals.postrender;
-    if (glfwGetKey(window, GLFW_KEY_E) == GLFW_PRESS)
-        globals.edge = !globals.edge;
-    if (glfwGetKey(window, GLFW_KEY_B) == GLFW_PRESS)
-        globals.skybox = !globals.skybox;
-    if (glfwGetKey(window, GLFW_KEY_M) == GLFW_PRESS)
-        globals.model_draw = !globals.model_draw;
-    if (glfwGetKey(window, GLFW_KEY_C) == GLFW_PRESS)
-        globals.display_corner = !globals.display_corner;
-    if (glfwGetKey(window, GLFW_KEY_L) == GLFW_PRESS)
-        globals.motion = !globals.motion;
-    if (glfwGetKey(window, GLFW_KEY_Q) == GLFW_PRESS)
-    {
-        if (globals.cursor_hidden)
-        {
-            glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_NORMAL);
-            globals.firstMouse = true;
-            glfwSetCursorPos(window, SCR_WIDTH / 2, SCR_HEIGHT / 2);
-        }
-        else
-            glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
-        globals.cursor_hidden = !globals.cursor_hidden;
-    }
+    // if (glfwGetKey(window, GLFW_KEY_R) == GLFW_PRESS)
+    //     globals.postrender = !globals.postrender;
+    // if (glfwGetKey(window, GLFW_KEY_E) == GLFW_PRESS)
+    //     globals.edge = !globals.edge;
+    // if (glfwGetKey(window, GLFW_KEY_B) == GLFW_PRESS)
+    //     globals.skybox = !globals.skybox;
+    // if (glfwGetKey(window, GLFW_KEY_M) == GLFW_PRESS)
+    //     globals.model_draw = !globals.model_draw;
 }
 
+void text_callback(GLFWwindow *window, unsigned int c){
+    switch (c) {
+        case 'c': case 'C':
+            globals.display_corner = !globals.display_corner;
+            break;
+        case 'l': case 'L':
+            globals.motion = !globals.motion;
+            break;
+        case 'q': case 'Q':
+            if (globals.cursor_hidden)
+            {
+                glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_NORMAL);
+                globals.firstMouse = true;
+                glfwSetCursorPos(window, SCR_WIDTH / 2, SCR_HEIGHT / 2);
+            }
+            else
+                glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
+            globals.cursor_hidden = !globals.cursor_hidden;
+            break;
+    }
+}
 // glfw: whenever the window size changed (by OS or user resize) this callback function executes
 // ---------------------------------------------------------------------------------------------
 void framebuffer_size_callback(GLFWwindow *window, int width, int height)

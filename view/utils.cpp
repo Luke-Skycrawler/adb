@@ -2,6 +2,8 @@
 #define STB_IMAGE_IMPLEMENTATION
 #include "stb_image.h"
 void renderCube(int light){
+    // first, configure the cube's VAO (and VBO)
+    static unsigned int VBO=-1, cubeVAO=-1, lightCubeVAO;
     static float vertices[] = {
         // positions          // normals           // texture coords
         -0.5f, -0.5f, -0.5f,  0.0f,  0.0f, -1.0f,  0.0f,  0.0f,
@@ -46,8 +48,6 @@ void renderCube(int light){
         -0.5f,  0.5f,  0.5f,  0.0f,  1.0f,  0.0f,  0.0f,  0.0f,
         -0.5f,  0.5f, -0.5f,  0.0f,  1.0f,  0.0f,  0.0f,  1.0f
     };
-    // first, configure the cube's VAO (and VBO)
-    static unsigned int VBO=-1, cubeVAO=-1,lightCubeVAO;
     if(cubeVAO==-1){
         glGenVertexArrays(1, &cubeVAO);
         glGenBuffers(1, &VBO);

@@ -36,6 +36,7 @@ int main()
     glfwSetCursorPosCallback(window, mouse_callback);
     glfwSetMouseButtonCallback(window, click_callback);
     glfwSetScrollCallback(window, scroll_callback);
+    glfwSetCharCallback(window, text_callback);
 
     // tell GLFW to capture our mouse
     glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
