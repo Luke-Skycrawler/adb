@@ -1,5 +1,11 @@
 #define LIGHT_CPP
+#include "env.h"
 #include "light.h"
+
+using namespace std;
+
+const unsigned int SCR_WIDTH=800;
+const unsigned int SCR_HEIGHT=600;
 
 
 Light::Light(glm::vec3 LightPositions[], int num):lightCubeShader("shaders/light_cube.vs", "shaders/light_cube.fs"),lightingShader("shaders/multi_light.vs", "shaders/multi_light.fs")
@@ -38,24 +44,6 @@ void Light::SetShaderValue(Camera &camera)
     lightingShader.setFloat("spotLight.quadratic", 0.032);
     lightingShader.setFloat("spotLight.cutOff", glm::cos(glm::radians(12.5f)));
     lightingShader.setFloat("spotLight.outerCutOff", glm::cos(glm::radians(15.0f)));
-    // view/projection transformations
-    #ifdef USE_DEPRECATED_RENDER
-    glm::mat4 projection = glm::perspective(glm::radians(camera.Zoom), (float)SCR_WIDTH / (float)SCR_HEIGHT, 0.1f, 100.0f);
-    glm::mat4 view = camera.GetViewMatrix();
-    lightingShader.setMat4("projection", projection);
-    lightingShader.setMat4("view", view);
-
-    // world transformation
-    glm::mat4 model = glm::mat4(1.0f);
-    lightingShader.setMat4("model", model);
-
-    glm::vec3 box2Pos(0.3, 0.0, 1.2);
-    lightingShader.use();
-    model = glm::translate(model, box2Pos);
-    lightingShader.setMat4("model", model);
-    glDrawArrays(GL_TRIANGLES, 0, 36);
-    model = glm::translate(model, box2Pos);
-    #endif
 }
 void Light::Draw(Camera &camera){
     // we now draw as many light bulbs as we have point lights.

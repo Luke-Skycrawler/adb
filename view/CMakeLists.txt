@@ -5,7 +5,7 @@ set(PROJECT_NAME view)
 ################################################################################
 set(headers
     "camera.h"
-    "gl1.h"
+    "env.h"
     "light.h"
     "mesh.h"
     "model.h"
@@ -15,7 +15,7 @@ set(headers
 source_group("headers" FILES ${headers})
 
 set(sources
-    "gl1.cpp"
+    "main.cpp"
     "glad.c"
     "light.cpp"
     "utils.cpp"

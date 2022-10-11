@@ -30,17 +30,17 @@
     <ClInclude Include="model.h">
       <Filter>headers</Filter>
     </ClInclude>
-    <ClInclude Include="gl1.h">
+    <ClInclude Include="light.h">
       <Filter>headers</Filter>
     </ClInclude>
-    <ClInclude Include="light.h">
+    <ClInclude Include="global_variables.h">
+      <Filter>headers</Filter>
+    </ClInclude>
+    <ClInclude Include="env.h">
       <Filter>headers</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="gl1.cpp">
-      <Filter>sources</Filter>
-    </ClCompile>
     <ClCompile Include="glad.c">
       <Filter>sources</Filter>
     </ClCompile>
@@ -48,6 +48,9 @@
       <Filter>sources</Filter>
     </ClCompile>
     <ClCompile Include="utils.cpp">
+      <Filter>sources</Filter>
+    </ClCompile>
+    <ClCompile Include="main.cpp">
       <Filter>sources</Filter>
     </ClCompile>
   </ItemGroup>

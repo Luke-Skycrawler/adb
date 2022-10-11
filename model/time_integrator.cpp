@@ -1,7 +1,7 @@
 #include "time_integrator.h"
 #include <iostream>
 using namespace std;
-static const int max_iters = 500;
+static const int max_iters = 10;
 mat3 compute_residue(Cube &c, float dt)
 {
     float m = c.mass / (dt * dt);
