@@ -1,6 +1,6 @@
 #include "tests.h"
 
-inline mat3 cross_matrix(vec3 a){
+inline mat3 cross_matrix(vec3 &a){
     mat3 ret;
     ret <<  0, -a[2], a[1],
             a[2], 0, -a[0],

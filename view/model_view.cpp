@@ -16,7 +16,7 @@ using namespace std;
 // #define FEATURE_POSTRENDER
 //-----------------------------------------------------------------
 
-render_cubes(Shader shader, vector<Cube> cubes){
+void render_cubes(Shader shader, vector<Cube> cubes){
     for (auto &c: cubes) {
         glm::mat4 A(from_eigen(c.A));
         shader.setMat4("model", A);
@@ -26,8 +26,9 @@ render_cubes(Shader shader, vector<Cube> cubes){
 int main()
 {
     vector<Cube> cubes;
-    Cube *cube = spinning_cube();
-    cubes.push_back(*cube);
+    vec3 omega(10.0f, 0.0f, 0.0f);
+    auto cube = spinning_cube(omega);
+    //cubes.push_back(*cube);
 
     // glfw: initialize and configure
     // ------------------------------
