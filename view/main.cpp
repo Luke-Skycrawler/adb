@@ -6,6 +6,7 @@
 #define _MAIN_CPP
 #include "global_variables.h"
 
+using namespace std;
 //------------------ optional features ----------------------------
 // #define FEATURE_MODEL
 // #define FEATURE_EDGE
@@ -21,13 +22,12 @@ int main()
     glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 5);
     glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
 
-
     // glfw window creation
     // --------------------
     GLFWwindow *window = glfwCreateWindow(SCR_WIDTH, SCR_HEIGHT, "adb viewer", NULL, NULL);
     if (window == NULL)
     {
-        std::cout << "Failed to create GLFW window" << std::endl;
+        cout << "Failed to create GLFW window" << endl;
         glfwTerminate();
         return -1;
     }
@@ -45,7 +45,7 @@ int main()
     // ---------------------------------------
     if (!gladLoadGLLoader((GLADloadproc)glfwGetProcAddress))
     {
-        std::cout << "Failed to initialize GLAD" << std::endl;
+        cout << "Failed to initialize GLAD" << endl;
         return -1;
     }
 
@@ -93,10 +93,10 @@ int main()
     glTexBuffer(GL_TEXTURE_BUFFER, GL_R32I, buf);
     // Now bind it for read-write to one of the image units
     glBindImageTexture(0, tex, 0, GL_FALSE, 0, GL_READ_WRITE, GL_R32I);
-    // ------------------------------------------------------------------
-    // set up vertex data (and buffer(s)) and configure vertex attributes
-    // ------------------------------------------------------------------
-    #ifdef FEATURE_POSTRENDER
+// ------------------------------------------------------------------
+// set up vertex data (and buffer(s)) and configure vertex attributes
+// ------------------------------------------------------------------
+#ifdef FEATURE_POSTRENDER
     unsigned int quadVBO, quadVAO;
     float quad[] = {
         -1.0f, 1.0f, 0.0f, 1.0f,
@@ -115,7 +115,7 @@ int main()
     glEnableVertexAttribArray(0);
     glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 4 * sizeof(float), (void *)(2 * sizeof(float)));
     glEnableVertexAttribArray(1);
-    #endif
+#endif
 
     float corner[] = {
         0.5f, 1.0f, 0.0f, 1.0f,
@@ -135,12 +135,11 @@ int main()
     glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 4 * sizeof(float), (void *)(2 * sizeof(float)));
     glEnableVertexAttribArray(1);
 
-
-    #ifdef FEATURE_MODEL
+#ifdef FEATURE_MODEL
     // load models
     Model temple("nanosuit/nanosuit.obj");
     // Model temple("mods/gallery/gallery.obj");
-    #endif
+#endif
     Light lights(LightPositions, 4);
 
     // load textures (we now use a utility function to keep the code more organized)
@@ -148,7 +147,7 @@ int main()
     unsigned int diffuseMap = loadTexture("assets/container2.png");
     unsigned int specularMap = loadTexture("assets/container2_specular.png");
     //--------cube texture
-    std::vector<std::string> faces{
+    vector<string> faces{
         "assets/skybox/right.jpg",
         "assets/skybox/left.jpg",
         "assets/skybox/top.jpg",
@@ -161,7 +160,7 @@ int main()
     screenShader.setInt("screenTexture", 0);
     cornerShader.setInt("screenTexture", 0);
 
-    #ifdef FEATURE_POSTRENDER
+#ifdef FEATURE_POSTRENDER
     unsigned int framebuffer;
     glGenFramebuffers(1, &framebuffer);
     glBindFramebuffer(GL_FRAMEBUFFER, framebuffer);
@@ -181,8 +180,8 @@ int main()
     glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH24_STENCIL8, SCR_WIDTH, SCR_HEIGHT);
     glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_STENCIL_ATTACHMENT, GL_RENDERBUFFER, rbo);
     if (glCheckFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE)
-        std::cout << "error: framebuffer\n";
-    #endif
+        cout << "error: framebuffer\n";
+#endif
 
     glBindFramebuffer(GL_FRAMEBUFFER, 0);
 
@@ -212,10 +211,9 @@ int main()
         processInput(window);
         // glBindFramebuffer(GL_FRAMEBUFFER,framebuffer);
 
-        #ifdef FEATURE_POSTRENDER
+#ifdef FEATURE_POSTRENDER
         glBindFramebuffer(GL_FRAMEBUFFER, globals.postrender ? framebuffer : 0);
-        #endif
-
+#endif
 
         // glBindFramebuffer(GL_FRAMEBUFFER,0);
         glClearColor(0.1f, 0.1f, 0.1f, 1.0f);
@@ -265,18 +263,18 @@ int main()
             depthShader.setMat4("model", model);
             renderCube();
 
-            #ifdef FEATURE_MODEL
+#ifdef FEATURE_MODEL
             if (globals.model_draw)
             {
                 depthShader.setMat4("model", glm::translate(glm::mat4(1.0f), glm::vec3(0.0f, -1.1f, 0.0f)));
                 temple.Draw(depthShader);
             }
-            #endif
+#endif
 
             glBindFramebuffer(GL_FRAMEBUFFER, 0);
-            #ifdef FEATURE_POSTRENDER
+#ifdef FEATURE_POSTRENDER
             glBindFramebuffer(GL_FRAMEBUFFER, globals.postrender ? framebuffer : 0);
-            #endif
+#endif
             model = glm::mat4(1.0f);
         }
         // glm::mat4 pick=glm::pickMatrix(glm::vec2(),glm::vec2(),glViewport())
@@ -333,7 +331,7 @@ int main()
         model = glm::translate(model, box2Pos);
         lightingShader.setMat4("model", model);
         glDrawArrays(GL_TRIANGLES, 0, 36);
-        #ifdef FEATURE_MODEL
+#ifdef FEATURE_MODEL
         if (globals.model_draw)
         {
             // lightingShader.use();
@@ -341,7 +339,7 @@ int main()
             lightingShader.setMat4("model", glm::translate(glm::mat4(1.0f), glm::vec3(0.0f, -1.1f, 0.0f)));
             temple.Draw(lightingShader);
         }
-        #endif
+#endif
         if (!globals.cursor_hidden && globals.objectType)
         {
             model = glm::mat4(glm::mat3(globals.camera.Right, globals.camera.Up, -globals.camera.Front));
@@ -355,7 +353,7 @@ int main()
             int obj;
             // glDisable(GL_RASTERIZER_DISCARD);
             glGetNamedBufferSubData(buf, 0, sizeof(int), &obj);
-            std::cout << obj << std::endl;
+            cout << obj << endl;
             //     bool b=glUnmapNamedBuffer(feedback_vbo);
             // glPauseTransformFeedback();
             // glBufferData(GL_TRANSFORM_FEEDBACK_BUFFER, 5 * sizeof(int), NULL, GL_DYNAMIC_READ);
@@ -385,7 +383,7 @@ int main()
             // glDepthMask(GL_TRUE);
             glDepthFunc(GL_LESS);
         }
-        #ifdef FEATURE_EDGE
+#ifdef FEATURE_EDGE
         if (globals.edge)
         {
             glStencilFunc(GL_NOTEQUAL, 1, 0XFF);
@@ -401,8 +399,8 @@ int main()
             glEnable(GL_DEPTH_TEST);
             glStencilFunc(GL_ALWAYS, 1, 0XFF);
         }
-        #endif
-        #ifdef FEATURE_POSTRENDER
+#endif
+#ifdef FEATURE_POSTRENDER
         if (globals.postrender)
         {
             glBindFramebuffer(GL_FRAMEBUFFER, 0);
@@ -415,7 +413,7 @@ int main()
             glBindTexture(GL_TEXTURE_2D, texColorBuffer);
             glDrawArrays(GL_TRIANGLES, 0, 6);
         }
-        #endif
+#endif
         if (globals.display_corner)
         {
             glBindFramebuffer(GL_FRAMEBUFFER, 0);
