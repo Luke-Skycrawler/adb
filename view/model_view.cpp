@@ -8,6 +8,7 @@
 #include "../test_cases/tests.h"
 #include "../model/time_integrator.h"
 #include "../model/glue.h"
+#include <glm/gtx/string_cast.hpp>
 
 using namespace std;
 //------------------ optional features ----------------------------
@@ -19,6 +20,8 @@ using namespace std;
 void render_cubes(Shader shader, vector<Cube> cubes){
     for (auto &c: cubes) {
         glm::mat4 A(from_eigen(c.A));
+        // cout << c.A << endl;
+        // cout << glm::to_string(A) << endl;
         shader.setMat4("model", A);
         renderCube();
     }
@@ -26,9 +29,9 @@ void render_cubes(Shader shader, vector<Cube> cubes){
 int main()
 {
     vector<Cube> cubes;
-    vec3 omega(10.0f, 0.0f, 0.0f);
+    vec3 omega(0.0f, 200.0f, 0.0f);
     auto cube = spinning_cube(omega);
-    //cubes.push_back(*cube);
+    cubes.push_back(*cube);
 
     // glfw: initialize and configure
     // ------------------------------
@@ -219,7 +222,6 @@ int main()
         // lightingShader.setFloat("time",currentFrame);
         globals.deltaTime = currentFrame - globals.lastFrame;
         globals.lastFrame = currentFrame;
-
         // input
         // -----
 
@@ -253,6 +255,7 @@ int main()
         glm::mat4 tmpmodel = glm::scale(model, glm::vec3(scale, scale, scale));
         glm::vec3 box2Pos(0.3, 0.0, 1.2);
         glm::mat4 lightSpaceTrans = glm::lookAt(lightPos, glm::vec3(0.0f), globals.camera.WorldUp);
+        implicit_euler(1e-4, cubes);
         if (globals.display_corner)
         {
             glBindFramebuffer(GL_FRAMEBUFFER, globals.depthMapFBO);
@@ -264,7 +267,6 @@ int main()
             // view/projection transformations
             model = glm::mat4(1.0f);
 
-            implicit_euler(globals.deltaTime, cubes);
              
 
             // depthShader.setMat4("projection",projection);
