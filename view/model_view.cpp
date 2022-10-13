@@ -22,6 +22,7 @@ void render_cubes(Shader shader, vector<Cube> cubes){
         glm::mat4 A(from_eigen(c.A));
         // cout << c.A << endl;
         // cout << glm::to_string(A) << endl;
+        A = glm::translate(A, from_eigen(c.p));
         shader.setMat4("model", A);
         renderCube();
     }

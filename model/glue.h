@@ -7,3 +7,7 @@ glm::mat4 from_eigen(Eigen::Matrix3f &eig_matrix){
     return ret;
 }
 
+glm::vec3 from_eigen(Eigen::Vector3f &eig_vec) {
+    glm::vec3 v = glm::make_vec3(eig_vec.data());
+    return v;
+}

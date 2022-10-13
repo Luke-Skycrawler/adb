@@ -4,9 +4,16 @@ using namespace std;
 static const int max_iters = 10;
 mat3 compute_residue(Cube &c, float dt)
 {
-    float m = c.mass / (dt * dt);
+    float m = c.mass / (dt * dt);   // to be corrected
     mat3 r = m * c.q_next + othogonal_energy::grad(c.q_next) - (c.A /*+ c.translation + dt * c.vc */ + dt * c.q_dot) * m;
     return r;
+}
+
+vec3 p_compute_residue(Cube &c, float dt) {
+    static const vec3 gravity(0.0f, -9800.0f, 0.0f);
+    float m = c.mass / (dt * dt);   
+    vec3 rp = m * c.p_next - gravity * c.mass - (c.p + dt * c.p_dot) * m;
+    return rp;
 }
 
 void implicit_euler(float dt, vector<Cube> &cubes)
@@ -15,6 +22,7 @@ void implicit_euler(float dt, vector<Cube> &cubes)
     for (auto &c : cubes)
     {
         c.q_next = c.A;
+        c.p_next = c.p;
     }
     for (int iter = 0; iter < max_iters; iter++)
     {
@@ -23,7 +31,8 @@ void implicit_euler(float dt, vector<Cube> &cubes)
         {
             float m = c.mass / (dt * dt);
             mat3 r = compute_residue(c, dt);
-
+            vec3 rp = p_compute_residue(c, dt);
+            
             // build hessian
             MatrixXf hess = MatrixXf::Identity(9, 9) * m;
 
@@ -49,6 +58,7 @@ void implicit_euler(float dt, vector<Cube> &cubes)
             p = hess.ldlt().solve(residue);
             Map<MatrixXf> _p(p.data(), 3, 3);
             c.q_next -= _p;
+            c.p_next -= rp / m;
 
             if (iter == 0 || iter == max_iters - 1){
                 cout<< "iter " << iter << ", residue = " << residue << endl;
