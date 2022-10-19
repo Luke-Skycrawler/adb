@@ -12,7 +12,7 @@ static const int max_iters = 10;
 
 
 // #define _DEBUG_BARRIER_
-#define PER_ITER_RESIDUE_PRINT
+// #define PER_ITER_RESIDUE_PRINT
 VectorXf q_residue_barrier_term(Cube &c) {
     VectorXf barrier_term;
     barrier_term.setZero(12, 1);
@@ -28,6 +28,7 @@ VectorXf q_residue_barrier_term(Cube &c) {
             barrier_term += barrier_gradient_q(v0, v);
         }
     }
+    // barrier_term.segment(0, 3).setZero();
     return barrier_term;
 }
 
@@ -39,6 +40,7 @@ mat3 q_residue(Cube &c, float dt)
 }
 
 vec3 p_residue(Cube &c, float dt) {
+    // static const vec3 gravity(0.0f, 0.0f, 0.0f);
     static const vec3 gravity(0.0f, -9.8e4, 0.0f);
     float m = c.mass / (dt * dt);   
     vec3 r = m * c.p_next - gravity * c.mass - (c.p + dt * c.p_dot) * m;
@@ -54,7 +56,7 @@ VectorXf cat(mat3 &rq, const vec3 &rp){
 void implicit_euler(vector<Cube> &cubes)
 {
     // x[t+1] = x[t] + v[t+1] dt
-    static const float dt = 1.1e-4;
+    static const float dt = 1e-4;
     for (auto &c : cubes)
     {
         c.q_next = c.A;
@@ -70,6 +72,7 @@ void implicit_euler(vector<Cube> &cubes)
             mat3 rq(q_residue(c, dt));
             vec3 rp(p_residue(c, dt));
             VectorXf r(cat(rq, rp));
+
             r += q_residue_barrier_term(c);
 
             // build hessian
@@ -80,7 +83,7 @@ void implicit_euler(vector<Cube> &cubes)
             {
                 for (int j = i; j < 4; j++)
                 {
-                    mat3 block = othogonal_energy::hessian(c.q_next, i, j);
+                    mat3 block = othogonal_energy::hessian(c.q_next, i - 1, j - 1);
                     if (j != i){
                         hess.block<3, 3>(j * 3, i * 3) = block;
                         hess.block<3, 3>(i * 3, j * 3) = block;
