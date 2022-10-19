@@ -29,4 +29,5 @@ struct Cube {
         dimensions.setOnes(3, 1);
         dimensions *= scale;
     }
+    float vf_collision_detect(const vec3 &dp, const mat3 &dq);
 };

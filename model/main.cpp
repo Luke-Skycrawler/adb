@@ -11,7 +11,7 @@ int main(void) {
     cubes.push_back(*cube);
     int timestep = 0;
     while (1){
-        implicit_euler(dt, cubes);
+        implicit_euler(cubes);
         if (timestep++ >= 10) break;
     }
     return 0;
