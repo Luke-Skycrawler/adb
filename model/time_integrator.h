@@ -2,4 +2,4 @@
 #include "othogonal_energy.h"
 #include <vector>
 
-void implicit_euler(float dt, std::vector<Cube> &cubes);
+void implicit_euler(std::vector<Cube> &cubes);

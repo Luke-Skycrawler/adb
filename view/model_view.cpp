@@ -22,6 +22,7 @@ void render_cubes(Shader shader, vector<Cube> cubes){
         glm::mat4 A(from_eigen(c.A));
         // cout << c.A << endl;
         // cout << glm::to_string(A) << endl;
+        A = glm::translate(A, from_eigen(c.p));
         shader.setMat4("model", A);
         renderCube();
     }
@@ -255,7 +256,7 @@ int main()
         glm::mat4 tmpmodel = glm::scale(model, glm::vec3(scale, scale, scale));
         glm::vec3 box2Pos(0.3, 0.0, 1.2);
         glm::mat4 lightSpaceTrans = glm::lookAt(lightPos, glm::vec3(0.0f), globals.camera.WorldUp);
-        implicit_euler(1e-4, cubes);
+        implicit_euler(cubes);
         if (globals.display_corner)
         {
             glBindFramebuffer(GL_FRAMEBUFFER, globals.depthMapFBO);
