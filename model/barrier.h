@@ -5,7 +5,7 @@
 // void barrier_forces_p_q(vector<Cube> &cubes);
 namespace barrier
 {
-    const float d_hat = 0.04f, kappa = 1e8f;
+    const float d_hat = 0.01f, kappa = 1e8f;
     MatrixXf barrier_hessian_q(const vec3 &x, const vec3 &vertex);
     VectorXf distance_gradient_q(const vec3 &x, const vec3 &vertex);
     MatrixXf x_jacobian_q(const vec3 &x);

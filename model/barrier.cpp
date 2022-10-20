@@ -39,7 +39,7 @@ namespace barrier
     VectorXf barrier_gradient_q(const vec3 &tilex, const vec3 &vertex)
     {
         // return distance_gradient_q(vertex) * barrier_derivative_d(vf_distance(vertex));
-        return barrier_gradient_x(vertex) * x_jacobian_q(tilex);
+        return barrier_gradient_x(vertex).adjoint() * x_jacobian_q(tilex);
     }
 
     MatrixXf x_jacobian_q(const vec3 &tilex)

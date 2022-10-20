@@ -25,7 +25,6 @@ VectorXf q_residue_barrier_term(Cube &c)
 
         if (d < d_hat)
         {
-            // TODO: ccd restart
             assert(d > 0);
             barrier_term += barrier_gradient_q(v0, v);
         }
@@ -44,7 +43,7 @@ mat3 q_residue(Cube &c, float dt)
 vec3 p_residue(Cube &c, float dt)
 {
     // static const vec3 gravity(0.0f, 0.0f, 0.0f);
-    static const vec3 gravity(0.0f, -9.8, 0.0f);
+    static const vec3 gravity(0.0f, -9.8e4, 0.0f);
     float m = c.mass / (dt * dt);
     vec3 r = m * c.p_next - gravity * c.mass - (c.p + dt * c.p_dot) * m;
     return r;
@@ -119,13 +118,13 @@ void implicit_euler(vector<Cube> &cubes)
             float toi = c.vf_collision_detect(dp, dq);
 
             if (toi < 1.0) {
-                cout << "collision detected, resetting i" << toi << endl;
+                cout << "collision detected, resetting i, toi = " << toi << endl;
                 iter = 0; 
             }
             // only works for single cube
 
-            c.q_next -= dq * toi;
-            c.p_next -= dp * toi;
+            c.q_next -= dq * toi * 0.8;
+            c.p_next -= dp * toi * 0.8;
 #ifdef PER_ITER_RESIDUE_PRINT
             if (iter == 0 || iter == max_iters - 1)
             {
