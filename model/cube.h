@@ -9,7 +9,6 @@ struct Cube {
     mat3 A, q_dot, q_next;
     vec3 p, p_next, p_dot, dimensions, f, tau;   // not used 
     float mass, scale;
-    std::vector<float> toi{0, 0, 0, 0, 0, 0, 0, 0};
     static const vec3* vertices() {
         static const vec3 v[] ={
             vec3(-0.5f, -0.5f, -0.5f),

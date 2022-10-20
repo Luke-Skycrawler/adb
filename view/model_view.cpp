@@ -17,12 +17,16 @@ using namespace std;
 // #define FEATURE_POSTRENDER
 //-----------------------------------------------------------------
 
-void render_cubes(Shader shader, vector<Cube> cubes){
-    for (auto &c: cubes) {
+void render_cubes(Shader shader, vector<Cube> cubes)
+{
+    for (auto &c : cubes)
+    {
         glm::mat4 A(from_eigen(c.A));
         // cout << c.A << endl;
         // cout << glm::to_string(A) << endl;
-        A = glm::translate(A, from_eigen(c.p));
+        // A = glm::translate(A, from_eigen(c.p));
+        for (int i = 0; i < 3; i++)
+            A[3][i] = c.p(i);
         shader.setMat4("model", A);
         renderCube();
     }
@@ -30,8 +34,7 @@ void render_cubes(Shader shader, vector<Cube> cubes){
 int main()
 {
     vector<Cube> cubes;
-    vec3 omega(0.0f, 200.0f, 0.0f);
-    auto cube = spinning_cube(omega);
+    auto cube = spinning_cube();
     cubes.push_back(*cube);
 
     // glfw: initialize and configure
@@ -268,8 +271,6 @@ int main()
             // view/projection transformations
             model = glm::mat4(1.0f);
 
-             
-
             // depthShader.setMat4("projection",projection);
             depthShader.setMat4("projection", glm::perspective(glm::radians(89.0f), (float)SHADOW_WIDTH / SHADOW_HEIGHT, 0.1f, 10.0f));
             depthShader.setMat4("view", lightSpaceTrans);
@@ -465,4 +466,3 @@ int main()
     glfwTerminate();
     return 0;
 }
-

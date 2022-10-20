@@ -23,16 +23,16 @@ float vf_collision_time(const vec3 &x, const vec3 &p, const mat3 &q, const vec3 
 
 float Cube::vf_collision_detect(const vec3 &dp, const mat3 &dq) {
     // TODO: ensure the updated q_next is collision-free
+    float min_toi = 1.0f;
     for (int i = 0; i < 8; i++) {
         const vec3 &v((q_next - dq) * vertices()[i] + (p_next - dp));
         float d = vf_distance(v); 
         if (d < 0){
             float t = vf_collision_time(vertices()[i], p, A, p_next, q_next);
-            toi[i] = t;
-        }
-        else {
-            toi[i] = 1.0f;
+            if (t<min_toi){
+                min_toi = t;
+            }
         }
     }
-    return *min_element(toi.begin(), toi.end());
+    return min_toi;
 }
