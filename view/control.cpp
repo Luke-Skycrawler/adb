@@ -1,5 +1,6 @@
 #include "env.h"
 #include "global_variables.h"
+#include "../test_cases/tests.h"
 // process all input: query GLFW whether relevant keys are pressed/released this frame and react accordingly
 // ---------------------------------------------------------------------------------------------------------
 void processInput(GLFWwindow *window)
@@ -40,12 +41,19 @@ void processInput(GLFWwindow *window)
 }
 
 void text_callback(GLFWwindow *window, unsigned int c){
+    Cube* p;
     switch (c) {
         case 'c': case 'C':
             globals.display_corner = !globals.display_corner;
             break;
         case 'l': case 'L':
             globals.motion = !globals.motion;
+            break;
+        case 'r': case 'R':
+            p = &(globals.cubes[0]);
+            globals.cubes.clear();
+            globals.cubes.push_back(*spinning_cube());
+            //delete p;
             break;
         case 'q': case 'Q':
             if (globals.cursor_hidden)

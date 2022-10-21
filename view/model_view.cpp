@@ -33,9 +33,9 @@ void render_cubes(Shader shader, vector<Cube> cubes)
 }
 int main()
 {
-    vector<Cube> cubes;
+    // vector<Cube> cubes;
     auto cube = spinning_cube();
-    cubes.push_back(*cube);
+    globals.cubes.push_back(*cube);
 
     // glfw: initialize and configure
     // ------------------------------
@@ -259,7 +259,7 @@ int main()
         glm::mat4 tmpmodel = glm::scale(model, glm::vec3(scale, scale, scale));
         glm::vec3 box2Pos(0.3, 0.0, 1.2);
         glm::mat4 lightSpaceTrans = glm::lookAt(lightPos, glm::vec3(0.0f), globals.camera.WorldUp);
-        implicit_euler(cubes);
+        implicit_euler(globals.cubes);
         if (globals.display_corner)
         {
             glBindFramebuffer(GL_FRAMEBUFFER, globals.depthMapFBO);
@@ -278,7 +278,7 @@ int main()
             depthShader.setVec3("viewPos", lightPos);
             // bind diffuse map
             renderPlane();
-            render_cubes(depthShader, cubes);
+            render_cubes(depthShader, globals.cubes);
 
             // model = glm::translate(model, box2Pos);
             // depthShader.setMat4("model", model);
@@ -351,7 +351,7 @@ int main()
         // model = glm::translate(model, box2Pos);
         // lightingShader.setMat4("model", model);
         // glDrawArrays(GL_TRIANGLES, 0, 36);
-        render_cubes(lightingShader, cubes);
+        render_cubes(lightingShader, globals.cubes);
 
 #ifdef FEATURE_MODEL
         if (globals.model_draw)

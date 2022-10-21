@@ -9,7 +9,8 @@ static const char *varyings[] = {
 };
 static const unsigned int SCR_WIDTH = 800;
 static const unsigned int SCR_HEIGHT = 600;
-
+#include "../model/cube.h"
+#include <vector>
 struct GlobalVariableMainCPP{
     // control
     bool postrender, edge, skybox, model_draw, display_corner, motion, feedback, cursor_hidden;
@@ -23,7 +24,7 @@ struct GlobalVariableMainCPP{
     Camera camera;
     float lastX, lastY;
     bool firstMouse;
-
+    std::vector<Cube> cubes; 
     GlobalVariableMainCPP(): camera(glm::vec3(0.0f, 0.0f, 3.0f)){
         postrender = false, edge = false, skybox = false, model_draw = false, display_corner = true, motion = false, feedback = false, cursor_hidden = true;        
         lastX = SCR_WIDTH / 2.0f;
