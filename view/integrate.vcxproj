@@ -70,6 +70,12 @@
     <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
   </ImportGroup>
   <PropertyGroup Label="UserMacros" />
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
+    <IncludePath>D:\third_party_libs\Tight-Inclusion\src;$(IncludePath)</IncludePath>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
+    <IncludePath>D:\third_party_libs\Tight-Inclusion\src;$(IncludePath)</IncludePath>
+  </PropertyGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
     <ClCompile>
       <WarningLevel>Level3</WarningLevel>
@@ -131,6 +137,7 @@
     <ClCompile Include="..\model\barrier.cpp" />
     <ClCompile Include="..\model\time_integrator.cpp" />
     <ClCompile Include="..\model\collision.cpp" />
+    <ClCompile Include="..\model\spatial_hashing.cpp" />
     <ClCompile Include="..\test_cases\spinning_cube.cpp" />
     <ClCompile Include="..\view\control.cpp" />
     <ClCompile Include="..\view\glad.c" />
@@ -145,6 +152,7 @@
     <ClInclude Include="..\model\time_integrator.h" />
     <ClInclude Include="..\model\barrier.h" />
     <ClInclude Include="..\model\collision.h" />
+    <ClInclude Include="..\model\spatial_hashing.h" />
     <ClInclude Include="..\test_cases\tests.h" />
     <ClInclude Include="..\view\camera.h" />
     <ClInclude Include="..\view\env.h" />

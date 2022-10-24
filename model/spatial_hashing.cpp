@@ -5,60 +5,79 @@
 using namespace std;
 using namespace spatial_hashing;
 
-static const unordered_map<unsigned, vector<Group>> table;
+static unordered_map<unsigned, vector<Group>*> table;
 
 namespace spatial_hashing{
     static const float MIN_XYZ = -10.0f, MAX_XYZ = 10.0f;
 
-    unsigned hash(const Vector3i &grid_index){
+    unsigned hash(const vec3i &grid_index){
         unsigned mask = 0x3ff, ret = 0;
-        ret = ret << 10;
-        ret |= (grid_index(i) & mask);
+        for (int i = 0; i < 3; i++) {
+            ret = ret << 10;
+            ret |= (grid_index(i) & mask);
+        }
         return ret;
     }
 
-    Vector3i ftoi(const vec3 &f){
-        Eigen::Vector3i u;
+    /*unsigned hash(int i, int j, int k) {
+        unsigned mask = 0x3ff, ret = 0;
+        int u[3] = { i, j, k };
+        for (int i = 0; i < 3; i++) {
+            ret = ret << 10;
+            ret |= u[i] & mask;
+        }
+        return ret;
+    }*/
+
+    vec3i tovec3i(const vec3 &f){
+        vec3i u;
         for (int i =0; i < 3; i ++){
-            u(i) = max(MIN_XYZ, min(f(i), MAX_XYZ));
+            u(i) = int(max(MIN_XYZ, min(MAX_XYZ,f(i))));
         } 
         return u;
     }
 
-    void register_interval(const Vector3i &l, const Vector3i &u, const Primitive &t) {
+    void register_interval(const vec3i &l, const vec3i &u, const Primitive &t, int ts) {
         int group = t.group;
         for(int i = l(0); i < u(0); i ++){
             for(int j = l(1); j < u(1); j++){
                 for (int  k = l(2); k < l(2); k++){
-                    auto &g = register_group(group, hash(i, j, k));
+                    auto &g(register_group(group, hash(vec3i (i, j, k)), ts));
                     g.insert(t);
                 }
             }
         }
     } 
-    void register_group(int group, unsigned h){
+    Group& register_group(int group, unsigned h, int ts){
         auto i = table.find(h);
         if (i == table.end()) {
-            table.at(h) = new vector<Group>;
-            h.push_basck(group);
+            vector<Group> *v = table[h] = new vector<Group>;
+            v->push_back(Group(group, ts));
+            return v -> back();
         }
-        else {
-            table[h].push_back(group);
+        for (auto &g : *table[h]) {
+            if (g.body == group) {
+                g.timestamp = ts;
+                return g;
+            }
         }
+            
+        table[h]->push_back(Group(group, ts));
+        return table[h]->back();
     }
 
-    set<Primitive> query_interval(const Vector3i &l, const Vector3i &u, int group_exl, int ts) {
-        set<Primitive> ret;
+    vector<Primitive> query_interval(const vec3i &l, const vec3i &u, int group_exl, int ts) {
+        vector<Primitive> ret;
         for (int i = l(0); i < u(0); i ++){
             for (int j = l(1); j < u(1); j ++){
                 for (int k = l(2); k < u(2); k ++) {
-                    unsigned h = hash(i,j,k);
+                    unsigned h = hash(vec3i(i, j, k));
                     if (table.find(h) != table.end()) {
-                        for (auto g: table[h]){
+                        for (auto g: *table[h]){
                             if (g.body != group_exl) {
                                 for (auto &p: g.primitives){
-                                    if (p.timestep == ts) {
-                                        ret.insert(p);
+                                    if (p.timestamp == ts) {
+                                        ret.push_back(p);
                                         // FIXME: possible redundent elements, use set to eliminate
                                     }
                                 }
@@ -68,5 +87,6 @@ namespace spatial_hashing{
                 }
             }
         }    
+        return ret;
     }
 };

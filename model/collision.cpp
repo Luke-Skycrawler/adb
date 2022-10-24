@@ -1,6 +1,6 @@
 #include "collision.h"
 #include "barrier.h"
-
+#include <tight_inclusion/ccd.hpp>
 using namespace barrier;
 
 
