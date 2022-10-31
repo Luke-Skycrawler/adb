@@ -8,7 +8,7 @@ using namespace spatial_hashing;
 static unordered_map<unsigned, vector<Group>*> table;
 
 namespace spatial_hashing{
-    static const float MIN_XYZ = -10.0f, MAX_XYZ = 10.0f;
+    static const double MIN_XYZ = -10.0f, MAX_XYZ = 10.0f;
 
     unsigned hash(const vec3i &grid_index){
         unsigned mask = 0x3ff, ret = 0;

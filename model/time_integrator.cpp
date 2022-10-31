@@ -12,16 +12,16 @@ static const int max_iters = 10;
 
 // #define _DEBUG_BARRIER_
 // #define PER_ITER_RESIDUE_PRINT
-VectorXf q_residue_barrier_term(Cube &c)
+VectorXd q_residue_barrier_term(Cube &c)
 {
-    VectorXf barrier_term;
+    VectorXd barrier_term;
     barrier_term.setZero(12, 1);
 
     for (int i = 0; i < 8; i++)
     {
         const vec3 &v0(c.vertices()[i]);
         const vec3 &v(c.q_next * v0 + c.p_next);
-        float d = vf_distance(v);
+        double d = vf_distance(v);
 
         if (d < d_hat)
         {
@@ -33,26 +33,26 @@ VectorXf q_residue_barrier_term(Cube &c)
     return barrier_term;
 }
 
-mat3 q_residue(Cube &c, float dt)
+mat3 q_residue(Cube &c, double dt)
 {
-    float m = 1.0 / 12.0f * c.mass * c.scale * c.scale / (dt * dt); // to be corrected
+    double m = 1.0 / 12.0 * c.mass * c.scale * c.scale / (dt * dt); // to be corrected
     mat3 r = m * c.q_next + othogonal_energy::grad(c.q_next) - (c.A + dt * c.q_dot) * m;
     return r;
 }
 
-vec3 p_residue(Cube &c, float dt)
+vec3 p_residue(Cube &c, double dt)
 {
     // static const vec3 gravity(0.0f, 0.0f, 0.0f);
     static const vec3 gravity(0.0f, -9.8e4, 0.0f);
-    float m = c.mass / (dt * dt);
+    double m = c.mass / (dt * dt);
     vec3 r = m * c.p_next - gravity * c.mass - (c.p + dt * c.p_dot) * m;
     return r;
 }
 
-VectorXf cat(mat3 &rq, const vec3 &rp)
+VectorXd cat(mat3 &rq, const vec3 &rp)
 {
-    Vector<float, 12> ret;
-    Map<VectorXf> _rq(rq.data(), rq.size());
+    Vector<double, 12> ret;
+    Map<VectorXd> _rq(rq.data(), rq.size());
     ret << rp, _rq;
     return ret;
 }
@@ -60,7 +60,7 @@ void implicit_euler(vector<Cube> &cubes)
 {
     static int ts = 0;
     // x[t+1] = x[t] + v[t+1] dt
-    static const float dt = 1e-4;
+    static const double dt = 1e-4;
     for (auto &c : cubes)
     {
         c.q_next = c.A;
@@ -71,17 +71,17 @@ void implicit_euler(vector<Cube> &cubes)
         // newton iterations
         for (auto &c : cubes)
         {
-            float m = c.mass / (dt * dt);
-            float Im = m / 12.0 * c.scale * c.scale;
+            double m = c.mass / (dt * dt);
+            double Im = m / 12.0 * c.scale * c.scale;
             mat3 rq(q_residue(c, dt));
             vec3 rp(p_residue(c, dt));
-            VectorXf r(cat(rq, rp));
+            VectorXd r(cat(rq, rp));
 
             r += q_residue_barrier_term(c);
 
             // build hessian
-            MatrixXf hess = MatrixXf::Identity(12, 12) * Im;
-            hess.block<3, 3>(0, 0) = MatrixXf::Identity(3, 3) * m;
+            MatrixXd hess = MatrixXd::Identity(12, 12) * Im;
+            hess.block<3, 3>(0, 0) = MatrixXd::Identity(3, 3) * m;
 
             for (int i = 1; i < 4; i++)
             {
@@ -109,11 +109,11 @@ void implicit_euler(vector<Cube> &cubes)
                 hess += barrier_hessian_q(v0, v);
             }
 
-            VectorXf _dq(hess.ldlt().solve(r));
+            VectorXd _dq(hess.ldlt().solve(r));
 
-            // Map<MatrixXf> dq(_dq.block<9,9>(3,3).data(), 3, 3);
-            VectorXf __dq(_dq.segment<9>(3));
-            Map<MatrixXf> dq(__dq.data(), 3, 3);
+            // Map<MatrixXd> dq(_dq.block<9,9>(3,3).data(), 3, 3);
+            VectorXd __dq(_dq.segment<9>(3));
+            Map<MatrixXd> dq(__dq.data(), 3, 3);
             vec3 dp(_dq.segment(0, 3));
             c.dp = dp;
             c.dq = dq;
@@ -146,12 +146,12 @@ void implicit_euler(vector<Cube> &cubes)
             }
             group ++;
         }
-        float toi = 1.0;
+        double toi = 1.0;
         group = 0;
         for (auto &c: cubes){
         
             // boundary collision detector
-            float body_toi = c.vf_collision_detect(c.dp, c.dq);
+            double body_toi = c.vf_collision_detect(c.dp, c.dq);
 
             for(int i = 0; i < 8; i ++) {
                 const vec3 &v0(c.vertices()[i]);
@@ -163,7 +163,7 @@ void implicit_euler(vector<Cube> &cubes)
                     int g = tri.group;
                     int id = tri.id - g * 12;
 
-                    float tri_toi = vf_collision_detect(v_start, v_end, cubes[g], id);
+                    double tri_toi = vf_collision_detect(v_start, v_end, cubes[g], id);
                     if(tri_toi < body_toi) {
                         body_toi = tri_toi;
                     }
@@ -180,7 +180,7 @@ void implicit_euler(vector<Cube> &cubes)
             cout << "collision detected, resetting i, toi = " << toi << endl;
             iter = 0; 
         }
-        float factor = toi < 1.0 ? 0.8 : 1.0; 
+        double factor = toi < 1.0 ? 0.8 : 1.0; 
         for (auto &c: cubes){
             
             c.q_next -= c.dq * toi * factor;

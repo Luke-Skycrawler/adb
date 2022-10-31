@@ -4,7 +4,7 @@ using namespace othogonal_energy;
 
 namespace othogonal_energy {
 
-    static const float kappa = 1e6;
+    static const double kappa = 1e6;
     vec3 grad(mat3& q, int i) {
         auto ai = q.col(i);
         vec3 ret = 4 * kappa * ai * (ai.dot(ai) - 1);
@@ -28,7 +28,7 @@ namespace othogonal_energy {
         mat3 ret;
         auto ai = q.col(i);
         if (i == j) {
-            ret = 2 * kappa * (4 * ai * ai.adjoint() + 2 * (ai.dot(ai) - 1) * Matrix3f::Identity(3, 3));
+            ret = 2 * kappa * (4 * ai * ai.adjoint() + 2 * (ai.dot(ai) - 1) * Matrix3d::Identity(3, 3));
             // adjoint = transpose
             for (int j = 0; j < 3; j++) {
                 if (j == i) continue;
@@ -38,13 +38,13 @@ namespace othogonal_energy {
         }
         else {
             auto aj = q.col(j);
-            ret = 4 * kappa * (Matrix3f::Identity(3, 3) * aj.dot(ai) + aj * ai.adjoint());
+            ret = 4 * kappa * (Matrix3d::Identity(3, 3) * aj.dot(ai) + aj * ai.adjoint());
         }
         return ret;
     }
 
-    float otho_energy(mat3 &q) {
-        mat3 qqtmi = q * q.adjoint() - Matrix3f::Identity(3,3);
+    double otho_energy(mat3 &q) {
+        mat3 qqtmi = q * q.adjoint() - Matrix3d::Identity(3,3);
         return qqtmi.squaredNorm() * kappa;
     }
 };

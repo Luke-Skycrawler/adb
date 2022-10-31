@@ -11,20 +11,20 @@ namespace barrier
         return vec3(0.0f, 1.0f, 0.0f);
     }
 
-    float vf_distance(const vec3 &vertex)
+    double vf_distance(const vec3 &vertex)
     {
         // ground plane y = -0.5
-        return vertex(1) + 0.5f;
+        return vertex(1) + 0.5;
     }
 
-    float barrier_second_derivative(float d)
+    double barrier_second_derivative(double d)
     {
         if (d >= d_hat)
             return 0.0f;
         return -kappa * (2 * log(d / d_hat) + (d - d_hat) / d + (d - d_hat) * (2 / d + d_hat / d / d));
     }
 
-    float barrier_derivative_d(float x)
+    double barrier_derivative_d(double x)
     {
         if (x >= d_hat)
             return 0.0f;
@@ -36,29 +36,29 @@ namespace barrier
         return vf_distance_gradient_x(vertex) * barrier_derivative_d(vf_distance(vertex));
     }
 
-    VectorXf barrier_gradient_q(const vec3 &tilex, const vec3 &vertex)
+    VectorXd barrier_gradient_q(const vec3 &tilex, const vec3 &vertex)
     {
         // return distance_gradient_q(vertex) * barrier_derivative_d(vf_distance(vertex));
         return barrier_gradient_x(vertex).adjoint() * x_jacobian_q(tilex);
     }
 
-    MatrixXf x_jacobian_q(const vec3 &tilex)
+    MatrixXd x_jacobian_q(const vec3 &tilex)
     {
         // x in static frame
-        Matrix<float, 3, 12> J;
-        J << Matrix3f::Identity(3, 3), Matrix3f::Identity(3, 3) * tilex(0), Matrix3f::Identity(3, 3) * tilex(1), Matrix3f::Identity(3, 3) * tilex(2);
+        Matrix<double, 3, 12> J;
+        J << Matrix3d::Identity(3, 3), Matrix3d::Identity(3, 3) * tilex(0), Matrix3d::Identity(3, 3) * tilex(1), Matrix3d::Identity(3, 3) * tilex(2);
         return J;
     }
 
-    VectorXf distance_gradient_q(const vec3 &tilex, const vec3 &vertex)
+    VectorXd distance_gradient_q(const vec3 &tilex, const vec3 &vertex)
     {
-        // VectorXf g(vf_distance_gradient_x(vertex).adjoint() * x_jacobian_q(tilex));
+        // VectorXd g(vf_distance_gradient_x(vertex).adjoint() * x_jacobian_q(tilex));
         // g.segment<3>(0).setZero();
         // return g;
         return vf_distance_gradient_x(vertex).adjoint() * x_jacobian_q(tilex);
     }
 
-    MatrixXf barrier_hessian_q(const vec3 &tilex, const vec3 &vertex)
+    MatrixXd barrier_hessian_q(const vec3 &tilex, const vec3 &vertex)
     {
         // arg: colliding vertex
         auto g(distance_gradient_q(tilex, vertex));

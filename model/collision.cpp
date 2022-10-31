@@ -7,12 +7,12 @@
 using namespace barrier;
 
 
-float vf_collision_time(const vec3 &x, const vec3 &p, const mat3 &q, const vec3 &p_next, const mat3 &q_next){
+double vf_collision_time(const vec3 &x, const vec3 &p, const mat3 &q, const vec3 &p_next, const mat3 &q_next){
     // one-way collision
     // assert that (p, q) is collision-free and (p_next, q_next) is the state after penetration 
     vec3 initial_guess(q * x + p);
-    float t = 0.0f;
-    float distance = barrier::vf_distance(initial_guess);
+    double t = 0.0f;
+    double distance = barrier::vf_distance(initial_guess);
     vec3 dd_dx(barrier::vf_distance_gradient_x(initial_guess));
     // distance derivative of x
 
@@ -24,15 +24,15 @@ float vf_collision_time(const vec3 &x, const vec3 &p, const mat3 &q, const vec3 
     return t;
 }
 
-float Cube::vf_collision_detect(const vec3 &dp, const mat3 &dq) {
+double Cube::vf_collision_detect(const vec3 &dp, const mat3 &dq) {
     // TODO: ensure the updated q_next is collision-free
-    float min_toi = 1.0f;
+    double min_toi = 1.0f;
     for (int i = 0; i < 8; i++) {
         const vec3 v0(vertices()[i]);
         const vec3 &v((q_next - dq) * v0 + (p_next - dp));
-        float d = vf_distance(v); 
+        double d = vf_distance(v); 
         if (d < 0){
-            float t = vf_collision_time(v0, p, A, p_next -dp, q_next-dq);
+            double t = vf_collision_time(v0, p, A, p_next -dp, q_next-dq);
             if (t<min_toi){
                 min_toi = t;
             }
@@ -64,26 +64,16 @@ double vf_collision_detect(vec3 &v0, vec3 &v1, const Cube& c, int id){
     auto err = Eigen::Array3d(-1, -1, -1);
     double minimum_seperation = 1e-3, tolerance = 1e-6, t_max = 1;
     ticcd::Scalar toi = 1.0, output_tolerance;
-    Vector3d _v0 = v0.cast<double>(),
-        _v1 = v1.cast<double>(),
-        _va = va.cast<double>(),
-        _vb = vb.cast<double>(),
-        _vc = vc.cast<double>(),
-        _va1 = va1.cast<double>(),
-        _vb1 = vb1.cast<double>(),
-        _vc1 = vc1.cast<double>();
-
-    long max_itr = 1e6;
-
+    int max_itr = 1e6;
     std::vector<ticcd::Vector3> bounding_box;
     for (int i = 0; i < 8; i++) {
-        bounding_box.push_back((c.vertices()[i].cast<double>() * 20.0));
+        bounding_box.push_back(c.vertices()[i] * 20.0);
     }
-    const ticcd::Array3 err_vf(ticcd::get_numerical_error(bounding_box, true, true));
+    const ticcd::Array3 err_vf(ticcd::get_numerical_error(bounding_box, true, false));
 
     bool _b = ticcd::vertexFaceCCD(
-           _v0, _va, _vb, _vc,
-           _v1, _va1, _vb1, _vc1,
+           v0, va, vb, vc,
+           v1, va1, vb1, vc1,
            err_vf, minimum_seperation, toi, tolerance,
            t_max, max_itr, output_tolerance);
     return toi;
