@@ -1,5 +1,6 @@
 #include "collision.h"
 #include "barrier.h"
+#define TIGHT_INCLUSION_DOUBLE
 #include <tight_inclusion/ccd.hpp>
 #include <tight_inclusion/interval_root_finder.hpp>
 
@@ -72,17 +73,17 @@ double vf_collision_detect(vec3 &v0, vec3 &v1, const Cube& c, int id){
         _vb1 = vb1.cast<double>(),
         _vc1 = vc1.cast<double>();
 
-    int max_itr = 1e6;
+    long max_itr = 1e6;
 
     std::vector<ticcd::Vector3> bounding_box;
     for (int i = 0; i < 8; i++) {
-        bounding_box.push_back((c.vertices()[i] * 20.0f));
+        bounding_box.push_back((c.vertices()[i].cast<double>() * 20.0));
     }
     const ticcd::Array3 err_vf(ticcd::get_numerical_error(bounding_box, true, true));
 
     bool _b = ticcd::vertexFaceCCD(
-           v0, va, vb, vc,
-           v1, va1, vb1, vc1,
+           _v0, _va, _vb, _vc,
+           _v1, _va1, _vb1, _vc1,
            err_vf, minimum_seperation, toi, tolerance,
            t_max, max_itr, output_tolerance);
     return toi;
