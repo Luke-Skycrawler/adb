@@ -3,7 +3,7 @@
 #include <iostream>
 #include <assert.h>
 #include "collision.h"
-
+#include "spatial_hashing.h"
 using namespace std;
 using namespace barrier;
 using namespace Eigen;
@@ -58,6 +58,7 @@ VectorXf cat(mat3 &rq, const vec3 &rp)
 }
 void implicit_euler(vector<Cube> &cubes)
 {
+    static int ts = 0;
     // x[t+1] = x[t] + v[t+1] dt
     static const float dt = 1e-4;
     for (auto &c : cubes)
@@ -114,26 +115,86 @@ void implicit_euler(vector<Cube> &cubes)
             VectorXf __dq(_dq.segment<9>(3));
             Map<MatrixXf> dq(__dq.data(), 3, 3);
             vec3 dp(_dq.segment(0, 3));
+            c.dp = dp;
+            c.dq = dq;
+        }
+        int group = 0;
+        for (auto &c: cubes){
+            for (int i = 0; i < 12; i++) {
+                int a = Cube::indices[i * 3 + 0], 
+                    b = Cube::indices[i * 3 + 1], 
+                    _c = Cube::indices[i * 3 + 2]; 
 
-            float toi = c.vf_collision_detect(dp, dq);
+                auto v = c.vertices();
+                const vec3 &v0a(v[a]),
+                    &v0b(v[b]),
+                    &v0c(v[_c]);
+                
+                vec3 va(c.q_next * v0a + c.p_next),
+                    vb(c.q_next * v0b + c.p_next),
+                    vc(c.q_next * v0c + c.p_next);
 
-            if (toi < 1.0) {
-                cout << "collision detected, resetting i, toi = " << toi << endl;
-                iter = 0; 
+                vec3 va1((c.q_next - c.dq) * v0a + (c.p_next - c.dp)),
+                    vb1((c.q_next - c.dq) * v0b + (c.p_next - c.dp)),
+                    vc1((c.q_next - c.dq) * v0c + (c.p_next - c.dp));
+                
+
+                Primitive t(ts, i + group * 12, group);
+                spatial_hashing::register_triangle_orbit(va, vb, vc, va1, vb1, vc1, t, ts);
+                // register_triangle(va, vb, vc, t, ts);
+                
             }
-            // only works for single cube
+            group ++;
+        }
+        float toi = 1.0;
+        group = 0;
+        for (auto &c: cubes){
+        
+            // boundary collision detector
+            float body_toi = c.vf_collision_detect(c.dp, c.dq);
 
-            c.q_next -= dq * toi * 0.8;
-            c.p_next -= dp * toi * 0.8;
+            for(int i = 0; i < 8; i ++) {
+                const vec3 &v0(c.vertices()[i]);
+                vec3 v_start(c.q_next * v0 + c.p_next);
+                vec3 v_end((c.q_next - c.dq) * v0 + c.p_next - c.dp);
+                auto triangle_list(spatial_hashing::query_edge(v_start, v_end, group, ts));
+                
+                for (auto tri: triangle_list) {
+                    int g = tri.group;
+                    int id = tri.id - g * 12;
+
+                    float tri_toi = vf_collision_detect(v_start, v_end, cubes[g], id);
+                    if(tri_toi < body_toi) {
+                        body_toi = tri_toi;
+                    }
+                }                
+            }
+            if (body_toi < toi) {
+                toi = body_toi;
+                cout << "overall toi changed" << group << toi << endl;
+            }
+            group ++;
+        }
+        
+        if (toi < 1.0) {
+            cout << "collision detected, resetting i, toi = " << toi << endl;
+            iter = 0; 
+        }
+        float factor = toi < 1.0 ? 0.8 : 1.0; 
+        for (auto &c: cubes){
+            
+            c.q_next -= c.dq * toi * factor;
+            c.p_next -= c.dp * toi * factor;
 #ifdef PER_ITER_RESIDUE_PRINT
             if (iter == 0 || iter == max_iters - 1)
             {
-                cout << "iter " << iter << ", residue = " << r << endl;
-                cout << "dp = " << dp << endl;
-                cout << "dq = " << dq << endl;
+                //cout << "iter " << iter << ", residue = " << r << endl;
+                cout << "dp = " << c.dp << endl;
+                cout << "dq = " << c.dq << endl;
             }
 #endif
         }
+        ts ++;
     }
     for (auto &c : cubes)
     {

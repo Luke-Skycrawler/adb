@@ -17,6 +17,8 @@ using namespace std;
 // #define FEATURE_POSTRENDER
 //-----------------------------------------------------------------
 
+int Cube::indices[] = { 0 };
+
 void render_cubes(Shader shader, vector<Cube> cubes)
 {
     for (auto &c : cubes)
@@ -34,6 +36,7 @@ void render_cubes(Shader shader, vector<Cube> cubes)
 int main()
 {
     // vector<Cube> cubes;
+    Cube::gen_indices();
     auto cube = spinning_cube();
     globals.cubes.push_back(*cube);
 
