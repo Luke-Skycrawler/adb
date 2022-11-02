@@ -35,11 +35,9 @@ void render_cubes(Shader shader, vector<Cube> cubes)
 }
 int main()
 {
-    // vector<Cube> cubes;
     Cube::gen_indices();
-    auto cube = spinning_cube();
-    globals.cubes.push_back(*cube);
-
+    globals.cubes = cube_blocks(2);
+    
     // glfw: initialize and configure
     // ------------------------------
     glfwInit();
