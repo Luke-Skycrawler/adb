@@ -65,6 +65,12 @@ void implicit_euler(vector<Cube>& cubes)
     }
     for (int iter = 0; iter < max_iters; iter++) {
         // newton iterations
+        auto colliding_set(vf_colliding_set(cubes));
+        for (auto& p : colliding_set) {
+            auto &v p.first;
+            auto &f p.second;
+            double d = vf_distance(v, f);
+        }
         for (auto& c : cubes) {
             double m = c.mass / (dt * dt);
             double Im = m / 12.0 * c.scale * c.scale;
@@ -109,31 +115,6 @@ void implicit_euler(vector<Cube>& cubes)
             c.dq = dq;
         }
         int group = 0;
-        // for (auto &c: cubes){
-        //     for (int i = 0; i < 12; i++) {
-        //         int a = Cube::indices[i * 3 + 0],
-        //             b = Cube::indices[i * 3 + 1],
-        //             _c = Cube::indices[i * 3 + 2];
-
-        //         auto v = c.vertices();
-        //         const vec3 &v0a(v[a]),
-        //             &v0b(v[b]),
-        //             &v0c(v[_c]);
-
-        //         vec3 va(c.q_next * v0a + c.p_next),
-        //             vb(c.q_next * v0b + c.p_next),
-        //             vc(c.q_next * v0c + c.p_next);
-
-        //         vec3 va1((c.q_next - c.dq) * v0a + (c.p_next - c.dp)),
-        //             vb1((c.q_next - c.dq) * v0b + (c.p_next - c.dp)),
-        //             vc1((c.q_next - c.dq) * v0c + (c.p_next - c.dp));
-
-        //         Primitive t(ts, i + group * 12, group);
-        //         spatial_hashing::register_triangle_orbit(va, vb, vc, va1, vb1, vc1, t, ts);
-
-        //     }
-        //     group ++;
-        // }
         double toi = 1.0;
         group = 0;
         for (auto& c : cubes) {

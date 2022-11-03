@@ -65,4 +65,5 @@ namespace barrier
         return barrier_second_derivative(vf_distance(vertex)) * g * g.adjoint();
     }
 
+    
 };

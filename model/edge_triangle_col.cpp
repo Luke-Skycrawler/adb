@@ -1,1 +1,0 @@
-#include "edge_triangle.h"

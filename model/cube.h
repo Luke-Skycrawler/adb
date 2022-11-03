@@ -10,6 +10,7 @@ struct Cube {
     vec3 p, p_next, p_dot, dimensions, f, tau, dp; 
     double mass, scale;
     static int indices[36];
+    static const int n_vertices = 8, n_faces = 12;
     static const vec3* vertices() {
         static const vec3 v[] ={
             vec3(-0.5f, -0.5f, -0.5f),

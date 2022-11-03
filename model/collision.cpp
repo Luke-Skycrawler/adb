@@ -1,5 +1,6 @@
 #include "collision.h"
 #include "barrier.h"
+#include "edge_triangle.h"
 #define TIGHT_INCLUSION_DOUBLE
 #include <tight_inclusion/ccd.hpp>
 #include <tight_inclusion/interval_root_finder.hpp>
@@ -42,36 +43,18 @@ double Cube::vf_collision_detect(const vec3 &dp, const mat3 &dq) {
 }
 
 double vf_collision_detect(vec3 &p_t0, vec3 &p_t1, const Cube& c, int id){
-    auto q(c.q_next - c.dq);
-    auto p(c.p_next - c.dp);
-
-    int a = Cube::indices[id * 3 + 0], 
-        b = Cube::indices[id * 3 + 1], 
-        _c = Cube::indices[id * 3 + 2]; 
-
-    const vec3 &v0a(c.vertices()[a]),
-        &v0b(c.vertices()[b]),
-        &v0c(c.vertices()[_c]);
-    
-    vec3 t0_t1(q * v0a + p),
-        t1_t1(q * v0b + p),
-        t2_t1(q * v0c + p);
-
-    vec3 t0_t0(c.q_next * v0a + c.p_next),
-        t1_t0(c.q_next * v0b + c.p_next),
-        t2_t0(c.q_next * v0c + c.p_next);
-    
+    Face f_t0(c, id, false), f_t1(c, id, true);
     ticcd::Scalar toi = 1.0, output_tolerance;
     std::vector<ticcd::Vector3> bounding_box;
     for (int i = 0; i < 8; i++) {
         bounding_box.push_back(c.vertices()[i] * 20.0);
     }
-    const ticcd::Array3 err_vf(ticcd::get_numerical_error(bounding_box, true, false));
+    static const ticcd::Array3 err_vf(ticcd::get_numerical_error(bounding_box, true, false));
     double min_distance = 1e-4, tmax = 1, adjusted_tolerance = 1e-6;
     long max_iterations = 1e2;
 
     bool is_impacting = ticcd::vertexFaceCCD(
-        p_t0, t0_t0, t1_t0, t2_t0, p_t1, t0_t1, t1_t1, t2_t1,
+        p_t0, f_t0.t0, f_t0.t1, f_t0.t2, p_t1, f_t1.t0, f_t1.t1, f_t1.t2,
         Eigen::Array3d::Constant(-1), // rounding error (auto)
         min_distance,                 // minimum separation distance
         toi,                          // time of impact
@@ -84,4 +67,25 @@ double vf_collision_detect(vec3 &p_t0, vec3 &p_t1, const Cube& c, int id){
         cout << "lowest level collision detected" << endl;
     }
     return toi;
+}
+
+vector<pair<vec3, Face>> vf_colliding_set(const Cube &ci, const Cube &cj) {
+   int n = cubes.size();
+   vector<pair<vec3, Face>> colliding_set;
+//    for (int i = 0; i < n; i++) {
+//        for (int j = 0; j < n; j++) {
+           auto p = ci.p_next;
+           auto q = ci.q_next;
+           for (int _v = 0; _v < Cube::n_vertices; _v++) {
+               auto v(q * ci.vertices()[_v] + p);
+               for (int f = 0; f < Cube::n_faces; f++){
+                    double d = vf_distance(v, cj, f);
+                    if (d < d_hat) {
+                        colliding_set.push_back(make_pair(v, Face(cj, f)));
+                    }
+               }
+           }
+//        }
+//    }
+   return colliding_set;
 }
