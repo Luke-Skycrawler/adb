@@ -25,25 +25,6 @@ namespace barrier
         return vec3(0.0f, 1.0f, 0.0f);
     }
 
-    /*void vf_distance_gradient_x(const vec3 &vertex, const Face &f, double g[12])
-    {
-        auto_gen::point_plane_distance_gradient(
-            vertex(0),
-            vertex(1),
-            vertex(2),
-            f.t0(0), 
-            f.t0(1), 
-            f.t0(2), 
-            f.t1(0), 
-            f.t1(1), 
-            f.t1(2), 
-            f.t2(0), 
-            f.t2(1), 
-            f.t2(2), 
-            g
-        ); 
-    }*/
-
     double vf_distance(const vec3 &vertex)
     {
         // ground plane y = -0.5
@@ -72,9 +53,6 @@ namespace barrier
 
     VectorXd distance_gradient_q(const vec3 &tilex, const vec3 &vertex)
     {
-        // VectorXd g(vf_distance_gradient_x(vertex).adjoint() * x_jacobian_q(tilex));
-        // g.segment<3>(0).setZero();
-        // return g;
         return vf_distance_gradient_x(vertex).adjoint() * x_jacobian_q(tilex);
     }
 
@@ -82,6 +60,7 @@ namespace barrier
     {
         // arg: colliding vertex
         auto g(distance_gradient_q(tilex, vertex));
+        // because distance hessian is 0, the first term of J^T B' hess_d J is 0
         return barrier_second_derivative(vf_distance(vertex)) * g * g.adjoint();
     }
 

@@ -74,22 +74,17 @@ void implicit_euler(vector<Cube>& cubes)
             VectorXd r(cat(rq, rp));
 
             r += q_residue_barrier_term(c);
+            c.barrier_gradient.setZero(12);
+            c.hess.setZero(12, 12);
+
             for (int j = _i + 1; j < cubes.size(); j ++) {
                 //if (j == _i) continue;
                 auto& cj(cubes[j]);
                 vf_colliding_response(cj, c);
                 vf_colliding_response(c, cj);
-                
-                // c.barrier_term += 
-                // auto colliding_set(vf_colliding_set(cubes[_i], cubes[j]));
-                // for (auto& p : colliding_set) {
-                //     auto &v p.first;
-                //     auto &f p.second;
-                //     double d = vf_distance(v, f);
-                    
-                // }
-
             }
+            r += c.barrier_gradient;
+            
             // build hessian
             MatrixXd hess = MatrixXd::Identity(12, 12) * Im;
             hess.block<3, 3>(0, 0) = MatrixXd::Identity(3, 3) * m;
@@ -107,6 +102,8 @@ void implicit_euler(vector<Cube>& cubes)
                     }
                 }
             }
+
+            hess += c.hess;
 
             // hessian for barrier term
             for (int i = 0; i < 8; i++) {
