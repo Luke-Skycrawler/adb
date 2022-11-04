@@ -143,6 +143,7 @@
     <ClCompile Include="..\model\collision.cpp" />
     <ClCompile Include="..\model\spatial_hashing.cpp" />
     <ClCompile Include="..\model\edge_triangle.cpp" />
+    <ClCompile Include="..\model\point_plane.cpp" />
     <ClCompile Include="..\test_cases\spinning_cube.cpp" />
     <ClCompile Include="..\view\control.cpp" />
     <ClCompile Include="..\view\glad.c" />

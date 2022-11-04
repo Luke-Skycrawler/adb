@@ -4,19 +4,6 @@ using namespace std;
 namespace barrier
 {
 
-    // nebla_q = nebla f J
-    vec3 vf_distance_gradient_x(const vec3 &vertex)
-    {
-        // edge-face detection, no need for face argument for now
-        return vec3(0.0f, 1.0f, 0.0f);
-    }
-
-    double vf_distance(const vec3 &vertex)
-    {
-        // ground plane y = -0.5
-        return vertex(1) + 0.5;
-    }
-
     double barrier_second_derivative(double d)
     {
         if (d >= d_hat)
@@ -30,6 +17,39 @@ namespace barrier
             return 0.0f;
         return -(x - d_hat) * kappa * (2 * log(x / d_hat) + (x - d_hat) / x);
     }
+
+    // nebla_q = nebla f J
+    vec3 vf_distance_gradient_x(const vec3 &vertex)
+    {
+        // face = grond plane y = 0.5
+        return vec3(0.0f, 1.0f, 0.0f);
+    }
+
+    /*void vf_distance_gradient_x(const vec3 &vertex, const Face &f, double g[12])
+    {
+        auto_gen::point_plane_distance_gradient(
+            vertex(0),
+            vertex(1),
+            vertex(2),
+            f.t0(0), 
+            f.t0(1), 
+            f.t0(2), 
+            f.t1(0), 
+            f.t1(1), 
+            f.t1(2), 
+            f.t2(0), 
+            f.t2(1), 
+            f.t2(2), 
+            g
+        ); 
+    }*/
+
+    double vf_distance(const vec3 &vertex)
+    {
+        // ground plane y = -0.5
+        return vertex(1) + 0.5;
+    }
+
 
     vec3 barrier_gradient_x(const vec3 &vertex)
     {

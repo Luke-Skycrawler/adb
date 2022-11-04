@@ -11,6 +11,7 @@ struct Cube {
     double mass, scale;
     static int indices[36];
     static const int n_vertices = 8, n_faces = 12;
+    Vector<double, 12> barrier_gradient;
     static const vec3* vertices() {
         static const vec3 v[] ={
             vec3(-0.5f, -0.5f, -0.5f),

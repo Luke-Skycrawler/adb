@@ -1,12 +1,12 @@
 #include "edge_triangle.h"
 #include <Eigen/Geometry>
 #include <cmath>
-vec3 Face::normal()
+vec3 Face::normal() const
 {
     return (t0 - t1).cross(t0 - t2);
 }
 
-vec3 Face::unit_normal()
+vec3 Face::unit_normal() const
 {
     auto n = (t0 - t1).cross(t0 - t2);
     return n / sqrt(n.dot(n));
