@@ -38,7 +38,7 @@ struct Cube {
         return fs;
     }
     // FIXME: probably switch to a static function
-    Cube(double scale = 1.0f): mass(1.0f), scale(scale), p(0.0f, 0.0f, 0.0f), p_dot(0.0f, 0.0f, 0.0f) {
+    Cube(double scale = 1.0f): mass(1000.0f), scale(scale), p(0.0f, 0.0f, 0.0f), p_dot(0.0f, 0.0f, 0.0f) {
         A.setIdentity(3, 3);
         dimensions.setOnes(3, 1);
         dimensions *= scale;

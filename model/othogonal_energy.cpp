@@ -4,7 +4,7 @@ using namespace othogonal_energy;
 
 namespace othogonal_energy {
 
-    static const double kappa = 1e6;
+    static const double kappa = 1e9;
     vec3 grad(mat3& q, int i) {
         auto ai = q.col(i);
         vec3 ret = 4 * kappa * ai * (ai.dot(ai) - 1);

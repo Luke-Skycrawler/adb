@@ -8,7 +8,7 @@ inline mat3 cross_matrix(const vec3& a)
         -a[1], a[0], 0;
     return ret;
 }
-static const vec3 omega(0.0, 0.0, 200.0);
+static const vec3 omega(0.0, 0.0, 20.0);
 Cube* spinning_cube()
 {
     auto R = cross_matrix(omega);
@@ -28,8 +28,8 @@ vector<Cube> cube_blocks(int n)
         auto R = cross_matrix(omega);
         cube->q_dot = R;
 
-        cube->p = vec3(0.0, 1.0 * (i * 3 + 1), 0.0);
-        cube->p_dot = vec3(0.0, -20.0, 0.0);
+        cube->p = vec3(i * 0.5, 1.0 * (i * 1.05 + 0.1), i * 0.5);
+        cube->p_dot = vec3(0.0, 0.0, 0.0);
         cubes.push_back(*cube);
     }
     return cubes;

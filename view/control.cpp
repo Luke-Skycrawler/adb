@@ -50,10 +50,11 @@ void text_callback(GLFWwindow *window, unsigned int c){
             globals.motion = !globals.motion;
             break;
         case 'r': case 'R':
-            p = &(globals.cubes[0]);
-            globals.cubes.clear();
-            globals.cubes.push_back(*spinning_cube());
+            //p = &(globals.cubes[0]);
+            //globals.cubes.clear();
+            //globals.cubes.push_back(*spinning_cube());
             //delete p;
+            globals.cubes = cube_blocks(2);
             break;
         case 'q': case 'Q':
             if (globals.cursor_hidden)

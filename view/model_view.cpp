@@ -260,7 +260,8 @@ int main()
         glm::mat4 tmpmodel = glm::scale(model, glm::vec3(scale, scale, scale));
         glm::vec3 box2Pos(0.3, 0.0, 1.2);
         glm::mat4 lightSpaceTrans = glm::lookAt(lightPos, glm::vec3(0.0f), globals.camera.WorldUp);
-        implicit_euler(globals.cubes);
+        for (int i = 0; i < 1; i++)
+            implicit_euler(globals.cubes);
         if (globals.display_corner)
         {
             glBindFramebuffer(GL_FRAMEBUFFER, globals.depthMapFBO);
