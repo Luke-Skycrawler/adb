@@ -142,8 +142,9 @@
     <ClCompile Include="..\model\time_integrator.cpp" />
     <ClCompile Include="..\model\collision.cpp" />
     <ClCompile Include="..\model\spatial_hashing.cpp" />
-    <ClCompile Include="..\model\edge_triangle.cpp" />
+    <ClCompile Include="..\model\point_triangle.cpp" />
     <ClCompile Include="..\model\point_plane.cpp" />
+    <ClCompile Include="..\model\edge_edge.cpp" />
     <ClCompile Include="..\test_cases\spinning_cube.cpp" />
     <ClCompile Include="..\view\control.cpp" />
     <ClCompile Include="..\view\glad.c" />
@@ -159,7 +160,7 @@
     <ClInclude Include="..\model\barrier.h" />
     <ClInclude Include="..\model\collision.h" />
     <ClInclude Include="..\model\spatial_hashing.h" />
-    <ClInclude Include="..\model\edge_triangle.h" />
+    <ClInclude Include="..\model\face.h" />
     <ClInclude Include="..\test_cases\tests.h" />
     <ClInclude Include="..\view\camera.h" />
     <ClInclude Include="..\view\env.h" />

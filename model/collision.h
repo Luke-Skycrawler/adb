@@ -1,5 +1,5 @@
 #include "cube.h"
-#include "edge_triangle.h"
+#include "face.h"
 #include <vector>
 double vf_collision_time(const vec3 &x, const vec3 &p, const mat3 &q, const vec3 &p_next, const mat3 &q_next);
 double vf_collision_detect(vec3 &p_t0, vec3 &p_t1, const Cube& cube, int id);

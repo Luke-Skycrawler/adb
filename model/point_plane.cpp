@@ -1,4 +1,4 @@
-#include "edge_triangle.h"
+#include "face.h"
 
 namespace autogen {
 

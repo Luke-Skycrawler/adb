@@ -1,4 +1,4 @@
-#include "edge_triangle.h"
+#include "face.h"
 #include <Eigen/Geometry>
 #include <cmath>
 using namespace std;

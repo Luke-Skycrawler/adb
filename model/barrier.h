@@ -1,7 +1,7 @@
 #pragma once
 #include "cube.h"
 #include <vector>
-#include "edge_triangle.h"
+#include "face.h"
 
 namespace barrier {
 const double d_hat = 0.01f, kappa = 1e8f;
