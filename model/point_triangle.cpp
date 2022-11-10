@@ -13,22 +13,23 @@ vec3 Face::unit_normal() const
     return n / sqrt(n.dot(n));
 }
 
+Edge::Edge(const Cube& c, int id, bool b) {
+    int _0 = Cube::edges[id * 2];
+    int _1 = Cube::edges[id * 2 + 1];
+    e0 = c.vi(_0, b);
+    e1 = c.vi(_1, b);
+}
 Face::Face(const Cube& c, int id, bool b)
 {
-    auto& q = b ? (c.q_next - c.dq) : c.q_next;
-    auto& p = b ? (c.p_next - c.dp) : c.p_next;
 
     int _a = Cube::indices[id * 3 + 0],
         _b = Cube::indices[id * 3 + 1],
         _c = Cube::indices[id * 3 + 2];
 
-    const vec3 &v0a(c.vertices()[_a]),
-        &v0b(c.vertices()[_b]),
-        &v0c(c.vertices()[_c]);
-
-    t0 = q * v0a + p;
-    t1 = q * v0b + p;
-    t2 = q * v0c + p;
+    t0 = c.vi(_a, b);
+    t1 = c.vi(_b, b);
+    t2 = c.vi(_c, b);
+    
 }
 
 double vf_distance(const vec3& v, const Cube& c, int id)
@@ -70,3 +71,15 @@ double vf_distance(const vec3& _v, const Face &f)
     return d;
 }
 
+double ee_distance(const Edge &ei, const Edge &ej){
+    double d = 0.0;
+    auto ei0 = ei.e0, ei1 = ei.e1, ej0 = ej.e0, ej1 = ej.e1;
+    auto n = (ei1 - ei0).cross(ej1 - ej0);
+    if (n.norm() < 1e-6) {
+        // degenerate case
+        auto t = ei1 - ei0;
+        d = t.cross(ej0 - ei0).norm() / t.dot(t);
+    }
+    d = abs(n.dot(ej0 - ei0))/ n.dot(n);
+    return d;
+}

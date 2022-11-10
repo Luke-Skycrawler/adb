@@ -18,6 +18,7 @@ using namespace std;
 //-----------------------------------------------------------------
 
 int Cube::indices[] = { 0 };
+int Cube::edges[] = { 0 };
 
 void render_cubes(Shader shader, vector<Cube> cubes)
 {

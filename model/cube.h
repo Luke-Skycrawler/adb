@@ -9,8 +9,8 @@ struct Cube {
     mat3 A, q_dot, q_next, dq;
     vec3 p, p_next, p_dot, dimensions, f, tau, dp; 
     double mass, scale;
-    static int indices[36];
-    static const int n_vertices = 8, n_faces = 12;
+    static int indices[36], edges[24];
+    static const int n_vertices = 8, n_faces = 12, n_edges = 12;
     Vector<double, 12> barrier_gradient;
     Matrix<double, 12, 12> hess;
     static const vec3* vertices() {
@@ -30,8 +30,8 @@ struct Cube {
         static const int fs[] = {
             0,1,3,2,
             4,5,1,0,
-            2,3,7,6,
             4,0,2,6,
+            2,3,7,6,
             1,5,7,3,
             5,4,6,7
         };
@@ -43,7 +43,13 @@ struct Cube {
         dimensions.setOnes(3, 1);
         dimensions *= scale;
     }
-    
+
+    inline vec3 vi(int i, bool increment = false) const{
+        const auto &q(increment? (q_next - dq): q_next); 
+        const auto &p(increment? (p_next - dp): p_next); 
+        return q * vertices()[i] + p;
+    }
+
     double vf_collision_detect(const vec3 &dp, const mat3 &dq);
     static void gen_indices() {
         for(int i = 0; i < 6; i++) {
@@ -53,6 +59,15 @@ struct Cube {
             Cube::indices[i * 6 + 3] = faces()[i * 4 + 2];
             Cube::indices[i * 6 + 4] = faces()[i * 4 + 3];
             Cube::indices[i * 6 + 5] = faces()[i * 4 + 0];
+        }
+        for (int i = 0; i< 3; i++){
+            int di = 1 << (2 - i);
+            for (int j = 0; j < 4; j ++){
+                int I = i * 4 + j;
+                int e0 = faces()[I];
+                Cube::edges[I * 2] = e0;
+                Cube::edges[I * 2 + 1] = e0 + di;
+            }
         }
     }
 };

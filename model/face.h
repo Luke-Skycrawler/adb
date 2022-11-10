@@ -10,12 +10,19 @@ struct Face {
     vec3 unit_normal() const;
 };
 
-using Edge = std::pair<vec3, vec3>;
+//using Edge = std::pair<vec3, vec3>;
+
+struct Edge {
+    vec3 e0, e1;
+    Edge(const vec3& e0, const vec3& e1)
+        : e0(e0), e1(e1) {}
+    Edge(const Cube& c, int eid, bool use_line_search_increment = false);
+};
 double vf_distance(const vec3& vertex, const Cube& c, int id);
 
 double vf_distance(const vec3& v, const Face& f);
 
-void ee_distance(const Edge &ei, const Edge &ej);
+double ee_distance(const Edge &ei, const Edge &ej);
 
 // Symbolically generated derivatives;
 namespace autogen {

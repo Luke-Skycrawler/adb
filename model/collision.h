@@ -8,3 +8,7 @@ double vf_collision_detect(vec3 &p_t0, vec3 &p_t1, const Cube& cube, int id);
 // q: affine matrix
 // std::vector<std::pair<vec3, Face>> vf_colliding_set(const Cube & c1, const Cube &c2);
 int vf_colliding_response(Cube & c1, Cube &c2);
+
+
+int ee_colliding_response(Cube & ci, Cube &cj);
+double ee_collision_detect(const Cube &ci, const Cube &cj, int eid_i, int eid_j);

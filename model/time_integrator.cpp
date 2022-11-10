@@ -277,19 +277,18 @@ void implicit_euler(vector<Cube>& cubes)
             auto q = ci.q_next - ci.dq;
 
             for (int _v = 0; _v < Cube::n_vertices; _v++) {
-                auto v(q * ci.vertices()[_v] + p);
-                auto vt0(ci.q_next * ci.vertices()[_v] + ci.p_next);
+                auto v_t1(ci.vi(_v, true)), v_t0(ci.vi(_v));
                 for (int _f = 0; _f < Cube::n_faces; _f++) {
                     Face ft1(cj, _f, true), ft0(cj, _f);
-                    double d = vf_distance(v, ft1);
-                    double d_t0= vf_distance(vt0, ft0);
+                    double d = vf_distance(v_t1, ft1);
+                    double d_t0= vf_distance(v_t0, ft0);
                     if (d < d_min) {
                         d_min = d;
                     }
                     if (d_t0_min > d_t0) d_t0_min = d_t0;
                 }
-                d_f = min(d_f, vf_distance(v));
-                d_f_t0 = min(d_f_t0, vf_distance(vt0));
+                d_f = min(d_f, vf_distance(v_t1));
+                d_f_t0 = min(d_f_t0, vf_distance(v_t0));
             }
         }
         
@@ -304,26 +303,31 @@ void implicit_euler(vector<Cube>& cubes)
         #endif
 
 
-        int group = 0;
         double toi = 1.0;
-        group = 0;
-        for (auto& c : cubes) {
+        for (int _i = 0; _i < cubes.size(); _i++) {
+            auto& c(cubes[_i]);
 
             // boundary collision detector
             double body_toi = c.vf_collision_detect(c.dp, c.dq);
 
-            for (int i = 0; i < 8; i++) {
-                const vec3& v0(c.vertices()[i]);
-                vec3 v_start(c.q_next * v0 + c.p_next);
-                vec3 v_end((c.q_next - c.dq) * v0 + (c.p_next - c.dp));
-                for (int id = 0; id < 12; id++) {
-                    int g = 1 - group;
-                    double tri_toi = 1.0;
-                    tri_toi = vf_collision_detect(v_start, v_end, cubes[g], id);
+            int _j = 1 - _i;
+            auto &cj(cubes[_j]);
 
-                    if (tri_toi < body_toi) {
-                        body_toi = tri_toi;
-                    }
+            for (int ei = 0; ei < Cube::n_edges; ei ++) {
+                for (int ej = 0; ej < Cube::n_edges; ej++){
+                    double edge_toi = ee_collision_detect(c, cj, ei, ej);
+                    body_toi = min(body_toi, edge_toi);
+                }
+            }
+            for (int i = 0; i < Cube::n_vertices; i++) {
+                const vec3& v0(c.vertices()[i]);
+                // vec3 v_start(c.q_next * v0 + c.p_next);
+                // vec3 v_end((c.q_next - c.dq) * v0 + (c.p_next - c.dp));
+                vec3 v_t0(c.vi(i)), v_t1(c.vi(i, true));
+                for (int _f = 0; _f < Cube::n_faces; _f++) {
+                    double tri_toi = 1.0;
+                    tri_toi = vf_collision_detect(v_t0, v_t1, cubes[_j], _f);
+                    body_toi = min(body_toi, tri_toi);
                 }
                 // auto triangle_list(spatial_hashing::query_edge(v_start, v_end, group, ts));
 
@@ -341,7 +345,6 @@ void implicit_euler(vector<Cube>& cubes)
                 toi = body_toi;
                 //cout << "overall toi changed" << group << toi << endl;
             }
-            group++;
         }
 
         if (toi < 1.0) {
