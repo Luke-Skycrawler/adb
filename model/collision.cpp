@@ -78,10 +78,10 @@ double ee_collision_detect(const Cube& ci, const Cube& cj, int eid_i, int eid_j)
     ticcd::Scalar toi = 1.0, output_tolerance;
     double min_distance = 1e-6, tmax = 1, adjusted_tolerance = 1e-6;
     long max_iterations = 1e6;
-    Edge ei_t1(ci, eid_i, true), ej_t1(ci, eid_i, true), ei_t0(ci, eid_i), ej_t0(cj, eid_j);
+    Edge ei_t1(ci, eid_i, true), ej_t1(cj, eid_j, true), ei_t0(ci, eid_i), ej_t0(cj, eid_j);
 
     bool is_impacting = ticcd::edgeEdgeCCD(
-        ei_t0.e0, ei_t0.e1, ej_t0.e0, ej_t0.e1, ei_t1.e0, ei_t0.e1, ej_t1.e0, ej_t1.e1,
+        ei_t0.e0, ei_t0.e1, ej_t0.e0, ej_t0.e1, ei_t1.e0, ei_t1.e1, ej_t1.e0, ej_t1.e1,
         Eigen::Array3d::Constant(-1), // rounding error (auto)
         min_distance, // minimum separation distance
         toi, // time of impact
