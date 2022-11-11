@@ -14,7 +14,7 @@ double vf_collision_time(const vec3& x, const vec3& p, const mat3& q, const vec3
     // one-way collision
     // assert that (p, q) is collision-free and (p_next, q_next) is the state after penetration
     vec3 initial_guess(q * x + p);
-    double t = 0.0f;
+    double t = 0.0;
     double distance = vf_distance(initial_guess);
     vec3 dd_dx(vf_distance_gradient_x(initial_guess));
     // distance derivative of x
@@ -30,7 +30,7 @@ double vf_collision_time(const vec3& x, const vec3& p, const mat3& q, const vec3
 double Cube::vf_collision_detect(const vec3& dp, const mat3& dq)
 {
     // TODO: ensure the updated q_next is collision-free
-    double min_toi = 1.0f;
+    double min_toi = 1.0;
     for (int i = 0; i < 8; i++) {
         const vec3 v0(vertices()[i]);
         const vec3& v((q_next - dq) * v0 + (p_next - dp));
@@ -73,12 +73,13 @@ double vf_collision_detect(vec3& p_t0, vec3& p_t1, const Cube& c, int id)
     return toi;
 }
 
-double ee_collision_detect(const Cube &ci, const Cube &cj, int eid_i, int eid_j){
+double ee_collision_detect(const Cube& ci, const Cube& cj, int eid_i, int eid_j)
+{
     ticcd::Scalar toi = 1.0, output_tolerance;
     double min_distance = 1e-6, tmax = 1, adjusted_tolerance = 1e-6;
     long max_iterations = 1e6;
     Edge ei_t1(ci, eid_i, true), ej_t1(ci, eid_i, true), ei_t0(ci, eid_i), ej_t0(cj, eid_j);
-    
+
     bool is_impacting = ticcd::edgeEdgeCCD(
         ei_t0.e0, ei_t0.e1, ej_t0.e0, ej_t0.e1, ei_t1.e0, ei_t0.e1, ej_t1.e0, ej_t1.e1,
         Eigen::Array3d::Constant(-1), // rounding error (auto)
@@ -92,7 +93,8 @@ double ee_collision_detect(const Cube &ci, const Cube &cj, int eid_i, int eid_j)
     if (toi < 1.0) {
         spdlog::warn("ee collision detected at toi = {}", toi);
     }
-    else toi = 1.0;
+    else
+        toi = 1.0;
     return toi;
 }
 
@@ -144,10 +146,10 @@ int vf_colliding_response(Cube& ci, Cube& cj)
                     f.t2(2),
                     Hx);
 
-                for(int i = 0; i < 12; i++){
+                for (int i = 0; i < 12; i++) {
                     gx[i] /= (2 * d);
                 }
-                for(int i = 0; i < 144; i ++) {
+                for (int i = 0; i < 144; i++) {
                     Hx[i] /= (4 * d * d);
                 }
                 double dbdd = barrier_derivative_d(d);
@@ -173,7 +175,6 @@ int vf_colliding_response(Cube& ci, Cube& cj)
                 auto gx_t2 = vec3(gx[9], gx[10], gx[11]);
                 ci_barrier_term += dbdd * gx_v.adjoint() * Jv;
                 cj_barrier_term += dbdd * (gx_t0.adjoint() * J_t0 + gx_t1.adjoint() * J_t1 + gx_t2.adjoint() * J_t2);
-                
 
                 // TODO: construct hessian
 
@@ -206,16 +207,16 @@ int vf_colliding_response(Cube& ci, Cube& cj)
                 ci.hess += hess_i;
                 cj.hess += hess_j;
 
-                //spdlog::info("grad_i {}", ci_barrier_term);
-                //spdlog::info("grad_j {}", cj_barrier_term);
-                // cout << "d " << d << endl;
-                //cout << "grad_i " << ci_barrier_term.adjoint() << endl;
-                //cout << "grad_j " << cj_barrier_term.adjoint() << endl;
-                //cout << "r0 " << ci.barrier_gradient.adjoint() << endl;
+                // spdlog::info("grad_i {}", ci_barrier_term);
+                // spdlog::info("grad_j {}", cj_barrier_term);
+                //  cout << "d " << d << endl;
+                // cout << "grad_i " << ci_barrier_term.adjoint() << endl;
+                // cout << "grad_j " << cj_barrier_term.adjoint() << endl;
+                // cout << "r0 " << ci.barrier_gradient.adjoint() << endl;
 
                 ci.barrier_gradient += ci_barrier_term;
                 cj.barrier_gradient += cj_barrier_term;
-                
+
                 cout << "r " << ci.barrier_gradient.adjoint() << endl;
                 cout << endl;
                 ret = 1;
@@ -225,32 +226,31 @@ int vf_colliding_response(Cube& ci, Cube& cj)
     return ret;
 }
 
-int ee_colliding_repsonse(Cube &ci, Cube &cj){
+int ee_colliding_repsonse(Cube& ci, Cube& cj)
+{
     int ret = 0;
     double gx[12], Hx[144];
     for (int _i = 0; _i < Cube::n_edges; _i++) {
         Edge ei(ci, _i);
-        for (int _j = 0; _j < Cube::n_edges; _j++){
+        for (int _j = 0; _j < Cube::n_edges; _j++) {
             Edge ej(cj, _j);
-            double d =  ee_distance(ei, ej);
-            if (d < d_hat){
+            double d = ee_distance(ei, ej);
+            if (d < d_hat) {
                 auto ea0 = ei.e0, ea1 = ei.e1, eb0 = ej.e0, eb1 = ej.e1;
 
                 VectorXd ci_barrier_term, cj_barrier_term;
                 ci_barrier_term.setZero(12);
                 cj_barrier_term.setZero(12);
                 autogen::line_line_distance_gradient(
-                    ea0(0), ea0(1), ea0(2), ea1(0), ea1(1), ea1(2), eb0(0), eb0(1), eb0(2), eb1(0), eb1(1), eb1(2), 
-                    gx 
-                );
+                    ea0(0), ea0(1), ea0(2), ea1(0), ea1(1), ea1(2), eb0(0), eb0(1), eb0(2), eb1(0), eb1(1), eb1(2),
+                    gx);
                 autogen::line_line_distance_hessian(
-                    ea0(0), ea0(1), ea0(2), ea1(0), ea1(1), ea1(2), eb0(0), eb0(1), eb0(2), eb1(0), eb1(1), eb1(2), 
-                    Hx
-                );
-                for(int i = 0; i < 12; i++){
+                    ea0(0), ea0(1), ea0(2), ea1(0), ea1(1), ea1(2), eb0(0), eb0(1), eb0(2), eb1(0), eb1(1), eb1(2),
+                    Hx);
+                for (int i = 0; i < 12; i++) {
                     gx[i] /= (2 * d);
                 }
-                for(int i = 0; i < 144; i ++) {
+                for (int i = 0; i < 144; i++) {
                     Hx[i] /= (4 * d * d);
                 }
                 double dbdd = barrier_derivative_d(d);
@@ -261,7 +261,6 @@ int ee_colliding_repsonse(Cube &ci, Cube &cj){
 
                 int _eb0 = Cube::edges[2 * _j];
                 int _eb1 = Cube::edges[2 * _j + 1];
-
 
                 auto tile_ea0 = cj.vertices()[_ea0];
                 auto tile_ea1 = cj.vertices()[_ea1];
@@ -282,7 +281,7 @@ int ee_colliding_repsonse(Cube &ci, Cube &cj){
                 cj_barrier_term += dbdd * (gx_eb0.adjoint() * J_eb0 + gx_eb1.adjoint() * J_eb1);
 
                 // cj_barrier_term += dbdd * (gx_t0.adjoint() * J_t0 + gx_t1.adjoint() * J_t1 + gx_t2.adjoint() * J_t2);
-                
+
                 // TODO: construct hessian
 
                 Map<MatrixXd> _Hx(Hx, 12, 12);
@@ -321,16 +320,16 @@ int ee_colliding_repsonse(Cube &ci, Cube &cj){
                 ci.hess += hess_i;
                 cj.hess += hess_j;
 
-                //spdlog::info("grad_i {}", ci_barrier_term);
-                //spdlog::info("grad_j {}", cj_barrier_term);
-                // cout << "d " << d << endl;
-                //cout << "grad_i " << ci_barrier_term.adjoint() << endl;
-                //cout << "grad_j " << cj_barrier_term.adjoint() << endl;
-                //cout << "r0 " << ci.barrier_gradient.adjoint() << endl;
+                // spdlog::info("grad_i {}", ci_barrier_term);
+                // spdlog::info("grad_j {}", cj_barrier_term);
+                //  cout << "d " << d << endl;
+                // cout << "grad_i " << ci_barrier_term.adjoint() << endl;
+                // cout << "grad_j " << cj_barrier_term.adjoint() << endl;
+                // cout << "r0 " << ci.barrier_gradient.adjoint() << endl;
 
                 ci.barrier_gradient += ci_barrier_term;
                 cj.barrier_gradient += cj_barrier_term;
-                
+
                 cout << "r " << ci.barrier_gradient.adjoint() << endl;
                 cout << endl;
                 ret = 1;

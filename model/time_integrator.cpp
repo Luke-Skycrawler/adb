@@ -16,7 +16,6 @@ static const int max_iters = 10;
 // #define DEBUG_COLLISION
 #define _DEBUG_TWO_BLOCKS
 
-
 VectorXd q_residue_barrier_term(Cube& c)
 {
     VectorXd barrier_term;
@@ -46,7 +45,7 @@ mat3 q_residue(Cube& c, double dt)
 vec3 p_residue(Cube& c, double dt)
 {
     static const vec3 gravity(0.0f, 0.0f, 0.0f);
-    //static const vec3 gravity(0.0f, -9.8e3, 0.0f);
+    // static const vec3 gravity(0.0f, -9.8e3, 0.0f);
     double m = c.mass / (dt * dt);
     vec3 r = m * c.p_next - gravity * c.mass - (c.p + dt * c.p_dot) * m;
     return r;
@@ -71,8 +70,8 @@ void implicit_euler(vector<Cube>& cubes)
     }
     for (int iter = 0; iter < max_iters; iter++) {
         // newton iterations
-        for (int _i = 0; _i < cubes.size(); _i ++) {
-            auto &c(cubes[_i]);
+        for (int _i = 0; _i < cubes.size(); _i++) {
+            auto& c(cubes[_i]);
             double m = c.mass / (dt * dt);
             double Im = m / 12.0 * c.scale * c.scale;
             mat3 rq(q_residue(c, dt));
@@ -100,25 +99,25 @@ void implicit_euler(vector<Cube>& cubes)
                 }
             }
 
-            #ifndef DEBUG_COLLISION
+#ifndef DEBUG_COLLISION
             r += q_residue_barrier_term(c);
             c.hess.setZero(12, 12);
             c.barrier_gradient = r;
-            //for (int j = 0; j < cubes.size(); j ++) {
+            // for (int j = 0; j < cubes.size(); j ++) {
             int j = 1 - _i;
-                /*if (j == _i) continue;*/
-                auto& cj(cubes[j]);
-                cf = vf_colliding_response(cj, c);
-                cv = vf_colliding_response(c, cj);
-                if (cf or cv) {
-                    if (ts % 10 == 0)
-                        spdlog::warn("updates velocity");
-                    spdlog::info("collision response at {}", ts);
-                    //cout << endl << ts << endl;
-                }
-            
+            /*if (j == _i) continue;*/
+            auto& cj(cubes[j]);
+            cf = vf_colliding_response(cj, c);
+            cv = vf_colliding_response(c, cj);
+            if (cf or cv) {
+                if (ts % 10 == 0)
+                    spdlog::warn("updates velocity");
+                spdlog::info("collision response at {}", ts);
+                // cout << endl << ts << endl;
+            }
+
             r = c.barrier_gradient;
-            
+
             hess += c.hess;
             // hessian for barrier term
             for (int i = 0; i < 8; i++) {
@@ -126,7 +125,7 @@ void implicit_euler(vector<Cube>& cubes)
                 const vec3& v(c.q_next * v0 + c.p_next);
                 hess += barrier_hessian_q(v0, v);
             }
-            #else 
+#else
             vec3 t0(-5.0, -0.5, 5.0),
                 t1(5.0, -0.5, 5.0),
                 t2(0.0, -0.5, -5.0);
@@ -147,7 +146,7 @@ void implicit_euler(vector<Cube>& cubes)
                         if (d < 1e-4) {
                             cout << "restarting " << endl;
                         }
-    
+
                         VectorXd ci_barrier_term, cj_barrier_term;
                         ci_barrier_term.setZero(12);
                         cj_barrier_term.setZero(12);
@@ -258,7 +257,7 @@ void implicit_euler(vector<Cube>& cubes)
                     }
                 }
             }
-            #endif
+#endif
             VectorXd _dq(hess.ldlt().solve(r));
 
             // Map<MatrixXd> dq(_dq.block<9,9>(3,3).data(), 3, 3);
@@ -268,8 +267,8 @@ void implicit_euler(vector<Cube>& cubes)
             c.dp = dp;
             c.dq = dq;
         }
-        #ifdef _DEBUG_TWO_BLOCKS
-        double d_min = d_hat, d_t0_min = d_hat, d_f =d_hat,  d_f_t0 = d_hat;
+#ifdef _DEBUG_TWO_BLOCKS
+        double d_min = d_hat, d_t0_min = d_hat, d_f = d_hat, d_f_t0 = d_hat;
         for (int i = 0; i < 2; i++) {
             auto& ci = cubes[i];
             auto& cj = cubes[1 - i];
@@ -281,7 +280,7 @@ void implicit_euler(vector<Cube>& cubes)
                 for (int _f = 0; _f < Cube::n_faces; _f++) {
                     Face ft1(cj, _f, true), ft0(cj, _f);
                     double d = vf_distance(v_t1, ft1);
-                    double d_t0= vf_distance(v_t0, ft0);
+                    double d_t0 = vf_distance(v_t0, ft0);
                     if (d < d_min) {
                         d_min = d;
                     }
@@ -291,7 +290,7 @@ void implicit_euler(vector<Cube>& cubes)
                 d_f_t0 = min(d_f_t0, vf_distance(v_t0));
             }
         }
-        
+
         if (cv || cf) {
             spdlog::info("after increment min d = {}, distance at t0 is {}", d_min, d_t0_min);
             spdlog::info("after increment d_floor = {}, distance at t0 is {}", d_f, d_f_t0);
@@ -300,8 +299,7 @@ void implicit_euler(vector<Cube>& cubes)
             spdlog::info("cube 0 norm of dp, dq = {}, {}", normp0, normq0);
             spdlog::info("cube 1 norm of dp, dq = {}, {}", normp1, normq1);
         }
-        #endif
-
+#endif
 
         double toi = 1.0;
         for (int _i = 0; _i < cubes.size(); _i++) {
@@ -311,10 +309,10 @@ void implicit_euler(vector<Cube>& cubes)
             double body_toi = c.vf_collision_detect(c.dp, c.dq);
 
             int _j = 1 - _i;
-            auto &cj(cubes[_j]);
+            auto& cj(cubes[_j]);
 
-            for (int ei = 0; ei < Cube::n_edges; ei ++) {
-                for (int ej = 0; ej < Cube::n_edges; ej++){
+            for (int ei = 0; ei < Cube::n_edges; ei++) {
+                for (int ej = 0; ej < Cube::n_edges; ej++) {
                     double edge_toi = ee_collision_detect(c, cj, ei, ej);
                     body_toi = min(body_toi, edge_toi);
                 }
@@ -343,7 +341,7 @@ void implicit_euler(vector<Cube>& cubes)
             }
             if (body_toi < toi) {
                 toi = body_toi;
-                //cout << "overall toi changed" << group << toi << endl;
+                // cout << "overall toi changed" << group << toi << endl;
             }
         }
 

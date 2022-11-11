@@ -2,7 +2,8 @@
 #include <Eigen/Geometry>
 #include <cmath>
 using namespace std;
-Edge::Edge(const Cube& c, int id, bool b) {
+Edge::Edge(const Cube& c, int id, bool b)
+{
     int _0 = Cube::edges[id * 2];
     int _1 = Cube::edges[id * 2 + 1];
     e0 = c.vi(_0, b);
@@ -30,7 +31,6 @@ Face::Face(const Cube& c, int id, bool b)
     t0 = c.vi(_a, b);
     t1 = c.vi(_b, b);
     t2 = c.vi(_c, b);
-    
 }
 
 double vf_distance(const vec3& v, const Cube& c, int id)
@@ -39,18 +39,18 @@ double vf_distance(const vec3& v, const Cube& c, int id)
     return vf_distance(v, f);
 }
 
-double vf_distance(const vec3 &vertex)
+double vf_distance(const vec3& vertex)
 {
     // ground plane y = -0.5
     return vertex(1) + 0.5;
 }
-vec3 vf_distance_gradient_x(const vec3 &vertex)
+vec3 vf_distance_gradient_x(const vec3& vertex)
 {
     // face = grond plane y = 0.5
     return vec3(0.0f, 1.0f, 0.0f);
 }
 
-double vf_distance(const vec3& _v, const Face &f)
+double vf_distance(const vec3& _v, const Face& f)
 {
     double d = f.unit_normal().dot(_v - f.t0);
     double area = (f.t1 - f.t0).cross(f.t2 - f.t0).norm();
@@ -62,7 +62,7 @@ double vf_distance(const vec3& _v, const Face &f)
         double ab = (f.t1 - f.t0).norm();
         double bc = (f.t2 - f.t1).norm();
         double ca = (f.t0 - f.t2).norm();
-        
+
         double d_ab = (v - f.t0).cross(f.t0 - f.t1).norm() / ab;
         double d_bc = (v - f.t1).cross(f.t1 - f.t2).norm() / bc;
         double d_ac = (v - f.t2).cross(f.t2 - f.t0).norm() / ca;
@@ -70,20 +70,20 @@ double vf_distance(const vec3& _v, const Face &f)
         double d_a = (v - f.t0).norm();
         double d_b = (v - f.t1).norm();
         double d_c = (v - f.t2).norm();
-        
+
         d_ab = abs(d_a * d_a - d_b * d_b) >= ab * ab ? min(d_a, d_b) : d_ab;
         d_bc = abs(d_b * d_b - d_c * d_c) >= bc * bc ? min(d_c, d_b) : d_bc;
         d_ac = abs(d_a * d_a - d_c * d_c) >= ca * ca ? min(d_a, d_c) : d_ac;
 
-        
         double d_projected = min(d_ab, min(d_bc, d_ac));
-        //double d_projected = min(min(min(min(min(d_ab, d_bc), d_ac), d_a), d_b), d_c);
+        // double d_projected = min(min(min(min(min(d_ab, d_bc), d_ac), d_a), d_b), d_c);
         d = sqrt(d * d + d_projected * d_projected);
     }
     return d;
 }
 
-double ee_distance(const Edge &ei, const Edge &ej){
+double ee_distance(const Edge& ei, const Edge& ej)
+{
     double d = 0.0;
     auto ei0 = ei.e0, ei1 = ei.e1, ej0 = ej.e0, ej1 = ej.e1;
     auto n = (ei1 - ei0).cross(ej1 - ej0);
@@ -92,6 +92,6 @@ double ee_distance(const Edge &ei, const Edge &ej){
         auto t = ei1 - ei0;
         d = t.cross(ej0 - ei0).norm() / t.dot(t);
     }
-    d = abs(n.dot(ej0 - ei0))/ n.dot(n);
+    d = abs(n.dot(ej0 - ei0)) / n.dot(n);
     return d;
 }
