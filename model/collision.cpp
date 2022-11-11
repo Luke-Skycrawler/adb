@@ -15,8 +15,8 @@ double vf_collision_time(const vec3& x, const vec3& p, const mat3& q, const vec3
     // assert that (p, q) is collision-free and (p_next, q_next) is the state after penetration
     vec3 initial_guess(q * x + p);
     double t = 0.0f;
-    double distance = barrier::vf_distance(initial_guess);
-    vec3 dd_dx(barrier::vf_distance_gradient_x(initial_guess));
+    double distance = vf_distance(initial_guess);
+    vec3 dd_dx(vf_distance_gradient_x(initial_guess));
     // distance derivative of x
 
     vec3 x_t = (q_next - q) * x + (p_next - p);

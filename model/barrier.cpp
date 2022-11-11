@@ -19,19 +19,6 @@ namespace barrier
     }
 
     // nebla_q = nebla f J
-    vec3 vf_distance_gradient_x(const vec3 &vertex)
-    {
-        // face = grond plane y = 0.5
-        return vec3(0.0f, 1.0f, 0.0f);
-    }
-
-    double vf_distance(const vec3 &vertex)
-    {
-        // ground plane y = -0.5
-        return vertex(1) + 0.5;
-    }
-
-
     vec3 barrier_gradient_x(const vec3 &vertex)
     {
         return vf_distance_gradient_x(vertex) * barrier_derivative_d(vf_distance(vertex));
@@ -51,7 +38,7 @@ namespace barrier
         return J;
     }
 
-    VectorXd distance_gradient_q(const vec3 &tilex, const vec3 &vertex)
+    inline VectorXd distance_gradient_q(const vec3 &tilex, const vec3 &vertex)
     {
         return vf_distance_gradient_x(vertex).adjoint() * x_jacobian_q(tilex);
     }

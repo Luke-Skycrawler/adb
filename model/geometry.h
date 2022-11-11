@@ -18,11 +18,16 @@ struct Edge {
         : e0(e0), e1(e1) {}
     Edge(const Cube& c, int eid, bool use_line_search_increment = false);
 };
+
+
 double vf_distance(const vec3& vertex, const Cube& c, int id);
-
 double vf_distance(const vec3& v, const Face& f);
-
 double ee_distance(const Edge &ei, const Edge &ej);
+vec3 vf_distance_gradient_x(const vec3& vertex);
+double vf_distance(const vec3& vertex);
+
+
+
 
 // Symbolically generated derivatives;
 namespace autogen {

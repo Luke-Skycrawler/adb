@@ -2,6 +2,13 @@
 #include <Eigen/Geometry>
 #include <cmath>
 using namespace std;
+Edge::Edge(const Cube& c, int id, bool b) {
+    int _0 = Cube::edges[id * 2];
+    int _1 = Cube::edges[id * 2 + 1];
+    e0 = c.vi(_0, b);
+    e1 = c.vi(_1, b);
+}
+
 vec3 Face::normal() const
 {
     return (t0 - t1).cross(t0 - t2);
@@ -13,12 +20,6 @@ vec3 Face::unit_normal() const
     return n / sqrt(n.dot(n));
 }
 
-Edge::Edge(const Cube& c, int id, bool b) {
-    int _0 = Cube::edges[id * 2];
-    int _1 = Cube::edges[id * 2 + 1];
-    e0 = c.vi(_0, b);
-    e1 = c.vi(_1, b);
-}
 Face::Face(const Cube& c, int id, bool b)
 {
 
@@ -36,6 +37,17 @@ double vf_distance(const vec3& v, const Cube& c, int id)
 {
     Face f(c, id);
     return vf_distance(v, f);
+}
+
+double vf_distance(const vec3 &vertex)
+{
+    // ground plane y = -0.5
+    return vertex(1) + 0.5;
+}
+vec3 vf_distance_gradient_x(const vec3 &vertex)
+{
+    // face = grond plane y = 0.5
+    return vec3(0.0f, 1.0f, 0.0f);
 }
 
 double vf_distance(const vec3& _v, const Face &f)
