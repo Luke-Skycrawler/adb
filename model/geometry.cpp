@@ -50,30 +50,64 @@ vec3 vf_distance_gradient_x(const vec3& vertex)
     return vec3(0.0f, 1.0f, 0.0f);
 }
 
+inline double ab(const vec3& a, const vec3& b)
+{
+    return (a - b).norm();
+}
+inline double ab_sqr(const vec3& v0, const vec3& v1) {
+    return (v0 - v1).dot(v0 - v1);
+}
+
+inline double h(const vec3 &a, const vec3 &b, const vec3 &c) {
+    // height of triangle
+    // ab as base
+    return (b-a).cross(c-a).norm() / ab(a, b);
+}
+
+inline double area(const vec3 &a, const vec3 &b, const vec3 &c) {
+    return (c -a).cross(b- a).norm();
+}
+inline bool is_obtuse_triangle(const vec3 &a, const vec3 &b, const vec3 &c) {
+    // determines if projection of c is in the span of ab
+    return abs(ab_sqr(c,a) - ab_sqr(c, b)) > ab_sqr(a, b);
+}
+inline double ev_distance(const Edge& e, const vec3& v)
+{
+    double d = h(e.e0, e.e1, v);
+    bool s = is_obtuse_triangle(e.e0, e.e1, v);
+    if (s) {
+        d = min(ab(v, e.e0), ab(v, e.e1));
+    }
+    return d;
+}
+
 double vf_distance(const vec3& _v, const Face& f)
 {
     double d = f.unit_normal().dot(_v - f.t0);
-    double area = (f.t1 - f.t0).cross(f.t2 - f.t0).norm();
-    vec3 v = _v - d * f.unit_normal();
     d = abs(d);
-    double a2 = ((f.t0 - v).cross(f.t1 - v).norm() + (f.t1 - v).cross(f.t2 - v).norm() + (f.t2 - v).cross(f.t0 - v).norm());
-    if (abs(a2 - area) > 1e-3) {
+    
+    double a1 = area(f.t1, f.t0, f.t2);
+    vec3 v = _v - d * f.unit_normal();
+    // double a2 = ((f.t0 - v).cross(f.t1 - v).norm() + (f.t1 - v).cross(f.t2 - v).norm() + (f.t2 - v).cross(f.t0 - v).norm());
+    double a2 = area(f.t0, f.t1, v) + area(f.t1, f.t2, v) + area(f.t2, f.t0, v);
+    if (abs(a2 - a1) > 1e-3) {
         // projection outside of triangle
-        double ab = (f.t1 - f.t0).norm();
-        double bc = (f.t2 - f.t1).norm();
-        double ca = (f.t0 - f.t2).norm();
+        double _ab = (f.t1 - f.t0).norm();
+        double _bc = (f.t2 - f.t1).norm();
+        double _ca = (f.t0 - f.t2).norm();
 
-        double d_ab = (v - f.t0).cross(f.t0 - f.t1).norm() / ab;
-        double d_bc = (v - f.t1).cross(f.t1 - f.t2).norm() / bc;
-        double d_ac = (v - f.t2).cross(f.t2 - f.t0).norm() / ca;
+        double d_ab = h(f.t0, f.t1, v);
+        double d_bc = h(f.t1, f.t2, v);
+        double d_ac = h(f.t0, f.t2, v);
 
-        double d_a = (v - f.t0).norm();
-        double d_b = (v - f.t1).norm();
-        double d_c = (v - f.t2).norm();
+        double d_a = ab(v, f.t0);
+        double d_b = ab(v, f.t1);
+        double d_c = ab(v, f.t2);
 
-        d_ab = abs(d_a * d_a - d_b * d_b) >= ab * ab ? min(d_a, d_b) : d_ab;
-        d_bc = abs(d_b * d_b - d_c * d_c) >= bc * bc ? min(d_c, d_b) : d_bc;
-        d_ac = abs(d_a * d_a - d_c * d_c) >= ca * ca ? min(d_a, d_c) : d_ac;
+
+        d_ab = is_obtuse_triangle(f.t0, f.t1, v) ? min(d_a, d_b): d_ab;
+        d_bc = is_obtuse_triangle(f.t2, f.t1, v) ? min(d_c, d_b): d_bc;
+        d_ac = is_obtuse_triangle(f.t0, f.t2, v) ? min(d_a, d_c): d_ac;
 
         double d_projected = min(d_ab, min(d_bc, d_ac));
         // double d_projected = min(min(min(min(min(d_ab, d_bc), d_ac), d_a), d_b), d_c);
@@ -87,11 +121,56 @@ double ee_distance(const Edge& ei, const Edge& ej)
     double d = 0.0;
     auto ei0 = ei.e0, ei1 = ei.e1, ej0 = ej.e0, ej1 = ej.e1;
     auto n = (ei1 - ei0).cross(ej1 - ej0);
+
     if (n.norm() < 1e-6) {
         // degenerate case
-        auto t = ei1 - ei0;
-        d = t.cross(ej0 - ei0).norm() / t.dot(t);
+        d = h(ei1, ei0, ej0);
+        if (is_obtuse_triangle(ei1, ei0, ej0) || is_obtuse_triangle(ei1, ei0, ej1)
+            || is_obtuse_triangle(ej0, ej1, ei1) || is_obtuse_triangle(ej0, ej1, ei0)) {
+            return d;
+        }
+        const auto& vei(ab(ei0, ej0) < ab(ei1,ej0) ? ei0: ei1);
+        const auto& vej(ab(ej0, ei0) < ab(ej1, ei0) ? ej0 : ej1);
+        d = sqrt(d * d + ab(vei, vej));
+        return d;
     }
-    d = abs(n.dot(ej0 - ei0)) / n.dot(n);
+
+
+    d = n.dot(ej0 - ei0) / n.dot(n);
+    ej0 -= d * n;
+    ej1 -= d * n;
+    d = abs(d);
+
+    auto t00 = (ei1 - ei0).cross(ej0 - ei0);
+    auto t01 = (ei1 - ei0).cross(ej1 - ei0);
+
+    auto t10 = (ej1 - ej0).cross(ei0 - ej0);
+    auto t11 = (ej1 - ej0).cross(ei1 - ej0);
+
+    bool s0 = t00.dot(t01) < 0;
+    bool s1 = t10.dot(t11) < 0;
+    
+    if (s0 && s1) {
+        return d;
+    }
+    double _d;
+    if (s0 || s1) {
+        double _d;
+        if (s0) {
+            bool s = h(ej0, ej1, ei0) > h(ej0, ej1, ei1);
+            const vec3 &v(s ? ei1 : ei0);
+            _d = ev_distance(ej, v);
+        }
+        else {
+            bool s = h(ei0, ei1, ej0) > h(ei0, ei1, ej1);
+            const vec3& v(s ? ej1 : ej0);
+            _d = ev_distance(ei, v);
+        }
+        
+    }
+    else {
+        _d = min(min(min(ab(ei0, ej0), ab(ei1, ej0)), ab(ei0, ej1)), ab(ei0, ej1));
+    }
+    d = sqrt(d * d + _d * _d);
     return d;
 }

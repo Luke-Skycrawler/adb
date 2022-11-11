@@ -330,11 +330,12 @@ void implicit_euler(vector<Cube>& cubes)
 
                     bool b = ((u1.array() >= l0.array()).array() && (u0.array() >= l1.array()).array()).all();
                     if (!b) {
+                        //cout << 0;
                         continue;
-                        cout << 0;
                     }
-                    else
-                        cout << 1;
+                    else {
+                        //cout << 1;
+                    }
 
 #endif
                     double edge_toi = ee_collision_detect(c, cj, ei, ej);
