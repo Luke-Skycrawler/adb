@@ -122,23 +122,23 @@ double ee_distance(const Edge& ei, const Edge& ej)
     auto ei0 = ei.e0, ei1 = ei.e1, ej0 = ej.e0, ej1 = ej.e1;
     auto n = (ei1 - ei0).cross(ej1 - ej0);
 
-    if (n.norm() < 1e-6) {
+    if (n.norm() < 1e-12) {
         // degenerate case
         d = h(ei1, ei0, ej0);
-        if (is_obtuse_triangle(ei1, ei0, ej0) || is_obtuse_triangle(ei1, ei0, ej1)
-            || is_obtuse_triangle(ej0, ej1, ei1) || is_obtuse_triangle(ej0, ej1, ei0)) {
+        if (!is_obtuse_triangle(ei1, ei0, ej0) || !is_obtuse_triangle(ei1, ei0, ej1)
+            || !is_obtuse_triangle(ej0, ej1, ei1) || !is_obtuse_triangle(ej0, ej1, ei0)) {
             return d;
         }
         const auto& vei(ab(ei0, ej0) < ab(ei1,ej0) ? ei0: ei1);
         const auto& vej(ab(ej0, ei0) < ab(ej1, ei0) ? ej0 : ej1);
-        d = sqrt(d * d + ab(vei, vej));
+        d = sqrt(d * d + ab_sqr(vei, vej));
         return d;
     }
 
 
-    d = n.dot(ej0 - ei0) / n.dot(n);
-    ej0 -= d * n;
-    ej1 -= d * n;
+    d = n.dot(ej0 - ei0) / n.norm();
+    ej0 -= d * n / n.norm();
+    ej1 -= d * n / n.norm();
     d = abs(d);
 
     auto t00 = (ei1 - ei0).cross(ej0 - ei0);
@@ -155,7 +155,6 @@ double ee_distance(const Edge& ei, const Edge& ej)
     }
     double _d;
     if (s0 || s1) {
-        double _d;
         if (s0) {
             bool s = h(ej0, ej1, ei0) > h(ej0, ej1, ei1);
             const vec3 &v(s ? ei1 : ei0);
@@ -169,7 +168,7 @@ double ee_distance(const Edge& ei, const Edge& ej)
         
     }
     else {
-        _d = min(min(min(ab(ei0, ej0), ab(ei1, ej0)), ab(ei0, ej1)), ab(ei0, ej1));
+        _d = min(min(min(ab(ei0, ej0), ab(ei1, ej0)), ab(ei0, ej1)), ab(ei1, ej1));
     }
     d = sqrt(d * d + _d * _d);
     return d;
