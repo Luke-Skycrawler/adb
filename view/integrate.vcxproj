@@ -76,7 +76,7 @@
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
     <IncludePath>D:\third_party_libs\Tight-Inclusion\src;$(IncludePath)</IncludePath>
-    <LibraryPath>D:\third_party_libs\Tight-Inclusion\build\Debug;$(LibraryPath)</LibraryPath>
+    <LibraryPath>D:\third_party_libs\Tight-Inclusion\release\Release;$(LibraryPath)</LibraryPath>
   </PropertyGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
     <ClCompile>

@@ -111,7 +111,7 @@ void implicit_euler(vector<Cube>& cubes)
             cf = vf_colliding_response(cj, c);
             cv = vf_colliding_response(c, cj);
             if (cf or cv) {
-                if (ts % 10 == 0)
+                if (ts % max_iters == 0)
                     spdlog::warn("updates velocity");
                 spdlog::info("collision response at {}", ts);
                 // cout << endl << ts << endl;
@@ -145,7 +145,7 @@ void implicit_euler(vector<Cube>& cubes)
                         // colliding_set.push_back(make_pair(v, Face(cj, f)));
                         // TODO: directly change it to collision response
                         if (d < 1e-4) {
-                            cout << "restarting " << endl;
+                            // cout << "restarting " << endl;
                         }
 
                         VectorXd ci_barrier_term, cj_barrier_term;
@@ -342,11 +342,11 @@ void implicit_euler(vector<Cube>& cubes)
                     bool term1 = (v_t1.array()  <= fu.array()).all() && (v_t1.array() >= fl.array()).all();
                     
                     if (!(term0 && term1)) {
-                        cout << "0 ";
+                        // cout << "0 ";
                         continue;
                     }
                     else
-                        cout << "1 ";
+                        // cout << "1 ";
                     #endif
                     tri_toi = vf_collision_detect(v_t0, v_t1, cj, _f);
                     body_toi = min(body_toi, tri_toi);

@@ -217,8 +217,8 @@ int vf_colliding_response(Cube& ci, Cube& cj)
                 ci.barrier_gradient += ci_barrier_term;
                 cj.barrier_gradient += cj_barrier_term;
 
-                cout << "r " << ci.barrier_gradient.adjoint() << endl;
-                cout << endl;
+                // cout << "r " << ci.barrier_gradient.adjoint() << endl;
+                // cout << endl;
                 ret = 1;
             }
         }
@@ -330,8 +330,8 @@ int ee_colliding_repsonse(Cube& ci, Cube& cj)
                 ci.barrier_gradient += ci_barrier_term;
                 cj.barrier_gradient += cj_barrier_term;
 
-                cout << "r " << ci.barrier_gradient.adjoint() << endl;
-                cout << endl;
+                // cout << "r " << ci.barrier_gradient.adjoint() << endl;
+                // cout << endl;
                 ret = 1;
             }
         }
