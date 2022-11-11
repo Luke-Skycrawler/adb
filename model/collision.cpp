@@ -226,7 +226,7 @@ int vf_colliding_response(Cube& ci, Cube& cj)
     return ret;
 }
 
-int ee_colliding_repsonse(Cube& ci, Cube& cj)
+int ee_colliding_response(Cube& ci, Cube& cj)
 {
     int ret = 0;
     double gx[12], Hx[144];

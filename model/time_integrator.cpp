@@ -16,7 +16,7 @@ static const int max_iters = 10;
 // #define DEBUG_COLLISION
 #define _DEBUG_TWO_BLOCKS
 #define _VF_CULLING_HACK
-
+#define _EE_CULLING_HACK
 VectorXd q_residue_barrier_term(Cube& c)
 {
     VectorXd barrier_term;
@@ -62,7 +62,7 @@ VectorXd cat(mat3& rq, const vec3& rp)
 void implicit_euler(vector<Cube>& cubes)
 {
     static int ts = 0;
-    static int cv = 0, cf = 0;
+    static int cv = 0, cf = 0, ce0 = 0, ce1 = 0;
     // x[t+1] = x[t] + v[t+1] dt
     static const double dt = 1e-4;
     for (auto& c : cubes) {
@@ -110,7 +110,11 @@ void implicit_euler(vector<Cube>& cubes)
             auto& cj(cubes[j]);
             cf = vf_colliding_response(cj, c);
             cv = vf_colliding_response(c, cj);
-            if (cf or cv) {
+
+            ce0 = ee_colliding_response(c, cj);
+            ce1 = ee_colliding_response(cj, c);
+
+            if (cf || cv || ce0 || ce1) {
                 if (ts % max_iters == 0)
                     spdlog::warn("updates velocity");
                 spdlog::info("collision response at {}", ts);
@@ -314,14 +318,27 @@ void implicit_euler(vector<Cube>& cubes)
 
             for (int ei = 0; ei < Cube::n_edges; ei++) {
                 for (int ej = 0; ej < Cube::n_edges; ej++) {
-                    #ifdef _EE_CULLING_HACK
-                    vec3 fl0, fl1;
-                    vec3 fu0, fu1;
-                    // fl0 = 
+                    Edge _ei(c, ei), _ej(cj, ej);
+#ifdef _EE_CULLING_HACK
+                    vec3 l0, l1;
+                    vec3 u0, u1;
 
-                    #endif
-                    // double edge_toi = ee_collision_detect(c, cj, ei, ej);
-                    // body_toi = min(body_toi, edge_toi);
+                    l0 = _ei.e0.cwiseMin(_ei.e1);
+                    u0 = _ei.e0.cwiseMax(_ei.e1);
+                    l1 = _ej.e0.cwiseMin(_ej.e1);
+                    u1 = _ej.e0.cwiseMax(_ej.e1);
+
+                    bool b = ((u1.array() >= l0.array()).array() && (u0.array() >= l1.array()).array()).all();
+                    if (!b) {
+                        continue;
+                        cout << 0;
+                    }
+                    else
+                        cout << 1;
+
+#endif
+                    double edge_toi = ee_collision_detect(c, cj, ei, ej);
+                    body_toi = min(body_toi, edge_toi);
                 }
             }
             for (int i = 0; i < Cube::n_vertices; i++) {
@@ -330,25 +347,25 @@ void implicit_euler(vector<Cube>& cubes)
                     Face f(cj, _f);
                     Face f1(cj, _f, true);
                     double tri_toi = 1.0;
-                    #ifdef _VF_CULLING_HACK
+#ifdef _VF_CULLING_HACK
                     vec3 fl, fu;
-                    fl = f.t0.cwiseMin( f.t1).cwiseMin(f.t2) ;
-                    fl = fl.cwiseMin(f1.t0).cwiseMin( f1.t1).cwiseMin(f1.t2) ;
+                    fl = f.t0.cwiseMin(f.t1).cwiseMin(f.t2);
+                    fl = fl.cwiseMin(f1.t0).cwiseMin(f1.t1).cwiseMin(f1.t2);
 
-                    fu = f.t0.cwiseMax( f.t1).cwiseMax(f.t2) ;
-                    fu = fl.cwiseMax(f1.t0).cwiseMax( f1.t1).cwiseMax(f1.t2) ;
-                    
-                    bool term0 = (v_t0.array()  <= fu.array()).all() && (v_t0.array() >= fl.array()).all();
-                    bool term1 = (v_t1.array()  <= fu.array()).all() && (v_t1.array() >= fl.array()).all();
-                    
+                    fu = f.t0.cwiseMax(f.t1).cwiseMax(f.t2);
+                    fu = fl.cwiseMax(f1.t0).cwiseMax(f1.t1).cwiseMax(f1.t2);
+
+                    bool term0 = (v_t0.array() <= fu.array()).all() && (v_t0.array() >= fl.array()).all();
+                    bool term1 = (v_t1.array() <= fu.array()).all() && (v_t1.array() >= fl.array()).all();
+
                     if (!(term0 && term1)) {
                         // cout << "0 ";
                         continue;
                     }
                     else
-                        // cout << "1 ";
-                    #endif
-                    tri_toi = vf_collision_detect(v_t0, v_t1, cj, _f);
+                    // cout << "1 ";
+#endif
+                        tri_toi = vf_collision_detect(v_t0, v_t1, cj, _f);
                     body_toi = min(body_toi, tri_toi);
                 }
                 // auto triangle_list(spatial_hashing::query_edge(v_start, v_end, group, ts));
