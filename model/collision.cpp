@@ -306,8 +306,8 @@ int ee_colliding_response(Cube& ci, Cube& cj)
                     const auto& g1(i == 2 ? gx_eb0 : gx_eb1);
 
                     for (int j = 2; j < 4; j++) {
-                        const auto& J2(j == 0 ? J_eb0 : J_eb1);
-                        const auto& g2(j == 0 ? gx_eb0 : gx_eb1);
+                        const auto& J2(j == 2 ? J_eb0 : J_eb1);
+                        const auto& g2(j == 2 ? gx_eb0 : gx_eb1);
                         hess_j += J1.adjoint() * (db2 * g1 * g2.adjoint() + dbdd * _Hx.block<3, 3>(i * 3, j * 3)) * J2;
                     }
                 }

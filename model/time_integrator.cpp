@@ -17,6 +17,8 @@ static const int max_iters = 10;
 #define _DEBUG_TWO_BLOCKS
 #define _VF_CULLING_HACK
 #define _EE_CULLING_HACK
+#define _EE_
+//#define _VF_
 VectorXd q_residue_barrier_term(Cube& c)
 {
     VectorXd barrier_term;
@@ -46,7 +48,7 @@ mat3 q_residue(Cube& c, double dt)
 vec3 p_residue(Cube& c, double dt)
 {
     static const vec3 gravity(0.0f, 0.0f, 0.0f);
-    // static const vec3 gravity(0.0f, -9.8e3, 0.0f);
+    //static const vec3 gravity(0.0f, -9.8, 0.0f);
     double m = c.mass / (dt * dt);
     vec3 r = m * c.p_next - gravity * c.mass - (c.p + dt * c.p_dot) * m;
     return r;
@@ -108,11 +110,14 @@ void implicit_euler(vector<Cube>& cubes)
             int j = 1 - _i;
             /*if (j == _i) continue;*/
             auto& cj(cubes[j]);
+#ifdef _VF_
             cf = vf_colliding_response(cj, c);
             cv = vf_colliding_response(c, cj);
-
+#endif
+#ifdef _EE_
             ce0 = ee_colliding_response(c, cj);
             ce1 = ee_colliding_response(cj, c);
+#endif
 
             if (cf || cv || ce0 || ce1) {
                 if (ts % max_iters == 0)
@@ -338,8 +343,10 @@ void implicit_euler(vector<Cube>& cubes)
                     }
 
 #endif
+#ifdef _EE_
                     double edge_toi = ee_collision_detect(c, cj, ei, ej);
                     body_toi = min(body_toi, edge_toi);
+#endif                    
                 }
             }
             for (int i = 0; i < Cube::n_vertices; i++) {
@@ -363,11 +370,15 @@ void implicit_euler(vector<Cube>& cubes)
                         // cout << "0 ";
                         continue;
                     }
-                    else
-                    // cout << "1 ";
+                    else {
+                        // cout << "1 ";
+                    }
+                    
 #endif
-                        tri_toi = vf_collision_detect(v_t0, v_t1, cj, _f);
+#ifdef _VF_
+                    tri_toi = vf_collision_detect(v_t0, v_t1, cj, _f);
                     body_toi = min(body_toi, tri_toi);
+#endif
                 }
                 // auto triangle_list(spatial_hashing::query_edge(v_start, v_end, group, ts));
 
