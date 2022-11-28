@@ -16,7 +16,7 @@ Cube* spinning_cube()
     cube->q_dot = R;
     cube->p = vec3(0.0, 1.0, 0.0);
     // cube->p = vec3(0.0, 0.2, 0.0);
-    cube->p_dot = vec3(0.0, -200.0, 0.0);
+    // cube->p_dot = vec3(0.0, -200.0, 0.0);
     return cube;
 }
 
@@ -28,8 +28,8 @@ vector<Cube> cube_blocks(int n)
         auto R = cross_matrix(omega);
         cube->q_dot = R;
 
-        cube->p = vec3(i * 0.5, 1.0 * (i * 1.05 + 0.1), i * 0.5);
-        cube->p_dot = vec3(0.0, 0.0, 0.0);
+        cube->p = vec3(i * 0.5, 1.0 * (i * 1.5 + 0.1), i * 0.5);
+        cube->p_dot = vec3(0.0, i * -50.0, 0.0);
         cubes.push_back(*cube);
     }
     return cubes;

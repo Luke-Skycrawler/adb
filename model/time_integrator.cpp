@@ -5,20 +5,12 @@
 #include "collision.h"
 #include "spatial_hashing.h"
 #include "spdlog/spdlog.h"
+#include "../view/global_variables.h"
 using namespace std;
 using namespace barrier;
 using namespace Eigen;
 
-static const int max_iters = 10;
-
-// #define _DEBUG_BARRIER_
-// #define PER_ITER_RESIDUE_PRINT
-// #define DEBUG_COLLISION
-#define _DEBUG_TWO_BLOCKS
-#define _VF_CULLING_HACK
-#define _EE_CULLING_HACK
-#define _EE_
-//#define _VF_
+#include "marcros_settings.h"
 VectorXd q_residue_barrier_term(Cube& c)
 {
     VectorXd barrier_term;
@@ -46,9 +38,12 @@ mat3 q_residue(Cube& c, double dt)
 }
 
 vec3 p_residue(Cube& c, double dt)
-{
+{   
+    #ifdef NO_GRAVITY
     static const vec3 gravity(0.0f, 0.0f, 0.0f);
-    //static const vec3 gravity(0.0f, -9.8, 0.0f);
+    #else
+    static const vec3 gravity(0.0f, -9.8e1, 0.0f);
+    #endif
     double m = c.mass / (dt * dt);
     vec3 r = m * c.p_next - gravity * c.mass - (c.p + dt * c.p_dot) * m;
     return r;
@@ -61,17 +56,19 @@ VectorXd cat(mat3& rq, const vec3& rp)
     ret << rp, _rq;
     return ret;
 }
-void implicit_euler(vector<Cube>& cubes)
+void implicit_euler(vector<Cube>& cubes, double dt)
 {
     static int ts = 0;
     static int cv = 0, cf = 0, ce0 = 0, ce1 = 0;
     // x[t+1] = x[t] + v[t+1] dt
-    static const double dt = 1e-4;
+    //static const double dt = 1e-4;
     for (auto& c : cubes) {
         c.q_next = c.A;
         c.p_next = c.p;
     }
-    for (int iter = 0; iter < max_iters; iter++) {
+    int iter = 0;
+    double max_increment = 0.0;
+    do {
         // newton iterations
         for (int _i = 0; _i < cubes.size(); _i++) {
             auto& c(cubes[_i]);
@@ -120,8 +117,8 @@ void implicit_euler(vector<Cube>& cubes)
 #endif
 
             if (cf || cv || ce0 || ce1) {
-                if (ts % max_iters == 0)
-                    spdlog::warn("updates velocity");
+                // if (ts % globals.max_iter == 0)
+                //     spdlog::warn("updates velocity");
                 spdlog::info("collision response at {}", ts);
                 // cout << endl << ts << endl;
             }
@@ -402,13 +399,17 @@ void implicit_euler(vector<Cube>& cubes)
             spdlog::info("collision detected at ", ts);
             // iter = 0;
         }
+        max_increment = 0.0;
         double factor = toi < 1.0 ? 0.9 : 1.0;
         for (auto& c : cubes) {
 
             c.q_next -= c.dq * toi * factor;
             c.p_next -= c.dp * toi * factor;
+            max_increment = max(max_increment, c.dp.norm());
+            max_increment = max(max_increment, c.dq.norm());
+            
 #ifdef PER_ITER_RESIDUE_PRINT
-            if (iter == 0 || iter == max_iters - 1) {
+            if (iter == 0 || iter == globals.max_iter - 1) {
                 // cout << "iter " << iter << ", residue = " << r << endl;
                 cout << "dp = " << c.dp << endl;
                 cout << "dq = " << c.dq << endl;
@@ -417,7 +418,10 @@ void implicit_euler(vector<Cube>& cubes)
         }
         // spatial_hashing::remove_all_entries();
         ts++;
+        iter ++;
     }
+    while(max_increment > 1e-6 && iter < globals.max_iter);
+    spdlog::warn("#iter = {}", iter);
     for (auto& c : cubes) {
         c.q_dot = (c.q_next - c.A) * (1.0 / dt);
         c.A = c.q_next;

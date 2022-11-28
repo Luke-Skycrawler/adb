@@ -31,6 +31,9 @@ struct GlobalVariableMainCPP{
         lastY = SCR_HEIGHT / 2.0f;
         firstMouse = true;
     }
+    
+    double dt;
+    int max_iter;
 };
 #ifdef _MAIN_CPP
 #define VARIABLE_LOCATOR

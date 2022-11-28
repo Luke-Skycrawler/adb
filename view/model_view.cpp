@@ -9,6 +9,9 @@
 #include "../model/time_integrator.h"
 #include "../model/glue.h"
 #include <glm/gtx/string_cast.hpp>
+#include "../model/marcros_settings.h"
+#include <fstream>
+#include <nlohmann/json.hpp>
 
 using namespace std;
 //------------------ optional features ----------------------------
@@ -37,8 +40,8 @@ void render_cubes(Shader shader, vector<Cube> cubes)
 int main()
 {
     Cube::gen_indices();
-    globals.cubes = cube_blocks(2);
-    
+    reset();
+    double dt = globals.dt;
     // glfw: initialize and configure
     // ------------------------------
     glfwInit();
@@ -262,7 +265,7 @@ int main()
         glm::vec3 box2Pos(0.3, 0.0, 1.2);
         glm::mat4 lightSpaceTrans = glm::lookAt(lightPos, glm::vec3(0.0f), globals.camera.WorldUp);
         for (int i = 0; i < 1; i++)
-            implicit_euler(globals.cubes);
+            implicit_euler(globals.cubes, dt);
         if (globals.display_corner)
         {
             glBindFramebuffer(GL_FRAMEBUFFER, globals.depthMapFBO);

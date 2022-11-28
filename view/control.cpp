@@ -1,6 +1,27 @@
 #include "env.h"
 #include "global_variables.h"
 #include "../test_cases/tests.h"
+
+#include "../model/marcros_settings.h"
+#include <fstream> 
+#include <nlohmann/json.hpp>
+using json = nlohmann::json;
+void reset(){
+    std::ifstream f("../config.json");
+    json data = json::parse(f);
+    double dt = data["dt"];
+    #ifdef _TEST_CASE_2_CUBES
+    globals.cubes = cube_blocks(2);
+    #else 
+    #ifdef _TEST_CASE_FROM_FILE
+    
+    #else
+    globals.cubes.push_back(*spinning_cube());
+    #endif
+    #endif
+    globals.dt = data["dt"];
+    globals.max_iter = data["max_iter"];
+}
 // process all input: query GLFW whether relevant keys are pressed/released this frame and react accordingly
 // ---------------------------------------------------------------------------------------------------------
 void processInput(GLFWwindow *window)
@@ -54,7 +75,8 @@ void text_callback(GLFWwindow *window, unsigned int c){
             //globals.cubes.clear();
             //globals.cubes.push_back(*spinning_cube());
             //delete p;
-            globals.cubes = cube_blocks(2);
+            // globals.cubes = cube_blocks(2);
+            reset();
             break;
         case 'q': case 'Q':
             if (globals.cursor_hidden)

@@ -92,9 +92,6 @@ double vf_distance(const vec3& _v, const Face& f)
     double a2 = area(f.t0, f.t1, v) + area(f.t1, f.t2, v) + area(f.t2, f.t0, v);
     if (abs(a2 - a1) > 1e-3) {
         // projection outside of triangle
-        double _ab = (f.t1 - f.t0).norm();
-        double _bc = (f.t2 - f.t1).norm();
-        double _ca = (f.t0 - f.t2).norm();
 
         double d_ab = h(f.t0, f.t1, v);
         double d_bc = h(f.t1, f.t2, v);
