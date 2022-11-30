@@ -12,6 +12,7 @@ static const unsigned int SCR_HEIGHT = 600;
 #include "../model/cube.h"
 #include <vector>
 struct GlobalVariableMainCPP{
+    #ifndef GOOGLE_TEST
     // control
     bool postrender, edge, skybox, model_draw, display_corner, motion, feedback, cursor_hidden;
     float deltaTime, lastFrame;
@@ -24,17 +25,18 @@ struct GlobalVariableMainCPP{
     Camera camera;
     float lastX, lastY;
     bool firstMouse;
-    std::vector<Cube> cubes; 
     GlobalVariableMainCPP(): camera(glm::vec3(0.0f, 0.0f, 3.0f)){
         postrender = false, edge = false, skybox = false, model_draw = false, display_corner = true, motion = false, feedback = false, cursor_hidden = true;        
         lastX = SCR_WIDTH / 2.0f;
         lastY = SCR_HEIGHT / 2.0f;
         firstMouse = true;
     }
-    
+    #endif
     double dt;
     int max_iter;
+    std::vector<Cube> cubes;
 };
+#ifndef GOOGLE_TEST
 #ifdef _MAIN_CPP
 #define VARIABLE_LOCATOR
 VARIABLE_LOCATOR glm::vec3 LightPositions[]
@@ -53,4 +55,4 @@ VARIABLE_LOCATOR GlobalVariableMainCPP globals;
 // lighting
 static glm::vec3 &lightPos(LightPositions[0]);
 
-
+#endif

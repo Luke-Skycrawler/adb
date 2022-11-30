@@ -13,3 +13,8 @@ build/
 CMakeFiles/
 model/x64/
 model/.vs/
+*.tlog
+*.log
+*.obj
+*.pdb
+google_test.*

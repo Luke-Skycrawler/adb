@@ -1,3 +1,6 @@
+#ifndef GOOGLE_TEST
+
+
 #include "time_integrator.h"
 #include "barrier.h"
 #include <iostream>
@@ -6,11 +9,12 @@
 #include "spatial_hashing.h"
 #include "spdlog/spdlog.h"
 #include "../view/global_variables.h"
+#include "marcros_settings.h"
+
 using namespace std;
 using namespace barrier;
 using namespace Eigen;
-
-#include "marcros_settings.h"
+#endif
 VectorXd q_residue_barrier_term(Cube& c)
 {
     VectorXd barrier_term;
@@ -402,11 +406,15 @@ void implicit_euler(vector<Cube>& cubes, double dt)
         max_increment = 0.0;
         double factor = toi < 1.0 ? 0.9 : 1.0;
         for (auto& c : cubes) {
-
+            double e0 = othogonal_energy::otho_energy(c.q_next);
             c.q_next -= c.dq * toi * factor;
             c.p_next -= c.dp * toi * factor;
             max_increment = max(max_increment, c.dp.norm());
             max_increment = max(max_increment, c.dq.norm());
+            double e1 = othogonal_energy::otho_energy(c.q_next);
+#ifdef GOOGLE_TEST
+            EXPECT_TRUE(e1 - e0 < 0) << "energy increases, e0 = " << e0 << ", e1 = " << e1 << endl;
+#endif
             
 #ifdef PER_ITER_RESIDUE_PRINT
             if (iter == 0 || iter == globals.max_iter - 1) {
