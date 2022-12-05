@@ -10,7 +10,7 @@
 #include "spdlog/spdlog.h"
 #include "../view/global_variables.h"
 #include "marcros_settings.h"
-
+#include <cmath>
 using namespace std;
 using namespace barrier;
 using namespace Eigen;
@@ -41,15 +41,16 @@ mat3 q_residue(Cube& c, double dt)
     return r;
 }
 
+
 vec3 p_residue(Cube& c, double dt)
 {   
     #ifdef NO_GRAVITY
     static const vec3 gravity(0.0f, 0.0f, 0.0f);
-    #else
+#else
     static const vec3 gravity(0.0f, -9.8e1, 0.0f);
-    #endif
+#endif
     double m = c.mass / (dt * dt);
-    vec3 r = m * c.p_next - gravity * c.mass - (c.p + dt * c.p_dot) * m;
+    vec3 r = m * c.p_next - c.mass * gravity  - (c.p + dt * c.p_dot) * m;
     return r;
 }
 
@@ -405,15 +406,40 @@ void implicit_euler(vector<Cube>& cubes, double dt)
         }
         max_increment = 0.0;
         double factor = toi < 1.0 ? 0.9 : 1.0;
+        const auto q_tile = [&](Cube &c) -> mat3{
+            return c.A + c.q_dot * dt;
+        };
+        const auto p_tile = [&](Cube &c) -> vec3{
+#ifdef NO_GRAVITY
+            const vec3 gravity(0.0f, 0.0f, 0.0f);
+#else
+            const vec3 gravity(0.0f, -9.8e1, 0.0f);
+#endif
+            return (c.p + c.p_dot * dt + dt * dt * gravity);
+        };
+        const auto eq = [&](Cube &c) -> double {
+            double e = 0.0;
+            auto dq = c.q_next - q_tile(c);
+            auto dp = c.p_next - p_tile(c);
+            for (int i = 0; i < 3; i++){
+                for(int j = 0; j < 3; j++ ){
+                    e += 0.5 * pow(dq(i, j), 2) * 1.0 / 12.0 * c.mass * c.scale * c.scale;
+                }
+                e += 0.5 * pow(dp(i), 2) * c.mass;
+            }
+            return e;
+        };
         for (auto& c : cubes) {
-            double e0 = othogonal_energy::otho_energy(c.q_next);
+            double e0 = othogonal_energy::otho_energy(c.q_next) * dt * dt + eq(c);
             c.q_next -= c.dq * toi * factor;
             c.p_next -= c.dp * toi * factor;
             max_increment = max(max_increment, c.dp.norm());
             max_increment = max(max_increment, c.dq.norm());
-            double e1 = othogonal_energy::otho_energy(c.q_next);
+            double e1 = othogonal_energy::otho_energy(c.q_next) *dt * dt + eq(c);
+            spdlog::info(
+                "enery e0 = {}, e1 = {}", e0, e1);
 #ifdef GOOGLE_TEST
-            EXPECT_TRUE(e1 - e0 < 0) << "energy increases, e0 = " << e0 << ", e1 = " << e1 << endl;
+            EXPECT_TRUE(e1 - e0 < -1e-3) << "energy increases, e0 = " << e0 << ", e1 = " << e1 << endl;
 #endif
             
 #ifdef PER_ITER_RESIDUE_PRINT

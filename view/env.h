@@ -22,3 +22,4 @@ unsigned int Feedback_Initialize(unsigned int *_vbo = NULL, unsigned int *_xfb =
 unsigned int loadCubemap(std::vector<std::string> faces);
 unsigned int loadTexture(char const *path);
 #endif
+void reset();

@@ -33,8 +33,6 @@
   <ImportGroup Label="PropertySheets" />
   <PropertyGroup Label="UserMacros" />
   <ItemGroup>
-    <ClInclude Include="..\..\model\spatial_hashing.h" />
-    <ClInclude Include="..\..\model\time_integrator.h" />
     <ClInclude Include="pch.h" />
   </ItemGroup>
   <ItemGroup>

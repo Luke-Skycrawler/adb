@@ -34,6 +34,7 @@ TEST(vf_distance_test, basic_random) {
     for (auto &f : fs){
       double d = vf_distance(v, f);
       EXPECT_EQ(d, 0.0);
+      //vf_distance_gradient_x()
     }
   }
   
@@ -73,11 +74,11 @@ class Implicit_Euler_Test : public ::testing::Test {
  protected:
   void SetUp() override {
     Cube::gen_indices();
-      
+      reset();
   }
   void reset()
   {
-      std::ifstream f("../config.json");
+      std::ifstream f("../../config.json");
       json data = json::parse(f);
       double dt = data["dt"];
 #ifdef _TEST_CASE_2_CUBES
@@ -116,8 +117,11 @@ TEST_F(Implicit_Euler_Test, numerical_grad_Eo){
           e0 = othogonal_energy::otho_energy(q1);
           g = (e1 - e0)  / dx;
           dx /= 2;
+          q1 = q0;
+          spdlog::info("g0, g1 = {} {}\ndx = {}", g_old, g, dx);
         }
         while (dx  > 1e-8 && abs(g_old - g) > 1e-4);
+        spdlog::info("final g0, g1 = {} {}\ndx = {}", g_old, g, dx);
         grad(i, j) = g;
         double t = abs(g - g_computed(i, j));
         EXPECT_TRUE(t < 1e-4) << "inconsistant with numerical grad at ("<< i <<"," << j  << "), \ng= " << g <<" , computed = " << g_computed(i, j);
@@ -125,7 +129,7 @@ TEST_F(Implicit_Euler_Test, numerical_grad_Eo){
   }
 }
 TEST_F(Implicit_Euler_Test, non_increasing_across_iter){
-  for (int i = 0; i < 10; i++){
+  for (int i = 0; i < 100; i++){
     implicit_euler(globals.cubes, globals.dt);    
   }
 }
