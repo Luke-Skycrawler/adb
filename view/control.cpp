@@ -10,15 +10,18 @@ void reset(){
     std::ifstream f("../config.json");
     json data = json::parse(f);
     double dt = data["dt"];
-    #ifdef _TEST_CASE_2_CUBES
-    globals.cubes = cube_blocks(2);
-    #else 
-    #ifdef _TEST_CASE_FROM_FILE
-    
-    #else
-    globals.cubes.push_back(*spinning_cube());
-    #endif
-    #endif
+    auto predefined = data["predefined_case"]["enable"];
+    if (predefined) {
+        int id = data["predefined_case"]["id"];
+        if (id == 1) {
+            globals.cubes.push_back(*spinning_cube());
+        }
+        else {
+            globals.cubes = cube_blocks(2);
+        }
+    }
+    else {
+    }
     globals.dt = data["dt"];
     globals.max_iter = data["max_iter"];
 }

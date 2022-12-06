@@ -1,6 +1,10 @@
 {
-    "dt": 1e-2,
+    "dt": 5e-3,
     "max_iter": 100,
+    "predefined_case" : {
+        "enable": true,
+        "id" : 2
+    },
     "case": [{
         "cubes": [
             {
