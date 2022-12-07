@@ -13,6 +13,13 @@ struct Cube {
     static const int n_vertices = 8, n_faces = 12, n_edges = 12;
     Vector<double, 12> barrier_gradient;
     Matrix<double, 12, 12> hess;
+    vec3 q[4], q0[4];
+    void cat_all(){
+        q[0] = p_next;
+        for (  int i = 0; i < 3; i++) {
+            q[i] = q_next.col(i);
+        }
+    }
     static const vec3* vertices()
     {
         static const vec3 v[] = {
