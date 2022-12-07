@@ -401,7 +401,7 @@ void implicit_euler(vector<Cube>& cubes, double dt)
         }
 
         if (toi < 1.0) {
-            spdlog::info("collision detected at ", ts);
+            spdlog::warn("collision detected at {}, toi = {}", ts, toi );
             // iter = 0;
         }
         max_increment = 0.0;
