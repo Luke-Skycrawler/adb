@@ -63,7 +63,7 @@ namespace othogonal_energy {
             for (int j = 1; j < 4; j++) {
                 auto qj = q[j];
                 mat3 h = (qi.dot(qj) - kronecker(i, j)) * Matrix3d::Identity(3, 3);
-                for (int k = 0; k < 3; k++) {
+                for (int k = 1; k < 4; k++) {
                     auto qk = q[k];
                     h += (kronecker(k, j) * qi + kronecker(i, j) * qk) * qk.adjoint();
                 }

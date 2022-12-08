@@ -17,6 +17,7 @@ Cube* spinning_cube()
     cube->p = vec3(0.0, 1.0, 0.0);
     // cube->p = vec3(0.0, 0.2, 0.0);
     // cube->p_dot = vec3(0.0, -200.0, 0.0);
+    cube->prepare_q_array();
     return cube;
 }
 
@@ -30,6 +31,7 @@ vector<Cube> cube_blocks(int n)
 
         cube->p = vec3(i * 0.5, 1.0 * (i * 1.5 + 0.1), i * 0.5);
         cube->p_dot = vec3(0.0, i * -5.0, 0.0);
+        cube->prepare_q_array();
         cubes.push_back(*cube);
     }
     return cubes;

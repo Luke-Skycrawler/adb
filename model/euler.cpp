@@ -47,7 +47,11 @@ void implicit_euler(vector<Cube> & cubes, double dt) {
     bool term_cond;
     int iter = 0;
     double sup_dq = 0.0;
-
+    for (auto &c: cubes) {
+        for (int i = 0; i < 4; i ++) {
+            c.q[i] = c.q0[i];
+        }
+    }
     const auto grad_residue_per_body = [&](Cube& c) -> VectorXd {
         VectorXd grad = othogonal_energy::grad(c.q);
         const auto M = [&](const VectorXd& dq) -> VectorXd {
@@ -63,6 +67,7 @@ void implicit_euler(vector<Cube> & cubes, double dt) {
         MatrixXd H = MatrixXd::Identity(12, 12) * c.Ic;
         H.block<3, 3>(0, 0) = MatrixXd::Identity(3, 3) * c.mass;
         auto hess_otho = othogonal_energy::hessian(c.q);
+        //cout << hess_otho << endl;
         return H + hess_otho * dt * dt;
     };
 
@@ -91,7 +96,6 @@ void implicit_euler(vector<Cube> & cubes, double dt) {
     };
 
     const auto line_search = [&](const VectorXd& dq, const VectorXd& grad, VectorXd& q0, const VectorXd q_tiled, Cube& c) -> double {
-        return 1.0;
         const double c1 = 1e-4;
         double alpha = 1.0;
         bool wolfe = false;
@@ -121,15 +125,19 @@ void implicit_euler(vector<Cube> & cubes, double dt) {
                 auto q_tiled = c.q_tile(dt, globals.gravity);
                 auto q = cat(c.q);
                 double alpha = line_search(dq, r, q, q_tiled, c);
-                c.increment_q = dq * alpha;
+                c.increment_q = dq; // * alpha;
                 c.toi = c.vg_collision_time();
+                c.alpha = alpha;
+                double n = (hess * dq + r).norm();
+                spdlog::info("alpha = {}, solver res = {}, grad = {}", alpha, n, r.norm());
+                // cout << hess;
             }
 #endif
         }
 
         double toi = 1.0, factor = 1.0;
 
-        for (auto c : cubes) {
+        for (auto &c : cubes) {
             toi = min(toi, c.toi);
         }
         if (toi < 1.0) {
@@ -141,15 +149,17 @@ void implicit_euler(vector<Cube> & cubes, double dt) {
             auto tiled_q = c.q_tile(dt, globals.gravity);
             double E0 = E(cat(c.q), tiled_q, c);
             for (int i = 0; i < 4; i++) {
+                
                 c.q[i] += c.increment_q.segment<3>(i * 3) * toi * factor;
             }
             double norm_dq = c.increment_q.norm();
             sup_dq = max(sup_dq, norm_dq);
             double E1 = E(cat(c.q), tiled_q, c);
-            spdlog::info("iter {}, e0 = {}, e1 = {}, dq = ", iter, E0, E1);
-            cout << c.increment_q << endl;
+            spdlog::info("iter {}, e0 = {}, e1 = {}, norm_dq = {}, sup_dq = {}, dq = ", iter, E0, E1, norm_dq, sup_dq);
+            //cout << c.increment_q << endl;
         }
-        term_cond = sup_dq > 1e-6 && iter ++< globals.max_iter;
+        term_cond = sup_dq < 1e-6 || iter ++ > globals.max_iter;
+        sup_dq = 0.0;
     }
     while (! term_cond);
     spdlog::info("\n  converge at iter {}", iter);
@@ -158,7 +168,9 @@ void implicit_euler(vector<Cube> & cubes, double dt) {
             c.dqdt[i] = (c.q[i] - c.q0[i]) / dt;
             c.q0[i] = c.q[i];
         }
-        
+        c.p = c.q0[0];
+        c.A << c.q0[1], c.q0[2], c.q0[3];
+
     }
 }
 
@@ -184,4 +196,15 @@ double Cube::vg_collision_time()
         }
     }
     return toi;
+}
+
+void Cube::prepare_q_array(){
+    q[0] = p_next;
+    q0[0] = p;
+    dqdt[0] = p_dot;
+    for (int i = 1; i < 4; i++) {
+        q[i] = q_next.col(i - 1);
+        q0[i] = A.col(i - 1);
+        dqdt[i] = q_dot.col(i - 1);
+    }
 }
