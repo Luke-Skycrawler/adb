@@ -38,6 +38,38 @@ namespace othogonal_energy {
         }
         return 4 * kappa * h;
     }
+
+    VectorXd grad(vec3 q[])
+    {
+        Vector<double, 12> ret;
+        for (int i = 1; i < 4; i++) {
+            vec3 g(0.0, 0.0, 0.0);
+            for (int j = 1; j < 4; j++) {
+                g += (q[i].dot(q[j]) - kronecker(i, j)) * q[j];
+            }
+            ret.segment<3>(i * 3) = 4 * kappa * g;
+        }
+        return ret;
+    }
+
+    MatrixXd hessian(vec3 q[])
+    {
+        Matrix<double, 12, 12> H;
+        for (int i = 1; i < 4; i++) {
+            auto qi = q[i];
+            for (int j = 1; j < 4; j++) {
+                auto qj = q[j];
+                mat3 h = (qi.dot(qj) - kronecker(i, j)) * Matrix3d::Identity(3, 3);
+                for (int k = 0; k < 3; k++) {
+                    auto qk = q[k];
+                    h += (kronecker(k, j) * qi + kronecker(i, j) * qk) * qk.adjoint();
+                }
+                H.block<3,3>(i * 3, j * 3) = 4 * kappa * h;
+            }
+        }
+        return H;
+    }
+
 #else
     vec3 grad(mat3& q, int i)
     {

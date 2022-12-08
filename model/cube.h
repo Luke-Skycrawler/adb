@@ -8,13 +8,13 @@ using mat3 = Matrix3d;
 struct Cube {
     mat3 A, q_dot, q_next, dq;
     vec3 p, p_next, p_dot, dimensions, f, tau, dp;
-    double mass, scale;
+    double mass, scale, Ic;
     static int indices[36], edges[24];
     static const int n_vertices = 8, n_faces = 12, n_edges = 12;
     Vector<double, 12> barrier_gradient;
     Matrix<double, 12, 12> hess;
-    vec3 q[4], q0[4];
-    void cat_all(){
+    vec3 q[4], q0[4], dqdt[4];
+    void prepare_q_array(){
         q[0] = p_next;
         for (  int i = 0; i < 3; i++) {
             q[i] = q_next.col(i);
@@ -53,6 +53,7 @@ struct Cube {
         A.setIdentity(3, 3);
         dimensions.setOnes(3, 1);
         dimensions *= scale;
+        Ic = mass * scale * scale / 12;
     }
 
     inline vec3 vi(int i, bool increment = false) const
@@ -61,7 +62,13 @@ struct Cube {
         const auto& p(increment ? (p_next - dp) : p_next);
         return q * vertices()[i] + p;
     }
-
+    inline vec3 v(int i) const {
+        mat3 A;
+        vec3 b = q[0];
+        A << q[1] , q[2], q[3];
+        return A * vertices() [i] + b;
+    }
+    VectorXd q_tile(double dt, const vec3 &f);
     double vf_collision_detect(const vec3& dp, const mat3& dq);
     static void gen_indices()
     {

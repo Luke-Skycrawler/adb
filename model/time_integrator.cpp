@@ -23,7 +23,7 @@ VectorXd q_residue_barrier_term(Cube& c)
     for (int i = 0; i < 8; i++) {
         const vec3& v0(c.vertices()[i]);
         const vec3& v(c.q_next * v0 + c.p_next);
-        double d = vf_distance(v);
+        double d = vg_distance(v);
 
         if (d < d_hat) {
             assert(d > 0);
@@ -298,8 +298,8 @@ void implicit_euler(vector<Cube>& cubes, double dt)
                     }
                     if (d_t0_min > d_t0) d_t0_min = d_t0;
                 }
-                d_f = min(d_f, vf_distance(v_t1));
-                d_f_t0 = min(d_f_t0, vf_distance(v_t0));
+                d_f = min(d_f, vg_distance(v_t1));
+                d_f_t0 = min(d_f_t0, vg_distance(v_t0));
             }
         }
 

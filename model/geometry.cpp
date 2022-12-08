@@ -39,7 +39,7 @@ double vf_distance(const vec3& v, const Cube& c, int id)
     return vf_distance(v, f);
 }
 
-double vf_distance(const vec3& vertex)
+double vg_distance(const vec3& vertex)
 {
     // ground plane y = -0.5
     return vertex(1) + 0.5;

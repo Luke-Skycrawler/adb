@@ -11,6 +11,8 @@ void reset(){
     json data = json::parse(f);
     double dt = data["dt"];
     auto predefined = data["predefined_case"]["enable"];
+    auto g = data["gravity"];
+    globals.gravity = vec3(0.0, g? -9.8 : 0.0 , 0.0);
     if (predefined) {
         int id = data["predefined_case"]["id"];
         if (id == 1) {

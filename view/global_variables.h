@@ -35,6 +35,7 @@ struct GlobalVariableMainCPP{
     double dt;
     int max_iter;
     std::vector<Cube> cubes;
+    vec3 gravity;
 };
 #ifndef GOOGLE_TEST
 #ifdef _MAIN_CPP
