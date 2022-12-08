@@ -6,6 +6,7 @@
 #include "marcros_settings.h"
 #include <assert.h>
 
+// #define NON_PEN_VALIDATE
 using namespace std;
 using namespace barrier;
 using namespace Eigen;
@@ -148,14 +149,38 @@ void implicit_euler(vector<Cube> & cubes, double dt) {
         for (auto& c : cubes) {
             auto tiled_q = c.q_tile(dt, globals.gravity);
             double E0 = E(cat(c.q), tiled_q, c);
+#ifdef NON_PEN_VALIDATE
+            for (int i = 0; i < c.n_vertices; i++) {
+                auto v2(c.vt2(i));
+                auto v1(c.vt1(i));
+                double d = vg_distance(v2) * toi * 0.8 + vg_distance(v1) * (1 - toi * 0.8);
+                if (d < 0) {
+                    cout << "fuck" << endl;
+                }
+                assert(d > 0.0);
+            }
+#endif
             for (int i = 0; i < 4; i++) {
-                
                 c.q[i] += c.increment_q.segment<3>(i * 3) * toi * factor;
             }
+
+#ifdef NON_PEN_VALIDATE
+            for (int i = 0; i < c.n_vertices; i++) {
+                auto v2(c.vt1(i));
+
+                double d = vg_distance(v2);
+                if (d < 0) {
+                    cout << "shit" << endl;
+                }
+                assert(d > 0.0);
+            }
+#endif
             double norm_dq = c.increment_q.norm();
             sup_dq = max(sup_dq, norm_dq);
             double E1 = E(cat(c.q), tiled_q, c);
             spdlog::info("iter {}, e0 = {}, e1 = {}, norm_dq = {}, sup_dq = {}, dq = ", iter, E0, E1, norm_dq, sup_dq);
+            spdlog::info("toi {}, factor = {}", toi, factor);
+
             //cout << c.increment_q << endl;
         }
         term_cond = sup_dq < 1e-6 || iter ++ > globals.max_iter;
@@ -178,21 +203,23 @@ double Cube::vg_collision_time()
 {
     double toi = 1.0;
     for (int i = 0; i < n_vertices; i++) {
-        const vec3 tile_v(vertices()[i]);
+        // const vec3 tile_v(vertices()[i]);
         const vec3 v_t2(vt2(i));
-        double d = vg_distance(v_t2);
-        if (d < 0) {
-            toi = 0.0;
-            const vec3 v_t0(vt0(i));
+        const vec3 v_t1(vt1(i));
 
-            double d0 = vg_distance(v_t0);
-            toi = d0 / (d0 - d);
-            auto vtoi = v_t2 * (toi * 0.9) + v_t0 * (1 - toi * 0.9);
+        double d2 = vg_distance(v_t2);
+        double d1 = vg_distance(v_t1);
+        assert(d1 > 0);
+        if (d2 < 0) {
+
+            double t = d1 / (d1 - d2);
+            auto vtoi = v_t2 * (t * 0.8) + v_t1 * (1 - t * 0.8);
             double dtoi = vg_distance(vtoi);
-            spdlog::warn("dtoi = {}, d0 = {}, d1 = {}", dtoi, vg_distance(v_t0), d);
+            spdlog::warn("dtoi = {}, d0 = {}, d1 = {}, toi = {}", dtoi, d1, d2, toi);
 
             assert(dtoi > 0.0);
-            assert(toi > 0.0 && toi < 1.0);
+            assert(t > 0.0 && t < 1.0);
+            toi = min(toi, t);
         }
     }
     return toi;

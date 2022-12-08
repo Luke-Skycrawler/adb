@@ -58,28 +58,28 @@ struct Cube {
         return q * vertices()[i] + p;
     }
     inline vec3 vt1(int i) const {
-        mat3 A;
+        mat3 a;
         vec3 b = q[0];
-        A << q[1] , q[2], q[3];
-        return A * vertices() [i] + b;
+        a << q[1] , q[2], q[3];
+        return a * vertices() [i] + b;
     }
     
     inline vec3 vt2(int i) const {
-        mat3 A;
+        mat3 a;
         vec3 b = q[0];
         b += increment_q.segment<3>(0);
-        A << q[1] , q[2], q[3];
+        a << q[1] , q[2], q[3];
         for (int i = 1; i < 4; i ++){
-            A.col(i) += increment_q.segment<3>(i * 3);
+            a.col(i - 1) += increment_q.segment<3>(i * 3);
         }
-        return A * vertices() [i] + b;
+        return a * vertices() [i] + b;
     }
 
     inline vec3 vt0(int i) const {
-        mat3 A;
+        mat3 a;
         vec3 b = q0[0];
-        A << q0[1] , q0[2], q0[3];
-        return A * vertices() [i] + b;
+        a << q0[1] , q0[2], q0[3];
+        return a * vertices() [i] + b;
     }
 
     double vg_collision_time();
