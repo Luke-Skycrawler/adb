@@ -8,4 +8,5 @@
 //#define _EE_
 #define NO_GRAVITY
 #define TEST_PYTHON
+#define _INDEPENDENT
 // #define _VF_

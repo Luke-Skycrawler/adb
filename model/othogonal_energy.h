@@ -12,5 +12,6 @@ namespace othogonal_energy{
     VectorXd grad(vec3 q[]);
     mat3 hessian(mat3 &q, int i, int j);
     MatrixXd hessian(vec3 q[]);
-    double otho_energy(mat3 &q);
+    double otho_energy(const VectorXd& q);
+    //double otho_energy(mat3 &q);
 }

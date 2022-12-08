@@ -1,0 +1,1 @@
+cp ../x64/Release/integrate.exe x64/Release/integrate.exe -f && x64/Release/integrate.exe

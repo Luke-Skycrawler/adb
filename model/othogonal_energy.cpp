@@ -1,4 +1,5 @@
 #include "othogonal_energy.h"
+#include <cmath>
 #include "marcros_settings.h"
 
 using namespace othogonal_energy;
@@ -42,6 +43,7 @@ namespace othogonal_energy {
     VectorXd grad(vec3 q[])
     {
         Vector<double, 12> ret;
+        ret.setZero(12);
         for (int i = 1; i < 4; i++) {
             vec3 g(0.0, 0.0, 0.0);
             for (int j = 1; j < 4; j++) {
@@ -55,6 +57,7 @@ namespace othogonal_energy {
     MatrixXd hessian(vec3 q[])
     {
         Matrix<double, 12, 12> H;
+        H.setZero(12, 12);
         for (int i = 1; i < 4; i++) {
             auto qi = q[i];
             for (int j = 1; j < 4; j++) {
@@ -70,6 +73,20 @@ namespace othogonal_energy {
         return H;
     }
 
+    double otho_energy(const VectorXd& x)
+    {
+        double E = 0;
+        vec3 q[4];
+        for (int i = 1; i < 4; i++) {
+            q[i] = x.segment<3>(i * 3);
+        }
+        for (int i = 1; i < 4; i++)
+            for (int j = 1; j < 4; j++) {
+                double e = pow(q[i].dot(q[j]) - 1.0 * (i == j), 2);
+                E += e;
+            }
+        return E;
+    }
 #else
     vec3 grad(mat3& q, int i)
     {
@@ -112,10 +129,10 @@ namespace othogonal_energy {
         return ret;
     }
 
-#endif
 
-    double otho_energy(mat3 &q) {
+    /*double otho_energy(const mat3 &q) {
         mat3 qqtmi = q.adjoint() * q - Matrix3d::Identity(3,3);
         return qqtmi.squaredNorm() * kappa;
-    }
+    }*/
+    #endif
 };

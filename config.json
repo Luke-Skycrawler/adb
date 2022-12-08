@@ -3,7 +3,7 @@
     "max_iter": 100,
     "predefined_case" : {
         "enable": true,
-        "id" : 2
+        "id" : 1
     },
     "gravity": false, 
     "case": [{

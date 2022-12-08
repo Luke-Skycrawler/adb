@@ -21,7 +21,7 @@ namespace barrier
     // nebla_q = nebla f J
     vec3 barrier_gradient_x(const vec3 &vertex)
     {
-        return vf_distance_gradient_x(vertex) * barrier_derivative_d(vf_distance(vertex));
+        return vf_distance_gradient_x(vertex) * barrier_derivative_d(vg_distance(vertex));
     }
 
     VectorXd barrier_gradient_q(const vec3 &tilex, const vec3 &vertex)
@@ -48,7 +48,7 @@ namespace barrier
         // arg: colliding vertex
         auto g(distance_gradient_q(tilex, vertex));
         // because distance hessian is 0, the first term of J^T B' hess_d J is 0
-        return barrier_second_derivative(vf_distance(vertex)) * g * g.adjoint();
+        return barrier_second_derivative(vg_distance(vertex)) * g * g.adjoint();
     }
 
     

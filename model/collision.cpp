@@ -15,7 +15,7 @@ double vf_collision_time(const vec3& x, const vec3& p, const mat3& q, const vec3
     // assert that (p, q) is collision-free and (p_next, q_next) is the state after penetration
     vec3 initial_guess(q * x + p);
     double t = 0.0;
-    double distance = vf_distance(initial_guess);
+    double distance = vg_distance(initial_guess);
     vec3 dd_dx(vf_distance_gradient_x(initial_guess));
     // distance derivative of x
 
@@ -34,7 +34,7 @@ double Cube::vf_collision_detect(const vec3& dp, const mat3& dq)
     for (int i = 0; i < 8; i++) {
         const vec3 v0(vertices()[i]);
         const vec3& v((q_next - dq) * v0 + (p_next - dp));
-        double d = vf_distance(v);
+        double d = vg_distance(v);
         if (d < 0) {
             double t = vf_collision_time(v0, p, A, p_next - dp, q_next - dq);
             if (t < min_toi) {

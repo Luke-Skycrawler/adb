@@ -1,0 +1,1 @@
+cp x64/Debug/integrate.exe view/x64/Debug/integrate.exe -f && view/x64/Debug/integrate.exe

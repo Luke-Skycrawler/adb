@@ -8,10 +8,10 @@ using mat3 = Matrix3d;
 struct Cube {
     mat3 A, q_dot, q_next, dq;
     vec3 p, p_next, p_dot, dimensions, f, tau, dp;
-    double mass, scale, Ic;
+    double mass, scale, Ic, toi;
     static int indices[36], edges[24];
     static const int n_vertices = 8, n_faces = 12, n_edges = 12;
-    Vector<double, 12> barrier_gradient;
+    Vector<double, 12> barrier_gradient, increment_q;
     Matrix<double, 12, 12> hess;
     vec3 q[4], q0[4], dqdt[4];
     void prepare_q_array(){
@@ -62,12 +62,32 @@ struct Cube {
         const auto& p(increment ? (p_next - dp) : p_next);
         return q * vertices()[i] + p;
     }
-    inline vec3 v(int i) const {
+    inline vec3 vt1(int i) const {
         mat3 A;
         vec3 b = q[0];
         A << q[1] , q[2], q[3];
         return A * vertices() [i] + b;
     }
+    
+    inline vec3 vt2(int i) const {
+        mat3 A;
+        vec3 b = q[0];
+        b += increment_q.segment<3>(0);
+        A << q[1] , q[2], q[3];
+        for (int i = 1; i < 4; i ++){
+            A.col(i) += increment_q.segment<3>(i * 3);
+        }
+        return A * vertices() [i] + b;
+    }
+
+    inline vec3 vt0(int i) const {
+        mat3 A;
+        vec3 b = q0[0];
+        A << q0[1] , q0[2], q0[3];
+        return A * vertices() [i] + b;
+    }
+
+    double vg_collision_time();
     VectorXd q_tile(double dt, const vec3 &f);
     double vf_collision_detect(const vec3& dp, const mat3& dq);
     static void gen_indices()
