@@ -184,14 +184,14 @@ double Cube::vg_collision_time()
         if (d < 0) {
             toi = 0.0;
             const vec3 v_t0(vt0(i));
-            double dis = vg_distance(v_t0);
-            const vec3 g(vf_distance_gradient_x(v_t0));
-            vec3 dq[4];
-            for (int i = 0; i < 4; i++) {
-                dq[i] = q[i] + increment_q.segment<3>(i * 3) - q0[i];
-            }
-            auto dx = stack(dq) * tile_v + dq[0];
-            toi -= dis / g.dot(dx);
+
+            double d0 = vg_distance(v_t0);
+            toi = d0 / (d0 - d);
+            auto vtoi = v_t2 * (toi * 0.9) + v_t0 * (1 - toi * 0.9);
+            double dtoi = vg_distance(vtoi);
+            spdlog::warn("dtoi = {}, d0 = {}, d1 = {}", dtoi, vg_distance(v_t0), d);
+
+            assert(dtoi > 0.0);
             assert(toi > 0.0 && toi < 1.0);
         }
     }
