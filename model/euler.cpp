@@ -147,7 +147,7 @@ void implicit_euler(vector<Cube> & cubes, double dt) {
 #endif
 
                 if (fi || vi || e0i || e1i) {
-                    spdlog::info("collision detected at {}", iter);
+                    spdlog::error("collision detected at {}", iter);
                 }
             }
 #endif

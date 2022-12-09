@@ -28,9 +28,19 @@ Face::Face(const Cube& c, int id, bool b)
         _b = Cube::indices[id * 3 + 1],
         _c = Cube::indices[id * 3 + 2];
 
-    t0 = c.vi(_a, b);
-    t1 = c.vi(_b, b);
-    t2 = c.vi(_c, b);
+    if (b) {
+        t0 = c.vt2(_a);
+        t1 = c.vt2(_b);
+        t2 = c.vt2(_c);
+    }
+    else {
+        t0 = c.vt1(_a);
+        t1 = c.vt1(_b);
+        t2 = c.vt1(_c);
+    }
+    //t0 = c.vi(_a, b);
+    //t1 = c.vi(_b, b);
+    //t2 = c.vi(_c, b);
 }
 
 double vf_distance(const vec3& v, const Cube& c, int id)
