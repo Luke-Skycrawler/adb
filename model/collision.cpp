@@ -6,6 +6,7 @@
 #include <iostream>
 #include <spdlog/spdlog.h>
 #include <spdlog/fmt/ostr.h>
+#include "../view/global_variables.h"
 using namespace barrier;
 using namespace std;
 
@@ -99,51 +100,29 @@ double ee_collision_detect(const Cube& ci, const Cube& cj, int eid_i, int eid_j)
 }
 
 // vector<pair<vec3, Face>> vf_colliding_set(const Cube &ci, const Cube &cj) {
-int vf_colliding_response(Cube& ci, Cube& cj)
+
+int vf_colliding_response(int __i, int __j)
 {
-    auto p = ci.p_next;
-    auto q = ci.q_next;
     int ret = 0;
+    Cube &ci(globals.cubes[__i]), &cj(globals.cubes[__j]);
+
     for (int _v = 0; _v < Cube::n_vertices; _v++) {
-        auto v(q * ci.vertices()[_v] + p);
+        vec3 v = ci.vt1(_v);
         for (int _f = 0; _f < Cube::n_faces; _f++) {
             Face f(cj, _f);
             double d = vf_distance(v, f);
             if (d < d_hat) {
-                // colliding_set.push_back(make_pair(v, Face(cj, f)));
-                // TODO: directly change it to collision response
-
-                VectorXd ci_barrier_term, cj_barrier_term;
-                ci_barrier_term.setZero(12);
-                cj_barrier_term.setZero(12);
+                VectorXd ci_grad, cj_grad;
+                ci_grad.setZero(12);
+                cj_grad.setZero(12);
                 double gx[12], Hx[144];
-                autogen::point_plane_distance_gradient(
-                    v(0),
-                    v(1),
-                    v(2),
-                    f.t0(0),
-                    f.t0(1),
-                    f.t0(2),
-                    f.t1(0),
-                    f.t1(1),
-                    f.t1(2),
-                    f.t2(0),
-                    f.t2(1),
-                    f.t2(2),
+                autogen::point_plane_distance_gradient( 
+                    v(0), v(1), v(2), 
+                    f.t0(0), f.t0(1), f.t0(2), f.t1(0), f.t1(1), f.t1(2), f.t2(0), f.t2(1), f.t2(2),
                     gx);
                 autogen::point_plane_distance_hessian(
-                    v(0),
-                    v(1),
-                    v(2),
-                    f.t0(0),
-                    f.t0(1),
-                    f.t0(2),
-                    f.t1(0),
-                    f.t1(1),
-                    f.t1(2),
-                    f.t2(0),
-                    f.t2(1),
-                    f.t2(2),
+                    v(0), v(1), v(2), 
+                    f.t0(0), f.t0(1), f.t0(2), f.t1(0), f.t1(1), f.t1(2), f.t2(0), f.t2(1), f.t2(2),
                     Hx);
 
                 for (int i = 0; i < 12; i++) {
@@ -173,8 +152,9 @@ int vf_colliding_response(Cube& ci, Cube& cj)
                 auto gx_t0 = vec3(gx[3], gx[4], gx[5]);
                 auto gx_t1 = vec3(gx[6], gx[7], gx[8]);
                 auto gx_t2 = vec3(gx[9], gx[10], gx[11]);
-                ci_barrier_term += dbdd * gx_v.adjoint() * Jv;
-                cj_barrier_term += dbdd * (gx_t0.adjoint() * J_t0 + gx_t1.adjoint() * J_t1 + gx_t2.adjoint() * J_t2);
+
+                ci_grad += dbdd * gx_v.adjoint() * Jv;
+                cj_grad += dbdd * (gx_t0.adjoint() * J_t0 + gx_t1.adjoint() * J_t1 + gx_t2.adjoint() * J_t2);
 
                 // TODO: construct hessian
 
@@ -183,6 +163,8 @@ int vf_colliding_response(Cube& ci, Cube& cj)
                 hess_i.setZero(12, 12);
                 hess_j.setZero(12, 12);
                 hess_ij.setZero(12, 12);
+
+
                 hess_i += Jv.adjoint() * (db2 * gx_v * gx_v.adjoint() + dbdd * _Hx.block<3, 3>(0, 0)) * Jv;
                 // the hessian term should be zero but add it up anyway.
 
@@ -204,21 +186,23 @@ int vf_colliding_response(Cube& ci, Cube& cj)
                 hess_ij += dbdd * (J_t0.adjoint() * _Hx.block<3, 3>(0, 3) + J_t1.adjoint() * _Hx.block<3, 3>(0, 6) + J_t2.adjoint() * _Hx.block<3, 3>(0, 9)) * Jv;
                 hess_ij += db2 * (J_t0.adjoint() * gx_t0 + J_t1.adjoint() * gx_t1 + J_t2.adjoint() * gx_t2) * gx_v.adjoint() * Jv;
                 // FIXME: transpose and symetry issues
+
                 ci.hess += hess_i;
                 cj.hess += hess_j;
 
-                // spdlog::info("grad_i {}", ci_barrier_term);
-                // spdlog::info("grad_j {}", cj_barrier_term);
+                // spdlog::info("grad_i {}", ci_grad);
+                // spdlog::info("grad_j {}", cj_grad);
                 //  cout << "d " << d << endl;
-                // cout << "grad_i " << ci_barrier_term.adjoint() << endl;
-                // cout << "grad_j " << cj_barrier_term.adjoint() << endl;
+                // cout << "grad_i " << ci_grad.adjoint() << endl;
+                // cout << "grad_j " << cj_grad.adjoint() << endl;
                 // cout << "r0 " << ci.barrier_gradient.adjoint() << endl;
 
-                ci.barrier_gradient += ci_barrier_term;
-                cj.barrier_gradient += cj_barrier_term;
+                ci.grad += ci_grad;
+                cj.grad += cj_grad;
 
                 // cout << "r " << ci.barrier_gradient.adjoint() << endl;
                 // cout << endl;
+                globals.hess_triplets.push_back(HessBlock(__i, __j, hess_ij));
                 ret = 1;
             }
         }
@@ -226,8 +210,9 @@ int vf_colliding_response(Cube& ci, Cube& cj)
     return ret;
 }
 
-int ee_colliding_response(Cube& ci, Cube& cj)
+int ee_colliding_response(int __i, int __j)
 {
+    Cube &ci(globals.cubes[__i]), &cj(globals.cubes[__j]);
     int ret = 0;
     double gx[12], Hx[144];
     for (int _i = 0; _i < Cube::n_edges; _i++) {

@@ -6,7 +6,6 @@
 #include "marcros_settings.h"
 #include <assert.h>
 
-// #define NON_PEN_VALIDATE
 using namespace std;
 using namespace barrier;
 using namespace Eigen;
@@ -133,7 +132,47 @@ void implicit_euler(vector<Cube> & cubes, double dt) {
                 spdlog::info("alpha = {}, solver res = {}, grad = {}", alpha, n, r.norm());
                 // cout << hess;
             }
+#else
+            {
+                int fi = 0, vi = 0, e0i = 0, e1i = 0;
+                c.grad = r;
+                c.hess = hess;
+#ifdef _VF_
+                fi = vf_colliding_response(1 - k, k);
+                vi = vf_colliding_response(k, 1 - k);
 #endif
+#ifdef _EE_
+                e0i = ee_colliding_response(k, 1 - k);
+                e1i = ee_colliding_response(1 - k, k);
+#endif
+
+                if (fi || vi || e0i || e1i) {
+                    spdlog::info("collision detected at {}", iter);
+                }
+            }
+#endif
+        }
+        {
+            const int n_cubes = cubes.size();
+            const int hess_dim = n_cubes * 12;
+            MatrixXd big_hess;
+            big_hess.setZero(hess_dim, hess_dim);
+            VectorXd r;
+            r.setZero(hess_dim);
+
+            for (int k = 0; k < n_cubes; k++) {
+                big_hess.block<12, 12>(k * 12, k * 12) = cubes[k].hess;
+                r.segment<12>(k * 12) = cubes[k].grad;
+            }
+            for (auto& triplet : globals.hess_triplets) {
+                big_hess.block<12, 12>(triplet.i * 12, triplet.j * 12) = triplet.block;
+            }
+            VectorXd dq = - big_hess.ldlt().solve(r);
+            for (int k = 0; k < n_cubes; k++) {
+                auto &c(cubes[k]);
+                c.increment_q = dq.segment<12>(k * 12); 
+                c.toi = c.vg_collision_time();
+            }
         }
 
         double toi = 1.0, factor = 1.0;
@@ -149,32 +188,10 @@ void implicit_euler(vector<Cube> & cubes, double dt) {
         for (auto& c : cubes) {
             auto tiled_q = c.q_tile(dt, globals.gravity);
             double E0 = E(cat(c.q), tiled_q, c);
-#ifdef NON_PEN_VALIDATE
-            for (int i = 0; i < c.n_vertices; i++) {
-                auto v2(c.vt2(i));
-                auto v1(c.vt1(i));
-                double d = vg_distance(v2) * toi * 0.8 + vg_distance(v1) * (1 - toi * 0.8);
-                if (d < 0) {
-                    cout << "fuck" << endl;
-                }
-                assert(d > 0.0);
-            }
-#endif
             for (int i = 0; i < 4; i++) {
                 c.q[i] += c.increment_q.segment<3>(i * 3) * toi * factor;
             }
 
-#ifdef NON_PEN_VALIDATE
-            for (int i = 0; i < c.n_vertices; i++) {
-                auto v2(c.vt1(i));
-
-                double d = vg_distance(v2);
-                if (d < 0) {
-                    cout << "shit" << endl;
-                }
-                assert(d > 0.0);
-            }
-#endif
             double norm_dq = c.increment_q.norm();
             sup_dq = max(sup_dq, norm_dq);
             double E1 = E(cat(c.q), tiled_q, c);

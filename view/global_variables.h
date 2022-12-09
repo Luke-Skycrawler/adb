@@ -11,6 +11,15 @@ static const unsigned int SCR_WIDTH = 800;
 static const unsigned int SCR_HEIGHT = 600;
 #include "../model/cube.h"
 #include <vector>
+
+struct HessBlock {
+    int i, j;
+    Matrix<double, 12, 12> block;
+    HessBlock(int _i, int _j, MatrixXd hess): i(_i), j(_j) {
+        block = hess;
+    }
+};
+
 struct GlobalVariableMainCPP{
     #ifndef GOOGLE_TEST
     // control
@@ -34,6 +43,7 @@ struct GlobalVariableMainCPP{
     #endif
     double dt;
     int max_iter;
+    std::vector<HessBlock> hess_triplets;
     std::vector<Cube> cubes;
     vec3 gravity;
 };

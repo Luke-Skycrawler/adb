@@ -11,7 +11,7 @@ struct Cube {
     double mass, scale, Ic, toi, alpha;
     static int indices[36], edges[24];
     static const int n_vertices = 8, n_faces = 12, n_edges = 12;
-    Vector<double, 12> barrier_gradient, increment_q;
+    Vector<double, 12> barrier_gradient, increment_q, grad;
     Matrix<double, 12, 12> hess;
     vec3 q[4], q0[4], dqdt[4];
     void prepare_q_array();
