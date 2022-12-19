@@ -46,6 +46,7 @@ struct GlobalVariableMainCPP{
     std::vector<HessBlock> hess_triplets;
     std::vector<Cube> cubes;
     vec3 gravity;
+    double alpha, beta;
 };
 #ifndef GOOGLE_TEST
 #ifdef _MAIN_CPP

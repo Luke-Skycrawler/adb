@@ -23,9 +23,15 @@ void reset(){
         }
     }
     else {
+        
     }
-    globals.dt = data["dt"];
-    globals.max_iter = data["max_iter"];
+
+    {
+        globals.dt = data["dt"];
+        globals.max_iter = data["max_iter"];
+        globals.alpha = data["damping"]["alpha"];
+        globals.beta = data["dampling"]["beta"];
+    }
 }
 // process all input: query GLFW whether relevant keys are pressed/released this frame and react accordingly
 // ---------------------------------------------------------------------------------------------------------

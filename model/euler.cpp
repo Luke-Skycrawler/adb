@@ -10,7 +10,7 @@ using namespace std;
 using namespace barrier;
 using namespace Eigen;
 
-VectorXd cat(vec3 q[])
+VectorXd cat(const vec3 q[])
 {
     Vector<double, 12> ret;
     for (int i = 0; i < 4; i++) {
@@ -167,6 +167,40 @@ void implicit_euler(vector<Cube> & cubes, double dt) {
             for (auto& triplet : globals.hess_triplets) {
                 big_hess.block<12, 12>(triplet.i * 12, triplet.j * 12) = triplet.block;
             }
+
+            const auto damping = [&]() {
+                MatrixXd M, D;
+                VectorXd q_cat;
+
+                q_cat.setZero(hess_dim);
+
+                for (int i = 0; i < cubes.size(); i++) {
+                    MatrixXd m;
+                    auto& c(cubes[i]);
+                    m = MatrixXd::Identity(12, 12) * c.Ic;
+                    m.block<3, 3>(0, 0) = MatrixXd::Identity(3, 3) * c.mass;
+                    M.block<12, 12>(i * 12, i * 12) = m;
+
+                    q_cat.segment<12>(i * 12) = cat(c.q0);
+                }
+
+                D = globals.beta * big_hess + (globals.beta - globals.alpha) * M;
+
+                VectorXd damp_term = D * q_cat / dt;
+                r += damp_term;
+
+                big_hess += globals.beta * big_hess / dt;
+                for (int i = 0; i < cubes.size(); i++) {
+                    for (int j = 0; j < 3; j++) {
+                        big_hess(i * 12 + j, i * 12 + j) += (globals.beta - globals.alpha) * cubes[i].mass / dt;
+                    }
+                    for (int j = 3; j < 12; j++) {
+                        big_hess(i * 12 + j, i * 12 + j) += (globals.beta - globals.alpha) * cubes[i].Ic / dt;
+                    }
+                }
+            };
+
+            damping();
             VectorXd dq = - big_hess.ldlt().solve(r);
             for (int k = 0; k < n_cubes; k++) {
                 auto &c(cubes[k]);
@@ -251,4 +285,9 @@ void Cube::prepare_q_array(){
         q0[i] = A.col(i - 1);
         dqdt[i] = q_dot.col(i - 1);
     }
+}
+
+
+void PSD_projection(){
+    
 }

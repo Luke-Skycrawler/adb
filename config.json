@@ -6,6 +6,10 @@
         "id" : 2
     },
     "gravity": false, 
+    "damping": {
+        "alpha": 2.5e-2,
+        "beta": 2.3e-2
+    },
     "case": [{
         "cubes": [
             {
@@ -24,4 +28,5 @@
         ],
         "gravity": false
     }]
+
 }
