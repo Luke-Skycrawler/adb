@@ -5,8 +5,13 @@
 #include <tight_inclusion/interval_root_finder.hpp>
 #include <iostream>
 #include <spdlog/spdlog.h>
-#include <spdlog/fmt/ostr.h>
 #include "../view/global_variables.h"
+#include "marcros_settings.h"
+
+#ifdef IPC_TOOLKIT
+#include <ipc/distance/point_triangle.hpp>
+#include <array>
+#endif
 using namespace barrier;
 using namespace std;
 
@@ -110,8 +115,20 @@ int vf_colliding_response(int __i, int __j)
         vec3 v = ci.vt1(_v);
         for (int _f = 0; _f < Cube::n_faces; _f++) {
             Face f(cj, _f);
+            #ifndef IPC_TOOLKIT
             double d = vf_distance(v, f);
+            d = d * d;
+            #else 
+            double d = ipc::point_triangle_distance(v, f.t0, f.t1, f.t2);
+            #endif
             if (d < d_hat) {
+                #define NEW_GEO
+                #ifdef NEW_GEO
+                array<vec3, 4> pt = { v, f.t0, f.t1, f.t2 };
+                array<int, 4> ij = { __i, _v, __j, _f };
+                ipc_term(ci.hess, cj.hess, ci.grad, cj.grad, pt, ij);
+
+                #else
                 VectorXd ci_grad, cj_grad;
                 ci_grad.setZero(12);
                 cj_grad.setZero(12);
@@ -125,12 +142,12 @@ int vf_colliding_response(int __i, int __j)
                     f.t0(0), f.t0(1), f.t0(2), f.t1(0), f.t1(1), f.t1(2), f.t2(0), f.t2(1), f.t2(2),
                     Hx);
 
-                for (int i = 0; i < 12; i++) {
-                    gx[i] /= (2 * d);
-                }
-                for (int i = 0; i < 144; i++) {
-                    Hx[i] /= (4 * d * d);
-                }
+                // for (int i = 0; i < 12; i++) {
+                //     gx[i] /= (2 * d);
+                // }
+                // for (int i = 0; i < 144; i++) {
+                //     Hx[i] /= (4 * d * d);
+                // }
                 double dbdd = barrier_derivative_d(d);
                 double db2 = barrier_second_derivative(d);
 
@@ -203,7 +220,9 @@ int vf_colliding_response(int __i, int __j)
                 // cout << "r " << ci.barrier_gradient.adjoint() << endl;
                 // cout << endl;
                 globals.hess_triplets.push_back(HessBlock(__i, __j, hess_ij));
+                globals.hess_triplets.push_back(HessBlock(__j, __i, hess_ij.adjoint()));
                 ret = 1;
+                #endif 
             }
         }
     }

@@ -5,10 +5,27 @@
 #include "../view/global_variables.h"
 #include "marcros_settings.h"
 #include <assert.h>
-
+#include <array>
+#include <ipc/distance/point_triangle.hpp>
 using namespace std;
 using namespace barrier;
 using namespace Eigen;
+
+MatrixXd PSD_projection(const MatrixXd& A12x12)
+{
+#ifdef _PSD_
+    SelfAdjointEigenSolver<MatrixXd> eig(A12x12);
+    VectorXd lam = eig.eigenvalues();
+    MatrixXd U = eig.eigenvectors();
+    for (int i = 0; i < 12; i++) {
+        lam(i) = max(lam(i), 0.0);
+    }
+    return U * lam.asDiagonal() * U.adjoint();
+
+#else
+    return A12x12;
+#endif
+}
 
 VectorXd cat(const vec3 q[])
 {
@@ -109,8 +126,34 @@ void implicit_euler(vector<Cube> & cubes, double dt) {
             if (alpha < 1e-8) break;
         } while (!wolfe && grad.norm() > 1e-3);
 
-        return alpha;
+        return alpha * 2;
     };
+
+    vector<array<vec3, 4>> pts;
+    vector<array<int, 4>> idx;
+    const auto gen_collision_set = [&](const vector<Cube>& cubes) {
+        int n = cubes.size();
+        for (int i = 0; i < n; i++)
+            for (int j = 0; j < n; j++) {
+                auto &ci(cubes[i]), &cj(cubes[j]);
+                if (i == j) continue;
+                for (int v = 0; v < Cube::n_vertices; v++)
+                    for (int f = 0; f < Cube::n_faces; f++) {
+                        Face _f(cj, f);
+                        vec3 p = ci.vt0(v);
+                        double d = ipc::point_triangle_distance(p, _f.t0, _f.t1, _f.t2);
+                        if (d < barrier::d_hat * 9) {
+                            array<vec3, 4> pt = { p, _f.t0, _f.t1, _f.t2 };
+                            array<int, 4> ij = { i, v, j, f };
+
+                            pts.push_back(pt);
+                            idx.push_back(ij);
+                        }
+                    }
+            }
+    };
+
+    gen_collision_set(cubes);
 
     do {
         for (int k = 0; k < cubes.size(); k++) {
@@ -138,8 +181,10 @@ void implicit_euler(vector<Cube> & cubes, double dt) {
                 c.grad = r;
                 c.hess = hess;
 #ifdef _VF_
-                fi = vf_colliding_response(1 - k, k);
-                vi = vf_colliding_response(k, 1 - k);
+                // fi = vf_colliding_response(1 - k, k);
+                // vi = vf_colliding_response(k, 1 - k);
+
+                
 #endif
 #ifdef _EE_
                 e0i = ee_colliding_response(k, 1 - k);
@@ -152,6 +197,35 @@ void implicit_euler(vector<Cube> & cubes, double dt) {
             }
 #endif
         }
+        #ifdef _VF_
+
+
+        for (int k = 0; k < pts.size(); k++) {
+            auto& pt(pts[k]);
+            auto& ij(idx[k]);
+
+            int i = ij[0], j = ij[2];
+            auto &ci(cubes[i]), &cj(cubes[j]);
+            ipc_term(ci.hess, cj.hess, ci.grad, cj.grad, pt, ij);
+        }
+
+        #endif
+        const auto step_size_upper_bound = [&](VectorXd &dq, vector<Cube> cubes) -> double { 
+            double toi = 1.0;
+            for (int k = 0; k < idx.size(); k++) {
+                auto &pt(pts[k]);
+                const auto &ij(idx[k]);
+
+                int i = ij[0], j = ij[2];
+                // Face f(cubes[j], ij[3], true);
+                vec3 p_t2 = cubes[i].vt2(ij[1]);
+                vec3 p_t1 = cubes[i].vt1(ij[1]);
+                double t = vf_collision_detect(p_t1, p_t2, cubes[j], ij[3]);
+                toi = min(toi, t);
+            }
+            return toi;
+        };
+        double toi = 1.0, factor = 1.0;
         {
             const int n_cubes = cubes.size();
             const int hess_dim = n_cubes * 12;
@@ -165,6 +239,7 @@ void implicit_euler(vector<Cube> & cubes, double dt) {
                 r.segment<12>(k * 12) = cubes[k].grad;
             }
             for (auto& triplet : globals.hess_triplets) {
+                // big_hess.block<12, 12>(triplet.i * 12, triplet.j * 12) = PSD_projection(triplet.block);
                 big_hess.block<12, 12>(triplet.i * 12, triplet.j * 12) = triplet.block;
             }
 
@@ -172,10 +247,12 @@ void implicit_euler(vector<Cube> & cubes, double dt) {
                 MatrixXd M, D;
                 VectorXd q_cat;
 
+                M.setZero(hess_dim, hess_dim);
+                D.setZero(hess_dim, hess_dim);
                 q_cat.setZero(hess_dim);
 
                 for (int i = 0; i < cubes.size(); i++) {
-                    MatrixXd m;
+                    Matrix<double, 12, 12> m;
                     auto& c(cubes[i]);
                     m = MatrixXd::Identity(12, 12) * c.Ic;
                     m.block<3, 3>(0, 0) = MatrixXd::Identity(3, 3) * c.mass;
@@ -184,7 +261,7 @@ void implicit_euler(vector<Cube> & cubes, double dt) {
                     q_cat.segment<12>(i * 12) = cat(c.q0);
                 }
 
-                D = globals.beta * big_hess + (globals.beta - globals.alpha) * M;
+                D = globals.beta * big_hess + (globals.alpha - globals.beta) * M;
 
                 VectorXd damp_term = D * q_cat / dt;
                 r += damp_term;
@@ -192,32 +269,36 @@ void implicit_euler(vector<Cube> & cubes, double dt) {
                 big_hess += globals.beta * big_hess / dt;
                 for (int i = 0; i < cubes.size(); i++) {
                     for (int j = 0; j < 3; j++) {
-                        big_hess(i * 12 + j, i * 12 + j) += (globals.beta - globals.alpha) * cubes[i].mass / dt;
+                        big_hess(i * 12 + j, i * 12 + j) += (globals.alpha - globals.beta) * cubes[i].mass / dt;
                     }
                     for (int j = 3; j < 12; j++) {
-                        big_hess(i * 12 + j, i * 12 + j) += (globals.beta - globals.alpha) * cubes[i].Ic / dt;
+                        big_hess(i * 12 + j, i * 12 + j) += (globals.alpha - globals.beta) * cubes[i].Ic / dt;
                     }
                 }
             };
 
-            damping();
+            // damping();
             VectorXd dq = - big_hess.ldlt().solve(r);
+
             for (int k = 0; k < n_cubes; k++) {
                 auto &c(cubes[k]);
                 c.increment_q = dq.segment<12>(k * 12); 
                 c.toi = c.vg_collision_time();
             }
+
+            toi = step_size_upper_bound(dq, cubes);
+
+            for (auto &c : cubes) {
+                toi = min(toi, c.toi);
+            }
+            
+            if (toi < 1.0) {
+                spdlog::warn("collision at {}, toi = {}", iter, toi);
+                factor = 0.8;
+            }
+            
         }
 
-        double toi = 1.0, factor = 1.0;
-
-        for (auto &c : cubes) {
-            toi = min(toi, c.toi);
-        }
-        if (toi < 1.0) {
-            spdlog::warn("collision at {}, toi = {}", iter, toi);
-            factor = 0.8;
-        }
 
         for (auto& c : cubes) {
             auto tiled_q = c.q_tile(dt, globals.gravity);
@@ -285,9 +366,4 @@ void Cube::prepare_q_array(){
         q0[i] = A.col(i - 1);
         dqdt[i] = q_dot.col(i - 1);
     }
-}
-
-
-void PSD_projection(){
-    
 }

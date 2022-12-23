@@ -1,6 +1,6 @@
 {
     "dt": 1e-3,
-    "max_iter": 100,
+    "max_iter": 10,
     "predefined_case" : {
         "enable": true,
         "id" : 2

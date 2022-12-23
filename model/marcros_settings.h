@@ -11,3 +11,5 @@
 // #define _INDEPENDENT
 #define _TWO
 #define _VF_
+#define _PSD_
+#define IPC_TOOLKIT

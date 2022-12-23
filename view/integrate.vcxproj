@@ -75,8 +75,8 @@
     <LibraryPath>D:\third_party_libs\Tight-Inclusion\build\Debug;$(LibraryPath)</LibraryPath>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
-    <IncludePath>D:\third_party_libs\Tight-Inclusion\src;$(IncludePath)</IncludePath>
-    <LibraryPath>D:\third_party_libs\Tight-Inclusion\release\Release;$(LibraryPath)</LibraryPath>
+    <IncludePath>D:\third_party_libs\Tight-Inclusion\src;D:\ref_repos\ipc-toolkit\src;$(IncludePath)</IncludePath>
+    <LibraryPath>D:\third_party_libs\Tight-Inclusion\release\Release;D:\ref_repos\ipc-toolkit\build\temp.win-amd64-cpython-38\Release\ipctk\Release;$(LibraryPath)</LibraryPath>
   </PropertyGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
     <ClCompile>
@@ -127,16 +127,18 @@
       <SDLCheck>true</SDLCheck>
       <PreprocessorDefinitions>NDEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
+      <AdditionalIncludeDirectories>%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
       <OptimizeReferences>true</OptimizeReferences>
       <GenerateDebugInformation>true</GenerateDebugInformation>
-      <AdditionalDependencies>tight_inclusion.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>tight_inclusion.lib;ipc_toolkit.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClCompile Include="..\model\geo.cpp" />
     <ClCompile Include="..\model\othogonal_energy.cpp" />
     <ClCompile Include="..\model\barrier.cpp" />
     <!-- <ClCompile Include="..\model\time_integrator.cpp" /> -->
