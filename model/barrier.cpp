@@ -3,7 +3,10 @@ using namespace std;
 
 namespace barrier
 {
-
+    double barrier_function(double d){
+        if (d >= d_hat) return 0.0;
+        return kappa * - (d - d_hat) * (d - d_hat) * log(d / d_hat);
+    }
     double barrier_second_derivative(double d)
     {
         if (d >= d_hat)

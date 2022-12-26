@@ -94,9 +94,27 @@ void implicit_euler(vector<Cube> & cubes, double dt) {
         auto q = x.tail(9);
         return p.dot(p) * c.mass + q.dot(q) * c.Ic;
     };
+
+    vector<array<vec3, 4>> pts;
+    vector<array<int, 4>> idx;
     const auto E = [&](const VectorXd &q, const VectorXd& q_tiled, const Cube& c) -> double {
         return othogonal_energy::otho_energy(q) * dt * dt + 0.5 * norm_M(q - q_tiled, c);
+        
         // FIXME: ugly, per_body otho energy
+    };
+    const auto E_global = [&](VectorXd& dq) -> double {
+        double e = 0.0;
+        for (auto& pt : pts) {
+            double d = ipc::point_triangle_distance(pt[0], pt[1], pt[2], pt[3]);
+            e += barrier::barrier_function(d);
+        }
+        for (int i = 0; i < cubes.size(); i++) {
+            auto& c(cubes[i]);
+            auto q_tiled = c.q_tile(dt, globals.gravity);
+            auto q = cat(c.q) + dq.segment<12>(12 * i);
+            e += E(q, q_tiled, c);
+        }
+        return e;
     };
     const auto barrier_grad_hess_per_body = [&](Cube& c, VectorXd& grad, MatrixXd& hess) {
         for (int i= 0; i < Cube::n_vertices; i++) {
@@ -116,11 +134,13 @@ void implicit_euler(vector<Cube> & cubes, double dt) {
         const double c1 = 1e-4;
         double alpha = 1.0;
         bool wolfe = false;
-        double E0 = E(q0, q_tiled, c);
+        double E0 = E_global(q0);
+        //double E0 = E(q0, q_tiled, c);
         VectorXd q1;
         do {
             q1 = q0 + dq * alpha;
-            double E1 = E(q1, q_tiled, c);
+            //double E1 = E(q1, q_tiled, c);
+            double E1 = E_global(q1);
             wolfe = E1 <= E0 + c1 * alpha * (dq.dot(grad));
             alpha /= 2;
             if (alpha < 1e-8) break;
@@ -129,8 +149,7 @@ void implicit_euler(vector<Cube> & cubes, double dt) {
         return alpha * 2;
     };
 
-    vector<array<vec3, 4>> pts;
-    vector<array<int, 4>> idx;
+    
     const auto gen_collision_set = [&](const vector<Cube>& cubes) {
         int n = cubes.size();
         for (int i = 0; i < n; i++)
@@ -142,7 +161,7 @@ void implicit_euler(vector<Cube> & cubes, double dt) {
                         Face _f(cj, f);
                         vec3 p = ci.vt0(v);
                         double d = ipc::point_triangle_distance(p, _f.t0, _f.t1, _f.t2);
-                        if (d < barrier::d_hat * 9) {
+                        if (d < barrier::d_hat) {
                             array<vec3, 4> pt = { p, _f.t0, _f.t1, _f.t2 };
                             array<int, 4> ij = { i, v, j, f };
 
@@ -206,7 +225,11 @@ void implicit_euler(vector<Cube> & cubes, double dt) {
 
             int i = ij[0], j = ij[2];
             auto &ci(cubes[i]), &cj(cubes[j]);
-            ipc_term(ci.hess, cj.hess, ci.grad, cj.grad, pt, ij);
+            double d = ipc::point_triangle_distance(pt[0], pt[1], pt[2], pt[3]);
+            if (d < barrier::d_hat) {
+                ipc_term(ci.hess, cj.hess, ci.grad, cj.grad, pt, ij);
+                
+            }
         }
 
         #endif
@@ -279,7 +302,7 @@ void implicit_euler(vector<Cube> & cubes, double dt) {
 
             // damping();
             VectorXd dq = - big_hess.ldlt().solve(r);
-
+            spdlog::info("norms: dq = {}, grad = {}, big_hess = {}", dq.norm(), r.norm(), big_hess.norm());
             for (int k = 0; k < n_cubes; k++) {
                 auto &c(cubes[k]);
                 c.increment_q = dq.segment<12>(k * 12); 
@@ -296,7 +319,8 @@ void implicit_euler(vector<Cube> & cubes, double dt) {
                 spdlog::warn("collision at {}, toi = {}", iter, toi);
                 factor = 0.8;
             }
-            
+
+            //line_search(dq, r, q0, q_tiled);
         }
 
 
@@ -314,6 +338,13 @@ void implicit_euler(vector<Cube> & cubes, double dt) {
             spdlog::info("toi {}, factor = {}", toi, factor);
 
             //cout << c.increment_q << endl;
+        }
+
+        for (int k = 0; k < pts.size(); k ++) {
+            auto  &ij = idx[k];
+            Face f(cubes[ij[2]], ij[3]);
+            vec3 v(cubes[ij[0]].vt1(ij[1]));
+            pts[k] = {v, f.t0, f.t1, f.t2};
         }
         term_cond = sup_dq < 1e-6 || iter ++ > globals.max_iter;
         sup_dq = 0.0;

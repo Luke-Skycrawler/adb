@@ -1,8 +1,10 @@
+#ifndef GOOGLE_TEST
 #include "cube.h"
 #include "geometry.h"
 #include "barrier.h"
 #include <ipc/distance/point_triangle.hpp>
 #include "../view/global_variables.h"
+#endif
 #include <array>
 using namespace std;
 void ipc_term(Matrix<double, 12, 12>& hess_p, Matrix<double, 12, 12>& hess_t, Vector<double, 12>& grad_p, Vector<double, 12>& grad_t, array<vec3, 4> pt, array<int, 4> ij
@@ -20,9 +22,13 @@ void ipc_term(Matrix<double, 12, 12>& hess_p, Matrix<double, 12, 12>& hess_t, Ve
     ipc::point_triangle_distance_gradient(p, t0, t1, t2, pt_grad);
     ipc::point_triangle_distance_hessian(p, t0, t1, t2, pt_hess);
 
-    double d = ipc::point_triangle_distance(p, t0, t1, t2);
-    double B_ = barrier::barrier_derivative_d(d) * barrier::kappa;
-    double B__ = barrier::barrier_second_derivative(d) * barrier::kappa;
+    double dist = 0.0;
+    
+    dist = ipc::point_triangle_distance(p, t0, t1, t2);
+    //dist = vf_distance(p, Face(globals.cubes[_j], f));
+    double B_ = barrier::barrier_derivative_d(dist);
+    double B__ = barrier::barrier_second_derivative(dist);
+    spdlog::info("dist = {}, B = {}, B__ = {}", dist, B_, B__);
 
     Matrix<double, 9, 12> Jt;
     Matrix<double, 3, 12> Jp;
@@ -33,7 +39,9 @@ void ipc_term(Matrix<double, 12, 12>& hess_p, Matrix<double, 12, 12>& hess_t, Ve
     Jt.block<3, 12>(9, 0) = barrier::x_jacobian_q(t2_tile);
     Jp = barrier::x_jacobian_q(p_tile);
 
-    Matrix<double, 12, 12> ipc_hess = B_ * pt_hess + B__ * pt_grad * pt_grad.adjoint();
+    Matrix<double, 12, 12> ipc_hess;
+    ipc_hess.setZero(12, 12);
+    ipc_hess = pt_hess  * B_ + pt_grad * pt_grad.adjoint() * B__;
     // psd project
 
     int ii = _i, jj = _j;
@@ -46,8 +54,11 @@ void ipc_term(Matrix<double, 12, 12>& hess_p, Matrix<double, 12, 12>& hess_t, Ve
     hess_p += Jp.adjoint() * ipc_hess.block<3, 3>(0, 0) * Jp;
     hess_t += Jt.adjoint() * ipc_hess.block<9, 9>(3, 3) * Jt;
     off_diag = Jp.adjoint() * ipc_hess.block<3, 9>(3, 0) * Jt;
-    globals.hess_triplets.push_back(HessBlock(ii, jj, off_diag));
-    globals.hess_triplets.push_back(HessBlock(ii, jj, off_diag.adjoint()));
+
+    #ifndef GOOGLE_TEST
+    //globals.hess_triplets.push_back(HessBlock(ii, jj, off_diag));
+    //globals.hess_triplets.push_back(HessBlock(ii, jj, off_diag.adjoint()));
+    #endif
     // H.block<12, 12>(jj * 12, ii * 12) += (Jp.adjoint() * ipc_hess.block<3, 9>(3, 0) * Jt).adjoint();
 
     // g.segment<12>(ii * 12) += Jp.adjoint() * pt_grad.segment<3>(0) * B_;
