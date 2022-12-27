@@ -5,20 +5,20 @@ namespace barrier
 {
     double barrier_function(double d){
         if (d >= d_hat) return 0.0;
-        return kappa * - (d - d_hat) * (d - d_hat) * log(d / d_hat);
+        return kappa * -(d - d_hat) * (d - d_hat) * log(d / d_hat) / (d_hat * d_hat);
     }
     double barrier_second_derivative(double d)
     {
         if (d >= d_hat)
             return 0.0f;
-        return -kappa * (2 * log(d / d_hat) + (d - d_hat) / d + (d - d_hat) * (2 / d + d_hat / d / d));
+        return -kappa * (2 * log(d / d_hat) + (d - d_hat) / d + (d - d_hat) * (2 / d + d_hat / d / d)) / (d_hat * d_hat);
     }
 
     double barrier_derivative_d(double x)
     {
         if (x >= d_hat)
             return 0.0f;
-        return -(x - d_hat) * kappa * (2 * log(x / d_hat) + (x - d_hat) / x);
+        return -(x - d_hat) * kappa * (2 * log(x / d_hat) + (x - d_hat) / x) / (d_hat * d_hat);
     }
 
     // nebla_q = nebla f J
@@ -37,6 +37,12 @@ namespace barrier
     {
         // x in static frame
         Matrix<double, 3, 12> J;
+        //J.setZero(3, 12);
+        //J.block<3, 3>(0, 0) = Matrix3d::Identity(3, 3);
+        //J.block<3, 3>(0, 3) = Matrix3d::Identity(3, 3) * tilex(0);
+        //J.block<3, 3>(0, 6) = Matrix3d::Identity(3, 3) * tilex(1);
+        //J.block<3, 3>(0, 9) = Matrix3d::Identity(3, 3) * tilex(2);
+
         J << Matrix3d::Identity(3, 3), Matrix3d::Identity(3, 3) * tilex(0), Matrix3d::Identity(3, 3) * tilex(1), Matrix3d::Identity(3, 3) * tilex(2);
         return J;
     }

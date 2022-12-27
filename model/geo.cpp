@@ -7,7 +7,7 @@
 #endif
 #include <array>
 using namespace std;
-void ipc_term(Matrix<double, 12, 12>& hess_p, Matrix<double, 12, 12>& hess_t, Vector<double, 12>& grad_p, Vector<double, 12>& grad_t, array<vec3, 4> pt, array<int, 4> ij
+void ipc_term(Matrix<double, 12, 12>& hess_p, Matrix<double, 12, 12>& hess_t, Vector<double, 12>& grad_p, Vector<double, 12>& grad_t, array<vec3, 4> pt, array<int, 4> ij, Matrix<double, 12, 12> &off_diag
     // , vector<Cube> &cubes
 )
 {
@@ -32,11 +32,21 @@ void ipc_term(Matrix<double, 12, 12>& hess_p, Matrix<double, 12, 12>& hess_t, Ve
 
     Matrix<double, 9, 12> Jt;
     Matrix<double, 3, 12> Jp;
-    Matrix<double, 12, 12> off_diag;
+    //Matrix<double, 12, 12> off_diag;
     auto p_tile = vnp[v], t0_tile = vnp[tidx[3 * f]], t1_tile = vnp[tidx[3 * f + 1]], t2_tile = vnp[tidx[3 * f + 2]];
-    Jt.block<3, 12>(0, 0) = barrier::x_jacobian_q(t0_tile);
+    Jt.setZero(9, 12);
+    Jp.setZero(3, 12);
+    bool same = true;
+    if (same) {
+       p_tile = vec3(0,0 ,0);
+       t0_tile = vec3(0, 0, 0);
+       t1_tile = vec3(0, 0, 1);
+       t2_tile = vec3(1, 0, 0);
+    }
+
+    Jt.block<3, 12>(0, 0) = barrier::x_jacobian_q(t0_tile);    
     Jt.block<3, 12>(3, 0) = barrier::x_jacobian_q(t1_tile);
-    Jt.block<3, 12>(9, 0) = barrier::x_jacobian_q(t2_tile);
+    Jt.block<3, 12>(6, 0) = barrier::x_jacobian_q(t2_tile);
     Jp = barrier::x_jacobian_q(p_tile);
 
     Matrix<double, 12, 12> ipc_hess;
@@ -53,7 +63,7 @@ void ipc_term(Matrix<double, 12, 12>& hess_p, Matrix<double, 12, 12>& hess_t, Ve
 
     hess_p += Jp.adjoint() * ipc_hess.block<3, 3>(0, 0) * Jp;
     hess_t += Jt.adjoint() * ipc_hess.block<9, 9>(3, 3) * Jt;
-    off_diag = Jp.adjoint() * ipc_hess.block<3, 9>(3, 0) * Jt;
+    off_diag += Jp.adjoint() * ipc_hess.block<3, 9>(0, 3) * Jt;
 
     #ifndef GOOGLE_TEST
     //globals.hess_triplets.push_back(HessBlock(ii, jj, off_diag));

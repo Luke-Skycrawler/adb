@@ -71,8 +71,8 @@
   </ImportGroup>
   <PropertyGroup Label="UserMacros" />
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
-    <IncludePath>D:\third_party_libs\Tight-Inclusion\src;$(IncludePath)</IncludePath>
-    <LibraryPath>D:\third_party_libs\Tight-Inclusion\build\Debug;$(LibraryPath)</LibraryPath>
+    <IncludePath>D:\third_party_libs\Tight-Inclusion\src;D:\ref_repos\ipc-toolkit\src;$(IncludePath)</IncludePath>
+    <LibraryPath>D:\third_party_libs\Tight-Inclusion\build\Debug;D:\ref_repos\ipc-toolkit\build\temp.win-amd64-cpython-38\Release\ipctk\Release;$(LibraryPath)</LibraryPath>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
     <IncludePath>D:\third_party_libs\Tight-Inclusion\src;D:\ref_repos\ipc-toolkit\src;$(IncludePath)</IncludePath>

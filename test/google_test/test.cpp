@@ -103,9 +103,6 @@ TEST(ee_distance_test, basic_random){
 //  }
 //}
 
-TEST(numerical_grad, hessian){
-
-}
 
 
 /*
@@ -145,7 +142,7 @@ TEST_F(Implicit_Euler_Test, non_increasing_across_iter){
 }
 */
 
-double dist = 1.0;
+const double dist = 0.09;
 // double d_hat = 10.0;
 
 inline double barrier_gradient(const double d, const double dHat2)
@@ -169,10 +166,10 @@ inline double barrier_hessian(const double d, const double dHat2)
 }
 
 double w[] = {
-    0.0, 0.0, 0.0,
-    0.0, 1.0, 0.0,
-    0.0, 1.0, 1.0,
-    1.0, 1.0, 0.0
+    1.0, 0.0, 0.0, 0.0,
+    1.0, 0.0, 0.0, 0.0,
+    1.0, 0.0, 0.0, 1.0,
+    1.0, 1.0, 0.0, 0.0
 };
 
 int dim = 3;
@@ -180,37 +177,41 @@ double barrier_hessian(double d)
 {
     if (d >= d_hat)
         return 0.0f;
-    return -barrier::kappa * (2 * log(d / d_hat) + (d - d_hat) / d + (d - d_hat) * (2 / d + d_hat / d / d));
+    return -barrier::kappa * (2 * log(d / d_hat) + (d - d_hat) / d + (d - d_hat) * (2 / d + d_hat / d / d)) / (d_hat * d_hat);
 }
 
 double barrier_gradient(double x)
 {
     if (x >= d_hat)
         return 0.0f;
-    return -(x - d_hat) * barrier::kappa * (2 * log(x / d_hat) + (x - d_hat) / x);
+    return -(x - d_hat) * barrier::kappa * (2 * log(x / d_hat) + (x - d_hat) / x) / (d_hat * d_hat);
 }
 
 void gradient(const vec3& p, const vec3& t0, const vec3& t1, const vec3& t2, VectorXd& grad)
 {
     Vector<double, 12> PT_grad;
-    double dE = barrier_gradient(dist, d_hat * d_hat);
+    //double dE = barrier_gradient(dist * dist, d_hat);
+    double d = ipc::point_triangle_distance(p, t0, t1, t2);
+    double dE = barrier_gradient(d);
     ipc::point_triangle_distance_gradient(p, t0, t1, t2, PT_grad);
 
     for (int i = 0; i < 4; i++) {
         for (int j = 0; j < 3; j++) {
             grad.data()[3 * i + j] = w[i] * dE * PT_grad.data()[j];
-            grad.data()[12 + 3 * i + j] = (w[4 + i] * PT_grad.data()[dim + j] + w[8 + i] * PT_grad.data()[6 + j] + w[12 + i] * PT_grad.data()[9 + j]) * dE;
+            grad.data()[12 + 3 * i + j] = (w[4 + i] * PT_grad.data()[3 + j] + w[8 + i] * PT_grad.data()[6 + j] + w[12 + i] * PT_grad.data()[9 + j]) * dE;
         }
     }
 }
 
-void hessian(const vec3& p, const vec3& t0, const vec3& t1, const vec3& t2, MatrixXd& hess, const VectorXd& PT_grad)
+void hessian(const vec3& p, const vec3& t0, const vec3& t1, const vec3& t2, MatrixXd& hess)
 {
     Eigen::Matrix<double, 12, 12> PT_hess;
+    Vector<double, 12> PT_grad;
     ipc::point_triangle_distance_hessian(p, t0, t1, t2, PT_hess);
-
-    double dE = barrier_gradient(dist, d_hat * d_hat);
-    double dE2 = barrier_hessian(dist, d_hat * d_hat);
+    ipc::point_triangle_distance_gradient(p, t0, t1, t2, PT_grad);
+    double d = ipc::point_triangle_distance(p, t0, t1, t2);
+    double dE = barrier_gradient(d);
+    double dE2 = barrier_hessian(d);
 
     for (int r = 0; r < 12; r++)
         for (int c = r; c < 12; c++) {
@@ -298,14 +299,29 @@ protected:
     // void TearDown() override {}
 };
 
-TEST_F(Implicit_Euler_Test, random_distance)
+#include <random>
+TEST_F(Implicit_Euler_Test, grad_random_distance)
 {
     double ds[10];
+    std::default_random_engine gen;
+    std::uniform_real_distribution<double> distribution(0.0, 1.0);
     for (int i = 0; i < 10; i++) {
-        double d = ds[i];
+        double d = distribution(gen) * d_hat;
         double b1 = barrier_gradient(d);
-        double b2 = barrier_gradient(d * d, d_hat * d_hat);
-        EXPECT_EQ(b1, b2);
+        double b2 = barrier_gradient(d, d_hat);
+        EXPECT_TRUE(abs(b1 - b2) < 1);
+    }
+}
+TEST_F(Implicit_Euler_Test, hess_random_distance)
+{
+    double ds[10];
+    std::default_random_engine gen;
+    std::uniform_real_distribution<double> distribution(0.0, 1.0);
+    for (int i = 0; i < 10; i++) {
+        double d = distribution(gen) * d_hat;
+        double b1 = barrier_hessian(d);
+        double b2 = barrier_hessian(d, d_hat);
+        EXPECT_TRUE(abs(b1 - b2) < 1);
     }
 }
 TEST_F(Implicit_Euler_Test, point_triangle)
@@ -337,20 +353,42 @@ TEST_F(Implicit_Euler_Test, point_triangle)
         // hess2.setZero(24, 24);
 
         grad1.setZero(24);
+        grad21.setZero(12);
+        grad22.setZero(12);
         // grad2.setZero(24);
 
         gradient(p, t0, t1, t2, grad1);
-        hessian(p, t0, t1, t2, hess1, grad1);
-        // crafted_hessian(p, t0, t1, t2);
-        // crafted_gradient(p, t0, t1, t2);
+        hessian(p, t0, t1, t2, hess1);
+        hess21.setZero(12, 12);
+        hess22.setZero(12, 12);
+
         array<vec3, 4> pt = { p, t0, t1, t2 };
         array<int, 4> ij = { 0, 0, 1, 1 };
-        // ipc_term(hess2, grad2, pt, ij);
-        ipc_term(hess21, hess22, grad21, grad22, pt, ij);
-        bool hess_eq = (hess1 - hess21).array().abs().maxCoeff() <= 1e-4;
-        bool grad_eq = (grad1 - grad22).array().abs().maxCoeff() <= 1e-4;
+        
+        Matrix<double, 12, 12> off_diag;  
+        off_diag.setZero(12, 12);
 
-        EXPECT_TRUE(grad_eq);
+        ipc_term(hess21, hess22, grad21, grad22, pt, ij, off_diag);
+        bool hess_eq = ((hess1 - hess21).array().abs() <= hess1.array().abs() * 1e-2).all();
+        bool grad_eq = ((grad1 - grad22).array().abs() <= grad1.array().abs() * 1e-2).all();
+        for (int k = 0; k < 12; k++)
+            for (int j = 0; j < 12; j++) {
+                //EXPECT_EQ(hess1(k, j), hess21(k, j)) << "i = " << k << ", j = " << j;
+                //EXPECT_EQ(hess1(k + 12, j + 12), hess22(k, j)) << "i = " << k << ", j = " << j;
+                EXPECT_EQ(hess1(k, j + 12), off_diag(k, j)) << "i = " << k << ", j = " << j;
+            }
+        
+            EXPECT_EQ(grad1(0), grad21(0));
+        EXPECT_EQ(grad1(1), grad21(1));
+        EXPECT_EQ(grad1(2), grad21(2));
+
+            EXPECT_EQ(grad1(12), grad22(0));
+        EXPECT_EQ(grad1(12 + 1), grad22(1));
+        EXPECT_EQ(grad1(12 + 2), grad22(2));
+        
+        
+        //EXPECT_TRUE(grad_eq);
+        //EXPECT_TRUE(hess_eq);
     }
 }
 
