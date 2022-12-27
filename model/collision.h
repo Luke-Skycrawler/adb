@@ -17,6 +17,6 @@ int ee_colliding_response(int ci, int cj);
 double ee_collision_detect(const Cube& ci, const Cube& cj, int eid_i, int eid_j);
 
 void ipc_term(Matrix<double, 12, 12>& hess_p, Matrix<double, 12, 12>& hess_t, Vector<double, 12>& grad_p, Vector<double, 12>& grad_t, std::array<vec3, 4> pt, std::array<int, 4> ij
-    , Matrix<double, 12 , 12> &off_diag
+    // , Matrix<double, 12 , 12> &off_diag
     // , vector<Cube> &cubes
 );

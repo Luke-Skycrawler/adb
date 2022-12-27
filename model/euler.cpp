@@ -11,22 +11,6 @@ using namespace std;
 using namespace barrier;
 using namespace Eigen;
 
-MatrixXd PSD_projection(const MatrixXd& A12x12)
-{
-#ifdef _PSD_
-    SelfAdjointEigenSolver<MatrixXd> eig(A12x12);
-    VectorXd lam = eig.eigenvalues();
-    MatrixXd U = eig.eigenvectors();
-    for (int i = 0; i < 12; i++) {
-        lam(i) = max(lam(i), 0.0);
-    }
-    return U * lam.asDiagonal() * U.adjoint();
-
-#else
-    return A12x12;
-#endif
-}
-
 VectorXd cat(const vec3 q[])
 {
     Vector<double, 12> ret;
@@ -47,17 +31,9 @@ VectorXd Cube::q_tile(double dt, const vec3& f)
     auto _q = cat(q0);
     auto _dqdt = cat(dqdt);
     _q = _q + dt * _dqdt;
-    _q.head(3) += dt* dt* f;
+    _q.head(3) += dt * dt * f;
     return _q;
 }
-
-// VectorXd& cat_all(vector<Cube>& cubes)
-// {
-//     VectorXd* ret = new VectorXd;
-//     // for (auto &c : cubes) {
-//     // }
-//     return *ret;
-// }
 
 void implicit_euler(vector<Cube> & cubes, double dt) {
 
@@ -102,17 +78,23 @@ void implicit_euler(vector<Cube> & cubes, double dt) {
         
         // FIXME: ugly, per_body otho energy
     };
-    const auto E_global = [&](VectorXd& dq) -> double {
+    const auto E_global = [&](const VectorXd& q, const VectorXd& dq) -> double {
         double e = 0.0;
-        for (auto& pt : pts) {
-            double d = ipc::point_triangle_distance(pt[0], pt[1], pt[2], pt[3]);
-            e += barrier::barrier_function(d);
-        }
         for (int i = 0; i < cubes.size(); i++) {
             auto& c(cubes[i]);
+            c.increment_q = dq.segment<12>(i * 12);
+
             auto q_tiled = c.q_tile(dt, globals.gravity);
-            auto q = cat(c.q) + dq.segment<12>(12 * i);
-            e += E(q, q_tiled, c);
+            auto _q = q.segment<12>(12 * i);
+            e += E(_q, q_tiled, c);
+        }
+        for (int k = 0; k < pts.size(); k++) {
+            auto& ij = idx[k];
+            Face f(cubes[ij[2]], ij[3], true);
+            vec3 v(cubes[ij[0]].vt2(ij[1]));
+            // array<vec3, 4> a = {v, f.t0, f.t1, f.t2};
+            double d = ipc::point_triangle_distance(v, f.t0, f.t1, f.t2);
+            e += barrier::barrier_function(d);
         }
         return e;
     };
@@ -130,17 +112,18 @@ void implicit_euler(vector<Cube> & cubes, double dt) {
         }
     };
 
-    const auto line_search = [&](const VectorXd& dq, const VectorXd& grad, VectorXd& q0, const VectorXd q_tiled, Cube& c) -> double {
+    const auto line_search = [&](const VectorXd& dq, const VectorXd& grad, VectorXd& q0) -> double {
         const double c1 = 1e-4;
         double alpha = 1.0;
         bool wolfe = false;
-        double E0 = E_global(q0);
+        double E0 = E_global(q0, 0.0 * dq);
         //double E0 = E(q0, q_tiled, c);
         VectorXd q1;
         do {
             q1 = q0 + dq * alpha;
-            //double E1 = E(q1, q_tiled, c);
-            double E1 = E_global(q1);
+            auto dqk = dq * alpha;
+
+            double E1 = E_global(q1, dqk);
             wolfe = E1 <= E0 + c1 * alpha * (dq.dot(grad));
             alpha /= 2;
             if (alpha < 1e-8) break;
@@ -149,8 +132,7 @@ void implicit_euler(vector<Cube> & cubes, double dt) {
         return alpha * 2;
     };
 
-    
-    const auto gen_collision_set = [&](const vector<Cube>& cubes) {
+        const auto gen_collision_set = [&](const vector<Cube>& cubes) {
         int n = cubes.size();
         for (int i = 0; i < n; i++)
             for (int j = 0; j < n; j++) {
@@ -248,18 +230,23 @@ void implicit_euler(vector<Cube> & cubes, double dt) {
             }
             return toi;
         };
-        double toi = 1.0, factor = 1.0;
+        double toi = 1.0, factor = 1.0, alpha = 1.0;
         {
             const int n_cubes = cubes.size();
             const int hess_dim = n_cubes * 12;
             MatrixXd big_hess;
             big_hess.setZero(hess_dim, hess_dim);
-            VectorXd r;
+            VectorXd r, q0_cat, q_tile_cat;
             r.setZero(hess_dim);
+            q0_cat.setZero(hess_dim);
+            q_tile_cat.setZero(hess_dim);
 
             for (int k = 0; k < n_cubes; k++) {
                 big_hess.block<12, 12>(k * 12, k * 12) = cubes[k].hess;
                 r.segment<12>(k * 12) = cubes[k].grad;
+                auto t = cat(cubes[k].q);
+                q0_cat.segment<12>(k * 12) = t;
+                q_tile_cat.segment<12>(k * 12) = cubes[k].q_tile(dt, t);
             }
             for (auto& triplet : globals.hess_triplets) {
                 // big_hess.block<12, 12>(triplet.i * 12, triplet.j * 12) = PSD_projection(triplet.block);
@@ -320,7 +307,8 @@ void implicit_euler(vector<Cube> & cubes, double dt) {
                 factor = 0.8;
             }
 
-            //line_search(dq, r, q0, q_tiled);
+            alpha = line_search(dq, r, q0_cat);
+            spdlog::info("alpha = {}", alpha);
         }
 
 
@@ -328,14 +316,14 @@ void implicit_euler(vector<Cube> & cubes, double dt) {
             auto tiled_q = c.q_tile(dt, globals.gravity);
             double E0 = E(cat(c.q), tiled_q, c);
             for (int i = 0; i < 4; i++) {
-                c.q[i] += c.increment_q.segment<3>(i * 3) * toi * factor;
+                c.q[i] += c.increment_q.segment<3>(i * 3) * toi * factor * alpha;
             }
 
             double norm_dq = c.increment_q.norm();
             sup_dq = max(sup_dq, norm_dq);
             double E1 = E(cat(c.q), tiled_q, c);
             spdlog::info("iter {}, e0 = {}, e1 = {}, norm_dq = {}, sup_dq = {}, dq = ", iter, E0, E1, norm_dq, sup_dq);
-            spdlog::info("toi {}, factor = {}", toi, factor);
+            spdlog::info("toi {}, factor = {}, alpha = {}", toi, factor, alpha);
 
             //cout << c.increment_q << endl;
         }

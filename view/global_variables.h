@@ -48,23 +48,23 @@ struct GlobalVariableMainCPP{
     vec3 gravity;
     double alpha, beta;
 };
-//#ifndef GOOGLE_TEST
-//#ifdef _MAIN_CPP
-//#define VARIABLE_LOCATOR
-//VARIABLE_LOCATOR glm::vec3 LightPositions[]
-// = {
-//    glm::vec3(1.2f, 1.0f, 2.0f),
-//    glm::vec3(1.2f, 2.0f, 0.0f),
-//    glm::vec3(-1.2f, 2.0f, 2.0f),
-//    glm::vec3(-1.2f, 2.0f, 0.0f)};
-//#else 
-//#define VARIABLE_LOCATOR extern
-//VARIABLE_LOCATOR glm::vec3 LightPositions[];
-//#endif
-//
-//VARIABLE_LOCATOR GlobalVariableMainCPP globals;
-//
-//// lighting
-//static glm::vec3 &lightPos(LightPositions[0]);
-//
-//#endif
+#ifndef GOOGLE_TEST
+#ifdef _MAIN_CPP
+#define VARIABLE_LOCATOR
+VARIABLE_LOCATOR glm::vec3 LightPositions[]
+= {
+   glm::vec3(1.2f, 1.0f, 2.0f),
+   glm::vec3(1.2f, 2.0f, 0.0f),
+   glm::vec3(-1.2f, 2.0f, 2.0f),
+   glm::vec3(-1.2f, 2.0f, 0.0f)};
+#else 
+#define VARIABLE_LOCATOR extern
+VARIABLE_LOCATOR glm::vec3 LightPositions[];
+#endif
+
+VARIABLE_LOCATOR GlobalVariableMainCPP globals;
+
+// lighting
+static glm::vec3 &lightPos(LightPositions[0]);
+
+#endif
