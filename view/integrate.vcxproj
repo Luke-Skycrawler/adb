@@ -76,7 +76,7 @@
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
     <IncludePath>D:\third_party_libs\Tight-Inclusion\src;D:\ref_repos\ipc-toolkit\src;$(IncludePath)</IncludePath>
-    <LibraryPath>D:\third_party_libs\Tight-Inclusion\release\Release;D:\ref_repos\ipc-toolkit\build\temp.win-amd64-cpython-38\Release\ipctk\Release;$(LibraryPath)</LibraryPath>
+    <LibraryPath>D:\third_party_libs\Tight-Inclusion\release\Release;D:\ref_repos\ipc-toolkit\build\temp.win-amd64-cpython-38\Release\ipctk\Release;D:\ref_repos\ipc-toolkit\build\temp.win-amd64-3.8\Release\ipctk\Release;$(LibraryPath)</LibraryPath>
   </PropertyGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
     <ClCompile>

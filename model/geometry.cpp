@@ -49,11 +49,11 @@ double vf_distance(const vec3& v, const Cube& c, int id)
     return vf_distance(v, f);
 }
 
-double vg_distance(const vec3& vertex)
+double vg_distance(const vec3& vertex) // not squared
 {
     // ground plane y = -0.5
     double d = vertex(1) + 0.5;
-    return d * d;
+    return d;
 }
 vec3 vf_distance_gradient_x(const vec3& vertex)
 {

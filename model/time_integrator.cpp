@@ -113,8 +113,8 @@ void implicit_euler(vector<Cube>& cubes, double dt)
             /*if (j == _i) continue;*/
             auto& cj(cubes[j]);
 #ifdef _VF_
-            cf = vf_colliding_response(cj, c);
-            cv = vf_colliding_response(c, cj);
+            //cf = vf_colliding_response(cj, c);
+            //cv = vf_colliding_response(c, cj);
 #endif
 #ifdef _EE_
             ce0 = ee_colliding_response(c, cj);
