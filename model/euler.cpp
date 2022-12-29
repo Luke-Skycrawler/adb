@@ -158,7 +158,7 @@ void implicit_euler(vector<Cube> & cubes, double dt) {
             }
     };
 
-    gen_collision_set(cubes);
+    //gen_collision_set(cubes);
         spdlog::info("constraint size = {}, {}", pts.size(), idx.size());
 
     do {
@@ -302,7 +302,7 @@ void implicit_euler(vector<Cube> & cubes, double dt) {
             dq *= factor * toi;
 
             alpha = 1.0;
-            alpha = line_search(dq, r, q0_cat);
+            //alpha = line_search(dq, r, q0_cat);
             spdlog::info("alpha = {}", alpha);
             dq *= alpha;
             double E0 = E_global(q0_cat, dq * 0.0), E1;

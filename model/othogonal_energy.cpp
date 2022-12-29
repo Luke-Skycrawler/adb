@@ -3,43 +3,16 @@
 #include "marcros_settings.h"
 
 using namespace othogonal_energy;
-
 namespace othogonal_energy {
 
-    static const double kappa = 1e8;
+    static const double kappa = 1e9;
 
 #ifdef TEST_PYTHON
     inline double kronecker(int i, int j)
     {
         return i == j ? 1.0 : 0.0;
     }
-    mat3 grad(mat3& q)
-    {
-        mat3 ret;
-        for (int i = 0; i < 3; i++) {
-            vec3 g(0.0, 0.0, 0.0);
-            for (int j = 0; j < 3; j++) {
-                auto qi = q.col(i);
-                auto qj = q.col(j);
-                g += (qi.dot(qj) - kronecker(i, j)) * qj;
-            }
-            ret.col(i) = 4 * kappa * g;
-        }
-        return ret;
-    }
-
-    mat3 hessian(mat3& q, int i, int j)
-    {
-        auto qi = q.col(i), qj = q.col(j);
-        
-        mat3 h = (qi.dot(qj) - kronecker(i, j)) * Matrix3d::Identity(3,3);
-        for (int k = 0; k < 3; k ++){
-            auto qk = q.col(k);
-            h += (kronecker(k, j) * qi + kronecker(i, j) * qk) * qk.adjoint();
-        }
-        return 4 * kappa * h;
-    }
-
+    
     VectorXd grad(vec3 q[])
     {
         Vector<double, 12> ret;
@@ -54,21 +27,38 @@ namespace othogonal_energy {
         return ret;
     }
 
-    MatrixXd hessian(vec3 q[])
-    {
+    //MatrixXd hessian(vec3 q[])
+    //{
+    //    Matrix<double, 12, 12> H;
+    //    H.setZero(12, 12);
+    //    for (int i = 1; i < 4; i++) {
+    //        auto qi = q[i];
+    //        for (int j = 1; j < 4; j++) {
+    //            auto qj = q[j];
+    //            mat3 h = (qi.dot(qj) - kronecker(i, j)) * Matrix3d::Identity(3, 3);
+    //            for (int k = 1; k < 4; k++) {
+    //                auto qk = q[k];
+    //                h += (kronecker(k, j) * qi + kronecker(i, j) * qk) * qk.adjoint();
+    //            }
+    //            H.block<3,3>(i * 3, j * 3) = 4 * kappa * h;
+    //        }
+    //    }
+    //    return H;
+    //}
+    MatrixXd hessian(vec3 q[]) {
         Matrix<double, 12, 12> H;
         H.setZero(12, 12);
-        for (int i = 1; i < 4; i++) {
-            auto qi = q[i];
-            for (int j = 1; j < 4; j++) {
-                auto qj = q[j];
-                mat3 h = (qi.dot(qj) - kronecker(i, j)) * Matrix3d::Identity(3, 3);
-                for (int k = 1; k < 4; k++) {
-                    auto qk = q[k];
-                    h += (kronecker(k, j) * qi + kronecker(i, j) * qk) * qk.adjoint();
-                }
-                H.block<3,3>(i * 3, j * 3) = 4 * kappa * h;
+        for (int i= 1; i < 4;i++)for(int j = 1; j < 4;j ++) {
+            mat3 h;
+            h.setZero(3,3);
+            if (i == j) {
+                h = 2 * q[i] * q[i].transpose() + (q[i].dot(q[i]) -1) * Matrix3d::Identity(3, 3);
+                for(int k = 1; k < 4; k++)if(k!= i) h += q[k] * q[k].transpose();
             }
+            else {
+                h = Matrix3d::Identity(3, 3) * q[j].dot(q[i]) + q[j] * q[i].transpose();
+            }
+            H.block<3, 3>(3 * i, 3 * j) = h * 4 * kappa;
         }
         return H;
     }
@@ -85,7 +75,7 @@ namespace othogonal_energy {
                 double e = pow(q[i].dot(q[j]) - 1.0 * (i == j), 2);
                 E += e;
             }
-        return E;
+        return E * kappa;
     }
 #else
     vec3 grad(mat3& q, int i)

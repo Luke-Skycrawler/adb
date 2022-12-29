@@ -30,7 +30,7 @@ vector<Cube> cube_blocks(int n)
         cube->q_dot = R;
 
         cube->p = vec3(i * 0.5, 1.0 * (i * 1.5 + 0.1), i * 0.5);
-        cube->p_dot = vec3(0.0, i * -50.0, 0.0);
+        cube->p_dot = vec3(0.0, i * -5.0, 0.0);
         cube->prepare_q_array();
         cubes.push_back(*cube);
     }
