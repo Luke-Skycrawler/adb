@@ -2,8 +2,9 @@
     "dt": 1e-3,
     "max_iter": 10,
     "predefined_case" : {
-        "enable": true,
-        "id" : 2
+        "enable": false,
+        "id" : 2,
+        "custom": "../test_cases/case.json"
     },
     "gravity": true, 
     "kappa": 1e3,
@@ -14,24 +15,5 @@
     "damping": {
         "alpha": 2.5e-2,
         "beta": 2.3e-2
-    },
-    "case": [{
-        "cubes": [
-            {
-                "omega": [0.0, 0.0, 20.0],
-                "p":[0.0, 1.0, 0.0]
-            }
-        ],
-        "gravity": [0.0, 0.0, 0.0]
-    },{
-        "cubes": [
-            {
-                "omega": [0.0, 0.0, 20.0], 
-                "p": [0.0, 0.0, 0.0],
-                "p_dot": [0.0, -50.0, 0.0]
-            }
-        ],
-        "gravity": false
-    }]
-
+    }
 }

@@ -81,7 +81,7 @@ struct Cube {
         a << q0[1] , q0[2], q0[3];
         return a * vertices() [i] + b;
     }
-
+    
     double vg_collision_time();
     VectorXd q_tile(double dt, const vec3 &f);
     double vf_collision_detect(const vec3& dp, const mat3& dq);
