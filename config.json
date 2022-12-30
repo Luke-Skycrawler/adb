@@ -5,7 +5,12 @@
         "enable": true,
         "id" : 2
     },
-    "gravity": false, 
+    "gravity": true, 
+    "kappa": 1e3,
+    "dhat": 1e-3,
+    "line_search": true,
+    "col_set": true,
+    "uppper_bound": true, 
     "damping": {
         "alpha": 2.5e-2,
         "beta": 2.3e-2

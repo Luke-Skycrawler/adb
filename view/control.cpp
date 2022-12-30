@@ -13,6 +13,9 @@ void reset(){
     auto predefined = data["predefined_case"]["enable"];
     auto g = data["gravity"];
     globals.gravity = vec3(0.0, g? -9.8 : 0.0 , 0.0);
+    globals.col_set = data["col_set"];
+    globals.line_search = data["line_search"];
+    globals.upper_bound = data["uppper_bound"];
     if (predefined) {
         int id = data["predefined_case"]["id"];
         if (id == 1) {

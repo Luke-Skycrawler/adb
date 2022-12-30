@@ -144,7 +144,7 @@ void implicit_euler(vector<Cube> & cubes, double dt) {
 
             double E1 = E_global(q1, dqk);
             wolfe = E1 <= E0 + c1 * alpha * qdg;
-            spdlog::info("wanted descend = {}, E1 - E0 = {}, E1 = {}, E0 = {}, alpha = {}", c1 * alpha * qdg, E1 - E0, E1, E0, alpha);
+            //spdlog::info("wanted descend = {}, E1 - E0 = {}, E1 = {}, E0 = {}, alpha = {}", c1 * alpha * qdg, E1 - E0, E1, E0, alpha);
             alpha /= 2;
             if (alpha < 1e-8) break;
         } while (!wolfe && grad.norm() > 1e-3);
@@ -161,7 +161,7 @@ void implicit_euler(vector<Cube> & cubes, double dt) {
                 for (int v = 0; v < Cube::n_vertices; v++)
                     for (int f = 0; f < Cube::n_faces; f++) {
                         Face _f(cj, f);
-                        vec3 p = ci.vt0(v);
+                        vec3 p = ci.vt1(v);
                         double d = ipc::point_triangle_distance(p, _f.t0, _f.t1, _f.t2);
                         if (d < barrier::d_hat) {
                             array<vec3, 4> pt = { p, _f.t0, _f.t1, _f.t2 };
@@ -173,8 +173,8 @@ void implicit_euler(vector<Cube> & cubes, double dt) {
                     }
             }
     };
-
-    //gen_collision_set(cubes);
+    if(globals.col_set)
+    gen_collision_set(cubes);
         spdlog::info("constraint size = {}, {}", pts.size(), idx.size());
 
     do {
@@ -304,6 +304,7 @@ void implicit_euler(vector<Cube> & cubes, double dt) {
             }
 
             toi = 1.0;
+            if (globals.upper_bound)
             toi = step_size_upper_bound(dq, cubes);
 
             for (auto &c : cubes) {
@@ -318,10 +319,11 @@ void implicit_euler(vector<Cube> & cubes, double dt) {
             dq *= factor * toi;
 
             alpha = 1.0;
+            if (globals.line_search)
             alpha = line_search(dq, r, q0_cat);
             spdlog::info("alpha = {}", alpha);
             dq *= alpha;
-            double E0 = E_global(q0_cat, dq * 0.0), E1 = E_global(q0_cat, dq);
+            double E0 = E_global(q0_cat, dq * 0.0), E1 = E_global(q0_cat + dq, dq);
             double norm_dq = dq.norm();
             sup_dq = norm_dq;
 

@@ -1,10 +1,9 @@
-#ifndef GOOGLE_TEST
 #include "cube.h"
 #include "geometry.h"
 #include "barrier.h"
 #include <ipc/distance/point_triangle.hpp>
+#include <ipc/utils/eigen_ext.hpp>
 #include "../view/global_variables.h"
-#endif
 #include <array>
 using namespace std;
 
@@ -18,6 +17,30 @@ MatrixXd PSD_projection(const MatrixXd& A12x12)
         lam(i) = max(lam(i), 0.0);
     }
     return U * lam.asDiagonal() * U.adjoint();
+}
+Matrix<double, 12, 12> project_to_psd(
+    const Eigen::Matrix<double, 12, 12>& A)
+{
+    // https://math.stackexchange.com/q/2776803
+    Eigen::SelfAdjointEigenSolver<
+        Eigen::Matrix<double, 12, 12>>
+        eigensolver(A);
+    // Check if all eigen values are zero or positive.
+    // The eigenvalues are sorted in increasing order.
+    if (eigensolver.eigenvalues()[0] >= 0.0) {
+        return A;
+    }
+    Eigen::DiagonalMatrix<double, Eigen::Dynamic> D(eigensolver.eigenvalues());
+    // Save a little time and only project the negative values
+    for (int i = 0; i < A.rows(); i++) {
+        if (D.diagonal()[i] < 0.0) {
+            D.diagonal()[i] = 0.0;
+        } else {
+            break;
+        }
+    }
+    return eigensolver.eigenvectors() * D
+        * eigensolver.eigenvectors().transpose();
 }
 void ipc_term(Matrix<double, 12, 12>& hess_p, Matrix<double, 12, 12>& hess_t, Vector<double, 12>& grad_p, Vector<double, 12>& grad_t, array<vec3, 4> pt, array<int, 4> ij
 // , Matrix<double, 12, 12> &off_diag
@@ -65,10 +88,11 @@ void ipc_term(Matrix<double, 12, 12>& hess_p, Matrix<double, 12, 12>& hess_t, Ve
 
     Matrix<double, 12, 12> ipc_hess;
     ipc_hess.setZero(12, 12);
-    ipc_hess = pt_hess  * B_ + pt_grad * pt_grad.adjoint() * B__;
+    // ipc_hess = PSD_projection(pt_hess  * B_) + pt_grad * pt_grad.adjoint() * B__;
+    ipc_hess = project_to_psd(pt_hess * B_) + pt_grad * pt_grad.adjoint() * B__;
     
     // psd project
-    ipc_hess = PSD_projection(ipc_hess);
+    // ipc_hess = PSD_projection(ipc_hess);
     int ii = _i, jj = _j;
 
     // H.block<12, 12> (ii * 12, ii * 12) += Jp.adjoint() * ipc_hess.block<3, 3>(0 ,0) * Jp;
@@ -80,10 +104,8 @@ void ipc_term(Matrix<double, 12, 12>& hess_p, Matrix<double, 12, 12>& hess_t, Ve
     hess_t += Jt.adjoint() * ipc_hess.block<9, 9>(3, 3) * Jt;
     off_diag += Jp.adjoint() * ipc_hess.block<3, 9>(0, 3) * Jt;
 
-    #ifndef GOOGLE_TEST
     globals.hess_triplets.push_back(HessBlock(ii, jj, off_diag));
     globals.hess_triplets.push_back(HessBlock(ii, jj, off_diag.adjoint()));
-    #endif
     // H.block<12, 12>(jj * 12, ii * 12) += (Jp.adjoint() * ipc_hess.block<3, 9>(3, 0) * Jt).adjoint();
 
     // g.segment<12>(ii * 12) += Jp.adjoint() * pt_grad.segment<3>(0) * B_;
