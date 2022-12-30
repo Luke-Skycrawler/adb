@@ -6,8 +6,9 @@ Edge::Edge(const Cube& c, int id, bool b)
 {
     int _0 = Cube::edges[id * 2];
     int _1 = Cube::edges[id * 2 + 1];
-    e0 = c.vi(_0, b);
-    e1 = c.vi(_1, b);
+    
+    e0 = b? c.vt1(_0): c.vt2(_0);
+    e1 = b? c.vt1(_1): c.vt2(_1);
 }
 
 vec3 Face::normal() const

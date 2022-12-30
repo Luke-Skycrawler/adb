@@ -15,16 +15,22 @@ inline mat3 cross_matrix(const vec3& a)
         -a[1], a[0], 0;
     return ret;
 }
-static const vec3 omega(0.0, 0.0, 20.0);
-Cube* spinning_cube()
+inline array<vec3, 4> skew(const vec3& a)
 {
-    auto R = cross_matrix(omega);
-    auto* cube = new Cube();
-    cube->q_dot = R;
-    cube->p = vec3(0.0, 1.0, 0.0);
-    // cube->p = vec3(0.0, 0.2, 0.0);
-    // cube->p_dot = vec3(0.0, -200.0, 0.0);
-    cube->prepare_q_array();
+    return {
+        -vec3(0, -a[2], a[1]),
+        -vec3(a[2], 0, -a[0]),
+        -vec3(-a[1], a[0], 0)
+    };
+}
+static const vec3 omega(0.0, 0.0, 20.0);
+Cube spinning_cube()
+{
+    Cube cube;
+    auto a = skew(omega);
+    for (int i = 0; i < 3; i++) cube.dqdt[i + 1] = a[i];
+    cube.q[0] = vec3(0.0, 1.0, 0.0);
+    cube.q0 = cube.q;
     return cube;
 }
 
@@ -32,14 +38,14 @@ vector<Cube> cube_blocks(int n)
 {
     vector<Cube> cubes;
     for (int i = 0; i < n; i++) {
-        Cube* cube = new Cube();
-        auto R = cross_matrix(omega);
-        cube->q_dot = R;
+        Cube cube;
+        auto R = skew(omega);
+        for (int j = 0; j < 3; j++) cube.dqdt[j + 1] = R[j];
+        cube.dqdt[0] = vec3(0.0, i * -5.0, 0.0);
 
-        cube->p = vec3(i * 0.5, 1.0 * (i * 1.5 + 0.1), i * 0.5);
-        cube->p_dot = vec3(0.0, i * -5.0, 0.0);
-        cube->prepare_q_array();
-        cubes.push_back(*cube);
+        cube.q[0] = vec3(i * 0.5, 1.0 * (i * 1.5 + 0.1), i * 0.5);
+        cube.q0 = cube.q;
+        cubes.push_back(cube);
     }
     return cubes;
 }
@@ -57,16 +63,16 @@ vector<Cube> customize(string file){
         double theta = it["theta"] / 180.0 * M_PI;
 
 
-        a.p_dot = vec3(p_dot[0], p_dot[1], p_dot[2]);
-        a.p = vec3(p[0], p[1], p[2]);
-        a.q_dot = cross_matrix(vec3(omega[0], omega[1], omega[2]));
+        a.dqdt[0] = vec3(p_dot[0], p_dot[1], p_dot[2]);
+        a.q[0] = vec3(p[0], p[1], p[2]);
+        auto R = skew(vec3(omega[0], omega[1], omega[2]));
+        for (int i = 0; i < 3; i++) a.dqdt[i + 1] = R[i];
         double s = sin(theta), c = cos(theta);
-        
-        a.A(0, 0) = c;
-        a.A(1, 1) = c;
-        a.A(1, 0) = s;
-        a.A(0, 1) = -s;
-        a.prepare_q_array();
+        a.q[1](0) = c;
+        a.q[2](1) = c;
+        a.q[2](0) = -s;
+        a.q[1](1) = s;
+        a.q0 = a.q;
         cubes.push_back(a);
     }
     return cubes;

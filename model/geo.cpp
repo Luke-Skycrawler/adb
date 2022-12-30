@@ -35,17 +35,15 @@ Matrix<double, 12, 12> project_to_psd(
     for (int i = 0; i < A.rows(); i++) {
         if (D.diagonal()[i] < 0.0) {
             D.diagonal()[i] = 0.0;
-        } else {
+        }
+        else {
             break;
         }
     }
     return eigensolver.eigenvectors() * D
         * eigensolver.eigenvectors().transpose();
 }
-void ipc_term(Matrix<double, 12, 12>& hess_p, Matrix<double, 12, 12>& hess_t, Vector<double, 12>& grad_p, Vector<double, 12>& grad_t, array<vec3, 4> pt, array<int, 4> ij
-// , Matrix<double, 12, 12> &off_diag
-    // , vector<Cube> &cubes
-)
+void ipc_term(Matrix<double, 12, 12>& hess_p, Matrix<double, 12, 12>& hess_t, Vector<double, 12>& grad_p, Vector<double, 12>& grad_t, array<vec3, 4> pt, array<int, 4> ij)
 {
     static auto vnp = Cube::vertices();
     static auto tidx = Cube::indices;
@@ -59,9 +57,8 @@ void ipc_term(Matrix<double, 12, 12>& hess_p, Matrix<double, 12, 12>& hess_t, Ve
     ipc::point_triangle_distance_hessian(p, t0, t1, t2, pt_hess);
 
     double dist = 0.0;
-    
+
     dist = ipc::point_triangle_distance(p, t0, t1, t2);
-    //dist = vf_distance(p, Face(globals.cubes[_j], f));
     double B_ = barrier::barrier_derivative_d(dist);
     double B__ = barrier::barrier_second_derivative(dist);
     spdlog::info("dist = {}, B = {}, B__ = {}", dist, B_, B__);
@@ -73,15 +70,7 @@ void ipc_term(Matrix<double, 12, 12>& hess_p, Matrix<double, 12, 12>& hess_t, Ve
     Jt.setZero(9, 12);
     Jp.setZero(3, 12);
     off_diag.setZero(12, 12);
-    // bool same = true;
-    // if (same) {
-    //    p_tile = vec3(0,0 ,0);
-    //    t0_tile = vec3(0, 0, 0);
-    //    t1_tile = vec3(0, 0, 1);
-    //    t2_tile = vec3(1, 0, 0);
-    // }
-
-    Jt.block<3, 12>(0, 0) = barrier::x_jacobian_q(t0_tile);    
+    Jt.block<3, 12>(0, 0) = barrier::x_jacobian_q(t0_tile);
     Jt.block<3, 12>(3, 0) = barrier::x_jacobian_q(t1_tile);
     Jt.block<3, 12>(6, 0) = barrier::x_jacobian_q(t2_tile);
     Jp = barrier::x_jacobian_q(p_tile);
@@ -90,26 +79,16 @@ void ipc_term(Matrix<double, 12, 12>& hess_p, Matrix<double, 12, 12>& hess_t, Ve
     ipc_hess.setZero(12, 12);
     // ipc_hess = PSD_projection(pt_hess  * B_) + pt_grad * pt_grad.adjoint() * B__;
     ipc_hess = project_to_psd(pt_hess * B_) + pt_grad * pt_grad.adjoint() * B__;
-    
     // psd project
     // ipc_hess = PSD_projection(ipc_hess);
+
     int ii = _i, jj = _j;
-
-    // H.block<12, 12> (ii * 12, ii * 12) += Jp.adjoint() * ipc_hess.block<3, 3>(0 ,0) * Jp;
-    // H.block<12, 12> (jj * 12, jj * 12) += Jt.adjoint() * ipc_hess.block<9, 9>(3, 3) * Jt;
-    // H.block<12, 12> (ii * 12, jj * 12) += Jp.adjoint() * ipc_hess.block<3, 9>(3, 0) * Jt;
-    // H.block<12, 12> (jj * 12, ii * 12) += (Jp.adjoint() * ipc_hess.block<3, 9>(3, 0) * Jt).adjoint();
-
     hess_p += Jp.adjoint() * ipc_hess.block<3, 3>(0, 0) * Jp;
     hess_t += Jt.adjoint() * ipc_hess.block<9, 9>(3, 3) * Jt;
     off_diag += Jp.adjoint() * ipc_hess.block<3, 9>(0, 3) * Jt;
 
     globals.hess_triplets.push_back(HessBlock(ii, jj, off_diag));
     globals.hess_triplets.push_back(HessBlock(ii, jj, off_diag.adjoint()));
-    // H.block<12, 12>(jj * 12, ii * 12) += (Jp.adjoint() * ipc_hess.block<3, 9>(3, 0) * Jt).adjoint();
-
-    // g.segment<12>(ii * 12) += Jp.adjoint() * pt_grad.segment<3>(0) * B_;
-    // g.segment<12>(jj * 12) += Jt.adjoint() * pt_grad.segment<9>(3) * B_;
     grad_p += Jp.adjoint() * pt_grad.segment<3>(0) * B_;
     grad_t += Jt.adjoint() * pt_grad.segment<9>(3) * B_;
 }

@@ -1,19 +1,20 @@
 #pragma once
 #include <Eigen/Eigen>
 #include <vector>
+#include <array>
 using namespace Eigen;
 using vec3 = Vector3d;
 using mat3 = Matrix3d;
-
+using q4 = std::array<vec3, 4>;
 struct Cube {
-    mat3 A, q_dot, q_next, dq;
-    vec3 p, p_next, p_dot, dimensions, f, tau, dp;
+    mat3 A;
+    vec3 p, dimensions, f, tau;
     double mass, scale, Ic, toi, alpha;
     static int indices[36], edges[24];
     static const int n_vertices = 8, n_faces = 12, n_edges = 12;
-    Vector<double, 12> barrier_gradient, increment_q, grad;
+    Vector<double, 12> barrier_gradient, dq, grad;
     Matrix<double, 12, 12> hess;
-    vec3 q[4], q0[4], dqdt[4];
+    q4 q, q0, dqdt;
     void prepare_q_array();
     static const vec3* vertices()
     {
@@ -43,20 +44,24 @@ struct Cube {
     }
     // FIXME: probably switch to a static function
     Cube(double scale = 1.0f)
-        : mass(1000.0f), scale(scale), p(0.0f, 0.0f, 0.0f), p_dot(0.0f, 0.0f, 0.0f)
+        : mass(1000.0f), scale(scale), p(0.0f, 0.0f, 0.0f)
     {
         A.setIdentity(3, 3);
+        q = {
+            p, 
+            vec3(1.0, 0.0, 0.0),
+            vec3(0.0, 1.0, 0.0),
+            vec3(0.0, 0.0, 1.0)
+        };
+        q0 = q;
+        for (int i= 0; i < 4; i++)
+            dqdt[i].setZero(3);
+        
         dimensions.setOnes(3, 1);
         dimensions *= scale;
         Ic = mass * scale * scale / 12;
     }
 
-    inline vec3 vi(int i, bool increment = false) const
-    {
-        const auto& q(increment ? (q_next - dq) : q_next);
-        const auto& p(increment ? (p_next - dp) : p_next);
-        return q * vertices()[i] + p;
-    }
     inline vec3 vt1(int i) const {
         mat3 a;
         vec3 b = q[0];
@@ -67,10 +72,10 @@ struct Cube {
     inline vec3 vt2(int i) const {
         mat3 a;
         vec3 b = q[0];
-        b += increment_q.segment<3>(0);
+        b += dq.segment<3>(0);
         a << q[1] , q[2], q[3];
         for (int i = 1; i < 4; i ++){
-            a.col(i - 1) += increment_q.segment<3>(i * 3);
+            a.col(i - 1) += dq.segment<3>(i * 3);
         }
         return a * vertices() [i] + b;
     }
@@ -83,8 +88,7 @@ struct Cube {
     }
     
     double vg_collision_time();
-    VectorXd q_tile(double dt, const vec3 &f);
-    double vf_collision_detect(const vec3& dp, const mat3& dq);
+    VectorXd q_tile(double dt, const vec3 &f) const;
     static void gen_indices()
     {
         for (int i = 0; i < 6; i++) {

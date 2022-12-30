@@ -1,7 +1,6 @@
 #include "othogonal_energy.h"
 #include <cmath>
 #include "marcros_settings.h"
-
 using namespace othogonal_energy;
 namespace othogonal_energy {
 
@@ -13,7 +12,7 @@ namespace othogonal_energy {
         return i == j ? 1.0 : 0.0;
     }
     
-    VectorXd grad(vec3 q[])
+    VectorXd grad(const q4 &q)
     {
         Vector<double, 12> ret;
         ret.setZero(12);
@@ -45,7 +44,7 @@ namespace othogonal_energy {
     //    }
     //    return H;
     //}
-    MatrixXd hessian(vec3 q[]) {
+    MatrixXd hessian(const q4 &q) {
         Matrix<double, 12, 12> H;
         H.setZero(12, 12);
         for (int i= 1; i < 4;i++)for(int j = 1; j < 4;j ++) {

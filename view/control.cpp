@@ -19,13 +19,15 @@ void reset(){
     if (predefined) {
         int id = data["predefined_case"]["id"];
         if (id == 1) {
-            globals.cubes.push_back(*spinning_cube());
+            globals.cubes.push_back(spinning_cube());
         }
         else {
+            globals.cubes.clear();
             globals.cubes = cube_blocks(2);
         }
     }
     else {
+        globals.cubes.clear();
         globals.cubes = customize(data["predefined_case"]["custom"]);
     }
 
