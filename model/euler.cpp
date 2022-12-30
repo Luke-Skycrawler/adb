@@ -79,6 +79,21 @@ void implicit_euler(vector<Cube> & cubes, double dt) {
         
         // FIXME: ugly, per_body otho energy
     };
+
+    const auto E_ground = [&](const Cube& c) -> double {
+        double e = 0.0;
+        for (int i = 0; i < Cube::n_vertices; i++) {
+            const vec3& v_tile(c.vertices()[i]);
+            const vec3 v(c.vt2(i));
+            double d = vg_distance(v);
+            d = d * d;
+            if (d < d_hat) {
+                e += barrier::barrier_function(d);
+            }
+        }
+        return e;
+    };
+
     const auto E_global = [&](const VectorXd& q_plus_dq, const VectorXd& dq) -> double {
         double e = 0.0;
         for (int i = 0; i < cubes.size(); i++) {
@@ -88,6 +103,7 @@ void implicit_euler(vector<Cube> & cubes, double dt) {
             auto q_tiled = c.q_tile(dt, globals.gravity);
             auto _q = q_plus_dq.segment<12>(12 * i);
             e += E(_q, q_tiled, c);
+            e += E_ground(c);
         }
         for (int k = 0; k < idx.size(); k++) {
             auto& ij = idx[k];
@@ -302,10 +318,10 @@ void implicit_euler(vector<Cube> & cubes, double dt) {
             dq *= factor * toi;
 
             alpha = 1.0;
-            //alpha = line_search(dq, r, q0_cat);
+            alpha = line_search(dq, r, q0_cat);
             spdlog::info("alpha = {}", alpha);
             dq *= alpha;
-            double E0 = E_global(q0_cat, dq * 0.0), E1;
+            double E0 = E_global(q0_cat, dq * 0.0), E1 = E_global(q0_cat, dq);
             double norm_dq = dq.norm();
             sup_dq = norm_dq;
 
@@ -313,25 +329,8 @@ void implicit_euler(vector<Cube> & cubes, double dt) {
                 for (int j = 0 ; j < 4; j ++)
                 cubes[i].q[j] += dq.segment<3>(i * 12 + j * 3);
             }
-            //for (auto& c : cubes) {
-            //    // auto tiled_q = c.q_tile(dt, globals.gravity);
-            //    // double E0 = E(cat(c.q), tiled_q, c);
-            //    for (int i = 0; i < 4; i++) {
-            //        c.q[i] += c.increment_q.segment<3>(i * 3) * toi * factor * alpha;
-            //    }
-
-            //    // double norm_dq = c.increment_q.norm();
-            //    // sup_dq = max(sup_dq, norm_dq);
-            //    // double E1 = E(cat(c.q), tiled_q, c);
-            //    //
-            //    // spdlog::info("iter {}, e0 = {}, e1 = {}, norm_dq = {}, sup_dq = {}, dq = ", iter, E0, E1, norm_dq, sup_dq);
-            //    // spdlog::info("toi {}, factor = {}, alpha = {}", toi, factor, alpha);
-
-            //    // cout << c.increment_q << endl;
-            //}
-            E1 = E_global(q0_cat + dq, dq);
             spdlog ::info("step size upper = {}, alpha = {}", toi, alpha);
-            spdlog::info("iter {}, e0 = {}, e1 = {}, norm_dq = {}, sup_dq = {}", iter, E0, E1, norm_dq, sup_dq);
+            spdlog::info("iter {}, e0 = {}, e1 = {}, norm_dq = {}\n", iter, E0, E1, norm_dq);
         }
 
         
@@ -373,7 +372,7 @@ double Cube::vg_collision_time()
             double t = d1 / (d1 - d2);
             auto vtoi = v_t2 * (t * 0.8) + v_t1 * (1 - t * 0.8);
             double dtoi = vg_distance(vtoi);
-            spdlog::warn("dtoi = {}, d0 = {}, d1 = {}, toi = {}", dtoi, d1, d2, toi);
+            spdlog::warn("dtoi = {}, d0 = {}, d1 = {}, toi = {}", dtoi, d1, d2, t);
 
             assert(dtoi > 0.0);
             assert(t > 0.0 && t < 1.0);
@@ -388,7 +387,7 @@ void Cube::prepare_q_array(){
     q0[0] = p;
     dqdt[0] = p_dot;
     for (int i = 1; i < 4; i++) {
-        q[i] = q_next.col(i - 1);
+        q[i] = A.col(i - 1);
         q0[i] = A.col(i - 1);
         dqdt[i] = q_dot.col(i - 1);
     }

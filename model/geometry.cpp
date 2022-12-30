@@ -55,7 +55,7 @@ double vg_distance(const vec3& vertex) // not squared
     double d = vertex(1) + 0.5;
     return d;
 }
-vec3 vf_distance_gradient_x(const vec3& vertex)
+vec3 vg_distance_gradient_x(const vec3& vertex)
 {
     // face = grond plane y = 0.5
     return vec3(0.0f, 1.0f, 0.0f);

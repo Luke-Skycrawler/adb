@@ -15,42 +15,6 @@
 using namespace barrier;
 using namespace std;
 
-double vf_collision_time(const vec3& x, const vec3& p, const mat3& q, const vec3& p_next, const mat3& q_next)
-{
-    // one-way collision
-    // assert that (p, q) is collision-free and (p_next, q_next) is the state after penetration
-    vec3 initial_guess(q * x + p);
-    double t = 0.0;
-    double distance = vg_distance(initial_guess);
-    vec3 dd_dx(vf_distance_gradient_x(initial_guess));
-    // distance derivative of x
-
-    vec3 x_t = (q_next - q) * x + (p_next - p);
-    t -= distance / (dd_dx.dot(x_t));
-    // distance function should be linear,
-    // leading to an exact solution
-
-    return t;
-}
-
-double Cube::vf_collision_detect(const vec3& dp, const mat3& dq)
-{
-    // TODO: ensure the updated q_next is collision-free
-    double min_toi = 1.0;
-    for (int i = 0; i < 8; i++) {
-        const vec3 v0(vertices()[i]);
-        const vec3& v((q_next - dq) * v0 + (p_next - dp));
-        double d = vg_distance(v);
-        if (d < 0) {
-            double t = vf_collision_time(v0, p, A, p_next - dp, q_next - dq);
-            if (t < min_toi) {
-                min_toi = t;
-            }
-        }
-    }
-    return min_toi;
-}
-
 double vf_collision_detect(vec3& p_t0, vec3& p_t1, const Cube& c, int id)
 {
     Face f_t0(c, id, false), f_t1(c, id, true);
