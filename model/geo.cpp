@@ -61,7 +61,7 @@ void ipc_term(Matrix<double, 12, 12>& hess_p, Matrix<double, 12, 12>& hess_t, Ve
     dist = ipc::point_triangle_distance(p, t0, t1, t2);
     double B_ = barrier::barrier_derivative_d(dist);
     double B__ = barrier::barrier_second_derivative(dist);
-    spdlog::info("dist = {}, B = {}, B__ = {}", dist, B_, B__);
+    //spdlog::info("dist = {}, B = {}, B__ = {}", dist, B_, B__);
 
     Matrix<double, 9, 12> Jt;
     Matrix<double, 3, 12> Jp;

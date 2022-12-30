@@ -155,6 +155,12 @@ void implicit_euler(vector<Cube>& cubes, double dt)
                     for (int f = 0; f < Cube::n_faces; f++) {
                         Face _f(cj, f);
                         vec3 p = ci.vt1(v);
+                        auto fu = _f.t0.cwiseMax(_f.t1).cwiseMax(_f.t2).array() + barrier :: d_sqrt;
+                        auto fl = _f.t0.cwiseMin(_f.t1).cwiseMin(_f.t2).array() - barrier::d_sqrt;
+                        if ((p.array() <= fu.array()).all() && (p.array() >= fl.array()).all()) {
+                            
+                        }
+                        else continue;
                         double d = ipc::point_triangle_distance(p, _f.t0, _f.t1, _f.t2);
                         if (d < barrier::d_hat) {
                             array<vec3, 4> pt = { p, _f.t0, _f.t1, _f.t2 };
@@ -229,61 +235,89 @@ void implicit_euler(vector<Cube>& cubes, double dt)
             const int n_cubes = cubes.size();
             const int hess_dim = n_cubes * 12;
             MatrixXd big_hess;
+            vector<Triplet<double>> bht;
+            SparseMatrix<double> sparse_hess(hess_dim, hess_dim);
+            if (globals.sparse){
+                int n_ele = (n_cubes + globals.hess_triplets.size())* 12 * 12;
+                bht.resize(n_ele);
+                sparse_hess.reserve(n_ele);
+            }
+
+            static const auto insert = [&](vector<Triplet<double>> &bht, const Matrix<double, 12, 12> &m, int r, int c) {
+                for(int i = 0; i< 12; i ++)for(int j = 0; j < 12; j ++){
+                    bht.push_back({r + i, c + j, m(i, j)});
+                }
+            };
+
             big_hess.setZero(hess_dim, hess_dim);
-            VectorXd r, q0_cat, q_tile_cat;
+            VectorXd r, q0_cat, q_tile_cat, dq;
             r.setZero(hess_dim);
+            dq.setZero(hess_dim);
             q0_cat.setZero(hess_dim);
             q_tile_cat.setZero(hess_dim);
 
             for (int k = 0; k < n_cubes; k++) {
-                big_hess.block<12, 12>(k * 12, k * 12) = cubes[k].hess;
+                if(!globals.sparse)
+                    big_hess.block<12, 12>(k * 12, k * 12) += cubes[k].hess;
+                else 
+                    insert(bht, cubes[k].hess, k * 12, k * 12);
                 r.segment<12>(k * 12) = cubes[k].grad;
                 auto t = cat(cubes[k].q);
                 q0_cat.segment<12>(k * 12) = t;
                 q_tile_cat.segment<12>(k * 12) = cubes[k].q_tile(dt, t);
             }
             for (auto& triplet : globals.hess_triplets) {
-                // big_hess.block<12, 12>(triplet.i * 12, triplet.j * 12) = PSD_projection(triplet.block);
+                if (!globals.sparse)
                 big_hess.block<12, 12>(triplet.i * 12, triplet.j * 12) = triplet.block;
+                else 
+                insert(bht, triplet.block, triplet.i * 12, triplet.j * 12);
             }
 
-            const auto damping = [&]() {
-                MatrixXd M, D;
-                VectorXd q_cat;
+            //const auto damping = [&]() {
+            //    MatrixXd M, D;
+            //    VectorXd q_cat;
 
-                M.setZero(hess_dim, hess_dim);
-                D.setZero(hess_dim, hess_dim);
-                q_cat.setZero(hess_dim);
+            //    M.setZero(hess_dim, hess_dim);
+            //    D.setZero(hess_dim, hess_dim);
+            //    q_cat.setZero(hess_dim);
 
-                for (int i = 0; i < cubes.size(); i++) {
-                    Matrix<double, 12, 12> m;
-                    auto& c(cubes[i]);
-                    m = MatrixXd::Identity(12, 12) * c.Ic;
-                    m.block<3, 3>(0, 0) = MatrixXd::Identity(3, 3) * c.mass;
-                    M.block<12, 12>(i * 12, i * 12) = m;
+            //    for (int i = 0; i < cubes.size(); i++) {
+            //        Matrix<double, 12, 12> m;
+            //        auto& c(cubes[i]);
+            //        m = MatrixXd::Identity(12, 12) * c.Ic;
+            //        m.block<3, 3>(0, 0) = MatrixXd::Identity(3, 3) * c.mass;
+            //        M.block<12, 12>(i * 12, i * 12) = m;
 
-                    q_cat.segment<12>(i * 12) = cat(c.q0);
-                }
+            //        q_cat.segment<12>(i * 12) = cat(c.q0);
+            //    }
 
-                D = globals.beta * big_hess + (globals.alpha - globals.beta) * M;
+            //    D = globals.beta * big_hess + (globals.alpha - globals.beta) * M;
 
-                VectorXd damp_term = D * q_cat / dt;
-                r += damp_term;
+            //    VectorXd damp_term = D * q_cat / dt;
+            //    r += damp_term;
 
-                big_hess += globals.beta * big_hess / dt;
-                for (int i = 0; i < cubes.size(); i++) {
-                    for (int j = 0; j < 3; j++) {
-                        big_hess(i * 12 + j, i * 12 + j) += (globals.alpha - globals.beta) * cubes[i].mass / dt;
-                    }
-                    for (int j = 3; j < 12; j++) {
-                        big_hess(i * 12 + j, i * 12 + j) += (globals.alpha - globals.beta) * cubes[i].Ic / dt;
-                    }
-                }
-            };
+            //    big_hess += globals.beta * big_hess / dt;
+            //    for (int i = 0; i < cubes.size(); i++) {
+            //        for (int j = 0; j < 3; j++) {
+            //            big_hess(i * 12 + j, i * 12 + j) += (globals.alpha - globals.beta) * cubes[i].mass / dt;
+            //        }
+            //        for (int j = 3; j < 12; j++) {
+            //            big_hess(i * 12 + j, i * 12 + j) += (globals.alpha - globals.beta) * cubes[i].Ic / dt;
+            //        }
+            //    }
+            //};
 
             // damping();
-            VectorXd dq = -big_hess.ldlt().solve(r);
-            spdlog::info("norms: dq = {}, grad = {}, big_hess = {}", dq.norm(), r.norm(), big_hess.norm());
+            if (globals.sparse){
+                sparse_hess.setFromTriplets(bht.begin(), bht.end());
+                SimplicialLDLT<SparseMatrix<double>> ldlt_solver;
+                ldlt_solver.compute(sparse_hess);
+                dq = -ldlt_solver.solve(r);
+            }
+            else 
+                dq = -big_hess.ldlt().solve(r);
+            spdlog::info("norms: dq = {}, grad = {}, big_hess = {}", dq.norm(), r.norm(), globals.sparse ? sparse_hess.norm(): big_hess.norm());
+            // spdlog::warn("dense norms: dq = {}, grad = {}, big_hess = {}, difference = {}", dq.norm(), r.norm(), big_hess.norm(), (dq - dq_sparse).norm());
             spdlog::info("dq dot grad = {}, cos = {}", dq.dot(r), dq.dot(r) / (dq.norm() * r.norm()));
 
             toi = 1.0;

@@ -2,10 +2,11 @@
     "dt": 1e-3,
     "max_iter": 10,
     "predefined_case" : {
-        "enable": true,
-        "id" : 2,
-        "custom": "../test_cases/case.json"
+        "enable": false,
+        "id" : 1,
+        "custom": "../test_cases/blocks.json"
     },
+    "sparse solver": false,
     "gravity": false, 
     "kappa": 1e3,
     "dhat": 1e-3,
