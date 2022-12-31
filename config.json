@@ -7,7 +7,7 @@
         "custom": "../test_cases/blocks.json"
     },
     "sparse solver": false,
-    "gravity": true, 
+    "gravity": false, 
     "kappa": 1e3,
     "dhat": 1e-3,
     "line_search": true,
