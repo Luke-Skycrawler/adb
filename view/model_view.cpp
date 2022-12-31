@@ -12,6 +12,7 @@
 #include "../model/marcros_settings.h"
 #include <fstream>
 #include <nlohmann/json.hpp>
+#include <omp.h>
 
 using namespace std;
 //------------------ optional features ----------------------------
@@ -40,6 +41,9 @@ void render_cubes(Shader shader, vector<Cube> cubes)
 int main()
 {
     Cube::gen_indices();
+    omp_set_num_threads(1);
+    //setNbThreads(1);
+    //initParallel();
     reset();
     double dt = globals.dt;
     // glfw: initialize and configure

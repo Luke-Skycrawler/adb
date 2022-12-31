@@ -89,16 +89,20 @@ void implicit_euler(vector<Cube>& cubes, double dt)
 
     const auto E_global = [&](const VectorXd& q_plus_dq, const VectorXd& dq) -> double {
         double e = 0.0;
-        for (int i = 0; i < cubes.size(); i++) {
+        const int n = cubes.size(), m = idx.size();
+        #pragma omp parallel for schedule(dynamic) reduction(+:e)
+        for (int i = 0; i < n; i++) {
             auto& c(cubes[i]);
             c.dq = dq.segment<12>(i * 12);
 
             auto q_tiled = c.q_tile(dt, globals.gravity);
             auto _q = q_plus_dq.segment<12>(12 * i);
-            e += E(_q, q_tiled, c);
-            e += E_ground(c);
+            double e_ground_inert = E(_q, q_tiled, c) + E_ground(c);
+
+            e += e_ground_inert;
         }
-        for (int k = 0; k < idx.size(); k++) {
+        #pragma omp parallel for schedule(dynamic)
+        for (int k = 0; k < m; k++) {
             auto& ij = idx[k];
             Face f(cubes[ij[2]], ij[3], true);
             vec3 v(cubes[ij[0]].vt2(ij[1]));
@@ -109,6 +113,7 @@ void implicit_euler(vector<Cube>& cubes, double dt)
         return e;
     };
     const auto barrier_grad_hess_per_body = [&](Cube& c, VectorXd& grad, MatrixXd& hess) {
+        #pragma omp parallel for schedule(dynamic)
         for (int i = 0; i < Cube::n_vertices; i++) {
             const vec3& v_tile(c.vertices()[i]);
             const vec3 v(c.vt1(i));
@@ -146,9 +151,10 @@ void implicit_euler(vector<Cube>& cubes, double dt)
     };
 
     const auto gen_collision_set = [&](const vector<Cube>& cubes) {
-        int n = cubes.size();
-        for (int i = 0; i < n; i++)
-            for (int j = 0; j < n; j++) {
+        const int n = cubes.size(), nsqr = n * n;
+        #pragma omp parallel for schedule(dynamic)
+        for (int I = 0; I < nsqr; I++) {
+            int i = I / n, j = I % n;
                 auto &ci(cubes[i]), &cj(cubes[j]);
                 if (i == j) continue;
                 for (int v = 0; v < Cube::n_vertices; v++)
@@ -166,8 +172,11 @@ void implicit_euler(vector<Cube>& cubes, double dt)
                             array<vec3, 4> pt = { p, _f.t0, _f.t1, _f.t2 };
                             array<int, 4> ij = { i, v, j, f };
 
-                            pts.push_back(pt);
-                            idx.push_back(ij);
+                            #pragma omp critical
+                            {
+                                pts.push_back(pt);
+                                idx.push_back(ij);
+                            }
                         }
                     }
             }
@@ -177,47 +186,58 @@ void implicit_euler(vector<Cube>& cubes, double dt)
     spdlog::info("constraint size = {}, {}", pts.size(), idx.size());
 
     do {
-        for (int k = 0; k < cubes.size(); k++) {
+        const int nc = cubes.size();
+        #pragma omp parallel for schedule(dynamic)
+        for (int k = 0; k < nc; k++) {
             auto& c(cubes[k]);
             VectorXd r = grad_residue_per_body(c);
             MatrixXd hess = hess_inertia_per_body(c);
             barrier_grad_hess_per_body(c, r, hess);
 
-            {
-                int fi = 0, vi = 0, e0i = 0, e1i = 0;
-                c.grad = r;
-                c.hess = hess;
-#ifdef _EE_
-                e0i = ee_colliding_response(k, 1 - k);
-                e1i = ee_colliding_response(1 - k, k);
-#endif
-
-                if (fi || vi || e0i || e1i) {
-                    spdlog::error("collision detected at {}, {}", iter, ts);
-                }
-            }
+            c.grad = r;
+            c.hess = hess;
         }
 #ifdef _VF_
-
-        for (int k = 0; k < pts.size(); k++) {
+        const int npts = pts.size();
+        #pragma omp parallel for schedule(dynamic)
+        for (int k = 0; k < npts; k++) {
             auto& pt(pts[k]);
             auto& ij(idx[k]);
 
             int i = ij[0], j = ij[2];
             auto &ci(cubes[i]), &cj(cubes[j]);
             double d = ipc::point_triangle_distance(pt[0], pt[1], pt[2], pt[3]);
+            
             if (d < barrier::d_hat) {
-                ipc_term(ci.hess, cj.hess, ci.grad, cj.grad, pt, ij);
+                Matrix<double, 12, 12> hess_p, hess_t;
+                Vector<double, 12> grad_p, grad_t;
+                ipc_term(hess_p, hess_t, grad_p, grad_t, pt, ij);
+                #pragma omp critical
+                {
+                    ci.hess += hess_p;
+                    cj.hess += hess_t;
+                    ci.grad += grad_p;
+                    cj.grad += grad_t;
+                }
             }
         }
 
 #endif
+#ifdef _EE_
+        e0i = ee_colliding_response(k, 1 - k);
+        e1i = ee_colliding_response(1 - k, k);
+#endif
+
         const auto step_size_upper_bound = [&](VectorXd& dq, vector<Cube> cubes) -> double {
             double toi = 1.0;
-            for (auto c:cubes)
-                toi = min(toi, c.vg_collision_time());
-
-            for (int k = 0; k < idx.size(); k++) {
+            const int nc = cubes.size(), nidx = idx.size();
+            //#pragma omp parallel for schedule(dynamic) reduction(min: toi)
+            for (int i = 0; i < nc; i++){
+                double _t = cubes[i].vg_collision_time();
+                toi = min(toi, _t);
+            }
+            //#pragma omp parallel for schedule(dynamic) reduction(min: toi)
+            for (int k = 0; k < nidx; k++) {
                 auto& pt(pts[k]);
                 const auto& ij(idx[k]);
 
@@ -231,6 +251,19 @@ void implicit_euler(vector<Cube>& cubes, double dt)
             return toi;
         };
         double toi = 1.0, factor = 1.0, alpha = 1.0;
+        static const auto insert = [&](vector<Triplet<double>> &bht, const Matrix<double, 12, 12> &m, int r, int c) {
+            for(int i = 0; i< 12; i ++)for(int j = 0; j < 12; j ++){
+                bht.push_back({r + i, c + j, m(i, j)});
+            }
+        };
+        static const auto insert1 = [&](SparseMatrix<double>& sm, const Matrix<double, 12, 12>& m, int r, int c) {
+            for (int j = 0; j < 12; j++) {
+                sm.startVec(j + c);
+                for (int i = 0; i < 12; i++) {
+                    sm.insertBack(i + r, j + c) = m(i, j);
+                }
+            }
+        }; 
         {
             const int n_cubes = cubes.size();
             const int hess_dim = n_cubes * 12;
@@ -243,11 +276,6 @@ void implicit_euler(vector<Cube>& cubes, double dt)
                 sparse_hess.reserve(n_ele);
             }
 
-            static const auto insert = [&](vector<Triplet<double>> &bht, const Matrix<double, 12, 12> &m, int r, int c) {
-                for(int i = 0; i< 12; i ++)for(int j = 0; j < 12; j ++){
-                    bht.push_back({r + i, c + j, m(i, j)});
-                }
-            };
 
             big_hess.setZero(hess_dim, hess_dim);
             VectorXd r, q0_cat, q_tile_cat, dq;
@@ -255,20 +283,25 @@ void implicit_euler(vector<Cube>& cubes, double dt)
             dq.setZero(hess_dim);
             q0_cat.setZero(hess_dim);
             q_tile_cat.setZero(hess_dim);
-
+            //#pragma omp parallel for schedule(dynamic)
             for (int k = 0; k < n_cubes; k++) {
                 if(!globals.sparse)
                     big_hess.block<12, 12>(k * 12, k * 12) += cubes[k].hess;
                 else 
                     insert(bht, cubes[k].hess, k * 12, k * 12);
+                    // insert1(sparse_hess, cubes[k].hess, k * 12, k * 12);
                 r.segment<12>(k * 12) = cubes[k].grad;
                 auto t = cat(cubes[k].q);
                 q0_cat.segment<12>(k * 12) = t;
                 q_tile_cat.segment<12>(k * 12) = cubes[k].q_tile(dt, t);
             }
-            for (auto& triplet : globals.hess_triplets) {
+
+            const int ntrip = globals.hess_triplets.size();
+            //#pragma omp parallel for schedule(dynamic)
+            for (int i = 0; i < ntrip; i++) {
+                auto &triplet(globals.hess_triplets[i]);
                 if (!globals.sparse)
-                big_hess.block<12, 12>(triplet.i * 12, triplet.j * 12) = triplet.block;
+                big_hess.block<12, 12>(triplet.i * 12, triplet.j * 12) += triplet.block;
                 else 
                 insert(bht, triplet.block, triplet.i * 12, triplet.j * 12);
             }
@@ -321,10 +354,12 @@ void implicit_euler(vector<Cube>& cubes, double dt)
             spdlog::info("dq dot grad = {}, cos = {}", dq.dot(r), dq.dot(r) / (dq.norm() * r.norm()));
 
             toi = 1.0;
+            #pragma omp parallel for schedule(dynamic)
             for (int k = 0; k < n_cubes; k++) {
                 auto& c(cubes[k]);
                 c.dq = dq.segment<12>(k * 12);
             }
+
             if (globals.upper_bound)
                 toi = step_size_upper_bound(dq, cubes);
 
@@ -343,16 +378,16 @@ void implicit_euler(vector<Cube>& cubes, double dt)
             double E0 = E_global(q0_cat, dq * 0.0), E1 = E_global(q0_cat + dq, dq);
             double norm_dq = dq.norm();
             sup_dq = norm_dq;
-
-            for (int i = 0; i < cubes.size(); i++) {
+            #pragma omp parallel for schedule(dynamic)
+            for (int i = 0; i < n_cubes; i++) {
                 for (int j = 0; j < 4; j++)
                     cubes[i].q[j] += dq.segment<3>(i * 12 + j * 3);
             }
             spdlog ::info("step size upper = {}, alpha = {}", toi, alpha);
             spdlog::info("iter {}, e0 = {}, e1 = {}, norm_dq = {}\n", iter, E0, E1, norm_dq);
         }
-
-        for (int k = 0; k < pts.size(); k++) {
+        #pragma omp parallel for schedule(dynamic)
+        for (int k = 0; k < npts; k++) {
             auto& ij = idx[k];
             Face f(cubes[ij[2]], ij[3]);
             vec3 v(cubes[ij[0]].vt1(ij[1]));
@@ -362,7 +397,10 @@ void implicit_euler(vector<Cube>& cubes, double dt)
         sup_dq = 0.0;
     } while (!term_cond);
     spdlog::info("\n  converge at iter {}, ts = {} \n", iter, ts++);
-    for (auto& c : cubes) {
+    const int nc = cubes.size();
+    #pragma omp parallel for schedule(dynamic)
+    for (int k = 0; k < nc; k++) {
+        auto &c(cubes[k]);
         for (int i = 0; i < 4; i++) {
             c.dqdt[i] = (c.q[i] - c.q0[i]) / dt;
             c.q0[i] = c.q[i];

@@ -86,9 +86,11 @@ void ipc_term(Matrix<double, 12, 12>& hess_p, Matrix<double, 12, 12>& hess_t, Ve
     hess_p += Jp.adjoint() * ipc_hess.block<3, 3>(0, 0) * Jp;
     hess_t += Jt.adjoint() * ipc_hess.block<9, 9>(3, 3) * Jt;
     off_diag += Jp.adjoint() * ipc_hess.block<3, 9>(0, 3) * Jt;
-
-    globals.hess_triplets.push_back(HessBlock(ii, jj, off_diag));
-    globals.hess_triplets.push_back(HessBlock(ii, jj, off_diag.adjoint()));
+    #pragma omp critical
+    {
+        globals.hess_triplets.push_back(HessBlock(ii, jj, off_diag));
+        globals.hess_triplets.push_back(HessBlock(ii, jj, off_diag.adjoint()));
+    }
     grad_p += Jp.adjoint() * pt_grad.segment<3>(0) * B_;
     grad_t += Jt.adjoint() * pt_grad.segment<9>(3) * B_;
 }
