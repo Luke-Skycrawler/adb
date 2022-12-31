@@ -2,12 +2,12 @@
     "dt": 1e-3,
     "max_iter": 10,
     "predefined_case" : {
-        "enable": true,
+        "enable": false,
         "id" : 2,
         "custom": "../test_cases/blocks.json"
     },
-    "sparse solver": true,
-    "gravity": false, 
+    "sparse solver": false,
+    "gravity": true, 
     "kappa": 1e3,
     "dhat": 1e-3,
     "line_search": true,

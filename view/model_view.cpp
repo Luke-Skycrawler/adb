@@ -41,9 +41,9 @@ void render_cubes(Shader shader, vector<Cube> cubes)
 int main()
 {
     Cube::gen_indices();
-    omp_set_num_threads(1);
-    //setNbThreads(1);
-    //initParallel();
+    omp_set_num_threads(8);
+    setNbThreads(8);
+    initParallel();
     reset();
     double dt = globals.dt;
     // glfw: initialize and configure

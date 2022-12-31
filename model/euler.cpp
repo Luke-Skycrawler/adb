@@ -41,6 +41,7 @@ void implicit_euler(vector<Cube>& cubes, double dt)
             c.q[i] = c.q0[i];
         }
     }
+    globals.hess_triplets.clear();
     const auto grad_residue_per_body = [&](Cube& c) -> VectorXd {
         VectorXd grad = othogonal_energy::grad(c.q);
         const auto M = [&](const VectorXd& dq) -> VectorXd {
@@ -113,7 +114,6 @@ void implicit_euler(vector<Cube>& cubes, double dt)
         return e;
     };
     const auto barrier_grad_hess_per_body = [&](Cube& c, VectorXd& grad, MatrixXd& hess) {
-        #pragma omp parallel for schedule(dynamic)
         for (int i = 0; i < Cube::n_vertices; i++) {
             const vec3& v_tile(c.vertices()[i]);
             const vec3 v(c.vt1(i));
@@ -198,45 +198,29 @@ void implicit_euler(vector<Cube>& cubes, double dt)
             c.hess = hess;
         }
 #ifdef _VF_
-        const int npts = pts.size();
-        #pragma omp parallel for schedule(dynamic)
-        for (int k = 0; k < npts; k++) {
+
+        for (int k = 0; k < pts.size(); k++) {
             auto& pt(pts[k]);
             auto& ij(idx[k]);
 
             int i = ij[0], j = ij[2];
             auto &ci(cubes[i]), &cj(cubes[j]);
             double d = ipc::point_triangle_distance(pt[0], pt[1], pt[2], pt[3]);
-            
             if (d < barrier::d_hat) {
-                Matrix<double, 12, 12> hess_p, hess_t;
-                Vector<double, 12> grad_p, grad_t;
-                ipc_term(hess_p, hess_t, grad_p, grad_t, pt, ij);
-                #pragma omp critical
-                {
-                    ci.hess += hess_p;
-                    cj.hess += hess_t;
-                    ci.grad += grad_p;
-                    cj.grad += grad_t;
-                }
+                ipc_term(ci.hess, cj.hess, ci.grad, cj.grad, pt, ij);
             }
         }
 
 #endif
-#ifdef _EE_
-        e0i = ee_colliding_response(k, 1 - k);
-        e1i = ee_colliding_response(1 - k, k);
-#endif
-
         const auto step_size_upper_bound = [&](VectorXd& dq, vector<Cube> cubes) -> double {
             double toi = 1.0;
             const int nc = cubes.size(), nidx = idx.size();
-            //#pragma omp parallel for schedule(dynamic) reduction(min: toi)
+            #pragma omp parallel for schedule(dynamic) reduction(min: toi)
             for (int i = 0; i < nc; i++){
                 double _t = cubes[i].vg_collision_time();
                 toi = min(toi, _t);
             }
-            //#pragma omp parallel for schedule(dynamic) reduction(min: toi)
+            #pragma omp parallel for schedule(dynamic) reduction(min: toi)
             for (int k = 0; k < nidx; k++) {
                 auto& pt(pts[k]);
                 const auto& ij(idx[k]);
@@ -283,7 +267,7 @@ void implicit_euler(vector<Cube>& cubes, double dt)
             dq.setZero(hess_dim);
             q0_cat.setZero(hess_dim);
             q_tile_cat.setZero(hess_dim);
-            //#pragma omp parallel for schedule(dynamic)
+            #pragma omp parallel for schedule(dynamic)
             for (int k = 0; k < n_cubes; k++) {
                 if(!globals.sparse)
                     big_hess.block<12, 12>(k * 12, k * 12) += cubes[k].hess;
@@ -297,7 +281,7 @@ void implicit_euler(vector<Cube>& cubes, double dt)
             }
 
             const int ntrip = globals.hess_triplets.size();
-            //#pragma omp parallel for schedule(dynamic)
+            // #pragma omp parallel for schedule(dynamic)
             for (int i = 0; i < ntrip; i++) {
                 auto &triplet(globals.hess_triplets[i]);
                 if (!globals.sparse)
@@ -386,6 +370,7 @@ void implicit_euler(vector<Cube>& cubes, double dt)
             spdlog ::info("step size upper = {}, alpha = {}", toi, alpha);
             spdlog::info("iter {}, e0 = {}, e1 = {}, norm_dq = {}\n", iter, E0, E1, norm_dq);
         }
+        const int npts = pts.size();
         #pragma omp parallel for schedule(dynamic)
         for (int k = 0; k < npts; k++) {
             auto& ij = idx[k];
