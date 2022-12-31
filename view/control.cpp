@@ -16,7 +16,8 @@ void reset(){
     globals.col_set = data["col_set"];
     globals.line_search = data["line_search"];
     globals.upper_bound = data["uppper_bound"];
-    globals.sparse = data["sparse solver"];
+    globals.sparse = data["solver"] != "dense";
+    globals.dense = data["solver"] != "sparse";
     if (predefined) {
         int id = data["predefined_case"]["id"];
         if (id == 1) {

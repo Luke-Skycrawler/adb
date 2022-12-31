@@ -7,6 +7,8 @@
 #include <assert.h>
 #include <array>
 #include <ipc/distance/point_triangle.hpp>
+#include <algorithm>
+
 using namespace std;
 using namespace barrier;
 using namespace Eigen;
@@ -231,8 +233,39 @@ void implicit_euler(vector<Cube>& cubes, double dt)
             return toi;
         };
         double toi = 1.0, factor = 1.0, alpha = 1.0;
+        static const auto insert = [&](vector<Triplet<double>>& bht, const Matrix<double, 12, 12>& m, int r, int c) {
+            for (int i = 0; i < 12; i++)
+                for (int j = 0; j < 12; j++) {
+                    bht.push_back({ r + i, c + j, m(i, j) });
+                }
+        };
+
         {
-            const int n_cubes = cubes.size();
+            static const int n_cubes = cubes.size();
+
+            vector<int> starting_point;
+            starting_point.resize(n_cubes);
+            static const auto merge_triplets = [&](vector<HessBlock>& triplets) {
+                sort(triplets.begin(), triplets.end(), [&](const HessBlock& a, const HessBlock& b) -> bool {
+                    return a.j < b.j || (a.j == b.j && a.i < b.i);
+                });
+                int n = triplets.size();
+                for (int i = 0; i < n; i++) {
+                    if (triplets[i].i == -1) continue;
+                    for (int j = i + 1; j < n; j++)
+                        if (triplets[i].i == triplets[j].i && triplets[i].j == triplets[j].j) {
+                            // diable triplet j
+                            triplets[j].i = triplets[j].j = -1;
+                            triplets[i].block += triplets[j].block;
+                        }
+                        else {
+                            if (triplets[i].j != triplets[j].j)
+                                starting_point[triplets[j].j] = j;
+                            break;
+                        }
+                }
+                starting_point[0] = 0;
+            };
             const int hess_dim = n_cubes * 12;
             MatrixXd big_hess;
             vector<Triplet<double>> bht;
@@ -243,12 +276,6 @@ void implicit_euler(vector<Cube>& cubes, double dt)
                 sparse_hess.reserve(n_ele);
             }
 
-            static const auto insert = [&](vector<Triplet<double>> &bht, const Matrix<double, 12, 12> &m, int r, int c) {
-                for(int i = 0; i< 12; i ++)for(int j = 0; j < 12; j ++){
-                    bht.push_back({r + i, c + j, m(i, j)});
-                }
-            };
-
             big_hess.setZero(hess_dim, hess_dim);
             VectorXd r, q0_cat, q_tile_cat, dq;
             r.setZero(hess_dim);
@@ -257,25 +284,32 @@ void implicit_euler(vector<Cube>& cubes, double dt)
             q_tile_cat.setZero(hess_dim);
 
             for (int k = 0; k < n_cubes; k++) {
-                if(!globals.sparse)
-                    big_hess.block<12, 12>(k * 12, k * 12) += cubes[k].hess;
-                else 
-                    insert(bht, cubes[k].hess, k * 12, k * 12);
+                // if (globals.dense)
+                //     big_hess.block<12, 12>(k * 12, k * 12) += cubes[k].hess;
+                
+                // if(globals.sparse)
+                //     insert(bht, cubes[k].hess, k * 12, k * 12);
+
+                globals.hess_triplets.push_back({ k, k, cubes[k].hess });
+
                 r.segment<12>(k * 12) = cubes[k].grad;
                 auto t = cat(cubes[k].q);
                 q0_cat.segment<12>(k * 12) = t;
                 q_tile_cat.segment<12>(k * 12) = cubes[k].q_tile(dt, t);
             }
+
+            merge_triplets(globals.hess_triplets);
             for (auto& triplet : globals.hess_triplets) {
-                if (!globals.sparse)
-                big_hess.block<12, 12>(triplet.i * 12, triplet.j * 12) = triplet.block;
-                else 
-                insert(bht, triplet.block, triplet.i * 12, triplet.j * 12);
+                if (triplet.i == -1) continue;
+                if (globals.dense)
+                    big_hess.block<12, 12>(triplet.i * 12, triplet.j * 12) = triplet.block;
+                if (globals.sparse)
+                    insert(bht, triplet.block, triplet.i * 12, triplet.j * 12);
             }
 
-            //const auto damping = [&]() {
-            //    MatrixXd M, D;
-            //    VectorXd q_cat;
+            // const auto damping = [&]() {
+            //     MatrixXd M, D;
+            //     VectorXd q_cat;
 
             //    M.setZero(hess_dim, hess_dim);
             //    D.setZero(hess_dim, hess_dim);
@@ -308,17 +342,20 @@ void implicit_euler(vector<Cube>& cubes, double dt)
             //};
 
             // damping();
-            if (globals.sparse){
+            if (globals.sparse) {
                 sparse_hess.setFromTriplets(bht.begin(), bht.end());
                 SimplicialLDLT<SparseMatrix<double>> ldlt_solver;
                 ldlt_solver.compute(sparse_hess);
                 dq = -ldlt_solver.solve(r);
             }
-            else 
+            else if (globals.dense)
                 dq = -big_hess.ldlt().solve(r);
+
+            double dif = (sparse_hess - big_hess).norm();
             spdlog::info("norms: dq = {}, grad = {}, big_hess = {}", dq.norm(), r.norm(), globals.sparse ? sparse_hess.norm(): big_hess.norm());
-            // spdlog::warn("dense norms: dq = {}, grad = {}, big_hess = {}, difference = {}", dq.norm(), r.norm(), big_hess.norm(), (dq - dq_sparse).norm());
+            spdlog::warn("dense norms: dq = {}, grad = {}, big_hess = {}, difference = {}", dq.norm(), r.norm(), big_hess.norm(), dif);
             spdlog::info("dq dot grad = {}, cos = {}", dq.dot(r), dq.dot(r) / (dq.norm() * r.norm()));
+            assert(dif < 1e-6);
 
             toi = 1.0;
             for (int k = 0; k < n_cubes; k++) {
