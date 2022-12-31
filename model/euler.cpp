@@ -179,6 +179,7 @@ void implicit_euler(vector<Cube>& cubes, double dt)
     spdlog::info("constraint size = {}, {}", pts.size(), idx.size());
 
     do {
+        globals.hess_triplets.clear();
         for (int k = 0; k < cubes.size(); k++) {
             auto& c(cubes[k]);
             VectorXd r = grad_residue_per_body(c);
