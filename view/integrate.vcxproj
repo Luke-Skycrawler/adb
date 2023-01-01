@@ -161,6 +161,7 @@
     <ClCompile Include="..\view\utils.cpp" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="..\model\affine_body.h" />
     <ClInclude Include="..\model\cube.h" />
     <ClInclude Include="..\model\glue.h" />
     <ClInclude Include="..\model\othogonal_energy.h" />

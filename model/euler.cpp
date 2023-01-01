@@ -13,7 +13,7 @@ using namespace std;
 using namespace barrier;
 using namespace Eigen;
 
-VectorXd cat(array<vec3, 4> q)
+VectorXd cat(const q4 &q)
 {
     Vector<double, 12> ret;
     for (int i = 0; i < 4; i++) {
@@ -22,7 +22,7 @@ VectorXd cat(array<vec3, 4> q)
     return ret;
 }
 
-VectorXd Cube::q_tile(double dt, const vec3& f) const
+VectorXd AffineBody::q_tile(double dt, const vec3& f) const
 {
     auto _q = cat(q0);
     auto _dqdt = cat(dqdt);

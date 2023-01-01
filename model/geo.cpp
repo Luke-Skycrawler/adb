@@ -45,8 +45,8 @@ Matrix<double, 12, 12> project_to_psd(
 }
 void ipc_term(Matrix<double, 12, 12>& hess_p, Matrix<double, 12, 12>& hess_t, Vector<double, 12>& grad_p, Vector<double, 12>& grad_t, array<vec3, 4> pt, array<int, 4> ij)
 {
-    static auto vnp = Cube::vertices();
-    static auto tidx = Cube::indices;
+    static const vec3* vnp = Cube::_vertices();
+    static int* tidx = Cube::_indices;
 
     int _i = ij[0], v = ij[1], _j = ij[2], f = ij[3];
 

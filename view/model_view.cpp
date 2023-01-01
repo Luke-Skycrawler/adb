@@ -21,9 +21,7 @@ using namespace std;
 // #define FEATURE_POSTRENDER
 //-----------------------------------------------------------------
 
-int Cube::indices[] = { 0 };
-int Cube::edges[] = { 0 };
-
+int *Cube::_edges = nullptr, *Cube::_indices = nullptr;
 void render_cubes(Shader shader, vector<Cube> cubes)
 {
     for (auto &c : cubes)

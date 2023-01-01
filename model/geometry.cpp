@@ -2,10 +2,10 @@
 #include <Eigen/Geometry>
 #include <cmath>
 using namespace std;
-Edge::Edge(const Cube& c, int id, bool b)
+Edge::Edge(const AffineBody& c, int id, bool b)
 {
-    int _0 = Cube::edges[id * 2];
-    int _1 = Cube::edges[id * 2 + 1];
+    int _0 = c.edges[id * 2];
+    int _1 = c.edges[id * 2 + 1];
     
     e0 = b? c.vt1(_0): c.vt2(_0);
     e1 = b? c.vt1(_1): c.vt2(_1);
@@ -22,12 +22,12 @@ vec3 Face::unit_normal() const
     return n / sqrt(n.dot(n));
 }
 
-Face::Face(const Cube& c, int id, bool b)
+Face::Face(const AffineBody& c, int id, bool b)
 {
 
-    int _a = Cube::indices[id * 3 + 0],
-        _b = Cube::indices[id * 3 + 1],
-        _c = Cube::indices[id * 3 + 2];
+    int _a = c.indices[id * 3 + 0],
+        _b = c.indices[id * 3 + 1],
+        _c = c.indices[id * 3 + 2];
 
     if (b) {
         t0 = c.vt2(_a);
@@ -39,9 +39,6 @@ Face::Face(const Cube& c, int id, bool b)
         t1 = c.vt1(_b);
         t2 = c.vt1(_c);
     }
-    //t0 = c.vi(_a, b);
-    //t1 = c.vi(_b, b);
-    //t2 = c.vi(_c, b);
 }
 
 double vf_distance(const vec3& v, const Cube& c, int id)
@@ -120,7 +117,8 @@ double vf_distance(const vec3& _v, const Face& f)
 
         double d_projected = min(d_ab, min(d_bc, d_ac));
         // double d_projected = min(min(min(min(min(d_ab, d_bc), d_ac), d_a), d_b), d_c);
-        d = sqrt(d * d + d_projected * d_projected);
+        //d = sqrt(d * d + d_projected * d_projected);
+        d = d * d + d_projected * d_projected;
     }
     return d;
 }
@@ -179,6 +177,7 @@ double ee_distance(const Edge& ei, const Edge& ej)
     else {
         _d = min(min(min(ab(ei0, ej0), ab(ei1, ej0)), ab(ei0, ej1)), ab(ei1, ej1));
     }
-    d = sqrt(d * d + _d * _d);
+    //d = sqrt(d * d + _d * _d);
+    d = d * d + _d * _d;
     return d;
 }
