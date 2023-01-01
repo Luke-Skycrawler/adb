@@ -15,7 +15,7 @@ static const unsigned int SCR_HEIGHT = 600;
 struct HessBlock {
     int i, j;
     Matrix<double, 12, 12> block;
-    HessBlock(int _i, int _j, MatrixXd hess): i(_i), j(_j) {
+    HessBlock(int _i, int _j, const Matrix<double, 12, 12> hess): i(_i), j(_j) {
         block = hess;
     }
 };

@@ -6,7 +6,7 @@
         "id" : 2,
         "custom": "../test_cases/case.json"
     },
-    "solver": "sparse",
+    "solver": "dense",
     "gravity": true, 
     "kappa": 1e3,
     "dhat": 1e-3,

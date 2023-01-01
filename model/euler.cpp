@@ -201,7 +201,6 @@ void implicit_euler(vector<Cube>& cubes, double dt)
             }
         }
 #ifdef _VF_
-
         for (int k = 0; k < pts.size(); k++) {
             auto& pt(pts[k]);
             auto& ij(idx[k]);
@@ -234,18 +233,12 @@ void implicit_euler(vector<Cube>& cubes, double dt)
             return toi;
         };
         double toi = 1.0, factor = 1.0, alpha = 1.0;
-        static const auto insert = [&](vector<Triplet<double>>& bht, const Matrix<double, 12, 12>& m, int r, int c) {
-            for (int i = 0; i < 12; i++)
-                for (int j = 0; j < 12; j++) {
-                    bht.push_back({ r + i, c + j, m(i, j) });
-                }
-        };
 
         {
             static const int n_cubes = cubes.size();
 
             vector<int> starting_point;
-            starting_point.resize(n_cubes);
+            starting_point.resize(n_cubes * 12);
             static const auto merge_triplets = [&](vector<HessBlock>& triplets) {
                 sort(triplets.begin(), triplets.end(), [&](const HessBlock& a, const HessBlock& b) -> bool {
                     return a.j < b.j || (a.j == b.j && a.i < b.i);
@@ -255,8 +248,8 @@ void implicit_euler(vector<Cube>& cubes, double dt)
                     if (triplets[i].i == -1) continue;
                     for (int j = i + 1; j < n; j++)
                         if (triplets[i].i == triplets[j].i && triplets[i].j == triplets[j].j) {
-                            // diable triplet j
-                            triplets[j].i = triplets[j].j = -1;
+                            // disable triplet j
+                            triplets[j].i = -1;
                             triplets[i].block += triplets[j].block;
                         }
                         else {
@@ -271,6 +264,24 @@ void implicit_euler(vector<Cube>& cubes, double dt)
             MatrixXd big_hess;
             vector<Triplet<double>> bht;
             SparseMatrix<double> sparse_hess(hess_dim, hess_dim);
+            static const auto insert = [&](vector<Triplet<double>>& bht, const Matrix<double, 12, 12>& m, int r, int c) {
+                for (int i = 0; i < 12; i++)
+                    for (int j = 0; j < 12; j++) {
+                        bht.push_back({ r + i, c + j, m(i, j) });
+                    }
+            };
+            static const auto insert2 = [&](SparseMatrix<double>& sm, int tid) {
+                auto& triplet = globals.hess_triplets[tid];
+                bool new_col = tid == 0 || globals.hess_triplets[tid - 1].j != triplet.j;
+
+                int c = triplet.j, r = triplet.i;
+                if (new_col)
+                    sm.startVec(c);
+                for (int i = 0; i < 12; i++) {
+                    sm.insert(i + r, c) = triplet.block(i, 0);
+                }
+            };
+
             if (globals.sparse){
                 int n_ele = (n_cubes + globals.hess_triplets.size())* 12 * 12;
                 bht.resize(n_ele);
@@ -291,21 +302,29 @@ void implicit_euler(vector<Cube>& cubes, double dt)
                 // if(globals.sparse)
                 //     insert(bht, cubes[k].hess, k * 12, k * 12);
 
-                globals.hess_triplets.push_back({ k, k, cubes[k].hess });
+                // for (int i = 0; i < 12; i++)
+                //     globals.hess_triplets.push_back({ k * 12, k * 12 + i, cubes[k].hess.block<12, 1>(0, i) });
+                globals.hess_triplets.push_back({k * 12, k * 12, cubes[k].hess});
 
                 r.segment<12>(k * 12) = cubes[k].grad;
                 auto t = cat(cubes[k].q);
                 q0_cat.segment<12>(k * 12) = t;
-                q_tile_cat.segment<12>(k * 12) = cubes[k].q_tile(dt, t);
+                q_tile_cat.segment<12>(k * 12) = cubes[k].q_tile(dt, globals.gravity);
             }
 
             merge_triplets(globals.hess_triplets);
-            for (auto& triplet : globals.hess_triplets) {
+
+            const int nt = globals.hess_triplets.size();
+
+            for (int k = 0; k < nt; k++) {
+                auto& triplet(globals.hess_triplets[k]);
                 if (triplet.i == -1) continue;
                 if (globals.dense)
-                    big_hess.block<12, 12>(triplet.i * 12, triplet.j * 12) = triplet.block;
+                    // big_hess.block<12, 1>(triplet.i, triplet.j) = triplet.col;
+                    big_hess.block<12, 12>(triplet.i, triplet.j) = triplet.block;
                 if (globals.sparse)
-                    insert(bht, triplet.block, triplet.i * 12, triplet.j * 12);
+                    // insert(bht, triplet.block, triplet.i * 12, triplet.j * 12);
+                    insert2(sparse_hess, k);
             }
 
             // const auto damping = [&]() {
@@ -343,20 +362,25 @@ void implicit_euler(vector<Cube>& cubes, double dt)
             //};
 
             // damping();
-            if (globals.sparse) {
-                sparse_hess.setFromTriplets(bht.begin(), bht.end());
+            if (globals.dense)
+                dq = -big_hess.ldlt().solve(r);
+            else if (globals.sparse) {
+                // sparse_hess.setFromTriplets(bht.begin(), bht.end());
+                sparse_hess.finalize();
                 SimplicialLDLT<SparseMatrix<double>> ldlt_solver;
                 ldlt_solver.compute(sparse_hess);
                 dq = -ldlt_solver.solve(r);
             }
-            else if (globals.dense)
-                dq = -big_hess.ldlt().solve(r);
 
             double dif = (sparse_hess - big_hess).norm();
             spdlog::info("norms: dq = {}, grad = {}, big_hess = {}", dq.norm(), r.norm(), globals.sparse ? sparse_hess.norm(): big_hess.norm());
             spdlog::warn("dense norms: dq = {}, grad = {}, big_hess = {}, difference = {}", dq.norm(), r.norm(), big_hess.norm(), dif);
             spdlog::info("dq dot grad = {}, cos = {}", dq.dot(r), dq.dot(r) / (dq.norm() * r.norm()));
-            assert(dif < 1e-6);
+            if (globals.sparse && globals.dense && dif > 1e-6) {
+                spdlog::error("diff too large");
+                cout << big_hess << "\n\n"
+                     << sparse_hess;
+            }
 
             toi = 1.0;
             for (int k = 0; k < n_cubes; k++) {
