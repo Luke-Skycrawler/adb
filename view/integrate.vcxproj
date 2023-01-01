@@ -72,7 +72,7 @@
   <PropertyGroup Label="UserMacros" />
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
     <IncludePath>D:\third_party_libs\Tight-Inclusion\src;D:\ref_repos\ipc-toolkit\src;$(IncludePath)</IncludePath>
-    <LibraryPath>D:\third_party_libs\Tight-Inclusion\build\Debug;D:\ref_repos\ipc-toolkit\build\temp.win-amd64-cpython-38\Release\ipctk\Release;$(LibraryPath)</LibraryPath>
+    <LibraryPath>D:\third_party_libs\Tight-Inclusion\build\Debug;D:\ref_repos\ipc-toolkit\build\Debug;$(LibraryPath)</LibraryPath>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
     <IncludePath>D:\third_party_libs\Tight-Inclusion\src;D:\ref_repos\ipc-toolkit\src;$(IncludePath)</IncludePath>
@@ -113,6 +113,7 @@
       <SDLCheck>true</SDLCheck>
       <PreprocessorDefinitions>_DEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
+      <AdditionalOptions>/bigobj %(AdditionalOptions)</AdditionalOptions>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>

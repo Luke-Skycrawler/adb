@@ -262,14 +262,14 @@ void implicit_euler(vector<Cube>& cubes, double dt)
             };
             const int hess_dim = n_cubes * 12;
             MatrixXd big_hess;
-            vector<Triplet<double>> bht;
+            //vector<Triplet<double>> bht;
             SparseMatrix<double> sparse_hess(hess_dim, hess_dim);
-            static const auto insert = [&](vector<Triplet<double>>& bht, const Matrix<double, 12, 12>& m, int r, int c) {
-                for (int i = 0; i < 12; i++)
-                    for (int j = 0; j < 12; j++) {
-                        bht.push_back({ r + i, c + j, m(i, j) });
-                    }
-            };
+            //static const auto insert = [&](vector<Triplet<double>>& bht, const Matrix<double, 12, 12>& m, int r, int c) {
+            //    for (int i = 0; i < 12; i++)
+            //        for (int j = 0; j < 12; j++) {
+            //            bht.push_back({ r + i, c + j, m(i, j) });
+            //        }
+            //};
             static const auto insert2 = [&](SparseMatrix<double>& sm, int tid) {
                 auto& triplet = globals.hess_triplets[tid];
                 bool new_col = tid == 0 || globals.hess_triplets[tid - 1].j != triplet.j;
@@ -278,14 +278,14 @@ void implicit_euler(vector<Cube>& cubes, double dt)
                 if (new_col)
                     sm.startVec(c);
                 for (int i = 0; i < 12; i++) {
-                    sm.insert(i + r, c) = triplet.block(i, 0);
+                    sm.insertBack(i + r, c) = triplet.block(i, 0);
                 }
             };
 
             if (globals.sparse){
                 int n_ele = (n_cubes + globals.hess_triplets.size())* 12 * 12;
-                bht.resize(n_ele);
-                sparse_hess.reserve(n_ele);
+                //bht.resize(n_ele);
+                //sparse_hess.reserve(n_ele);
             }
 
             big_hess.setZero(hess_dim, hess_dim);
@@ -302,9 +302,9 @@ void implicit_euler(vector<Cube>& cubes, double dt)
                 // if(globals.sparse)
                 //     insert(bht, cubes[k].hess, k * 12, k * 12);
 
-                // for (int i = 0; i < 12; i++)
-                //     globals.hess_triplets.push_back({ k * 12, k * 12 + i, cubes[k].hess.block<12, 1>(0, i) });
-                globals.hess_triplets.push_back({k * 12, k * 12, cubes[k].hess});
+                for (int i = 0; i < 12; i++)
+                    globals.hess_triplets.push_back({ k * 12, k * 12 + i, cubes[k].hess.block<12, 1>(0, i) });
+                // globals.hess_triplets.push_back({k * 12, k * 12, cubes[k].hess});
 
                 r.segment<12>(k * 12) = cubes[k].grad;
                 auto t = cat(cubes[k].q);
@@ -320,8 +320,8 @@ void implicit_euler(vector<Cube>& cubes, double dt)
                 auto& triplet(globals.hess_triplets[k]);
                 if (triplet.i == -1) continue;
                 if (globals.dense)
-                    // big_hess.block<12, 1>(triplet.i, triplet.j) = triplet.col;
-                    big_hess.block<12, 12>(triplet.i, triplet.j) = triplet.block;
+                    big_hess.block<12, 1>(triplet.i, triplet.j) = triplet.block;
+                    // big_hess.block<12, 12>(triplet.i, triplet.j) = triplet.block;
                 if (globals.sparse)
                     // insert(bht, triplet.block, triplet.i * 12, triplet.j * 12);
                     insert2(sparse_hess, k);
