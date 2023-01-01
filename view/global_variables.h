@@ -14,8 +14,8 @@ static const unsigned int SCR_HEIGHT = 600;
 
 struct HessBlock {
     int i, j;
-    Matrix<double, 12, 12> block;
-    HessBlock(int _i, int _j, MatrixXd hess): i(_i), j(_j) {
+    Matrix<double, 12, 1> block;
+    HessBlock(int _i, int _j, const Matrix<double, 12, 1> hess): i(_i), j(_j) {
         block = hess;
     }
 };
@@ -49,7 +49,7 @@ struct GlobalVariableMainCPP{
     double alpha, beta;
     double kappa, d_hat;
 
-    bool col_set, upper_bound, line_search, sparse;
+    bool col_set, upper_bound, line_search, sparse, dense;
 };
 #ifndef GOOGLE_TEST
 #ifdef _MAIN_CPP

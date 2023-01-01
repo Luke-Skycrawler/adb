@@ -7,6 +7,8 @@
 #include <assert.h>
 #include <array>
 #include <ipc/distance/point_triangle.hpp>
+#include <algorithm>
+
 using namespace std;
 using namespace barrier;
 using namespace Eigen;
@@ -41,7 +43,6 @@ void implicit_euler(vector<Cube>& cubes, double dt)
             c.q[i] = c.q0[i];
         }
     }
-    globals.hess_triplets.clear();
     const auto grad_residue_per_body = [&](Cube& c) -> VectorXd {
         VectorXd grad = othogonal_energy::grad(c.q);
         const auto M = [&](const VectorXd& dq) -> VectorXd {
@@ -183,10 +184,11 @@ void implicit_euler(vector<Cube>& cubes, double dt)
     };
     if (globals.col_set)
         gen_collision_set(cubes);
-    spdlog::info("constraint size = {}, {}", pts.size(), idx.size());
+    // spdlog::info("constraint size = {}, {}", pts.size(), idx.size());
 
     do {
         const int nc = cubes.size();
+        globals.hess_triplets.clear();
         #pragma omp parallel for schedule(dynamic)
         for (int k = 0; k < nc; k++) {
             auto& c(cubes[k]);
@@ -198,7 +200,6 @@ void implicit_euler(vector<Cube>& cubes, double dt)
             c.hess = hess;
         }
 #ifdef _VF_
-
         for (int k = 0; k < pts.size(); k++) {
             auto& pt(pts[k]);
             auto& ij(idx[k]);
@@ -235,31 +236,60 @@ void implicit_euler(vector<Cube>& cubes, double dt)
             return toi;
         };
         double toi = 1.0, factor = 1.0, alpha = 1.0;
-        static const auto insert = [&](vector<Triplet<double>> &bht, const Matrix<double, 12, 12> &m, int r, int c) {
-            for(int i = 0; i< 12; i ++)for(int j = 0; j < 12; j ++){
-                bht.push_back({r + i, c + j, m(i, j)});
-            }
-        };
-        static const auto insert1 = [&](SparseMatrix<double>& sm, const Matrix<double, 12, 12>& m, int r, int c) {
-            for (int j = 0; j < 12; j++) {
-                sm.startVec(j + c);
-                for (int i = 0; i < 12; i++) {
-                    sm.insertBack(i + r, j + c) = m(i, j);
-                }
-            }
-        }; 
+
         {
-            const int n_cubes = cubes.size();
+            static const int n_cubes = cubes.size();
+
+            vector<int> starting_point;
+            starting_point.resize(n_cubes * 12);
+            static const auto merge_triplets = [&](vector<HessBlock>& triplets) {
+                sort(triplets.begin(), triplets.end(), [&](const HessBlock& a, const HessBlock& b) -> bool {
+                    return a.j < b.j || (a.j == b.j && a.i < b.i);
+                });
+                int n = triplets.size();
+                for (int i = 0; i < n; i++) {
+                    if (triplets[i].i == -1) continue;
+                    for (int j = i + 1; j < n; j++)
+                        if (triplets[i].i == triplets[j].i && triplets[i].j == triplets[j].j) {
+                            // disable triplet j
+                            triplets[j].i = -1;
+                            triplets[i].block += triplets[j].block;
+                        }
+                        else {
+                            if (triplets[i].j != triplets[j].j)
+                                starting_point[triplets[j].j] = j;
+                            break;
+                        }
+                }
+                starting_point[0] = 0;
+            };
             const int hess_dim = n_cubes * 12;
             MatrixXd big_hess;
-            vector<Triplet<double>> bht;
+            //vector<Triplet<double>> bht;
             SparseMatrix<double> sparse_hess(hess_dim, hess_dim);
+            //static const auto insert = [&](vector<Triplet<double>>& bht, const Matrix<double, 12, 12>& m, int r, int c) {
+            //    for (int i = 0; i < 12; i++)
+            //        for (int j = 0; j < 12; j++) {
+            //            bht.push_back({ r + i, c + j, m(i, j) });
+            //        }
+            //};
+            static const auto insert2 = [&](SparseMatrix<double>& sm, int tid) {
+                auto& triplet = globals.hess_triplets[tid];
+                bool new_col = tid == 0 || globals.hess_triplets[tid - 1].j != triplet.j;
+
+                int c = triplet.j, r = triplet.i;
+                if (new_col)
+                    sm.startVec(c);
+                for (int i = 0; i < 12; i++) {
+                    sm.insertBack(i + r, c) = triplet.block(i, 0);
+                }
+            };
+
             if (globals.sparse){
                 int n_ele = (n_cubes + globals.hess_triplets.size())* 12 * 12;
-                bht.resize(n_ele);
-                sparse_hess.reserve(n_ele);
+                //bht.resize(n_ele);
+                //sparse_hess.reserve(n_ele);
             }
-
 
             big_hess.setZero(hess_dim, hess_dim);
             VectorXd r, q0_cat, q_tile_cat, dq;
@@ -267,32 +297,42 @@ void implicit_euler(vector<Cube>& cubes, double dt)
             dq.setZero(hess_dim);
             q0_cat.setZero(hess_dim);
             q_tile_cat.setZero(hess_dim);
-            #pragma omp parallel for schedule(dynamic)
+
             for (int k = 0; k < n_cubes; k++) {
-                if(!globals.sparse)
-                    big_hess.block<12, 12>(k * 12, k * 12) += cubes[k].hess;
-                else 
-                    insert(bht, cubes[k].hess, k * 12, k * 12);
-                    // insert1(sparse_hess, cubes[k].hess, k * 12, k * 12);
+                // if (globals.dense)
+                //     big_hess.block<12, 12>(k * 12, k * 12) += cubes[k].hess;
+                
+                // if(globals.sparse)
+                //     insert(bht, cubes[k].hess, k * 12, k * 12);
+
+                for (int i = 0; i < 12; i++)
+                    globals.hess_triplets.push_back({ k * 12, k * 12 + i, cubes[k].hess.block<12, 1>(0, i) });
+                // globals.hess_triplets.push_back({k * 12, k * 12, cubes[k].hess});
+
                 r.segment<12>(k * 12) = cubes[k].grad;
                 auto t = cat(cubes[k].q);
                 q0_cat.segment<12>(k * 12) = t;
-                q_tile_cat.segment<12>(k * 12) = cubes[k].q_tile(dt, t);
+                q_tile_cat.segment<12>(k * 12) = cubes[k].q_tile(dt, globals.gravity);
             }
 
-            const int ntrip = globals.hess_triplets.size();
-            // #pragma omp parallel for schedule(dynamic)
-            for (int i = 0; i < ntrip; i++) {
-                auto &triplet(globals.hess_triplets[i]);
-                if (!globals.sparse)
-                big_hess.block<12, 12>(triplet.i * 12, triplet.j * 12) += triplet.block;
-                else 
-                insert(bht, triplet.block, triplet.i * 12, triplet.j * 12);
+            merge_triplets(globals.hess_triplets);
+
+            const int nt = globals.hess_triplets.size();
+
+            for (int k = 0; k < nt; k++) {
+                auto& triplet(globals.hess_triplets[k]);
+                if (triplet.i == -1) continue;
+                if (globals.dense)
+                    big_hess.block<12, 1>(triplet.i, triplet.j) = triplet.block;
+                    // big_hess.block<12, 12>(triplet.i, triplet.j) = triplet.block;
+                if (globals.sparse)
+                    // insert(bht, triplet.block, triplet.i * 12, triplet.j * 12);
+                    insert2(sparse_hess, k);
             }
 
-            //const auto damping = [&]() {
-            //    MatrixXd M, D;
-            //    VectorXd q_cat;
+            // const auto damping = [&]() {
+            //     MatrixXd M, D;
+            //     VectorXd q_cat;
 
             //    M.setZero(hess_dim, hess_dim);
             //    D.setZero(hess_dim, hess_dim);
@@ -325,17 +365,25 @@ void implicit_euler(vector<Cube>& cubes, double dt)
             //};
 
             // damping();
-            if (globals.sparse){
-                sparse_hess.setFromTriplets(bht.begin(), bht.end());
+            if (globals.dense)
+                dq = -big_hess.ldlt().solve(r);
+            else if (globals.sparse) {
+                // sparse_hess.setFromTriplets(bht.begin(), bht.end());
+                sparse_hess.finalize();
                 SimplicialLDLT<SparseMatrix<double>> ldlt_solver;
                 ldlt_solver.compute(sparse_hess);
                 dq = -ldlt_solver.solve(r);
             }
-            else 
-                dq = -big_hess.ldlt().solve(r);
+
+            double dif = (sparse_hess - big_hess).norm();
             spdlog::info("norms: dq = {}, grad = {}, big_hess = {}", dq.norm(), r.norm(), globals.sparse ? sparse_hess.norm(): big_hess.norm());
-            // spdlog::warn("dense norms: dq = {}, grad = {}, big_hess = {}, difference = {}", dq.norm(), r.norm(), big_hess.norm(), (dq - dq_sparse).norm());
+            spdlog::warn("dense norms: dq = {}, grad = {}, big_hess = {}, difference = {}", dq.norm(), r.norm(), big_hess.norm(), dif);
             spdlog::info("dq dot grad = {}, cos = {}", dq.dot(r), dq.dot(r) / (dq.norm() * r.norm()));
+            if (globals.sparse && globals.dense && dif > 1e-6) {
+                spdlog::error("diff too large");
+                cout << big_hess << "\n\n"
+                     << sparse_hess;
+            }
 
             toi = 1.0;
             #pragma omp parallel for schedule(dynamic)
