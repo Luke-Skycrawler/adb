@@ -18,6 +18,8 @@ void reset(){
     globals.upper_bound = data["uppper_bound"];
     globals.sparse = data["solver"] != "dense";
     globals.dense = data["solver"] != "sparse";
+    globals.ee = data["ee"];
+    globals.pt = data["pt"];
     if (predefined) {
         int id = data["predefined_case"]["id"];
         if (id == 1) {

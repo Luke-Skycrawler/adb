@@ -20,3 +20,4 @@ void ipc_term(Matrix<double, 12, 12>& hess_p, Matrix<double, 12, 12>& hess_t, Ve
     // , Matrix<double, 12 , 12> &off_diag
     // , vector<Cube> &cubes
 );
+void ipc_term_ee(Matrix<double, 12, 12>& hess_0, Matrix<double, 12, 12>& hess_1, Vector<double, 12>& grad_0, Vector<double, 12>& grad_1, std::array<vec3, 4> ee, std::array<int, 4> ij);

@@ -2,7 +2,9 @@
 #include "geometry.h"
 #include "barrier.h"
 #include <ipc/distance/point_triangle.hpp>
+#include <ipc/distance/edge_edge.hpp>
 #include <ipc/utils/eigen_ext.hpp>
+#include <ipc/distance/edge_edge_mollifier.hpp>
 #include "../view/global_variables.h"
 #include <array>
 using namespace std;
@@ -98,3 +100,64 @@ void ipc_term(Matrix<double, 12, 12>& hess_p, Matrix<double, 12, 12>& hess_t, Ve
     grad_p += Jp.adjoint() * pt_grad.segment<3>(0) * B_;
     grad_t += Jt.adjoint() * pt_grad.segment<9>(3) * B_;
 }
+
+void ipc_term_ee(Matrix<double, 12, 12>& hess_0, Matrix<double, 12, 12>& hess_1, Vector<double, 12>& grad_0, Vector<double, 12>& grad_1, array<vec3, 4> ee, array<int, 4> ij)
+{
+    static auto vnp = Cube::vertices();
+    static auto eidx = Cube::edges;
+
+    int _i = ij[0], _ei = ij[1], _j = ij[2], _ej = ij[3];
+
+    auto ei0 = ee[0], ei1 = ee[1],
+        ej0 = ee[2], ej1 = ee[3];
+    Vector<double, 12> ee_grad;
+    Matrix<double, 12, 12> ee_hess;
+    double eps_x = 1e-2;
+
+    // ipc::edge_edge_mollifier_gradient(ei0, ei1, ej0, ej1, eps_x, ee_grad);
+    // ipc::edge_edge_mollifier_hessian(ei0, ei1, ej0, ej1, eps_x, ee_hess);
+    ipc::edge_edge_distance_gradient(ei0, ei1, ej0, ej1, ee_grad);
+    ipc::edge_edge_distance_hessian(ei0, ei1, ej0, ej1, ee_hess);
+
+    double dist = 0.0;
+
+    // dist = ipc::edge_edge_mollifier(ei0, ei1, ej0, ej1, eps_x);
+    dist = ipc::edge_edge_distance(ei0, ei1, ej0, ej1);
+    double B_ = barrier::barrier_derivative_d(dist);
+    double B__ = barrier::barrier_second_derivative(dist);
+
+    //spdlog::info("dist = {}, B = {}, B__ = {}", dist, B_, B__);
+
+    Matrix<double, 6, 12> J0;
+    Matrix<double, 6, 12> J1;
+    Matrix<double, 12, 12> off_diag;
+    auto ei0_tile = vnp[eidx[2 * _ei]], ei1_tile = vnp[eidx[2 * _ei + 1]],
+        ej0_tile = vnp[eidx[2 * _ej]], ej1_tile = vnp[eidx[2 * _ej + 1]];
+
+    J0.setZero(6, 12);
+    J1.setZero(6, 12);
+    off_diag.setZero(12, 12);
+    J0.block<3, 12>(0, 0) = barrier::x_jacobian_q(ei0_tile);
+    J0.block<3, 12>(3, 0) = barrier::x_jacobian_q(ei1_tile);
+    J1.block<3, 12>(0, 0) = barrier::x_jacobian_q(ej0_tile);
+    J1.block<3, 12>(3, 0) = barrier::x_jacobian_q(ej1_tile);
+
+    Matrix<double, 12, 12> ipc_hess;
+    ipc_hess.setZero(12, 12);
+    ipc_hess = project_to_psd(ee_hess * B_) + ee_grad * ee_grad.adjoint() * B__;
+
+    int ii = _i, jj = _j;
+    hess_0 += J0.adjoint() * ipc_hess.block<6, 6>(0, 0) * J0;
+    hess_1 += J1.adjoint() * ipc_hess.block<6, 6>(6, 6) * J1;
+    off_diag += J0.adjoint() * ipc_hess.block<6, 6>(0, 6) * J1;
+    auto off_T = off_diag.adjoint();
+    #pragma omp critical
+    for (int i = 0; i < 12; i++ ){
+        globals.hess_triplets.push_back(HessBlock(ii *12, jj * 12 + i, off_diag.block<12, 1>(0, i)));
+        globals.hess_triplets.push_back(HessBlock(jj * 12, ii + i, off_T.block<12, 1>(0, i)));
+    }
+    
+    grad_0 += J0.adjoint() * ee_grad.segment<6>(0) * B_;
+    grad_1 += J1.adjoint() * ee_grad.segment<6>(6) * B_;
+}
+
