@@ -197,8 +197,7 @@ void implicit_euler(vector<Cube>& cubes, double dt)
             }
         }
         if (globals.ee)
-        for (int I = 0; I < nsqr; I++) {
-            int i = I / n, j = I % n;
+        for(int i = 0; i < n; i++) for(int j = i + 1; j < n; j ++){
                 auto &ci(cubes[i]), &cj(cubes[j]);
                 if (i == j) continue;
                 for (int _ei = 0; _ei < Cube::n_edges; _ei++)
@@ -268,7 +267,7 @@ void implicit_euler(vector<Cube>& cubes, double dt)
         
         const auto step_size_upper_bound = [&](VectorXd& dq, vector<Cube> cubes) -> double {
             double toi = 1.0;
-            const int nc = cubes.size(), nidx = idx.size();
+            const int nc = cubes.size(), nidx = idx.size(), ne = eidx.size();
             #pragma omp parallel for schedule(dynamic) reduction(min: toi)
             for (int i = 0; i < nc; i++){
                 double _t = cubes[i].vg_collision_time();
@@ -284,6 +283,15 @@ void implicit_euler(vector<Cube>& cubes, double dt)
                 vec3 p_t2 = cubes[i].vt2(ij[1]);
                 vec3 p_t1 = cubes[i].vt1(ij[1]);
                 double t = vf_collision_detect(p_t1, p_t2, cubes[j], ij[3]);
+                toi = min(toi, t);
+            }
+            #pragma omp parallel for schedule(dynamic) reduction(min: toi)
+            for (int k = 0; k < ne; k++) {
+                auto& ee(ees[k]);
+                const auto& ij(eidx[k]);
+
+                auto & ci(cubes[ij[0]]), &cj(cubes[ij[2]]);
+                double t = ee_collision_detect(ci, cj, ij[1], ij[2]);
                 toi = min(toi, t);
             }
             return toi;

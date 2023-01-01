@@ -1,8 +1,8 @@
 {
-    "dt": 5e-3,
+    "dt": 4e-3,
     "max_iter": 10,
     "predefined_case" : {
-        "enable": false,
+        "enable": true,
         "id" : 2,
         "custom": "../test_cases/case.json"
     },
