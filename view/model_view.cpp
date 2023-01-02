@@ -9,7 +9,6 @@
 #include "../model/time_integrator.h"
 #include "../model/glue.h"
 #include <glm/gtx/string_cast.hpp>
-#include "../model/marcros_settings.h"
 #include <fstream>
 #include <nlohmann/json.hpp>
 #include <omp.h>
@@ -21,7 +20,7 @@ using namespace std;
 // #define FEATURE_POSTRENDER
 //-----------------------------------------------------------------
 
-int *Cube::_edges = nullptr, *Cube::_indices = nullptr;
+unsigned *Cube::_edges = nullptr, *Cube::_indices = nullptr;
 void render_cubes(Shader shader, vector<Cube> cubes)
 {
     for (auto &c : cubes)

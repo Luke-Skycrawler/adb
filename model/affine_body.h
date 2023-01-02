@@ -10,8 +10,9 @@ struct AffineBody {
     mat3 A;
     vec3 p;
     double mass;
-    int *indices, *edges;
-    virtual const vec3 *vertices() const = 0;
+    unsigned *indices, *edges;
+    virtual const vec3 vertices(int i) const = 0;
+    int n_vertices, n_faces, n_edges;
     Eigen::Vector<double, 12> dq;
 
     q4 q, q0, dqdt;
@@ -20,14 +21,14 @@ struct AffineBody {
         mat3 a;
         vec3 b = q0[0];
         a << q0[1] , q0[2], q0[3];
-        return a * vertices() [i] + b;
+        return a * vertices(i) + b;
     }
 
     inline vec3 vt1(int i) const {
         mat3 a;
         vec3 b = q[0];
         a << q[1] , q[2], q[3];
-        return a * vertices() [i] + b;
+        return a * vertices(i) + b;
     }
     
     inline vec3 vt2(int i) const {
@@ -38,9 +39,11 @@ struct AffineBody {
         for (int i = 1; i < 4; i ++){
             a.col(i - 1) += dq.segment<3>(i * 3);
         }
-        return a * vertices() [i] + b;
+        return a * vertices(i) + b;
     }
-    AffineBody(int *indices = nullptr, int *edges = nullptr):mass(1000.0), p(0.0f, 0.0f, 0.0f), indices(indices), edges(edges){
+    AffineBody(int n_vertices, int n_edges, int n_faces, unsigned *indices = nullptr, unsigned *edges = nullptr):
+    mass(1000.0), p(0.0f, 0.0f, 0.0f), indices(indices), edges(edges), 
+    n_vertices(n_vertices), n_edges(n_edges), n_faces(n_faces){
         A.setIdentity(3, 3);
         q = {
             p, 

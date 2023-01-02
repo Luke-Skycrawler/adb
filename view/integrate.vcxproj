@@ -143,6 +143,7 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClCompile Include="..\model\affine_obj.cpp" />
     <ClCompile Include="..\model\geo.cpp" />
     <ClCompile Include="..\model\othogonal_energy.cpp" />
     <ClCompile Include="..\model\barrier.cpp" />
@@ -151,8 +152,6 @@
     <ClCompile Include="..\model\collision.cpp" />
     <ClCompile Include="..\model\spatial_hashing.cpp" />
     <ClCompile Include="..\model\geometry.cpp" />
-    <ClCompile Include="..\model\autogen_point_plane.cpp" />
-    <ClCompile Include="..\model\autogen_edge_edge.cpp" />
     <ClCompile Include="..\test_cases\spinning_cube.cpp" />
     <ClCompile Include="..\view\control.cpp" />
     <ClCompile Include="..\view\glad.c" />
@@ -162,6 +161,7 @@
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\model\affine_body.h" />
+    <ClInclude Include="..\model\affine_obj.h" />
     <ClInclude Include="..\model\cube.h" />
     <ClInclude Include="..\model\glue.h" />
     <ClInclude Include="..\model\othogonal_energy.h" />

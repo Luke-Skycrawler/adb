@@ -3,7 +3,6 @@
 #include "spdlog/spdlog.h"
 #include "collision.h"
 #include "../view/global_variables.h"
-#include "marcros_settings.h"
 #include <assert.h>
 #include <array>
 #include <ipc/distance/point_triangle.hpp>
@@ -78,7 +77,7 @@ void implicit_euler(vector<Cube>& cubes, double dt)
     const auto E_ground = [&](const Cube& c) -> double {
         double e = 0.0;
         for (int i = 0; i < Cube::n_vertices; i++) {
-            const vec3& v_tile(c.vertices()[i]);
+            const vec3& v_tile(c.vertices(i));
             const vec3 v(c.vt2(i));
             double d = vg_distance(v);
             d = d * d;
@@ -116,7 +115,7 @@ void implicit_euler(vector<Cube>& cubes, double dt)
     };
     const auto barrier_grad_hess_per_body = [&](Cube& c, VectorXd& grad, MatrixXd& hess) {
         for (int i = 0; i < Cube::n_vertices; i++) {
-            const vec3& v_tile(c.vertices()[i]);
+            const vec3& v_tile(c.vertices(i));
             const vec3 v(c.vt1(i));
             double d = vg_distance(v);
             d = d * d;
@@ -443,27 +442,3 @@ void implicit_euler(vector<Cube>& cubes, double dt)
     }
 }
 
-double Cube::vg_collision_time()
-{
-    double toi = 1.0;
-    for (int i = 0; i < n_vertices; i++) {
-        const vec3 v_t2(vt2(i));
-        const vec3 v_t1(vt1(i));
-
-        double d2 = vg_distance(v_t2);
-        double d1 = vg_distance(v_t1);
-        assert(d1 > 0);
-        if (d2 < 0) {
-
-            double t = d1 / (d1 - d2);
-            auto vtoi = v_t2 * (t * 0.8) + v_t1 * (1 - t * 0.8);
-            double dtoi = vg_distance(vtoi);
-            spdlog::warn("dtoi = {}, d0 = {}, d1 = {}, toi = {}", dtoi, d1, d2, t);
-
-            assert(dtoi > 0.0);
-            assert(t > 0.0 && t < 1.0);
-            toi = min(toi, t);
-        }
-    }
-    return toi;
-}

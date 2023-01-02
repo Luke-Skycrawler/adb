@@ -6,12 +6,7 @@
 #include <iostream>
 #include <spdlog/spdlog.h>
 #include "../view/global_variables.h"
-#include "marcros_settings.h"
 
-#ifdef IPC_TOOLKIT
-#include <ipc/distance/point_triangle.hpp>
-#include <array>
-#endif
 using namespace barrier;
 using namespace std;
 
@@ -21,7 +16,7 @@ double vf_collision_detect(vec3& p_t0, vec3& p_t1, const Cube& c, int id)
     ticcd::Scalar toi = 1.0, output_tolerance;
     std::vector<ticcd::Vector3> bounding_box;
     for (int i = 0; i < 8; i++) {
-        bounding_box.push_back(c.vertices()[i] * 20.0);
+        bounding_box.push_back(c.vertices(i) * 20.0);
     }
     static const ticcd::Array3 err_vf(ticcd::get_numerical_error(bounding_box, true, false));
     double min_distance = 1e-6, tmax = 1, adjusted_tolerance = 1e-6;
@@ -65,6 +60,31 @@ double ee_collision_detect(const Cube& ci, const Cube& cj, int eid_i, int eid_j)
     }
     else
         toi = 1.0;
+    return toi;
+}
+
+double Cube::vg_collision_time()
+{
+    double toi = 1.0;
+    for (int i = 0; i < n_vertices; i++) {
+        const vec3 v_t2(vt2(i));
+        const vec3 v_t1(vt1(i));
+
+        double d2 = vg_distance(v_t2);
+        double d1 = vg_distance(v_t1);
+        assert(d1 > 0);
+        if (d2 < 0) {
+
+            double t = d1 / (d1 - d2);
+            auto vtoi = v_t2 * (t * 0.8) + v_t1 * (1 - t * 0.8);
+            double dtoi = vg_distance(vtoi);
+            spdlog::warn("dtoi = {}, d0 = {}, d1 = {}, toi = {}", dtoi, d1, d2, t);
+
+            assert(dtoi > 0.0);
+            assert(t > 0.0 && t < 1.0);
+            toi = min(toi, t);
+        }
+    }
     return toi;
 }
 

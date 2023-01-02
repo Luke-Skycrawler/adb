@@ -9,7 +9,7 @@ struct Cube: AffineBody {
     static const int n_vertices = 8, n_faces = 12, n_edges = 12;
     Vector<double, 12> barrier_gradient, grad;
     Matrix<double, 12, 12> hess;
-    inline const vec3 * vertices() const {return _vertices();}
+    inline const vec3 vertices(int i) const {return _vertices()[i];}
     static const vec3* _vertices()
     {
         static const vec3 v[] = {
@@ -38,17 +38,17 @@ struct Cube: AffineBody {
     }
     // FIXME: probably switch to a static function
     Cube(double scale = 1.0f)
-        : scale(scale), AffineBody(_indices, _edges){
+        : scale(scale), AffineBody(8, 12, 12, _indices, _edges){
         Ic = mass * scale * scale / 12;
     }
     
     double vg_collision_time();
     
-    static int * _indices, *_edges;
+    static unsigned * _indices, *_edges;
     static void gen_indices()
     {
-        _indices = new int[n_faces * 3];
-        _edges = new int[n_edges * 2];
+        _indices = new unsigned[n_faces * 3];
+        _edges = new unsigned[n_edges * 2];
         for (int i = 0; i < 6; i++) {
             const int * f = faces();
             _indices[i * 6 + 0] = f[i * 4 + 0];
