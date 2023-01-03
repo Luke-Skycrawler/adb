@@ -110,12 +110,15 @@ void ipc_term_ee(Matrix<double, 12, 12>& hess_0, Matrix<double, 12, 12>& hess_1,
 
     auto ei0 = ee[0], ei1 = ee[1],
         ej0 = ee[2], ej1 = ee[3];
-    Vector<double, 12> ee_grad;
-    Matrix<double, 12, 12> ee_hess;
-    double eps_x = 1e-2;
+    Vector<double, 12> ee_grad, p_grad;
+    Matrix<double, 12, 12> ee_hess, p_hess;
+    double eps_x = 1e-3;
+    // 1e-3 * edge length square
 
-    // ipc::edge_edge_mollifier_gradient(ei0, ei1, ej0, ej1, eps_x, ee_grad);
-    // ipc::edge_edge_mollifier_hessian(ei0, ei1, ej0, ej1, eps_x, ee_hess);
+    double p = ipc::edge_edge_mollifier(ei0, ei1, ej0, ej1, eps_x);
+    ipc::edge_edge_mollifier_gradient(ei0, ei1, ej0, ej1, eps_x, p_grad);
+    ipc::edge_edge_mollifier_hessian(ei0, ei1, ej0, ej1, eps_x, p_hess);
+
     ipc::edge_edge_distance_gradient(ei0, ei1, ej0, ej1, ee_grad);
     ipc::edge_edge_distance_hessian(ei0, ei1, ej0, ej1, ee_hess);
 
@@ -125,6 +128,8 @@ void ipc_term_ee(Matrix<double, 12, 12>& hess_0, Matrix<double, 12, 12>& hess_1,
     dist = ipc::edge_edge_distance(ei0, ei1, ej0, ej1);
     double B_ = barrier::barrier_derivative_d(dist);
     double B__ = barrier::barrier_second_derivative(dist);
+    double B = barrier::barrier_function(dist);
+    
 
     //spdlog::info("dist = {}, B = {}, B__ = {}", dist, B_, B__);
 
@@ -144,7 +149,11 @@ void ipc_term_ee(Matrix<double, 12, 12>& hess_0, Matrix<double, 12, 12>& hess_1,
 
     Matrix<double, 12, 12> ipc_hess;
     ipc_hess.setZero(12, 12);
-    ipc_hess = project_to_psd(ee_hess * B_) + ee_grad * ee_grad.adjoint() * B__;
+    ipc_hess = p_hess * B + B_ * (p_grad * ee_grad.transpose() + ee_grad * p_grad.transpose()) + p * (B__ * ee_grad * ee_grad.transpose() + B_ * ee_hess);
+    // ipc_hess = B__ * ee_grad * ee_grad.transpose() + project_to_psd(B_ * ee_hess);
+    ipc_hess = project_to_psd(ipc_hess);
+
+    ee_grad = p * ee_grad * B_ + p_grad * B;
 
     int ii = _i, jj = _j;
     hess_0 += J0.adjoint() * ipc_hess.block<6, 6>(0, 0) * J0;
@@ -157,7 +166,7 @@ void ipc_term_ee(Matrix<double, 12, 12>& hess_0, Matrix<double, 12, 12>& hess_1,
         globals.hess_triplets.push_back(HessBlock(jj * 12, ii + i, off_T.block<12, 1>(0, i)));
     }
     
-    grad_0 += J0.adjoint() * ee_grad.segment<6>(0) * B_;
-    grad_1 += J1.adjoint() * ee_grad.segment<6>(6) * B_;
+    grad_0 += J0.adjoint() * ee_grad.segment<6>(0);
+    grad_1 += J1.adjoint() * ee_grad.segment<6>(6);
 }
 

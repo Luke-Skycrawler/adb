@@ -268,12 +268,12 @@ void implicit_euler(vector<Cube>& cubes, double dt)
         const auto step_size_upper_bound = [&](VectorXd& dq, vector<Cube> cubes) -> double {
             double toi = 1.0;
             const int nc = cubes.size(), nidx = idx.size(), ne = eidx.size();
-            #pragma omp parallel for schedule(dynamic) reduction(min: toi)
+            //#pragma omp parallel for schedule(dynamic) reduction(min: toi)
             for (int i = 0; i < nc; i++){
                 double _t = cubes[i].vg_collision_time();
                 toi = min(toi, _t);
             }
-            #pragma omp parallel for schedule(dynamic) reduction(min: toi)
+            //#pragma omp parallel for schedule(dynamic) reduction(min: toi)
             for (int k = 0; k < nidx; k++) {
                 auto& pt(pts[k]);
                 const auto& ij(idx[k]);
@@ -285,7 +285,7 @@ void implicit_euler(vector<Cube>& cubes, double dt)
                 double t = vf_collision_detect(p_t1, p_t2, cubes[j], ij[3]);
                 toi = min(toi, t);
             }
-            #pragma omp parallel for schedule(dynamic) reduction(min: toi)
+            //#pragma omp parallel for schedule(dynamic) reduction(min: toi)
             for (int k = 0; k < ne; k++) {
                 auto& ee(ees[k]);
                 const auto& ij(eidx[k]);

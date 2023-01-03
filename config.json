@@ -1,5 +1,5 @@
 {
-    "dt": 4e-3,
+    "dt": 5e-3,
     "max_iter": 10,
     "predefined_case" : {
         "enable": true,
@@ -12,8 +12,8 @@
     "dhat": 1e-3,
     "line_search": true,
     "col_set": true,
-    "ee": true,
-    "pt": false,
+    "ee": false,
+    "pt": true,
     "uppper_bound": true, 
     "damping": {
         "alpha": 2.5e-2,
