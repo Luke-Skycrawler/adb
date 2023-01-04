@@ -11,10 +11,10 @@
     "line_search": true,
     "col_set": true,
     "ee": true,
-    "pt": true,
+    "pt": false,
+    "ground": false,
     "safe_factor": 1.0,
     "uppper_bound": true, 
-    "ground": true,
     "damping": {
         "alpha": 2.5e-2,
         "beta": 2.3e-2

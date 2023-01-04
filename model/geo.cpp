@@ -108,7 +108,11 @@ void ipc_term(
     grad_t += Jt.adjoint() * pt_grad.segment<9>(3) * B_;
 }
 
-void ipc_term_ee(Matrix<double, 12, 12>& hess_0, Matrix<double, 12, 12>& hess_1, Vector<double, 12>& grad_0, Vector<double, 12>& grad_1, array<vec3, 4> ee, array<int, 4> ij)
+void ipc_term_ee(
+    array<vec3, 4> ee, array<int, 4> ij,
+    vector<HessBlock>& triplets,
+    Vector<double, 12>& grad_0, Vector<double, 12>& grad_1
+    )
 {
     static auto vnp = Cube::vertices();
     static auto eidx = Cube::edges;
@@ -163,14 +167,16 @@ void ipc_term_ee(Matrix<double, 12, 12>& hess_0, Matrix<double, 12, 12>& hess_1,
     ee_grad = p * ee_grad * B_ + p_grad * B;
 
     int ii = _i, jj = _j;
-    hess_0 += J0.adjoint() * ipc_hess.block<6, 6>(0, 0) * J0;
-    hess_1 += J1.adjoint() * ipc_hess.block<6, 6>(6, 6) * J1;
+    auto hess_0 = J0.adjoint() * ipc_hess.block<6, 6>(0, 0) * J0;
+    auto hess_1 = J1.adjoint() * ipc_hess.block<6, 6>(6, 6) * J1;
     off_diag += J0.adjoint() * ipc_hess.block<6, 6>(0, 6) * J1;
     auto off_T = off_diag.adjoint();
     #pragma omp critical
     for (int i = 0; i < 12; i++ ){
-        globals.hess_triplets.push_back(HessBlock(ii *12, jj * 12 + i, off_diag.block<12, 1>(0, i)));
-        globals.hess_triplets.push_back(HessBlock(jj * 12, ii + i, off_T.block<12, 1>(0, i)));
+        triplets.push_back(HessBlock(ii * 12, jj * 12 + i, off_diag.block<12, 1>(0, i)));
+        triplets.push_back(HessBlock(jj * 12, ii * 12 + i, off_T.block<12, 1>(0, i)));
+        triplets.push_back(HessBlock(ii * 12, ii * 12 + i, hess_0.block<12, 1>(0, i)));
+        triplets.push_back(HessBlock(jj * 12, jj * 12 + i, hess_1.block<12, 1>(0, i)));
     }
     
     grad_0 += J0.adjoint() * ee_grad.segment<6>(0);
