@@ -218,7 +218,7 @@ void implicit_euler(vector<Cube>& cubes, double dt)
             auto &ci(cubes[i]), &cj(cubes[j]);
             double d = ipc::point_triangle_distance(pt[0], pt[1], pt[2], pt[3]);
             if (d < barrier::d_hat) {
-                ipc_term(ci.hess, cj.hess, ci.grad, cj.grad, pt, ij);
+                ipc_term(pt, ij, globals.hess_triplets ,ci.grad, cj.grad);
             }
         }
 
