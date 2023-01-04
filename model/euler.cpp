@@ -366,41 +366,16 @@ void implicit_euler(vector<Cube>& cubes, double dt)
                     insert2(sparse_hess, k);
             }
 
-            // const auto damping = [&]() {
-            //     MatrixXd M, D;
-            //     VectorXd q_cat;
+            const auto damping = [&]() {
+                MatrixXd D = globals.beta * big_hess;
+                for (int i = 0; i < n_cubes; i++) {
+                    for (int j = 0; j < 3; j++) { D(i * 12 + j, i * 12 + j) += cubes[i].mass; }
+                    for (int j = 3; j < 12; j++) { D(i * 12 + j, i * 12 + j) += cubes[i].Ic; }
+                }
+                big_hess += D / dt;
+            };
 
-            //    M.setZero(hess_dim, hess_dim);
-            //    D.setZero(hess_dim, hess_dim);
-            //    q_cat.setZero(hess_dim);
-
-            //    for (int i = 0; i < cubes.size(); i++) {
-            //        Matrix<double, 12, 12> m;
-            //        auto& c(cubes[i]);
-            //        m = MatrixXd::Identity(12, 12) * c.Ic;
-            //        m.block<3, 3>(0, 0) = MatrixXd::Identity(3, 3) * c.mass;
-            //        M.block<12, 12>(i * 12, i * 12) = m;
-
-            //        q_cat.segment<12>(i * 12) = cat(c.q0);
-            //    }
-
-            //    D = globals.beta * big_hess + (globals.alpha - globals.beta) * M;
-
-            //    VectorXd damp_term = D * q_cat / dt;
-            //    r += damp_term;
-
-            //    big_hess += globals.beta * big_hess / dt;
-            //    for (int i = 0; i < cubes.size(); i++) {
-            //        for (int j = 0; j < 3; j++) {
-            //            big_hess(i * 12 + j, i * 12 + j) += (globals.alpha - globals.beta) * cubes[i].mass / dt;
-            //        }
-            //        for (int j = 3; j < 12; j++) {
-            //            big_hess(i * 12 + j, i * 12 + j) += (globals.alpha - globals.beta) * cubes[i].Ic / dt;
-            //        }
-            //    }
-            //};
-
-            // damping();
+            damping();
             if (globals.dense)
                 dq = -big_hess.ldlt().solve(r);
             else if (globals.sparse) {
