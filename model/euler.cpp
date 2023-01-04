@@ -148,7 +148,7 @@ void implicit_euler(vector<Cube>& cubes, double dt)
                     auto p = cubes[i].vt1(v);
                     double d = vg_distance(p);
                     d = d * d;
-                    if (d < barrier::d_hat) {
+                    if (d < barrier::d_hat * globals.safe_factor) {
                         vidx.push_back({ i, v });
                     }
                 }
@@ -168,7 +168,7 @@ void implicit_euler(vector<Cube>& cubes, double dt)
                         }
                         else continue;
                         double d = ipc::point_triangle_distance(p, _f.t0, _f.t1, _f.t2);
-                        if (d < barrier::d_hat) {
+                        if (d < barrier::d_hat * globals.safe_factor) {
                             array<vec3, 4> pt = { p, _f.t0, _f.t1, _f.t2 };
                             array<int, 4> ij = { i, v, j, f };
 

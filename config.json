@@ -8,12 +8,11 @@
     },
     "solver": "sparse",
     "gravity": false, 
-    "kappa": 1e3,
-    "dhat": 1e-3,
     "line_search": true,
     "col_set": true,
+    "safe_factor": 4.0,
     "uppper_bound": true, 
-    "ground": false,
+    "ground": true,
     "damping": {
         "alpha": 2.5e-2,
         "beta": 2.3e-2

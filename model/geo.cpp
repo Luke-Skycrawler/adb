@@ -95,7 +95,7 @@ void ipc_term(
     auto off_T = off_diag.adjoint();
     for (int i = 0; i < 12; i++ ){
         triplets.push_back(HessBlock(ii *12, jj * 12 + i, off_diag.block<12, 1>(0, i)));
-        triplets.push_back(HessBlock(jj * 12, ii + i, off_T.block<12, 1>(0, i)));
+        triplets.push_back(HessBlock(jj * 12, ii * 12 + i, off_T.block<12, 1>(0, i)));
         triplets.push_back(HessBlock(ii * 12, ii * 12 + i, hess_p.block<12, 1>(0, i)));
         triplets.push_back(HessBlock(jj * 12, jj * 12 + i, hess_t.block<12, 1>(0, i)));
     }
