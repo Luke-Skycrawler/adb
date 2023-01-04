@@ -4,15 +4,16 @@
     "predefined_case" : {
         "enable": false,
         "id" : 2,
-        "custom": "../test_cases/case.json"
+        "custom": "../test_cases/10b.json"
     },
     "solver": "sparse",
-    "gravity": true, 
+    "gravity": false, 
     "kappa": 1e3,
     "dhat": 1e-3,
     "line_search": true,
     "col_set": true,
     "uppper_bound": true, 
+    "ground": false,
     "damping": {
         "alpha": 2.5e-2,
         "beta": 2.3e-2
