@@ -47,9 +47,9 @@ struct GlobalVariableMainCPP{
     std::vector<Cube> cubes;
     vec3 gravity;
     double alpha, beta;
-    double kappa, d_hat;
+    double kappa, d_hat, safe_factor;
 
-    bool col_set, upper_bound, line_search, sparse, dense, ee, pt;
+    bool col_set, upper_bound, line_search, sparse, dense, ee, pt, ground;
 };
 #ifndef GOOGLE_TEST
 #ifdef _MAIN_CPP

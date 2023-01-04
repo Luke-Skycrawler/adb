@@ -45,7 +45,12 @@ Matrix<double, 12, 12> project_to_psd(
     return eigensolver.eigenvectors() * D
         * eigensolver.eigenvectors().transpose();
 }
-void ipc_term(Matrix<double, 12, 12>& hess_p, Matrix<double, 12, 12>& hess_t, Vector<double, 12>& grad_p, Vector<double, 12>& grad_t, array<vec3, 4> pt, array<int, 4> ij)
+void ipc_term(
+    array<vec3, 4> pt, array<int, 4> ij,
+    vector<HessBlock> &triplets,
+    Vector<double, 12>& grad_p, Vector<double, 12>& grad_t
+    // Matrix<double, 12, 12>& hess_p, Matrix<double, 12, 12>& hess_t, 
+    )
 {
     static auto vnp = Cube::vertices();
     static auto tidx = Cube::indices;
@@ -85,14 +90,16 @@ void ipc_term(Matrix<double, 12, 12>& hess_p, Matrix<double, 12, 12>& hess_t, Ve
     // ipc_hess = PSD_projection(ipc_hess);
 
     int ii = _i, jj = _j;
-    hess_p += Jp.adjoint() * ipc_hess.block<3, 3>(0, 0) * Jp;
-    hess_t += Jt.adjoint() * ipc_hess.block<9, 9>(3, 3) * Jt;
+    auto hess_p = Jp.adjoint() * ipc_hess.block<3, 3>(0, 0) * Jp;
+    auto hess_t = Jt.adjoint() * ipc_hess.block<9, 9>(3, 3) * Jt;
+
     off_diag += Jp.adjoint() * ipc_hess.block<3, 9>(0, 3) * Jt;
     auto off_T = off_diag.adjoint();
-    #pragma omp critical
     for (int i = 0; i < 12; i++ ){
-        globals.hess_triplets.push_back(HessBlock(ii *12, jj * 12 + i, off_diag.block<12, 1>(0, i)));
-        globals.hess_triplets.push_back(HessBlock(jj * 12, ii + i, off_T.block<12, 1>(0, i)));
+        triplets.push_back(HessBlock(ii *12, jj * 12 + i, off_diag.block<12, 1>(0, i)));
+        triplets.push_back(HessBlock(jj * 12, ii * 12 + i, off_T.block<12, 1>(0, i)));
+        triplets.push_back(HessBlock(ii * 12, ii * 12 + i, hess_p.block<12, 1>(0, i)));
+        triplets.push_back(HessBlock(jj * 12, jj * 12 + i, hess_t.block<12, 1>(0, i)));
     }
     // globals.hess_triplets.push_back({ii * 12, jj * 12, off_diag});
     // globals.hess_triplets.push_back({jj * 12, ii * 12, off_T});
