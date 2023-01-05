@@ -1,19 +1,19 @@
 {
-    "dt": 5e-3,
+    "dt": 2e-3,
     "max_iter": 10,
     "predefined_case" : {
         "enable": false,
         "id" : 2,
-        "custom": "../test_cases/10b.json"
+        "custom": "../test_cases/case2.json"
     },
     "solver": "sparse",
     "gravity": false, 
     "line_search": true,
     "col_set": true,
     "ee": true,
-    "pt": false,
-    "ground": false,
-    "safe_factor": 1.0,
+    "pt": true,
+    "ground": true,
+    "safe_factor": 4.0,
     "uppper_bound": true, 
     "damping": {
         "alpha": 2.5e-2,
