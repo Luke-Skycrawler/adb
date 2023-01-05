@@ -154,7 +154,6 @@
     <ClCompile Include="..\model\geometry.cpp" />
     <ClCompile Include="..\test_cases\spinning_cube.cpp" />
     <ClCompile Include="..\view\control.cpp" />
-    <ClCompile Include="..\view\glad.c" />
     <ClCompile Include="..\view\light.cpp" />
     <ClCompile Include="..\view\model_view.cpp" />
     <ClCompile Include="..\view\utils.cpp" />
