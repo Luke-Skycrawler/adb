@@ -2,6 +2,7 @@
 #include "geometry.h"
 #include <vector>
 #include <array>
+#include "../view/global_variables.h"
 //double vf_collision_time(const vec3& x, const vec3& p, const mat3& q, const vec3& p_next, const mat3& q_next);
 double vf_collision_detect(vec3& p_t0, vec3& p_t1, const Cube& cube, int id);
 // x: vertex position in the static frame;
@@ -16,7 +17,15 @@ double vf_collision_detect(vec3& p_t0, vec3& p_t1, const Cube& cube, int id);
 //int ee_colliding_response(int ci, int cj);
 double ee_collision_detect(const Cube& ci, const Cube& cj, int eid_i, int eid_j);
 
-void ipc_term(Matrix<double, 12, 12>& hess_p, Matrix<double, 12, 12>& hess_t, Vector<double, 12>& grad_p, Vector<double, 12>& grad_t, std::array<vec3, 4> pt, std::array<int, 4> ij
+void ipc_term(
+    std::array<vec3, 4> pt, std::array<int, 4> ij,
+    std::vector<HessBlock> &triplets,
+    Vector<double, 12>& grad_p, Vector<double, 12>& grad_t
     // , Matrix<double, 12 , 12> &off_diag
     // , vector<Cube> &cubes
 );
+void ipc_term_ee(
+    std::array<vec3, 4> ee, std::array<int, 4> ij,
+    std::vector<HessBlock> &triplets,
+    Vector<double, 12>& grad_0, Vector<double, 12>& grad_1
+    );

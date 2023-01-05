@@ -42,7 +42,6 @@ struct Cube: AffineBody {
         Ic = mass * scale * scale / 12;
     }
     
-    double vg_collision_time();
     
     static unsigned * _indices, *_edges;
     static void gen_indices()
