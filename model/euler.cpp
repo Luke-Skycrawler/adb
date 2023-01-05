@@ -323,7 +323,7 @@ void implicit_euler(vector<Cube>& cubes, double dt)
                 const auto& ij(eidx[k]);
 
                 auto & ci(cubes[ij[0]]), &cj(cubes[ij[2]]);
-                double t = ee_collision_detect(ci, cj, ij[1], ij[2]);
+                double t = ee_collision_detect(ci, cj, ij[1], ij[3]);
                 toi = min(toi, t);
             }
             return toi;

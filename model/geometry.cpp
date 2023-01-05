@@ -2,13 +2,10 @@
 #include <Eigen/Geometry>
 #include <cmath>
 using namespace std;
-Edge::Edge(const AffineBody& c, int id, bool b)
+Edge::Edge(const AffineBody& c, int id, bool b): 
+    e0(b? c.vt2(c.edges[id * 2]): c.vt1(c.edges[id * 2])), 
+    e1(b? c.vt2(c.edges[id * 2 + 1]): c.vt1(c.edges[id * 2  + 1]))
 {
-    int _0 = c.edges[id * 2];
-    int _1 = c.edges[id * 2 + 1];
-    
-    e0 = !b? c.vt1(_0): c.vt2(_0);
-    e1 = !b? c.vt1(_1): c.vt2(_1);
 }
 
 vec3 Face::normal() const
