@@ -1,5 +1,4 @@
 #include "affine_body.h"
-#include "../view/model.h"
 #include "../view/mesh.h"
 
 struct AffineObject: AffineBody {
@@ -11,4 +10,5 @@ struct AffineObject: AffineBody {
     }
     std::vector<unsigned> _edges;
     void extract_edges();
+    const vec3 vertices(int i) const;
 };

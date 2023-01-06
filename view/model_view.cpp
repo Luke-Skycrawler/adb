@@ -12,7 +12,7 @@
 #include <fstream>
 #include <nlohmann/json.hpp>
 #include <omp.h>
-
+#define FEATURE_MODEL
 using namespace std;
 //------------------ optional features ----------------------------
 // #define FEATURE_MODEL
@@ -33,6 +33,14 @@ void render_cubes(Shader shader, vector<Cube> cubes)
             A[3][i] = c.p(i);
         shader.setMat4("model", A);
         renderCube();
+    }
+}
+void render_models(Shader shader, vector<AffineObject> models){
+    for (auto &m: models) {
+        glm::mat4 A(from_eigen(m.A));
+        for(int i = 0; i < 3; i++) A[3][i] = m.p(i);
+        shader.setMat4("model", A);
+        m.mesh.Draw(shader);
     }
 }
 int main()
@@ -165,8 +173,10 @@ int main()
 
 #ifdef FEATURE_MODEL
     // load models
-    Model temple("nanosuit/nanosuit.obj");
-    // Model temple("mods/gallery/gallery.obj");
+    Model b_model("assets/bunny.obj");
+    auto &b_mesh = b_model.meshes[0];
+    AffineObject bunny(b_mesh);
+    globals.models.push_back(bunny);
 #endif
     Light lights(LightPositions, 4);
 
@@ -292,11 +302,7 @@ int main()
             // renderCube();
 
 #ifdef FEATURE_MODEL
-            if (globals.model_draw)
-            {
-                depthShader.setMat4("model", glm::translate(glm::mat4(1.0f), glm::vec3(0.0f, -1.1f, 0.0f)));
-                temple.Draw(depthShader);
-            }
+            render_models(depthShader, globals.models);
 #endif
 #ifdef FEATURE_POSTRENDER
             glBindFramebuffer(GL_FRAMEBUFFER, globals.postrender ? framebuffer : 0);
@@ -361,13 +367,7 @@ int main()
         render_cubes(lightingShader, globals.cubes);
 
 #ifdef FEATURE_MODEL
-        if (globals.model_draw)
-        {
-            // lightingShader.use();
-            lightingShader.setInt("alias", 2);
-            lightingShader.setMat4("model", glm::translate(glm::mat4(1.0f), glm::vec3(0.0f, -1.1f, 0.0f)));
-            temple.Draw(lightingShader);
-        }
+        render_models(lightingShader, globals.models);
 #endif
         if (!globals.cursor_hidden && globals.objectType)
         {

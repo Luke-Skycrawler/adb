@@ -10,6 +10,7 @@ static const char *varyings[] = {
 static const unsigned int SCR_WIDTH = 800;
 static const unsigned int SCR_HEIGHT = 600;
 #include "../model/cube.h"
+#include "../model/affine_obj.h"
 #include <vector>
 
 struct HessBlock {
@@ -45,6 +46,7 @@ struct GlobalVariableMainCPP{
     int max_iter;
     std::vector<HessBlock> hess_triplets;
     std::vector<Cube> cubes;
+    std::vector<AffineObject> models;
     vec3 gravity;
     double alpha, beta;
     double kappa, d_hat, safe_factor;

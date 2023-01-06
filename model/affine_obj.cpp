@@ -21,3 +21,9 @@ void AffineObject::extract_edges() {
     n_edges = _edges.size() / 2; 
     edges = _edges.data();
 }
+
+const vec3 AffineObject::vertices(int i) const{
+    auto &p = mesh.vertices[i].Position;
+    return vec3(p[0], p[1], p[2]);
+}
+
