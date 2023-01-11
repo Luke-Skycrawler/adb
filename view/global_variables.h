@@ -46,8 +46,7 @@ struct GlobalVariableMainCPP{
     double dt;
     int max_iter;
     std::vector<HessBlock> hess_triplets;
-    std::vector<unique_ptr<Cube>> cubes;
-    std::vector<AffineObject> models;
+    std::vector<unique_ptr<AffineBody>> cubes;
     vec3 gravity;
     double alpha, beta;
     double kappa, d_hat, safe_factor;

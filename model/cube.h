@@ -5,10 +5,9 @@ using namespace Eigen;
 // using mat3 = Matrix3d;
 // using q4 = std::array<vec3, 4>;
 struct Cube: AffineBody {
-    double scale, Ic, toi;
+    double scale, toi;
     static const int n_vertices = 8, n_faces = 12, n_edges = 12;
-    Vector<double, 12> barrier_gradient, grad;
-    Matrix<double, 12, 12> hess;
+    Vector<double, 12> barrier_gradient;
     inline const vec3 vertices(int i) const {return _vertices()[i];}
     static const vec3* _vertices()
     {

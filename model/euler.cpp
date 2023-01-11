@@ -31,7 +31,7 @@ VectorXd AffineBody::q_tile(double dt, const vec3& f) const
     return _q;
 }
 
-void implicit_euler(vector<unique_ptr<Cube>>& cubes, double dt)
+void implicit_euler(vector<unique_ptr<AffineBody>>& cubes, double dt)
 {
 
     bool term_cond;
@@ -44,7 +44,7 @@ void implicit_euler(vector<unique_ptr<Cube>>& cubes, double dt)
             c.q[i] = c.q0[i];
         }
     }
-    const auto grad_residue_per_body = [&](Cube& c) -> VectorXd {
+    const auto grad_residue_per_body = [&](AffineBody& c) -> VectorXd {
         VectorXd grad = othogonal_energy::grad(c.q);
         const auto M = [&](const VectorXd& dq) -> VectorXd {
             auto ret = dq;
@@ -55,7 +55,7 @@ void implicit_euler(vector<unique_ptr<Cube>>& cubes, double dt)
         return dt * dt * grad + M(cat(c.q) - c.q_tile(dt, globals.gravity));
     };
 
-    const auto hess_inertia_per_body = [&](Cube& c) -> MatrixXd {
+    const auto hess_inertia_per_body = [&](AffineBody& c) -> MatrixXd {
         MatrixXd H = MatrixXd::Identity(12, 12) * c.Ic;
         H.block<3, 3>(0, 0) = MatrixXd::Identity(3, 3) * c.mass;
         auto hess_otho = othogonal_energy::hessian(c.q);
@@ -63,7 +63,7 @@ void implicit_euler(vector<unique_ptr<Cube>>& cubes, double dt)
         return H + hess_otho * dt * dt;
     };
 
-    const auto norm_M = [&](const VectorXd& x, const Cube& c) -> double {
+    const auto norm_M = [&](const VectorXd& x, const AffineBody& c) -> double {
         // assert shape of x
         auto p = x.head(3);
         auto q = x.tail(9);
@@ -78,11 +78,11 @@ void implicit_euler(vector<unique_ptr<Cube>>& cubes, double dt)
 
     const int n_cubes = cubes.size(), nsqr = n_cubes * n_cubes;
 
-    const auto E = [&](const VectorXd& q, const VectorXd& q_tiled, const Cube& c) -> double {
+    const auto E = [&](const VectorXd& q, const VectorXd& q_tiled, const AffineBody& c) -> double {
         return othogonal_energy::otho_energy(q) * dt * dt + 0.5 * norm_M(q - q_tiled, c);
     };
 
-    const auto gen_collision_set = [&](const vector<unique_ptr<Cube>>& cubes) {
+    const auto gen_collision_set = [&](const vector<unique_ptr<AffineBody>>& cubes) {
         if (globals.ground)
             for (int i = 0; i < n_cubes; i++)
                 for (int v = 0; v < cubes[i]->n_vertices; v++) {
@@ -160,7 +160,7 @@ void implicit_euler(vector<unique_ptr<Cube>>& cubes, double dt)
     
     spdlog::info("constraint size = {}, {}", n_pt, n_ee);
     
-    const auto E_ground = [&](const Cube& c, int i) -> double {
+    const auto E_ground = [&](const AffineBody& c, int i) -> double {
         double e = 0.0;
         const vec3& v_tile(c.vertices(i));
         const vec3 v(c.vt2(i));
@@ -236,7 +236,7 @@ void implicit_euler(vector<unique_ptr<Cube>>& cubes, double dt)
         return alpha * 2;
     };
 
-    const auto ipc_term_vg = [&](Cube& c, int v) {
+    const auto ipc_term_vg = [&](AffineBody& c, int v) {
         vec3 p = c.vt1(v);
         vec3 v_tile = c.vertices(v);
         double d = vg_distance(p);
@@ -286,7 +286,7 @@ void implicit_euler(vector<unique_ptr<Cube>>& cubes, double dt)
         }
         
 
-        const auto collision_time = [&](Cube& c, int i) {
+        const auto collision_time = [&](AffineBody& c, int i) {
             double toi = 1.0;
             const vec3 v_t2(c.vt2(i));
             const vec3 v_t1(c.vt1(i));
@@ -315,7 +315,7 @@ void implicit_euler(vector<unique_ptr<Cube>>& cubes, double dt)
             }
             return norm;
         };
-        const auto step_size_upper_bound = [&](VectorXd& dq, vector<unique_ptr<Cube>>& cubes) -> double {
+        const auto step_size_upper_bound = [&](VectorXd& dq, vector<unique_ptr<AffineBody>>& cubes) -> double {
             double toi = barrier::d_sqrt / 2.0 / norm_1(dq);
             toi = min(1.0, toi);
 

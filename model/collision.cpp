@@ -10,15 +10,12 @@
 using namespace barrier;
 using namespace std;
 
-double vf_collision_detect(vec3& p_t0, vec3& p_t1, const Cube& c, int id)
+double vf_collision_detect(vec3& p_t0, vec3& p_t1, const AffineBody& c, int id)
 {
     Face f_t0(c, id, false), f_t1(c, id, true);
     ticcd::Scalar toi = 1.0, output_tolerance;
     std::vector<ticcd::Vector3> bounding_box;
-    for (int i = 0; i < 8; i++) {
-        bounding_box.push_back(c.vertices(i) * 20.0);
-    }
-    static const ticcd::Array3 err_vf(ticcd::get_numerical_error(bounding_box, true, false));
+   
     double min_distance = 1e-6, tmax = 1, adjusted_tolerance = 1e-6;
     long max_iterations = 1e6;
 
@@ -38,7 +35,7 @@ double vf_collision_detect(vec3& p_t0, vec3& p_t1, const Cube& c, int id)
     return toi;
 }
 
-double ee_collision_detect(const Cube& ci, const Cube& cj, int eid_i, int eid_j)
+double ee_collision_detect(const AffineBody& ci, const AffineBody& cj, int eid_i, int eid_j)
 {
     ticcd::Scalar toi = 1.0, output_tolerance;
     double min_distance = 1e-6, tmax = 1, adjusted_tolerance = 1e-6;

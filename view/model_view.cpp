@@ -21,27 +21,16 @@ using namespace std;
 //-----------------------------------------------------------------
 
 unsigned *Cube::_edges = nullptr, *Cube::_indices = nullptr;
-void render_cubes(Shader shader, vector<unique_ptr<Cube>> &cubes)
+void render_cubes(Shader shader, vector<unique_ptr<AffineBody>> &cubes)
 {
     for (int i = 0; i < cubes.size(); i++)
     {
         auto& c(*cubes[i]);
         glm::mat4 A(from_eigen(c.A));
-        // cout << c.A << endl;
-        // cout << glm::to_string(A) << endl;
-        // A = glm::translate(A, from_eigen(c.p));
         for (int i = 0; i < 3; i++)
             A[3][i] = c.p(i);
         shader.setMat4("model", A);
         renderCube();
-    }
-}
-void render_models(Shader shader, vector<AffineObject> models){
-    for (auto &m: models) {
-        glm::mat4 A(from_eigen(m.A));
-        for(int i = 0; i < 3; i++) A[3][i] = m.p(i);
-        shader.setMat4("model", A);
-        m.mesh.Draw(shader);
     }
 }
 int main()
@@ -176,8 +165,8 @@ int main()
     // load models
     Model b_model("assets/bunny.obj");
     auto &b_mesh = b_model.meshes[0];
-    AffineObject bunny(b_mesh);
-    globals.models.push_back(bunny);
+    auto bunny = make_unique<AffineObject>(b_mesh);
+    globals.cubes.push_back(move(bunny));
 #endif
     Light lights(LightPositions, 4);
 
@@ -298,13 +287,6 @@ int main()
             renderPlane();
             render_cubes(depthShader, globals.cubes);
 
-            // model = glm::translate(model, box2Pos);
-            // depthShader.setMat4("model", model);
-            // renderCube();
-
-#ifdef FEATURE_MODEL
-            render_models(depthShader, globals.models);
-#endif
 #ifdef FEATURE_POSTRENDER
             glBindFramebuffer(GL_FRAMEBUFFER, globals.postrender ? framebuffer : 0);
 #endif
@@ -354,22 +336,7 @@ int main()
         // FIXME: should do the select pass in reverse order
         lightingShader.setInt("alias", 5);
         renderPlane();
-        // render the cube
-        // lightingShader.setInt("alias", 3);
-        // renderCube();
-        // // glBindVertexArray(cubeVAO);
-        // // glDrawArrays(GL_TRIANGLES, 0, 36);
-
-        // glActiveTexture(GL_TEXTURE0);
-        // lightingShader.use();
-        // model = glm::translate(model, box2Pos);
-        // lightingShader.setMat4("model", model);
-        // glDrawArrays(GL_TRIANGLES, 0, 36);
         render_cubes(lightingShader, globals.cubes);
-
-#ifdef FEATURE_MODEL
-        render_models(lightingShader, globals.models);
-#endif
         if (!globals.cursor_hidden && globals.objectType)
         {
             model = glm::mat4(glm::mat3(globals.camera.Right, globals.camera.Up, -globals.camera.Front));
