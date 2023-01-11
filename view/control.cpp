@@ -28,12 +28,12 @@ void reset(){
         }
         else {
             globals.cubes.clear();
-            globals.cubes = cube_blocks(2);
+            cube_blocks(2);
         }
     }
     else {
         globals.cubes.clear();
-        globals.cubes = customize(data["predefined_case"]["custom"]);
+        customize(data["predefined_case"]["custom"]);
     }
 
     {

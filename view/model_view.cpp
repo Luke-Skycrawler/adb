@@ -21,10 +21,11 @@ using namespace std;
 //-----------------------------------------------------------------
 
 unsigned *Cube::_edges = nullptr, *Cube::_indices = nullptr;
-void render_cubes(Shader shader, vector<Cube> cubes)
+void render_cubes(Shader shader, vector<unique_ptr<Cube>> &cubes)
 {
-    for (auto &c : cubes)
+    for (int i = 0; i < cubes.size(); i++)
     {
+        auto& c(*cubes[i]);
         glm::mat4 A(from_eigen(c.A));
         // cout << c.A << endl;
         // cout << glm::to_string(A) << endl;
