@@ -2,9 +2,9 @@
     "dt": 5e-3,
     "max_iter": 10,
     "predefined_case" : {
-        "enable": true,
+        "enable": false,
         "id" : 2,
-        "custom": "../test_cases/empty.json"
+        "custom": "../test_cases/case2.json"
     },
     "solver": "sparse",
     "gravity": true, 
@@ -16,7 +16,7 @@
     "safe_factor": 4.0,
     "uppper_bound": true, 
     "damping": {
-        "alpha": 2.5e-2,
-        "beta": 2.3e-2
+        "alpha": 0.0,
+        "beta": 0.0
     }
 }

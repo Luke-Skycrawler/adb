@@ -44,7 +44,7 @@ struct AffineBody {
         }
         return a * vertices(i) + b;
     }
-    AffineBody(int n_vertices,  int n_edges ,int n_faces, unsigned* indices = nullptr, unsigned* edges = nullptr)
+    AffineBody(int n_vertices, int n_faces, int n_edges, unsigned* indices = nullptr, unsigned* edges = nullptr)
         : mass(1000.0), Ic(1000.0), p(0.0f, 0.0f, 0.0f), indices(indices), edges(edges), n_vertices(n_vertices), n_edges(n_edges), n_faces(n_faces)
     {
         A.setIdentity(3, 3);
