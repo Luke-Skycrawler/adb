@@ -52,12 +52,14 @@ void ipc_term(
     // Matrix<double, 12, 12>& hess_p, Matrix<double, 12, 12>& hess_t, 
     )
 {
-    static const vec3* vnp = Cube::_vertices();
-    static unsigned* tidx = Cube::_indices;
+    // static const vec3* vnp = Cube::_vertices();
+    // static unsigned* tidx = Cube::_indices;
 
     int _i = ij[0], v = ij[1], _j = ij[2], f = ij[3];
 
     auto p = pt[0], t0 = pt[1], t1 = pt[2], t2 = pt[3];
+    auto &ci{ *globals.cubes[_i] }, &cj{ *globals.cubes[_j] };
+    auto* tidx = cj.indices;
     Vector<double, 12> pt_grad;
     Matrix<double, 12, 12> pt_hess;
     ipc::point_triangle_distance_gradient(p, t0, t1, t2, pt_grad);
@@ -73,7 +75,8 @@ void ipc_term(
     Matrix<double, 9, 12> Jt;
     Matrix<double, 3, 12> Jp;
     Matrix<double, 12, 12> off_diag;
-    auto p_tile = vnp[v], t0_tile = vnp[tidx[3 * f]], t1_tile = vnp[tidx[3 * f + 1]], t2_tile = vnp[tidx[3 * f + 2]];
+    auto p_tile = ci.vertices(v), t0_tile = cj.vertices(tidx[3 * f]), t1_tile = cj.vertices(tidx[3 * f + 1]), t2_tile = ci.vertices(tidx[3 * f + 2]);
+    // auto p_tile = vnp[v], t0_tile = vnp[tidx[3 * f]], t1_tile = vnp[tidx[3 * f + 1]], t2_tile = vnp[tidx[3 * f + 2]];
     Jt.setZero(9, 12);
     Jp.setZero(3, 12);
     off_diag.setZero(12, 12);
@@ -115,9 +118,10 @@ void ipc_term_ee(
     )
 {
     static auto vnp = Cube::_vertices();
-    static auto eidx = Cube::_edges;
 
     int _i = ij[0], _ei = ij[1], _j = ij[2], _ej = ij[3];
+    auto &ci(*globals.cubes[_i]), &cj(*globals.cubes[_j]);
+    auto *eidxi = ci.edges, *eidxj = cj.edges;
 
     auto ei0 = ee[0], ei1 = ee[1],
         ej0 = ee[2], ej1 = ee[3];
@@ -147,8 +151,10 @@ void ipc_term_ee(
     Matrix<double, 6, 12> J0;
     Matrix<double, 6, 12> J1;
     Matrix<double, 12, 12> off_diag;
-    auto ei0_tile = vnp[eidx[2 * _ei]], ei1_tile = vnp[eidx[2 * _ei + 1]],
-        ej0_tile = vnp[eidx[2 * _ej]], ej1_tile = vnp[eidx[2 * _ej + 1]];
+    auto ei0_tile = ci.vertices(eidxi[2 * _ei]), ei1_tile = ci.vertices(eidxi[2 * _ei + 1]),
+         ej0_tile = cj.vertices(eidxj[2 * _ej]), ej1_tile = cj.vertices(eidxj[2 * _ej + 1]);
+    // auto ei0_tile = vnp[eidx[2 * _ei]], ei1_tile = vnp[eidx[2 * _ei + 1]],
+    //     ej0_tile = vnp[eidx[2 * _ej]], ej1_tile = vnp[eidx[2 * _ej + 1]];
 
     J0.setZero(6, 12);
     J1.setZero(6, 12);

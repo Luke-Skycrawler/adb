@@ -346,3 +346,7 @@ unsigned int TextureFromFile(const char *path, const string &directory, bool gam
 
     return textureID;
 }
+void Cube::draw(Shader& shader) const
+{
+    renderCube();
+}

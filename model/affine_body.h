@@ -2,6 +2,7 @@
 #include <vector>
 #include <array>
 #include <Eigen/Eigen>
+#include "../view/shader.h"
 using mat3 = Eigen::Matrix3d;
 using vec3 = Eigen::Vector3d;
 using q4 = std::array<vec3, 4>;
@@ -12,6 +13,7 @@ struct AffineBody {
     double mass, Ic;
     unsigned *indices, *edges;
     virtual const vec3 vertices(int i) const = 0;
+    virtual void draw(Shader& shader) const = 0;
     const int n_vertices, n_faces;
     int n_edges;
     Eigen::Vector<double, 12> dq, grad;

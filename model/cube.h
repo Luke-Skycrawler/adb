@@ -66,4 +66,5 @@ struct Cube: AffineBody {
             }
         }
     }
+    void draw(Shader &shader) const;
 };

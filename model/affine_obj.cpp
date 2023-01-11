@@ -27,3 +27,7 @@ const vec3 AffineObject::vertices(int i) const{
     return vec3(p[0], p[1], p[2]);
 }
 
+void AffineObject::draw(Shader& shader) const
+{
+    mesh.Draw(shader);
+}
