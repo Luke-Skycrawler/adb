@@ -8,10 +8,13 @@
 #include <ipc/distance/point_triangle.hpp>
 #include <ipc/distance/edge_edge.hpp>
 #include <algorithm>
-
+#include <chrono>
 using namespace std;
 using namespace barrier;
 using namespace Eigen;
+using namespace std::chrono;
+
+#define DURATION_TO_DOUBLE(X) duration_cast<duration<double>>((X)).count()
 
 VectorXd cat(const q4 &q)
 {
@@ -75,7 +78,6 @@ void implicit_euler(vector<unique_ptr<AffineBody>>& cubes, double dt)
     vector<array<int, 4>> idx;
     vector<array<vec3, 4>> ees;
     vector<array<int, 4>> eidx;
-
     const int n_cubes = cubes.size(), nsqr = n_cubes * n_cubes;
 
     const auto E = [&](const VectorXd& q, const VectorXd& q_tiled, const AffineBody& c) -> double {
@@ -83,6 +85,7 @@ void implicit_euler(vector<unique_ptr<AffineBody>>& cubes, double dt)
     };
 
     const auto gen_collision_set = [&](const vector<unique_ptr<AffineBody>>& cubes) {
+        auto start = high_resolution_clock::now();
         if (globals.ground)
             for (int i = 0; i < n_cubes; i++)
                 for (int v = 0; v < cubes[i]->n_vertices; v++) {
@@ -152,6 +155,8 @@ void implicit_euler(vector<unique_ptr<AffineBody>>& cubes, double dt)
                             }
                         }
                 }
+        double _duration = DURATION_TO_DOUBLE(high_resolution_clock::now() - start);
+        spdlog::info("collision set : time = {:0.6f} ms", _duration * 1000);
     };
     if (globals.col_set)
         gen_collision_set(cubes);
@@ -246,9 +251,11 @@ void implicit_euler(vector<unique_ptr<AffineBody>>& cubes, double dt)
             c.hess += barrier_hessian_q(v_tile, p);
         }
     };
+
     do {
         globals.hess_triplets.clear();
-        #pragma omp parallel for schedule(dynamic)
+        auto newton_iter_start = high_resolution_clock::now();
+#pragma omp parallel for schedule(dynamic)
         for (int k = 0; k < n_cubes; k++) {
             auto& c(*cubes[k]);
             VectorXd r = grad_residue_per_body(c);
@@ -262,6 +269,8 @@ void implicit_euler(vector<unique_ptr<AffineBody>>& cubes, double dt)
             int i = _v[0], v = _v[1];
             ipc_term_vg(*cubes[i], v);
         }
+
+        auto ipc_start = high_resolution_clock::now();
         for (int k = 0; k < n_pt; k++) {
             auto& pt(pts[k]);
             auto& ij(idx[k]);
@@ -284,7 +293,8 @@ void implicit_euler(vector<unique_ptr<AffineBody>>& cubes, double dt)
                 ipc_term_ee(ee, ij, globals.hess_triplets, ci.grad, cj.grad);
             }
         }
-        
+
+        auto ipc_duration = DURATION_TO_DOUBLE(high_resolution_clock::now() - ipc_start);
 
         const auto collision_time = [&](AffineBody& c, int i) {
             double toi = 1.0;
@@ -316,6 +326,7 @@ void implicit_euler(vector<unique_ptr<AffineBody>>& cubes, double dt)
             return norm;
         };
         const auto step_size_upper_bound = [&](VectorXd& dq, vector<unique_ptr<AffineBody>>& cubes) -> double {
+            auto start = high_resolution_clock::now();
             double toi = barrier::d_sqrt / 2.0 / norm_1(dq);
             toi = min(1.0, toi);
 
@@ -345,6 +356,8 @@ void implicit_euler(vector<unique_ptr<AffineBody>>& cubes, double dt)
                 double t = ee_collision_detect(ci, cj, ij[1], ij[3]);
                 toi = min(toi, t);
             }
+            auto _duration = DURATION_TO_DOUBLE(high_resolution_clock::now() - start);
+            spdlog::info("time: step size upper bound = {:0.6f} ms", _duration * 1000);
             return toi;
         };
         double toi = 1.0, factor = 1.0, alpha = 1.0;
@@ -353,6 +366,8 @@ void implicit_euler(vector<unique_ptr<AffineBody>>& cubes, double dt)
             vector<int> starting_point;
             starting_point.resize(n_cubes * 12);
             static const auto merge_triplets = [&](vector<HessBlock>& triplets) {
+                auto start = high_resolution_clock::now();
+
                 sort(triplets.begin(), triplets.end(), [&](const HessBlock& a, const HessBlock& b) -> bool {
                     return a.j < b.j || (a.j == b.j && a.i < b.i);
                 });
@@ -372,6 +387,8 @@ void implicit_euler(vector<unique_ptr<AffineBody>>& cubes, double dt)
                         }
                 }
                 starting_point[0] = 0;
+                auto _duration = high_resolution_clock::now() - start;
+                spdlog::info("merge & sort time = {:0.6f} ms", DURATION_TO_DOUBLE(_duration) * 1000);
             };
             const int hess_dim = n_cubes * 12;
             MatrixXd big_hess;
@@ -450,6 +467,8 @@ void implicit_euler(vector<unique_ptr<AffineBody>>& cubes, double dt)
             };
 
             damping();
+            auto solver_start = high_resolution_clock::now();
+
             if (globals.dense)
                 dq = -big_hess.ldlt().solve(r);
             else if (globals.sparse) {
@@ -459,6 +478,8 @@ void implicit_euler(vector<unique_ptr<AffineBody>>& cubes, double dt)
                 ldlt_solver.compute(sparse_hess);
                 dq = -ldlt_solver.solve(r);
             }
+            auto solver_duration = DURATION_TO_DOUBLE (high_resolution_clock::now() - solver_start);
+            spdlog::info("solver time = {:0.6f} ms", solver_duration);
 
             double dif = (sparse_hess - big_hess).norm();
             spdlog::info("norms: dq = {}, grad = {}, big_hess = {}", dq.norm(), r.norm(), globals.sparse ? sparse_hess.norm(): big_hess.norm());
@@ -501,7 +522,11 @@ void implicit_euler(vector<unique_ptr<AffineBody>>& cubes, double dt)
                     cubes[i]->q[j] += dq.segment<3>(i * 12 + j * 3);
             }
             spdlog ::info("step size upper = {}, alpha = {}", toi, alpha);
-            spdlog::info("iter {}, e0 = {}, e1 = {}, norm_dq = {}\n", iter, E0, E1, norm_dq);
+
+            auto iter_duration = DURATION_TO_DOUBLE (high_resolution_clock::now() - newton_iter_start);
+            spdlog::info("iter {}, time = {} ms, IPC term time = {} \n e0 = {}, e1 = {}, norm_dq = {}\n", iter, iter_duration * 1000, ipc_duration
+                 * 1000, E0, E1, norm_dq);
+            
         }
         #pragma omp parallel for schedule(dynamic)
         for (int k = 0; k < n_pt; k++) {
