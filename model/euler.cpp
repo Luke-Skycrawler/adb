@@ -7,6 +7,8 @@
 #include <array>
 #include <ipc/distance/point_triangle.hpp>
 #include <ipc/distance/edge_edge.hpp>
+#include <ipc/friction/closest_point.hpp>
+#include <ipc/friction/tangent_basis.hpp>
 #include <algorithm>
 #include <chrono>
 using namespace std;
@@ -74,10 +76,13 @@ void implicit_euler(vector<unique_ptr<AffineBody>>& cubes, double dt)
     };
 
     vector<array<vec3, 4>> pts;
+    vector<array<double, 3>> pt_lams;
+
     vector<array<int, 2>> vidx;
     vector<array<int, 4>> idx;
     vector<array<vec3, 4>> ees;
     vector<array<int, 4>> eidx;
+    vector<array<double, 4>> ee_lams;
     const int n_cubes = cubes.size(), nsqr = n_cubes * n_cubes;
 
     const auto E = [&](const VectorXd& q, const VectorXd& q_tiled, const AffineBody& c) -> double {
@@ -86,6 +91,14 @@ void implicit_euler(vector<unique_ptr<AffineBody>>& cubes, double dt)
 
     const auto gen_collision_set = [&](const vector<unique_ptr<AffineBody>>& cubes) {
         auto start = high_resolution_clock::now();
+
+        // const auto blend_e = [=](const vec3& x, const vec3& y, double lam) -> vec3 {
+        //     return y * lam + (1.0 - lam) * x;
+        // };
+        // const auto blend_t = [=](const vec3& x, const vec3& y, const vec3& z, double lam0, double lam1) -> vec3 {
+        //     return z * lam1 + y * lam0 + x * (1 - lam0 - lam1);
+        // };
+
         if (globals.ground)
             for (int i = 0; i < n_cubes; i++)
                 for (int v = 0; v < cubes[i]->n_vertices; v++) {
@@ -112,15 +125,67 @@ void implicit_euler(vector<unique_ptr<AffineBody>>& cubes, double dt)
                         }
                         else
                             continue;
-                        double d = ipc::point_triangle_distance(p, _f.t0, _f.t1, _f.t2);
+
+                        auto pt_type = ipc::point_triangle_distance_type(p, _f.t0, _f.t1, _f.t2);
+
+                        double d = ipc::point_triangle_distance(p, _f.t0, _f.t1, _f.t2, pt_type);
                         if (d < barrier::d_hat * globals.safe_factor) {
                             array<vec3, 4> pt = { p, _f.t0, _f.t1, _f.t2 };
                             array<int, 4> ij = { i, v, j, f };
+
+                            auto lams = ipc::point_triangle_closest_point(p, _f.t0, _f.t1, _f.t2);
+                            array<double, 3> tlams = { 1 - lams(0) - lams(1), lams(0), lams(1) };
+                            if (pt_type == ipc::PointTriangleDistanceType::P_T)
+                                ; // do nothing
+                            else if (pt_type == ipc::PointTriangleDistanceType::P_T0)
+                                tlams = { 1.0, 0.0, 0.0 };
+                            else if (pt_type == ipc::PointTriangleDistanceType::P_T1)
+                                tlams = { 0.0, 1.0, 0.0 };
+                            else if (pt_type == ipc::PointTriangleDistanceType::P_T2)
+                                tlams = { 0.0, 0.0, 1.0 };
+                            else if (pt_type == ipc::PointTriangleDistanceType::P_E0) {
+                                auto elam = ipc::point_edge_closest_point(p, _f.t0, _f.t1);
+                                tlams = { 1.0 - elam, elam, 0.0 };
+                            }
+                            else if (pt_type == ipc::PointTriangleDistanceType::P_E1) {
+                                auto elam = ipc::point_edge_closest_point(p, _f.t1, _f.t2);
+                                tlams = { 0.0, 1.0 - elam, elam };
+                            }
+                            else if (pt_type == ipc::PointTriangleDistanceType::P_E2) {
+                                auto elam = ipc::point_edge_closest_point(p, _f.t2, _f.t0);
+                                tlams = { elam, 0.0, 1.0 - elam };
+                            }
+
+                            auto tp = (_f.t0 * tlams[0] + _f.t1 * tlams[1] + _f.t2 * tlams[2]);
+                            auto closest = (p - tp).squaredNorm();
+                            assert(abs(d - closest) < 1e-8);
+                            auto Pk = ipc::point_triangle_tangent_basis(p, _f.t0, _f.t1, _f.t2);
+                            Matrix<double, 3, 12> gamma;
+                            gamma.block<3, 3>(0, 0) = Matrix3d::Identity(3, 3) * -1.0;
+                            gamma.block<3, 3>(0, 3) = Matrix3d::Identity(3, 3) * lams[0];
+                            gamma.block<3, 3>(0, 6) = Matrix3d::Identity(3, 3) * lams[1];
+                            gamma.block<3, 3>(0, 9) = Matrix3d::Identity(3, 3) * lams[2];
+
+                            auto Tk_T = Pk.transpose() * gamma;
+
+                            Matrix<double, 12, 24> jacobian;
+                            auto _0 = ci.indices[f * 3], _1 = ci.indices[f * 3 + 1], _2 = ci.indices[f * 3 + 2];
+                            jacobian.setZero(12, 24);
+                            jacobian.block<3, 12>(0, 0) = x_jacobian_q(ci.vertices(v));
+                            jacobian.block<3, 12>(3, 12) = x_jacobian_q(cj.vertices(_0));
+                            jacobian.block<3, 12>(6, 12) = x_jacobian_q(cj.vertices(_1));
+                            jacobian.block<3, 12>(9, 12) = x_jacobian_q(cj.vertices(_2));
+
+                            auto Tq_k = Tk_T * jacobian;
+
+                            auto contact_force_lam = - barrier_derivative_d(d) / (dt * dt) * 2 * sqrt(d);
 
 #pragma omp critical
                             {
                                 pts.push_back(pt);
                                 idx.push_back(ij);
+
+                                pt_lams.push_back(tlams);
                             }
                         }
                     }
@@ -147,10 +212,47 @@ void implicit_euler(vector<unique_ptr<AffineBody>>& cubes, double dt)
                                 array<vec3, 4> ee = { ei.e0, ei.e1, ej.e0, ej.e1 };
                                 array<int, 4> ij = { i, _ei, j, _ej };
 
+                                auto lams = ipc::edge_edge_closest_point(ei.e0, ei.e1, ej.e0, ej.e1);
+                                const auto clip = [&](double& a, double l, double u) {
+                                    a = max(min(u, a), l);
+                                };
+                                clip(lams(0), 0.0, 1.0);
+                                clip(lams(1), 0.0, 1.0);
+                                array<double, 4> lambdas = { 1 - lams(0), lams(0), 1 - lams(1), lams(1) };
+
+                                auto pei = ei.e0 * lambdas[0] + ei.e1 * lambdas[1];
+                                auto pej = ej.e0 * lambdas[2] + ej.e1 * lambdas[3];
+                                auto closest = (pei - pej).squaredNorm();
+                                assert(abs(d - closest) < 1e-8);
+
+                                auto Pk = ipc::edge_edge_tangent_basis(ei.e0, ei.e1, ej.e0, ej.e1);
+                                Matrix<double, 3, 12> gamma;
+                                gamma.block<3, 3>(0, 0) = Matrix3d::Identity(3, 3) * -lambdas[0];
+                                gamma.block<3, 3>(0, 3) = Matrix3d::Identity(3, 3) * -lambdas[1];
+                                gamma.block<3, 3>(0, 6) = Matrix3d::Identity(3, 3) * lambdas[2];
+                                gamma.block<3, 3>(0, 9) = Matrix3d::Identity(3, 3) * lambdas[3];
+
+                                auto Tk_T = Pk.transpose() * gamma;
+
+                                Matrix<double, 12, 24> jacobian;
+                                auto _i0 = ci.edges[_ei * 2], _i1 = ci.edges[_ei * 2 + 1],
+                                     _j0 = cj.edges[_ej * 2], _j1 = cj.edges[_ej * 2 + 1];
+
+                                jacobian.setZero(12, 24);
+                                jacobian.block<3, 12>(0, 0) = x_jacobian_q(ci.vertices(_i0));
+                                jacobian.block<3, 12>(3, 0) = x_jacobian_q(cj.vertices(_i1));
+                                jacobian.block<3, 12>(6, 12) = x_jacobian_q(cj.vertices(_j0));
+                                jacobian.block<3, 12>(9, 12) = x_jacobian_q(cj.vertices(_j1));
+
+                                auto Tq_k = Tk_T * jacobian;
+
+                                auto contact_force_lam = barrier_derivative_d(d) / (dt * dt) * 2 * sqrt(d);
+
 #pragma omp critical
                                 {
                                     ees.push_back(ee);
                                     eidx.push_back(ij);
+                                    ee_lams.push_back(lambdas);
                                 }
                             }
                         }
@@ -176,7 +278,28 @@ void implicit_euler(vector<unique_ptr<AffineBody>>& cubes, double dt)
         }
         return e;
     };
-    
+
+    // const auto v_relative_pt = [&](
+    //                                array<int, 4> ij, array<double, 3> lams,
+    //                                const VectroXd& dq) {
+    //     auto &ci(*cubes[ij[0]]), &cj(*cubes[ij[2]]);
+    //     // const auto dxi = [&] (AffineBody &c, unsigned vid) -> vec3{
+    //     // };
+
+    //     // u_k = P_k ^T  Gamma (x - x^t)
+
+    //     unsigned f = ij[3];
+    //     auto _0 = cj.indices[3 * f],
+    //          _1 = cj.indices[3 * f + 1],
+    //          _2 = cj.indices[3 * f + 2];
+    //     auto dp = dxi(ci, ij[1]),
+    //          dt0 = dxi(cj, _0),
+    //          dt1 = dxi(cj, _1),
+    //          dt2 = dxi(cj, _2);
+
+    //     // auto dv = dp - (dt0 * lams[0] + dt1 * lams[1] + dt2 * lams[2]);
+    //     // auto du = projection(dv);
+    // };
     const auto E_global = [&](const VectorXd& q_plus_dq, const VectorXd& dq) -> double {
         double e = 0.0;
         const int n = cubes.size(), m = idx.size(), l = eidx.size();
