@@ -15,9 +15,15 @@ using namespace std;
 using namespace barrier;
 using namespace Eigen;
 using namespace std::chrono;
-
 #define DURATION_TO_DOUBLE(X) duration_cast<duration<double>>((X)).count()
-
+struct CollisionPT {
+    array<double, 3> lams;
+    Matrix<double, 2, 12> Tk_T;
+};
+struct CollisionEE {
+    array<double, 4> lams;
+    Matrix<double, 2, 12> Tk_T;
+};
 VectorXd cat(const q4 &q)
 {
     Vector<double, 12> ret;
@@ -76,13 +82,13 @@ void implicit_euler(vector<unique_ptr<AffineBody>>& cubes, double dt)
     };
 
     vector<array<vec3, 4>> pts;
-    vector<array<double, 3>> pt_lams;
+    vector<CollisionPT> ptcs;
 
     vector<array<int, 2>> vidx;
     vector<array<int, 4>> idx;
     vector<array<vec3, 4>> ees;
     vector<array<int, 4>> eidx;
-    vector<array<double, 4>> ee_lams;
+    vector<CollisionEE> eecs;
     const int n_cubes = cubes.size(), nsqr = n_cubes * n_cubes;
 
     const auto E = [&](const VectorXd& q, const VectorXd& q_tiled, const AffineBody& c) -> double {
@@ -166,26 +172,26 @@ void implicit_euler(vector<unique_ptr<AffineBody>>& cubes, double dt)
                             gamma.block<3, 3>(0, 6) = Matrix3d::Identity(3, 3) * lams[1];
                             gamma.block<3, 3>(0, 9) = Matrix3d::Identity(3, 3) * lams[2];
 
-                            auto Tk_T = Pk.transpose() * gamma;
+                            Matrix<double, 2, 12> Tk_T = Pk.transpose() * gamma;
 
-                            Matrix<double, 12, 24> jacobian;
-                            auto _0 = ci.indices[f * 3], _1 = ci.indices[f * 3 + 1], _2 = ci.indices[f * 3 + 2];
-                            jacobian.setZero(12, 24);
-                            jacobian.block<3, 12>(0, 0) = x_jacobian_q(ci.vertices(v));
-                            jacobian.block<3, 12>(3, 12) = x_jacobian_q(cj.vertices(_0));
-                            jacobian.block<3, 12>(6, 12) = x_jacobian_q(cj.vertices(_1));
-                            jacobian.block<3, 12>(9, 12) = x_jacobian_q(cj.vertices(_2));
+                            // Matrix<double, 12, 24> jacobian;
+                            // auto _0 = ci.indices[f * 3], _1 = ci.indices[f * 3 + 1], _2 = ci.indices[f * 3 + 2];
+                            // jacobian.setZero(12, 24);
+                            // jacobian.block<3, 12>(0, 0) = x_jacobian_q(ci.vertices(v));
+                            // jacobian.block<3, 12>(3, 12) = x_jacobian_q(cj.vertices(_0));
+                            // jacobian.block<3, 12>(6, 12) = x_jacobian_q(cj.vertices(_1));
+                            // jacobian.block<3, 12>(9, 12) = x_jacobian_q(cj.vertices(_2));
 
-                            auto Tq_k = Tk_T * jacobian;
+                            // auto Tq_k = Tk_T * jacobian;
 
-                            auto contact_force_lam = - barrier_derivative_d(d) / (dt * dt) * 2 * sqrt(d);
+                            // auto contact_force_lam = - barrier_derivative_d(d) / (dt * dt) * 2 * sqrt(d);
 
 #pragma omp critical
                             {
                                 pts.push_back(pt);
                                 idx.push_back(ij);
 
-                                pt_lams.push_back(tlams);
+                                ptcs.push_back({ tlams, Tk_T });
                             }
                         }
                     }
@@ -232,27 +238,27 @@ void implicit_euler(vector<unique_ptr<AffineBody>>& cubes, double dt)
                                 gamma.block<3, 3>(0, 6) = Matrix3d::Identity(3, 3) * lambdas[2];
                                 gamma.block<3, 3>(0, 9) = Matrix3d::Identity(3, 3) * lambdas[3];
 
-                                auto Tk_T = Pk.transpose() * gamma;
+                                Matrix<double, 2, 12> Tk_T = Pk.transpose() * gamma;
 
-                                Matrix<double, 12, 24> jacobian;
-                                auto _i0 = ci.edges[_ei * 2], _i1 = ci.edges[_ei * 2 + 1],
-                                     _j0 = cj.edges[_ej * 2], _j1 = cj.edges[_ej * 2 + 1];
+                                // Matrix<double, 12, 24> jacobian;
+                                // auto _i0 = ci.edges[_ei * 2], _i1 = ci.edges[_ei * 2 + 1],
+                                //      _j0 = cj.edges[_ej * 2], _j1 = cj.edges[_ej * 2 + 1];
 
-                                jacobian.setZero(12, 24);
-                                jacobian.block<3, 12>(0, 0) = x_jacobian_q(ci.vertices(_i0));
-                                jacobian.block<3, 12>(3, 0) = x_jacobian_q(cj.vertices(_i1));
-                                jacobian.block<3, 12>(6, 12) = x_jacobian_q(cj.vertices(_j0));
-                                jacobian.block<3, 12>(9, 12) = x_jacobian_q(cj.vertices(_j1));
+                                // jacobian.setZero(12, 24);
+                                // jacobian.block<3, 12>(0, 0) = x_jacobian_q(ci.vertices(_i0));
+                                // jacobian.block<3, 12>(3, 0) = x_jacobian_q(cj.vertices(_i1));
+                                // jacobian.block<3, 12>(6, 12) = x_jacobian_q(cj.vertices(_j0));
+                                // jacobian.block<3, 12>(9, 12) = x_jacobian_q(cj.vertices(_j1));
 
-                                auto Tq_k = Tk_T * jacobian;
+                                // auto Tq_k = Tk_T * jacobian;
 
-                                auto contact_force_lam = barrier_derivative_d(d) / (dt * dt) * 2 * sqrt(d);
+                                // auto contact_force_lam = barrier_derivative_d(d) / (dt * dt) * 2 * sqrt(d);
 
 #pragma omp critical
                                 {
                                     ees.push_back(ee);
                                     eidx.push_back(ij);
-                                    ee_lams.push_back(lambdas);
+                                    eecs.push_back({ lambdas, Tk_T });
                                 }
                             }
                         }
@@ -402,7 +408,27 @@ void implicit_euler(vector<unique_ptr<AffineBody>>& cubes, double dt)
             auto &ci(*cubes[i]), &cj(*cubes[j]);
             double d = ipc::point_triangle_distance(pt[0], pt[1], pt[2], pt[3]);
             if (d < barrier::d_hat) {
-                ipc_term(pt, ij, globals.hess_triplets ,ci.grad, cj.grad);
+#ifdef _FRICTION_
+                Vector<double, 12> v_stack;
+                auto f = ij[3];
+                auto _0 = cj.indices[f * 3 + 0];
+                auto _1 = cj.indices[f * 3 + 1];
+                auto _2 = cj.indices[f * 3 + 2];
+
+                v_stack << ci.vt1(ij[1]) - ci.vt0(ij[1]),
+                    cj.vt1(_0) - cj.vt0(_0),
+                    cj.vt1(_1) - cj.vt0(_1),
+                    cj.vt1(_2) - cj.vt0(_2);
+
+                Vector2d uk = ptcs[k].Tk_T * v_stack;
+                auto contact_force = -barrier_derivative_d(d) / (dt * dt) * 2 * sqrt(d);
+
+                ipc_term(
+                    pt, ij, globals.hess_triplets, ci.grad, cj.grad,
+                    uk, contact_force, ptcs[k].Tk_T.transpose());
+#else
+                ipc_term(pt, ij, globals.hess_triplets, ci.grad, cj.grad);
+#endif
             }
         }
         
@@ -413,7 +439,32 @@ void implicit_euler(vector<unique_ptr<AffineBody>>& cubes, double dt)
             auto &ci(*cubes[i]), &cj(*cubes[j]);
             double d = ipc::edge_edge_distance(ee[0], ee[1], ee[2], ee[3]);
             if(d < barrier::d_hat) {
+
+#ifdef _FRICTION_
+                Vector<double, 12> v_stack;
+                auto ei = ij[1];
+                auto ej = ij[3];
+
+                int i0 = ci.edges[ei * 2 + 0];
+                int i1 = ci.edges[ei * 2 + 1];
+                int j0 = cj.edges[ej * 2 + 0];
+                int j1 = cj.edges[ej * 2 + 1];
+
+                v_stack << ci.vt1(i0) - ci.vt0(i0),
+                    ci.vt1(i1) - ci.vt0(i1),
+                    cj.vt1(j0) - cj.vt0(j0),
+                    cj.vt1(j1) - cj.vt0(j1);
+
+                Vector2d uk = eecs[k].Tk_T * v_stack;
+                auto contact_force = -barrier_derivative_d(d) / (dt * dt) * 2 * sqrt(d);
+
+                ipc_term(
+                    ee, ij, globals.hess_triplets, ci.grad, cj.grad,
+                    uk, contact_force, eecs[k].Tk_T.transpose());
+
+#else
                 ipc_term_ee(ee, ij, globals.hess_triplets, ci.grad, cj.grad);
+#endif
             }
         }
 

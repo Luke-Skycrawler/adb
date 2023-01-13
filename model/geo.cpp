@@ -1,12 +1,16 @@
 #include "cube.h"
-#include "geometry.h"
+// #include "geometry.h"
 #include "barrier.h"
 #include <ipc/distance/point_triangle.hpp>
 #include <ipc/distance/edge_edge.hpp>
 #include <ipc/utils/eigen_ext.hpp>
 #include <ipc/distance/edge_edge_mollifier.hpp>
+#include <ipc/friction/smooth_friction_mollifier.hpp>
 #include "../view/global_variables.h"
+#include "collision.h"
 #include <array>
+static const double mu = 0.15;
+
 using namespace std;
 
 MatrixXd PSD_projection(const MatrixXd& A12x12)
@@ -20,12 +24,12 @@ MatrixXd PSD_projection(const MatrixXd& A12x12)
     }
     return U * lam.asDiagonal() * U.adjoint();
 }
-Matrix<double, 12, 12> project_to_psd(
-    const Eigen::Matrix<double, 12, 12>& A)
+Eigen::MatrixXd project_to_psd(
+    const Eigen::MatrixXd& A)
 {
     // https://math.stackexchange.com/q/2776803
     Eigen::SelfAdjointEigenSolver<
-        Eigen::Matrix<double, 12, 12>>
+        Eigen::MatrixXd>
         eigensolver(A);
     // Check if all eigen values are zero or positive.
     // The eigenvalues are sorted in increasing order.
@@ -45,12 +49,34 @@ Matrix<double, 12, 12> project_to_psd(
     return eigensolver.eigenvectors() * D
         * eigensolver.eigenvectors().transpose();
 }
+
+void friction(
+    const Vector2d& _uk, double contact_lambda, const Matrix<double, 12, 2>& Tk,
+    Vector<double, 12> g, Matrix<double, 12, 12>& H)
+{
+    static const double evh = globals.dt * 1e-2, h2 = globals.dt * globals.dt;
+    auto uk = _uk.norm();
+    auto f1 = ipc::f1_SF_over_x(uk, evh);
+    auto F_k = -mu * contact_lambda * Tk * f1 * _uk;
+    auto D_k = mu * contact_lambda * ipc::f0_SF(uk, evh);
+    Matrix2d M2x2 = (ipc::df1_x_minus_f1_over_x3(uk, evh) * _uk * _uk.transpose() + f1 * Matrix2d::Identity(2, 2));
+    M2x2 = project_to_psd(M2x2);
+    auto D_k_hessian = mu * contact_lambda * Tk * M2x2 * Tk.transpose();
+
+    g += F_k * h2;
+    H += D_k_hessian * h2;
+}
+
 void ipc_term(
     array<vec3, 4> pt, array<int, 4> ij,
-    vector<HessBlock> &triplets,
+    vector<HessBlock>& triplets,
     Vector<double, 12>& grad_p, Vector<double, 12>& grad_t
-    // Matrix<double, 12, 12>& hess_p, Matrix<double, 12, 12>& hess_t, 
-    )
+// Matrix<double, 12, 12>& hess_p, Matrix<double, 12, 12>& hess_t,
+#ifdef _FRICTION_
+    ,
+    const Vector2d& _uk, double contact_lambda, const Matrix<double, 12, 2>& Tk
+#endif
+)
 {
     // static const vec3* vnp = Cube::_vertices();
     // static unsigned* tidx = Cube::_indices;
@@ -98,6 +124,12 @@ void ipc_term(
 
     off_diag += Jp.adjoint() * ipc_hess.block<3, 9>(0, 3) * Jt;
     auto off_T = off_diag.adjoint();
+
+    pt_grad *= B_;
+#ifdef _FRICTION_
+    friction(_uk, contact_lambda, Tk, pt_grad, ipc_hess);
+#endif
+
     for (int i = 0; i < 12; i++ ){
         triplets.push_back(HessBlock(ii *12, jj * 12 + i, off_diag.block<12, 1>(0, i)));
         triplets.push_back(HessBlock(jj * 12, ii * 12 + i, off_T.block<12, 1>(0, i)));
@@ -106,16 +138,20 @@ void ipc_term(
     }
     // globals.hess_triplets.push_back({ii * 12, jj * 12, off_diag});
     // globals.hess_triplets.push_back({jj * 12, ii * 12, off_T});
-    
-    grad_p += Jp.adjoint() * pt_grad.segment<3>(0) * B_;
-    grad_t += Jt.adjoint() * pt_grad.segment<9>(3) * B_;
+
+    grad_p += Jp.adjoint() * pt_grad.segment<3>(0);
+    grad_t += Jt.adjoint() * pt_grad.segment<9>(3);
 }
 
 void ipc_term_ee(
     array<vec3, 4> ee, array<int, 4> ij,
     vector<HessBlock>& triplets,
     Vector<double, 12>& grad_0, Vector<double, 12>& grad_1
-    )
+#ifdef _FRICTION_
+    ,
+    const Vector2d& _uk, double contact_lambda, const Matrix<double, 12, 2>& Tk
+#endif
+)
 {
     static auto vnp = Cube::_vertices();
 
@@ -171,6 +207,10 @@ void ipc_term_ee(
     ipc_hess = project_to_psd(ipc_hess);
 
     ee_grad = p * ee_grad * B_ + p_grad * B;
+
+#ifdef _FRICTION_
+    friction(_uk, contact_lambda, Tk, ee_grad, ipc_hess);
+#endif
 
     int ii = _i, jj = _j;
     auto hess_0 = J0.adjoint() * ipc_hess.block<6, 6>(0, 0) * J0;
