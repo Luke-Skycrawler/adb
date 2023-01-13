@@ -13,6 +13,9 @@ static const unsigned int SCR_HEIGHT = 600;
 #include "../model/affine_obj.h"
 #include <vector>
 #include <memory>
+#include <map>
+#include "model.h"
+#include <string>
 
 struct HessBlock {
     int i, j;
@@ -47,6 +50,8 @@ struct GlobalVariableMainCPP{
     int max_iter;
     std::vector<HessBlock> hess_triplets;
     std::vector<unique_ptr<AffineBody>> cubes;
+        std::map<std::string, unique_ptr<Model>> loaded_models;
+
     vec3 gravity;
     double alpha, beta;
     double kappa, d_hat, safe_factor, mu;

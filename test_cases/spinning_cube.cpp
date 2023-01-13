@@ -56,7 +56,21 @@ void customize(string file)
     std::fstream f(file);
     json data = json::parse(f);
     for (auto &it: data) {
-        auto _a = make_unique<Cube>();
+        bool isobj = it.find("obj") != it.end();
+        string objfile = isobj ? it["obj"] : "";
+        unique_ptr<AffineBody> _a;
+        if (isobj) {
+
+            if (globals.loaded_models.find(objfile) == end(globals.loaded_models)) {
+                auto model = make_unique<Model>(objfile);
+                globals.loaded_models[objfile] = move(model);
+            }
+            auto& mesh{ globals.loaded_models[objfile]->meshes[0] };
+            _a = make_unique<AffineObject>(mesh);
+        }
+        else
+            _a = make_unique<Cube>();
+
         auto& a = *_a;
         array<double, 3> omega = {0.0, 0.0, 20.0};
         omega = it["omega"];

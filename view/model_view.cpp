@@ -39,8 +39,6 @@ int main()
     omp_set_num_threads(8);
     setNbThreads(8);
     initParallel();
-    reset();
-    double dt = globals.dt;
     // glfw: initialize and configure
     // ------------------------------
     glfwInit();
@@ -222,6 +220,10 @@ int main()
     lightingShader.setInt("shadowMap", 2);
 
     lightingShader.setFloat("material.shininess", 64);
+
+    reset();
+    double dt = globals.dt;
+
     // render loop
     // -----------
     while (!glfwWindowShouldClose(window))
