@@ -11,6 +11,12 @@ double vf_collision_detect(vec3& p_t0, vec3& p_t1, const AffineBody& cube, int i
 // q: affine matrix
 double ee_collision_detect(const AffineBody& ci, const AffineBody& cj, int eid_i, int eid_j);
 
+void ipc_term_vg(AffineBody& c, int v
+#ifdef _FRICTION_
+    ,
+    const Vector2d& _uk, double contact_lambda, const Matrix<double, 3, 2>& Tk
+#endif
+);
 void ipc_term(
     std::array<vec3, 4> pt, std::array<int, 4> ij,
     std::vector<HessBlock> &triplets,

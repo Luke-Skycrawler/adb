@@ -15,6 +15,7 @@
     "ground": true,
     "safe_factor": 4.0,
     "uppper_bound": true, 
+    "mu": 10.0,
     "damping": {
         "alpha": 0.0,
         "beta": 0.0

@@ -49,7 +49,7 @@ struct GlobalVariableMainCPP{
     std::vector<unique_ptr<AffineBody>> cubes;
     vec3 gravity;
     double alpha, beta;
-    double kappa, d_hat, safe_factor;
+    double kappa, d_hat, safe_factor, mu;
 
     bool col_set, upper_bound, line_search, sparse, dense, ee, pt, ground;
 };

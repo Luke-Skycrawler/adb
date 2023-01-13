@@ -284,17 +284,6 @@ void implicit_euler(vector<unique_ptr<AffineBody>>& cubes, double dt)
         return alpha * 2;
     };
 
-    const auto ipc_term_vg = [&](AffineBody& c, int v) {
-        vec3 p = c.vt1(v);
-        vec3 v_tile = c.vertices(v);
-        double d = vg_distance(p);
-        d = d * d;
-        if (d < barrier::d_hat) {
-            c.grad += barrier_gradient_q(v_tile, p);
-            c.hess += barrier_hessian_q(v_tile, p);
-        }
-    };
-
     do {
         globals.hess_triplets.clear();
         auto newton_iter_start = high_resolution_clock::now();
@@ -310,7 +299,24 @@ void implicit_euler(vector<unique_ptr<AffineBody>>& cubes, double dt)
         }
         for (auto _v : vidx) {
             int i = _v[0], v = _v[1];
-            ipc_term_vg(*cubes[i], v);
+            auto& c{ *cubes[i] };
+            vec3 p = c.vt1(v);
+            double _d = vg_distance(p);
+            double d = _d * _d;
+            if (d < barrier::d_hat) {
+#ifdef _FRICTION_
+                Matrix<double, 3, 2> Pk;
+                Pk.col(0) = vec3(1.0, 0.0, 0.0);
+                Pk.col(1) = vec3(0.0, 0.0, 1.0);
+
+                Vector2d uk = Pk.transpose() * (c.vt1(v) - c.vt0(v));
+                auto contact_force = -barrier_derivative_d(d) / (dt * dt) * 2 * _d;
+
+                ipc_term_vg(c, v, uk, contact_force, Pk);
+#else
+                ipc_term_vg(c, v);
+#endif
+            }
         }
 
         auto ipc_start = high_resolution_clock::now();
