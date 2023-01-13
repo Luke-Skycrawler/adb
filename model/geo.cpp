@@ -56,12 +56,14 @@ void friction(
 {
     static const double evh = globals.dt * 1e-2, h2 = globals.dt * globals.dt;
     auto uk = _uk.norm();
+    if (uk < 1e-10) return;
     auto f1 = ipc::f1_SF_over_x(uk, evh);
-    auto F_k = -mu * contact_lambda * Tk * f1 * _uk;
-    auto D_k = mu * contact_lambda * ipc::f0_SF(uk, evh);
-    Matrix2d M2x2 = (ipc::df1_x_minus_f1_over_x3(uk, evh) * _uk * _uk.transpose() + f1 * Matrix2d::Identity(2, 2));
+    Vector<double, 12> F_k = -mu * contact_lambda * Tk * f1 * _uk;
+    double D_k = mu * contact_lambda * ipc::f0_SF(uk, evh);
+    double df1_term = ipc::df1_x_minus_f1_over_x3(uk, evh);
+    Matrix2d M2x2 = (df1_term * _uk * _uk.transpose() + f1 * Matrix2d::Identity(2, 2));
     M2x2 = project_to_psd(M2x2);
-    auto D_k_hessian = mu * contact_lambda * Tk * M2x2 * Tk.transpose();
+    Matrix<double, 12, 12> D_k_hessian = mu * contact_lambda * Tk * M2x2 * Tk.transpose();
 
     g += F_k * h2;
     H += D_k_hessian * h2;

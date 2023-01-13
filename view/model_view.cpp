@@ -12,7 +12,7 @@
 #include <fstream>
 #include <nlohmann/json.hpp>
 #include <omp.h>
-#define FEATURE_MODEL
+//#define FEATURE_MODEL
 using namespace std;
 //------------------ optional features ----------------------------
 // #define FEATURE_MODEL

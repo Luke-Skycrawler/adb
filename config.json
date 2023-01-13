@@ -4,7 +4,7 @@
     "predefined_case" : {
         "enable": false,
         "id" : 2,
-        "custom": "../test_cases/case2.json"
+        "custom": "../test_cases/friction.json"
     },
     "solver": "sparse",
     "gravity": true, 
