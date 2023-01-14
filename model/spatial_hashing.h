@@ -36,12 +36,16 @@ inline void register_edge(const vec3& a, const vec3& b, const Primitive& t, int 
     register_interval(l, u, t, ts);
 }
 
-inline std::vector<Primitive> query_edge(const vec3& a, const vec3& b, int group_exl, int timestep)
+
+
+
+inline std::vector<Primitive> query_edge(const vec3& a, const vec3& b, int group_exl, double dhat)
 {
-    vec3i ia(tovec3i(a)), ib(tovec3i(b));
-    vec3i u = ia.cwiseMax(ib);
-    vec3i l = ia.cwiseMin(ib);
-    return query_interval(l, u, group_exl, timestep);
+    auto _u = a.cwiseMax(b).array() + dhat;
+    auto _l = a.cwiseMin(b).array() - dhat;
+    auto u = tovec3i(_u);
+    auto l = tovec3i(_l);
+    return query_interval(l, u, group_exl);
 }
 
 inline void register_triangle_orbit(const vec3& a0, const vec3& b0, const vec3& c0, const vec3& a1, const vec3& b1, const vec3& c1, const Primitive& t, int ts)

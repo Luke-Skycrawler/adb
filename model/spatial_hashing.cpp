@@ -50,8 +50,7 @@ std::vector<unsigned>& register_group(unsigned body, hi h)
     }
 }
 
-void register_interval(const vec3i& l, const vec3i& u, const Primitive& t,
-    int ts)
+void register_interval(const vec3i& l, const vec3i& u, const Primitive& t)
 {
     int body = t.body;
     
@@ -62,8 +61,7 @@ void register_interval(const vec3i& l, const vec3i& u, const Primitive& t,
     }
 }
 
-vector<Primitive> query_interval(const vec3i& l, const vec3i& u, int body_exl,
-    int ts)
+vector<Primitive> query_interval(const vec3i& l, const vec3i& u, int body_exl)
 {
     vector<Primitive> ret;
     for (int i = l(0); i <= u(0); i++) for (int j = l(1); j <= u(1); j++) for (int k = l(2); k <= u(2); k++) {
