@@ -1,28 +1,24 @@
 #pragma once
 #include <vector>
-#include <set>
-#include "cube.h"
+#include "affine_body.h"
+#include <memory>
 struct Primitive {
-    int timestamp, type, id, group;
-    Primitive(int timestamp, int id, int group, int type = 0)
-        : timestamp(timestamp), id(id), group(group), type(type) {}
+    unsigned pid, body;
 };
-struct Group {
-    int body, timestamp;
-    std::vector<Primitive> primitives;
-
-    Group(int group, int ts)
-        : body(group), timestamp(ts) {}
-};
-
+// struct BodyGroup {
+//     unsigned body;
+//     std::unique_ptr<std::vector<unsigned>> primitives;
+// };
+using BodyGroup = std::map<unsigned, std::unique_ptr<std::vector<unsigned>>>;
 namespace spatial_hashing {
 using vec3i = Vector<int, 3>;
-
+using hi = unsigned long long;
+// hashing index type
 vec3i tovec3i(const vec3& f);
-unsigned int hash(const vec3i& grid_index);
-Group& register_group(int group, unsigned h, int ts);
+hi hash(const vec3i& grid_index);
+
 void register_interval(const vec3i& l, const vec3i& u, const Primitive& t, int ts);
-std::vector<Primitive> query_interval(const vec3i& l, const vec3i& u, int group_exl, int timestep);
+std::vector<Primitive> query_interval(const vec3i& l, const vec3i& u, int group_exl);
 
 inline void reigster_triangle(const vec3& a, const vec3& b, const vec3& c, const Primitive& t, int ts)
 {

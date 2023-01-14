@@ -222,7 +222,7 @@ int main()
     lightingShader.setFloat("material.shininess", 64);
 
     reset();
-    double dt = globals.dt;
+    // be sure to call after glfw intiailzation 
 
     // render loop
     // -----------
@@ -268,7 +268,7 @@ int main()
         glm::vec3 box2Pos(0.3, 0.0, 1.2);
         glm::mat4 lightSpaceTrans = glm::lookAt(lightPos, glm::vec3(0.0f), globals.camera.WorldUp);
         for (int i = 0; i < 1; i++)
-            implicit_euler(globals.cubes, dt);
+            implicit_euler(globals.cubes, globals.dt);
         if (globals.display_corner)
         {
             glBindFramebuffer(GL_FRAMEBUFFER, globals.depthMapFBO);
