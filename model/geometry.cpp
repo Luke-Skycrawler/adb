@@ -2,7 +2,7 @@
 #include <Eigen/Geometry>
 #include <cmath>
 using namespace std;
-Edge::Edge(const AffineBody& c, int id, bool b): 
+Edge::Edge(const AffineBody& c, unsigned id, bool b): 
     e0(b? c.vt2(c.edges[id * 2]): c.vt1(c.edges[id * 2])), 
     e1(b? c.vt2(c.edges[id * 2 + 1]): c.vt1(c.edges[id * 2  + 1]))
 {
@@ -19,7 +19,7 @@ vec3 Face::unit_normal() const
     return n / sqrt(n.dot(n));
 }
 
-Face::Face(const AffineBody& c, int id, bool b)
+Face::Face(const AffineBody& c, unsigned id, bool b)
 {
 
     int _a = c.indices[id * 3 + 0],
