@@ -112,12 +112,13 @@ void implicit_euler(vector<unique_ptr<AffineBody>>& cubes, double dt)
                     auto p = cubes[i]->vt1(v);
                     double d = vg_distance(p);
                     d = d * d;
-                    if (d < barrier::d_hat * globals.safe_factor) {
+                    if (d < barrier::d_hat * (globals.safe_factor * globals.safe_factor)) {
                         vidx.push_back({ i, v });
                     }
                 }
         if (globals.pt) {
 #ifdef SPATIAL_HASHING_H
+// #pragma omp parallel for schedule(dynamic)
             for (unsigned I = 0; I < n_cubes; I++) {
                 auto& ci(*cubes[I]);
                 for (unsigned v = 0; v < ci.n_vertices; v++) {
@@ -125,21 +126,22 @@ void implicit_euler(vector<unique_ptr<AffineBody>>& cubes, double dt)
                     spatial_hashing::register_vertex(p, I, v);
                 }
             }
+#pragma omp parallel for schedule(dynamic)
             for (unsigned J = 0; J < n_cubes; J++) {
                 auto& cj(*cubes[J]);
                 for (unsigned f = 0; f < cj.n_faces; f++) {
                     Face _f(cj, f);
-                    auto collisions = spatial_hashing::query_triangle(_f.t0, _f.t1, _f.t2, J, barrier::d_sqrt);
+                    auto collisions = spatial_hashing::query_triangle(_f.t0, _f.t1, _f.t2, J, barrier::d_sqrt * globals.safe_factor);
                     for (auto& c : collisions) {
                         unsigned I = c.body, v = c.pid;
                         vec3 p = cubes[I]->vt1(v);
                         auto pt_type = ipc::point_triangle_distance_type(p, _f.t0, _f.t1, _f.t2);
 
                         double d = ipc::point_triangle_distance(p, _f.t0, _f.t1, _f.t2, pt_type);
-                        if (d < barrier::d_hat * globals.safe_factor) {
+                        if (d < barrier::d_hat * (globals.safe_factor * globals.safe_factor)) {
                             array<vec3, 4> pt = { p, _f.t0, _f.t1, _f.t2 };
                             array<int, 4> ij = { I, v, J, f };
-
+#pragma omp critical
                             {
                                 pts.push_back(pt);
                                 idx.push_back(ij);
@@ -186,6 +188,7 @@ void implicit_euler(vector<unique_ptr<AffineBody>>& cubes, double dt)
         if (globals.ee) {
 
 #ifdef SPATIAL_HASHING_H
+// #pragma omp parallel for schedule(dynamic)
             for (unsigned I = 0; I < n_cubes; I++) {
                 auto& ci(*cubes[I]);
                 for (unsigned ei = 0; ei < ci.n_edges; ei++) {
@@ -193,20 +196,21 @@ void implicit_euler(vector<unique_ptr<AffineBody>>& cubes, double dt)
                     spatial_hashing::register_edge(e.e0, e.e1, I, ei);
                 }
             }
+#pragma omp parallel for schedule(dynamic)
             for (unsigned J = 0; J < n_cubes; J++) {
                 auto& cj(*cubes[J]);
                 for (unsigned ej = 0; ej < cj.n_edges; ej++) {
                     Edge e{ cj, ej };
-                    auto collisions = spatial_hashing::query_edge(e.e0, e.e1, J, barrier::d_sqrt);
+                    auto collisions = spatial_hashing::query_edge(e.e0, e.e1, J, barrier::d_sqrt * globals.safe_factor);
                     for (auto& c : collisions) {
                         unsigned I = c.body, ei = c.pid;
                         Edge _ei{ *cubes[I], ei };
 
                         double d = ipc::edge_edge_distance(_ei.e0, _ei.e1, e.e0, e.e1);
-                        if (d < barrier::d_hat * globals.safe_factor) {
+                        if (d < barrier::d_hat * (globals.safe_factor * globals.safe_factor)) {
                             array<vec3, 4> ee = { _ei.e0, _ei.e1, e.e0, e.e1 };
                             array<int, 4> ij = { I, ei, J, ej };
-
+#pragma omp critical
                             {
                                 ees.push_back(ee);
                                 eidx.push_back(ij);

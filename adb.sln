@@ -13,6 +13,8 @@ Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "test", "test\test\test.vcxp
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "google_test", "test\google_test\google_test.vcxproj", "{CBD69F18-0FB7-42C5-AF67-A41B5DB03F58}"
 EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "spatial hashing", "spatial hashing\spatial hashing.vcxproj", "{FE1C3876-74FE-4EDC-9DC5-649A930953E6}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|x64 = Debug|x64
@@ -61,6 +63,14 @@ Global
 		{CBD69F18-0FB7-42C5-AF67-A41B5DB03F58}.Release|x64.Build.0 = Release|x64
 		{CBD69F18-0FB7-42C5-AF67-A41B5DB03F58}.Release|x86.ActiveCfg = Release|Win32
 		{CBD69F18-0FB7-42C5-AF67-A41B5DB03F58}.Release|x86.Build.0 = Release|Win32
+		{FE1C3876-74FE-4EDC-9DC5-649A930953E6}.Debug|x64.ActiveCfg = Debug|x64
+		{FE1C3876-74FE-4EDC-9DC5-649A930953E6}.Debug|x64.Build.0 = Debug|x64
+		{FE1C3876-74FE-4EDC-9DC5-649A930953E6}.Debug|x86.ActiveCfg = Debug|Win32
+		{FE1C3876-74FE-4EDC-9DC5-649A930953E6}.Debug|x86.Build.0 = Debug|Win32
+		{FE1C3876-74FE-4EDC-9DC5-649A930953E6}.Release|x64.ActiveCfg = Release|x64
+		{FE1C3876-74FE-4EDC-9DC5-649A930953E6}.Release|x64.Build.0 = Release|x64
+		{FE1C3876-74FE-4EDC-9DC5-649A930953E6}.Release|x86.ActiveCfg = Release|Win32
+		{FE1C3876-74FE-4EDC-9DC5-649A930953E6}.Release|x86.Build.0 = Release|Win32
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

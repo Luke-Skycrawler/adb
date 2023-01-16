@@ -13,7 +13,7 @@ namespace spatial_hashing {
 static unordered_map<hi, unique_ptr<BodyGroup>> pt_table;
 static unordered_map<hi, unique_ptr<BodyGroup>> ee_table;
 
-static const double MIN_XYZ = -10.0f, MAX_XYZ = 10.0f, dx = 0.02;
+static const double MIN_XYZ = -10.0f, MAX_XYZ = 10.0f, dx = 0.05;
 
 hi hash(const vec3i& grid_index)
 {
@@ -27,7 +27,7 @@ hi hash(const vec3i& grid_index)
 
 vec3i tovec3i(const vec3& f)
 {
-    vec3i u = ((f.array() - MIN_XYZ).max(0) / dx).cast<int>();
+    vec3i u = ((f.array() - MIN_XYZ).max(0.0) / dx).cast<int>();
     return u;
 }
 
@@ -45,7 +45,7 @@ std::vector<unsigned>& register_group(unsigned body, hi h, unordered_map<hi, uni
         return *(jt -> second);
     }
     else {
-        container_grid[body] = make_unique<std::vector<unsigned>>();
+        container_grid[body] = move(make_unique<std::vector<unsigned>>());
         jt = container_grid.find(body);
         return *(jt -> second);
     }
@@ -58,7 +58,7 @@ void register_interval(const vec3i& l, const vec3i& u, const Primitive& t, unord
     for (int i = l(0); i <= u(0); i++) for (int j = l(1); j <= u(1); j++) for (int k = l(2); k <= u(2); k++) {
         auto idx = hash(vec3i(i, j, k));
         auto& g{ register_group(body, idx, table) };
-        g.push_back(t.body);
+        g.push_back(t.pid);
     }
 }
 
@@ -68,8 +68,8 @@ vector<Primitive> query_interval(const vec3i& l, const vec3i& u, int body_exl, u
     for (int i = l(0); i <= u(0); i++) for (int j = l(1); j <= u(1); j++) for (int k = l(2); k <= u(2); k++) {
         auto h = hash(vec3i(i, j, k));
         auto it = table.find(h);
-        if (it == table.end()) return ret;
-        auto &container_grid = *(it->second);
+        if (it == table.end()) continue;
+         auto &container_grid = *(it->second);
         for (auto &jt: container_grid) {
             auto body = jt.first;
             if (body_exl != body) for (auto kt: *(jt.second))
@@ -95,10 +95,10 @@ void register_edge(const vec3& a, const vec3& b, unsigned body, unsigned pid)
 
 vector<Primitive> query_edge(const vec3& a, const vec3& b, int group_exl, double dhat)
 {
-    auto _u = a.cwiseMax(b).array() + dhat;
-    auto _l = a.cwiseMin(b).array() - dhat;
-    auto u = tovec3i(_u);
-    auto l = tovec3i(_l);
+    vec3 _u = a.cwiseMax(b).array() + dhat;
+    vec3 _l = a.cwiseMin(b).array() - dhat;
+    vec3i u = tovec3i(_u);
+    vec3i l = tovec3i(_l);
     return query_interval(l, u, group_exl, ee_table);
 }
 
@@ -110,10 +110,10 @@ void register_vertex(const vec3& a, unsigned body, unsigned pid)
 
 vector<Primitive> query_triangle(const vec3& a, const vec3& b, const vec3& c, int group_exl, double dhat)
 {
-    auto _u = a.cwiseMax(b).cwiseMax(c).array() + dhat;
-    auto _l = a.cwiseMin(b).cwiseMin(c).array() - dhat;
-    auto u = tovec3i(_u);
-    auto l = tovec3i(_l);
+    vec3 _u = a.cwiseMax(b).cwiseMax(c).array() + dhat;
+    vec3 _l = a.cwiseMin(b).cwiseMin(c).array() - dhat;
+    vec3i u = tovec3i(_u);
+    vec3i l = tovec3i(_l);
     return query_interval(l, u, group_exl, pt_table);
 }
 };
