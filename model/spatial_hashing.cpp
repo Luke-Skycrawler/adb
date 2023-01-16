@@ -64,7 +64,11 @@ void register_interval(const vec3i& l, const vec3i& u, const Primitive& t, unord
 
 vector<Primitive> query_interval(const vec3i& l, const vec3i& u, int body_exl, unordered_map<hi, unique_ptr<BodyGroup>>& table)
 {
-    vector<Primitive> ret;
+    const auto cmp = [](const Primitive &a, const Primitive &b) {
+        return a.body < b.body || (a.body == b.body && a.pid < b.pid );
+    };
+    set<Primitive, decltype(cmp)> ret(cmp);
+    vector<Primitive> val;
     for (int i = l(0); i <= u(0); i++) for (int j = l(1); j <= u(1); j++) for (int k = l(2); k <= u(2); k++) {
         auto h = hash(vec3i(i, j, k));
         auto it = table.find(h);
@@ -73,10 +77,11 @@ vector<Primitive> query_interval(const vec3i& l, const vec3i& u, int body_exl, u
         for (auto &jt: container_grid) {
             auto body = jt.first;
             if (body_exl != body) for (auto kt: *(jt.second))
-                ret.push_back({kt, body});
+                ret.insert({kt, body});
         }
     }
-    return ret;
+    for(auto &a: ret)val.push_back(a);
+    return val;
 }
 
 void remove_all_entries()

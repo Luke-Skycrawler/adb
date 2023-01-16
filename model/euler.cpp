@@ -233,6 +233,7 @@ void implicit_euler(vector<unique_ptr<AffineBody>>& cubes, double dt)
                     auto collisions = spatial_hashing::query_edge(e.e0, e.e1, J, barrier::d_sqrt * globals.safe_factor);
                     for (auto& c : collisions) {
                         unsigned I = c.body, ei = c.pid;
+                        if (I > J) continue;
                         Edge _ei{ *cubes[I], ei };
 
                         double d = ipc::edge_edge_distance(_ei.e0, _ei.e1, e.e0, e.e1);
