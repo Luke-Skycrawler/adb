@@ -50,6 +50,13 @@ Eigen::MatrixXd project_to_psd(
         * eigensolver.eigenvectors().transpose();
 }
 
+double D_f0(double uk, double lam)
+{
+    static double mu = globals.mu, evh = globals.dt * 1e-2, h2 = globals.dt * globals.dt;
+    double D_k = mu * lam * ipc::f0_SF(uk, evh);
+    return D_k * h2;
+}
+
 void friction(
     const Vector2d& _uk, double contact_lambda, const Matrix<double, 12, 2>& Tk,
     Vector<double, 12> g, Matrix<double, 12, 12>& H)
@@ -60,7 +67,7 @@ void friction(
     if (uk < 1e-10) return;
     auto f1 = ipc::f1_SF_over_x(uk, evh);
     Vector<double, 12> F_k = -mu * contact_lambda * Tk * f1 * _uk;
-    double D_k = mu * contact_lambda * ipc::f0_SF(uk, evh);
+    // double D_k = mu * contact_lambda * ipc::f0_SF(uk, evh);
     double df1_term = ipc::df1_x_minus_f1_over_x3(uk, evh);
     Matrix2d M2x2 = (df1_term * _uk * _uk.transpose() + f1 * Matrix2d::Identity(2, 2));
     M2x2 = project_to_psd(M2x2);

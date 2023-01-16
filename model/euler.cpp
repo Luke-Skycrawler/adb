@@ -81,8 +81,35 @@ void implicit_euler(vector<unique_ptr<AffineBody>>& cubes, double dt)
         auto q = x.tail(9);
         return p.dot(p) * c.mass + q.dot(q) * c.Ic;
     };
+    const auto pt_vstack = [&](AffineBody& ci, AffineBody& cj, unsigned v, unsigned f) -> Vector<double, 12> {
+        auto _0 = cj.indices[f * 3 + 0];
+        auto _1 = cj.indices[f * 3 + 1];
+        auto _2 = cj.indices[f * 3 + 2];
+        Vector<double, 12> v_stack;
+        v_stack << ci.vt1(v) - ci.vt0(v),
+            cj.vt1(_0) - cj.vt0(_0),
+            cj.vt1(_1) - cj.vt0(_1),
+            cj.vt1(_2) - cj.vt0(_2);
+        return v_stack;
+    };
+    const auto ee_vstack = [&](AffineBody& ci, AffineBody& cj, unsigned ei, unsigned ej) -> Vector<double, 12> {
+        Vector<double, 12> v_stack;
+
+        int i0 = ci.edges[ei * 2 + 0];
+        int i1 = ci.edges[ei * 2 + 1];
+        int j0 = cj.edges[ej * 2 + 0];
+        int j1 = cj.edges[ej * 2 + 1];
+
+        v_stack << ci.vt1(i0) - ci.vt0(i0),
+            ci.vt1(i1) - ci.vt0(i1),
+            cj.vt1(j0) - cj.vt0(j0),
+            cj.vt1(j1) - cj.vt0(j1);
+        return v_stack;
+    };
 
     vector<array<vec3, 4>> pts;
+    vector<Matrix<double, 2, 12>> pt_tk;
+    vector<Matrix<double, 2, 12>> ee_tk;
     vector<CollisionPT> ptcs;
 
     vector<array<int, 2>> vidx;
@@ -90,6 +117,7 @@ void implicit_euler(vector<unique_ptr<AffineBody>>& cubes, double dt)
     vector<array<vec3, 4>> ees;
     vector<array<int, 4>> eidx;
     vector<CollisionEE> eecs;
+    double D_friction;
     const int n_cubes = cubes.size(), nsqr = n_cubes * n_cubes;
 
     const auto E = [&](const VectorXd& q, const VectorXd& q_tiled, const AffineBody& c) -> double {
@@ -145,6 +173,7 @@ void implicit_euler(vector<unique_ptr<AffineBody>>& cubes, double dt)
                             {
                                 pts.push_back(pt);
                                 idx.push_back(ij);
+                                pt_tk.push_back(MatrixXd::Zero(2, 12));
                             }
                         }
                     }
@@ -214,6 +243,7 @@ void implicit_euler(vector<unique_ptr<AffineBody>>& cubes, double dt)
                             {
                                 ees.push_back(ee);
                                 eidx.push_back(ij);
+                                ee_tk.push_back(MatrixXd::Zero(2, 12));
                             }
                         }
                     }
@@ -318,6 +348,12 @@ void implicit_euler(vector<unique_ptr<AffineBody>>& cubes, double dt)
             // array<vec3, 4> a = {v, f.t0, f.t1, f.t2};
             double d = ipc::point_triangle_distance(v, f.t0, f.t1, f.t2);
             e += barrier::barrier_function(d);
+#ifdef _FRICTION_
+            auto contact_force = -barrier_derivative_d(d) / (dt * dt) * 2 * sqrt(d);
+            auto v_stack = pt_vstack(*cubes[ij[0]], *cubes[ij[0]], ij[1], ij[3]);
+            auto uk = (pt_tk[k] * v_stack).norm();
+            e += D_f0(uk, contact_force);
+#endif
         }
 
         // ee ipc energy
@@ -326,6 +362,12 @@ void implicit_euler(vector<unique_ptr<AffineBody>>& cubes, double dt)
             Edge ei(*cubes[ij[0]], ij[1], true), ej(*cubes[ij[2]], ij[3], true);
             double d = ipc::edge_edge_distance(ei.e0, ei.e1, ej.e0, ej.e1);
             e += barrier_function(d);
+#ifdef _FRICTION_
+            auto contact_force = -barrier_derivative_d(d) / (dt * dt) * 2 * sqrt(d);
+            auto v_stack = ee_vstack(*cubes[ij[0]], *cubes[ij[0]], ij[1], ij[3]);
+            auto uk = (ee_tk[k] * v_stack).norm();
+            e += D_f0(uk, contact_force);
+#endif
         }
 
         // vertex-ground ipc energy
@@ -404,16 +446,8 @@ void implicit_euler(vector<unique_ptr<AffineBody>>& cubes, double dt)
             double d = ipc::point_triangle_distance(pt[0], pt[1], pt[2], pt[3]);
             if (d < barrier::d_hat) {
 #ifdef _FRICTION_
-                Vector<double, 12> v_stack;
-                auto f = ij[3];
-                auto _0 = cj.indices[f * 3 + 0];
-                auto _1 = cj.indices[f * 3 + 1];
-                auto _2 = cj.indices[f * 3 + 2];
 
-                v_stack << ci.vt1(ij[1]) - ci.vt0(ij[1]),
-                    cj.vt1(_0) - cj.vt0(_0),
-                    cj.vt1(_1) - cj.vt0(_1),
-                    cj.vt1(_2) - cj.vt0(_2);
+                Vector<double, 12> v_stack = pt_vstack(ci, cj, ij[1], ij[3]);
 
                 auto lams = ipc::point_triangle_closest_point(pt[0], pt[1], pt[2], pt[3]);
                 array<double, 3> tlams = { 1 - lams(0) - lams(1), lams(0), lams(1) };
@@ -468,6 +502,7 @@ void implicit_euler(vector<unique_ptr<AffineBody>>& cubes, double dt)
                 ipc_term(
                     pt, ij, globals.hess_triplets, ci.grad, cj.grad,
                     uk, contact_force, Tk_T.transpose());
+                ee_tk[k] = Tk_T;
 #else
                 ipc_term(pt, ij, globals.hess_triplets, ci.grad, cj.grad);
 #endif
@@ -484,20 +519,7 @@ void implicit_euler(vector<unique_ptr<AffineBody>>& cubes, double dt)
             if(d < barrier::d_hat) {
 
 #ifdef _FRICTION_
-                Vector<double, 12> v_stack;
-                auto ei = ij[1];
-                auto ej = ij[3];
-
-                int i0 = ci.edges[ei * 2 + 0];
-                int i1 = ci.edges[ei * 2 + 1];
-                int j0 = cj.edges[ej * 2 + 0];
-                int j1 = cj.edges[ej * 2 + 1];
-
-                v_stack << ci.vt1(i0) - ci.vt0(i0),
-                    ci.vt1(i1) - ci.vt0(i1),
-                    cj.vt1(j0) - cj.vt0(j0),
-                    cj.vt1(j1) - cj.vt0(j1);
-
+                auto v_stack = ee_vstack(ci, cj, ij[1], ij[3]);
                 auto ei0 = ee[0], ei1 = ee[1], ej0 = ee[2], ej1 = ee[3];
                 auto rei = ei0 - ei1, rej = ej0 - ej1;
                 auto cnorm = rei.cross(rej).squaredNorm();
@@ -581,6 +603,7 @@ void implicit_euler(vector<unique_ptr<AffineBody>>& cubes, double dt)
                     ee, ij, globals.hess_triplets, ci.grad, cj.grad,
                     uk, contact_force, Tk_T.transpose());
 
+                ee_tk[k] = Tk_T;
 #else
                 ipc_term_ee(ee, ij, globals.hess_triplets, ci.grad, cj.grad);
 #endif

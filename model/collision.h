@@ -3,7 +3,7 @@
 #include <vector>
 #include <array>
 #include "../view/global_variables.h"
-// #define _FRICTION_
+#define _FRICTION_
 //double vf_collision_time(const vec3& x, const vec3& p, const mat3& q, const vec3& p_next, const mat3& q_next);
 double vf_collision_detect(vec3& p_t0, vec3& p_t1, const AffineBody& cube, int id);
 // x: vertex position in the static frame;
@@ -37,3 +37,5 @@ void ipc_term_ee(
     , const Vector2d &_uk, double contact_lambda, const Matrix<double, 12, 2> &Tk
     #endif
     );
+
+double D_f0(double uk, double lam);
