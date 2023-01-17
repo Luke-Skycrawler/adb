@@ -23,7 +23,7 @@ inline int starting_offset(int i, int j, std::map<std::array<int, 2>, int>& lut,
 
 inline int stride(int j, int* outers)
 {
-    return outers[j * 12 + 1] - outers[j];
+    return outers[j * 12 + 1] - outers[j * 12];
     // full 12x12 matrix, no overflow issue
 }
 

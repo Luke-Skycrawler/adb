@@ -517,7 +517,8 @@ void implicit_euler(vector<unique_ptr<AffineBody>>& cubes, double dt)
                     pt, ij,
 #ifdef _SM_
                     lut, sparse_hess,
-#else
+#endif
+#ifdef _TRIPLETS_
                     globals.hess_triplets,
 #endif
                     ci.grad, cj.grad,
@@ -525,8 +526,9 @@ void implicit_euler(vector<unique_ptr<AffineBody>>& cubes, double dt)
 #else
                 ipc_term(pt, ij,
 #ifdef _SM_
+#ifdef _TRIPLETS_
                     lut, sparse_hess,
-#else
+#endif
                     globals.hess_triplets,
 #endif
                     ci.grad, cj.grad);
@@ -629,7 +631,8 @@ void implicit_euler(vector<unique_ptr<AffineBody>>& cubes, double dt)
                     ee, ij,
 #ifdef _SM_
                     lut, sparse_hess,
-#else
+#endif
+#ifdef _TRIPLETS_
                     globals.hess_triplets,
 #endif
                     ci.grad, cj.grad,
@@ -641,7 +644,8 @@ void implicit_euler(vector<unique_ptr<AffineBody>>& cubes, double dt)
                 ipc_term_ee(ee, ij,
 #ifdef _SM_
                     lut, sparse_hess,
-#else
+#endif
+#ifdef _TRIPLETS_
                     globals.hess_triplets,
 #endif
                     ci.grad, cj.grad);
@@ -734,8 +738,8 @@ void implicit_euler(vector<unique_ptr<AffineBody>>& cubes, double dt)
                 q_tile_cat.segment<12>(k * 12) = c.q_tile(dt, globals.gravity);
             }
 
-#ifndef _SM_
-            SparseMatrix<double> sparse_hess(hess_dim, hess_dim);
+#ifdef _TRIPLETS_
+            SparseMatrix<double> sparse_hess_trip(hess_dim, hess_dim);
             vector<int> starting_point;
             starting_point.resize(n_cubes * 12);
             static const auto merge_triplets = [&](vector<HessBlock>& triplets) {
@@ -814,10 +818,11 @@ void implicit_euler(vector<unique_ptr<AffineBody>>& cubes, double dt)
                 // big_hess.block<12, 12>(triplet.i, triplet.j) = triplet.block;
                 if (globals.sparse)
                     // insert(bht, triplet.block, triplet.i * 12, triplet.j * 12);
-                    insert2(sparse_hess, k);
+                    insert2(sparse_hess_trip, k);
             }
 
-#else 
+#endif
+#ifdef _SM_
             for (int k = 0; k < n_cubes; k++) {
                 auto& c = *cubes[k];
                 double * values = sparse_hess.valuePtr();
@@ -856,10 +861,20 @@ void implicit_euler(vector<unique_ptr<AffineBody>>& cubes, double dt)
                 dq = -big_hess.ldlt().solve(r);
             else if (globals.sparse) {
                 // sparse_hess.setFromTriplets(bht.begin(), bht.end());
-                sparse_hess.finalize();
+                // sparse_hess.finalize();
                 SimplicialLDLT<SparseMatrix<double>> ldlt_solver;
                 ldlt_solver.compute(sparse_hess);
                 dq = -ldlt_solver.solve(r);
+#ifdef _TRIPLET_
+                sparse_hess_trip.finalize();
+                double _dif = (sparse_hess - sparse_hess_trip).norm();
+                if (_dif > 1e-6) {
+                    cout << "error: dif = " << _dif << "\n\n";
+                    cout << sparse_hess_trip << "\n\n"
+                         << sparse_hess;
+                    exit(0);
+                }
+#endif
             }
             auto solver_duration = DURATION_TO_DOUBLE (high_resolution_clock::now() - solver_start);
             spdlog::info("solver time = {:0.6f} ms", solver_duration);

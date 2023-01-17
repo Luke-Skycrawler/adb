@@ -6,8 +6,8 @@
 #include "../view/global_variables.h"
 #define _FRICTION_
 #define _SM_
-
-//double vf_collision_time(const vec3& x, const vec3& p, const mat3& q, const vec3& p_next, const mat3& q_next);
+// #define _TRIPLETS_
+// double vf_collision_time(const vec3& x, const vec3& p, const mat3& q, const vec3& p_next, const mat3& q_next);
 double vf_collision_detect(vec3& p_t0, vec3& p_t1, const AffineBody& cube, int id);
 // x: vertex position in the static frame;
 // p: affine body translation
@@ -25,7 +25,8 @@ void ipc_term(
 #ifdef _SM_
     std::map<std::array<int, 2>, int>& lut,
     SparseMatrix<double>& sparse_hess,
-#else
+#endif
+#ifdef _TRIPLETS_
     std::vector<HessBlock>& triplets,
 #endif
     Vector<double, 12>& grad_p, Vector<double, 12>& grad_t
@@ -43,7 +44,8 @@ void ipc_term_ee(
 #ifdef _SM_
     std::map<std::array<int, 2>, int>& lut,
     SparseMatrix<double>& sparse_hess,
-#else
+#endif
+#ifdef _TRIPLETS_
     std::vector<HessBlock>& triplets,
 #endif
     Vector<double, 12>& grad_0, Vector<double, 12>& grad_1

@@ -134,7 +134,8 @@ void ipc_term(
 #ifdef _SM_
     std::map<std::array<int, 2>, int>& lut,
     SparseMatrix<double>& sparse_hess,
-#else
+#endif
+#ifdef _TRIPLETS_
 
     vector<HessBlock>& triplets,
 #endif
@@ -208,7 +209,9 @@ void ipc_term(
     put(values, oji, stride_i, off_T);
     put(values, oii, stride_i, hess_p);
     put(values, ojj, stride_j, hess_t);
-#else
+#endif
+#ifdef _TRIPLETS_
+
     for (int i = 0; i < 12; i++) {
         triplets.push_back(HessBlock(ii * 12, jj * 12 + i, off_diag.block<12, 1>(0, i)));
         triplets.push_back(HessBlock(jj * 12, ii * 12 + i, off_T.block<12, 1>(0, i)));
@@ -228,7 +231,8 @@ void ipc_term_ee(
 #ifdef _SM_
     std::map<std::array<int, 2>, int>& lut,
     SparseMatrix<double>& sparse_hess,
-#else
+#endif
+#ifdef _TRIPLETS_
     vector<HessBlock>& triplets,
 #endif
     Vector<double, 12>& grad_0, Vector<double, 12>& grad_1
@@ -313,8 +317,10 @@ void ipc_term_ee(
     put(values, oii, stride_i, hess_0);
     put(values, ojj, stride_j, hess_1);
 
-#else
-    #pragma omp critical
+#endif
+#ifdef _TRIPLETS_
+
+#pragma omp critical
     for (int i = 0; i < 12; i++ ){
         triplets.push_back(HessBlock(ii * 12, jj * 12 + i, off_diag.block<12, 1>(0, i)));
         triplets.push_back(HessBlock(jj * 12, ii * 12 + i, off_T.block<12, 1>(0, i)));
