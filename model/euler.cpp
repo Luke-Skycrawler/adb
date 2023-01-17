@@ -118,7 +118,7 @@ void implicit_euler(vector<unique_ptr<AffineBody>>& cubes, double dt)
     vector<array<int, 4>> eidx;
     vector<CollisionEE> eecs;
     double D_friction;
-    const int n_cubes = cubes.size(), nsqr = n_cubes * n_cubes;
+    const int n_cubes = cubes.size(), nsqr = n_cubes * n_cubes, hess_dim = n_cubes * 12;
 
     const auto E = [&](const VectorXd& q, const VectorXd& q_tiled, const AffineBody& c) -> double {
         return othogonal_energy::otho_energy(q) * dt * dt + 0.5 * norm_M(q - q_tiled, c);
@@ -287,6 +287,11 @@ void implicit_euler(vector<unique_ptr<AffineBody>>& cubes, double dt)
     };
     if (globals.col_set)
         gen_collision_set(cubes);
+
+    SparseMatrix<double> sparse_hess(hess_dim, hess_dim);
+#ifdef _SM_
+    gen_empty_sm(n_cubes, idx, eidx, sparse_hess);
+#endif
     const int n_pt = idx.size(), n_ee = eidx.size(), n_g = vidx.size();
     globals.hess_triplets.reserve(((n_pt+  n_ee) * 2 + n_cubes) * 12);
     
@@ -680,6 +685,23 @@ void implicit_euler(vector<unique_ptr<AffineBody>>& cubes, double dt)
         double toi = 1.0, factor = 1.0, alpha = 1.0;
 
         {
+            MatrixXd big_hess;
+            clear(sparse_hess);
+            big_hess.setZero(hess_dim, hess_dim);
+            VectorXd r, q0_cat, q_tile_cat, dq;
+            r.setZero(hess_dim);
+            dq.setZero(hess_dim);
+            q0_cat.setZero(hess_dim);
+            q_tile_cat.setZero(hess_dim);
+            for (int k = 0; k < n_cubes; k++) {
+                auto& c = *cubes[k];
+                r.segment<12>(k * 12) = c.grad;
+                auto t = cat(c.q);
+                q0_cat.segment<12>(k * 12) = t;
+                q_tile_cat.segment<12>(k * 12) = c.q_tile(dt, globals.gravity);
+            }
+
+#ifndef _SM_
             vector<int> starting_point;
             starting_point.resize(n_cubes * 12);
             static const auto merge_triplets = [&](vector<HessBlock>& triplets) {
@@ -707,10 +729,9 @@ void implicit_euler(vector<unique_ptr<AffineBody>>& cubes, double dt)
                 auto _duration = high_resolution_clock::now() - start;
                 spdlog::info("merge & sort time = {:0.6f} ms", DURATION_TO_DOUBLE(_duration) * 1000);
             };
-            const int hess_dim = n_cubes * 12;
-            MatrixXd big_hess;
+
             //vector<Triplet<double>> bht;
-            SparseMatrix<double> sparse_hess(hess_dim, hess_dim);
+
             //static const auto insert = [&](vector<Triplet<double>>& bht, const Matrix<double, 12, 12>& m, int r, int c) {
             //    for (int i = 0; i < 12; i++)
             //        for (int j = 0; j < 12; j++) {
@@ -735,28 +756,16 @@ void implicit_euler(vector<unique_ptr<AffineBody>>& cubes, double dt)
                 //sparse_hess.reserve(n_ele);
             }
 
-            big_hess.setZero(hess_dim, hess_dim);
-            VectorXd r, q0_cat, q_tile_cat, dq;
-            r.setZero(hess_dim);
-            dq.setZero(hess_dim);
-            q0_cat.setZero(hess_dim);
-            q_tile_cat.setZero(hess_dim);
-
             for (int k = 0; k < n_cubes; k++) {
                 // if (globals.dense)
                 //     big_hess.block<12, 12>(k * 12, k * 12) += cubes[k].hess;
-                
+
                 // if(globals.sparse)
                 //     insert(bht, cubes[k].hess, k * 12, k * 12);
                 auto& c = *cubes[k];
                 for (int i = 0; i < 12; i++)
                     globals.hess_triplets.push_back({ k * 12, k * 12 + i, c.hess.block<12, 1>(0, i) });
                 // globals.hess_triplets.push_back({k * 12, k * 12, cubes[k].hess});
-
-                r.segment<12>(k * 12) = c.grad;
-                auto t = cat(c.q);
-                q0_cat.segment<12>(k * 12) = t;
-                q_tile_cat.segment<12>(k * 12) = c.q_tile(dt, globals.gravity);
             }
 
             merge_triplets(globals.hess_triplets);
@@ -768,13 +777,14 @@ void implicit_euler(vector<unique_ptr<AffineBody>>& cubes, double dt)
                 if (triplet.i == -1) continue;
                 if (globals.dense)
                     big_hess.block<12, 1>(triplet.i, triplet.j) = triplet.block;
-                    // big_hess.block<12, 12>(triplet.i, triplet.j) = triplet.block;
+                // big_hess.block<12, 12>(triplet.i, triplet.j) = triplet.block;
                 if (globals.sparse)
                     // insert(bht, triplet.block, triplet.i * 12, triplet.j * 12);
                     insert2(sparse_hess, k);
             }
+#endif
 
-            const auto damping = [&]() {
+            const auto damping_dense = [&]() {
                 MatrixXd D = globals.beta * big_hess;
                 for (int i = 0; i < n_cubes; i++) {
                     for (int j = 0; j < 3; j++) { D(i * 12 + j, i * 12 + j) += cubes[i]->mass; }
@@ -783,7 +793,16 @@ void implicit_euler(vector<unique_ptr<AffineBody>>& cubes, double dt)
                 big_hess += D / dt;
             };
 
-            damping();
+            const auto damping_sparse = [&]() {
+                SparseMatrix<double> D = globals.beta * sparse_hess;
+                for (int i = 0; i < n_cubes; i++) {
+                    for (int j = 0; j < 3; j++) { D.coeffRef(i * 12 + j, i * 12 + j) += cubes[i]->mass; }
+                    for (int j = 3; j < 12; j++) { D.coeffRef(i * 12 + j, i * 12 + j) += cubes[i]->Ic; }
+                }
+                big_hess += D / dt;
+            };
+
+            // damping();
             auto solver_start = high_resolution_clock::now();
 
             if (globals.dense)

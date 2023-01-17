@@ -4,6 +4,8 @@
 #include <array>
 #include "../view/global_variables.h"
 #define _FRICTION_
+// #define _SM_
+
 //double vf_collision_time(const vec3& x, const vec3& p, const mat3& q, const vec3& p_next, const mat3& q_next);
 double vf_collision_detect(vec3& p_t0, vec3& p_t1, const AffineBody& cube, int id);
 // x: vertex position in the static frame;
@@ -19,23 +21,34 @@ void ipc_term_vg(AffineBody& c, int v
 );
 void ipc_term(
     std::array<vec3, 4> pt, std::array<int, 4> ij,
-    std::vector<HessBlock> &triplets,
+#ifdef _SM_
+    SparseMatrix<double>& sparse_hess
+#else
+    std::vector<HessBlock>& triplets,
     Vector<double, 12>& grad_p, Vector<double, 12>& grad_t
+#endif
 
-    #ifdef _FRICTION_
-    , const Vector2d &_uk, double contact_lambda, const Matrix<double, 12, 2> &Tk
-    #endif
+#ifdef _FRICTION_
+    ,
+    const Vector2d& _uk, double contact_lambda, const Matrix<double, 12, 2>& Tk
+#endif
     // , Matrix<double, 12 , 12> &off_diag
     // , vector<Cube> &cubes
 );
 void ipc_term_ee(
     std::array<vec3, 4> ee, std::array<int, 4> ij,
-    std::vector<HessBlock> &triplets,
+
+#ifdef _SM_
+    SparseMatrix<double>& sparse_hess
+#else
+    std::vector<HessBlock>& triplets,
     Vector<double, 12>& grad_0, Vector<double, 12>& grad_1
-    
-    #ifdef _FRICTION_
-    , const Vector2d &_uk, double contact_lambda, const Matrix<double, 12, 2> &Tk
-    #endif
-    );
+#endif
+
+#ifdef _FRICTION_
+    ,
+    const Vector2d& _uk, double contact_lambda, const Matrix<double, 12, 2>& Tk
+#endif
+);
 
 double D_f0(double uk, double lam);

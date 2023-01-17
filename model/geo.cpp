@@ -125,8 +125,13 @@ void ipc_term_vg(AffineBody& c, int v
 
 void ipc_term(
     array<vec3, 4> pt, array<int, 4> ij,
+        #ifdef _SM_
+    SparseMatrix<double>& sparse_hess
+    #else
+
     vector<HessBlock>& triplets,
     Vector<double, 12>& grad_p, Vector<double, 12>& grad_t
+    #endif
 // Matrix<double, 12, 12>& hess_p, Matrix<double, 12, 12>& hess_t,
 #ifdef _FRICTION_
     ,
@@ -201,8 +206,12 @@ void ipc_term(
 
 void ipc_term_ee(
     array<vec3, 4> ee, array<int, 4> ij,
+        #ifdef _SM_
+    SparseMatrix<double>& sparse_hess
+    #else
     vector<HessBlock>& triplets,
     Vector<double, 12>& grad_0, Vector<double, 12>& grad_1
+    #endif
 #ifdef _FRICTION_
     ,
     const Vector2d& _uk, double contact_lambda, const Matrix<double, 12, 2>& Tk
@@ -273,6 +282,15 @@ void ipc_term_ee(
     auto hess_1 = J1.adjoint() * ipc_hess.block<6, 6>(6, 6) * J1;
     off_diag += J0.adjoint() * ipc_hess.block<6, 6>(0, 6) * J1;
     auto off_T = off_diag.adjoint();
+    #ifdef _SM_
+    for (int j = jj * 12; j < jj * 12 + 12; ++j){
+		for (SparseMatrix<double>::InnerIterator it(sparse_hess, j); it ;  ++it){
+			int i = it.row();
+			it.valueRef() = += off_diag;
+			double &a= it.valueRef();
+		}
+	}
+    #else
     #pragma omp critical
     for (int i = 0; i < 12; i++ ){
         triplets.push_back(HessBlock(ii * 12, jj * 12 + i, off_diag.block<12, 1>(0, i)));
@@ -283,5 +301,6 @@ void ipc_term_ee(
     
     grad_0 += J0.adjoint() * ee_grad.segment<6>(0);
     grad_1 += J1.adjoint() * ee_grad.segment<6>(6);
+    #endif
 }
 
