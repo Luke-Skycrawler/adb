@@ -288,15 +288,15 @@ void implicit_euler(vector<unique_ptr<AffineBody>>& cubes, double dt)
     if (globals.col_set)
         gen_collision_set(cubes);
 
-    SparseMatrix<double> sparse_hess(hess_dim, hess_dim);
+        // SparseMatrix<double> sparse_hess(hess_dim, hess_dim);
 #ifdef _SM_
     gen_empty_sm(n_cubes, idx, eidx, sparse_hess);
 #endif
     const int n_pt = idx.size(), n_ee = eidx.size(), n_g = vidx.size();
-    globals.hess_triplets.reserve(((n_pt+  n_ee) * 2 + n_cubes) * 12);
-    
+    globals.hess_triplets.reserve(((n_pt + n_ee) * 2 + n_cubes) * 12);
+
     spdlog::info("constraint size = {}, {}", n_pt, n_ee);
-    
+
     const auto E_ground = [&](const AffineBody& c, int i) -> double {
         double e = 0.0;
         const vec3& v_tile(c.vertices(i));
@@ -333,8 +333,9 @@ void implicit_euler(vector<unique_ptr<AffineBody>>& cubes, double dt)
     const auto E_global = [&](const VectorXd& q_plus_dq, const VectorXd& dq) -> double {
         double e = 0.0;
         const int n = cubes.size(), m = idx.size(), l = eidx.size();
-        // inertia energy
-        #pragma omp parallel for schedule(dynamic) reduction(+:e)
+// inertia energy
+#pragma omp parallel for schedule(dynamic) reduction(+ \
+                                                     : e)
         for (int i = 0; i < n; i++) {
             auto& c(*cubes[i]);
             c.dq = dq.segment<12>(i * 12);
@@ -344,9 +345,9 @@ void implicit_euler(vector<unique_ptr<AffineBody>>& cubes, double dt)
             double e_inert = E(_q, q_tiled, c);
             e += e_inert;
         }
-        
-        // point-triangle energy
-        #pragma omp parallel for schedule(dynamic)
+
+// point-triangle energy
+#pragma omp parallel for schedule(dynamic)
         for (int k = 0; k < m; k++) {
             auto& ij = idx[k];
             Face f(*cubes[ij[2]], ij[3], true);
@@ -364,7 +365,7 @@ void implicit_euler(vector<unique_ptr<AffineBody>>& cubes, double dt)
 
         // ee ipc energy
         for (int k = 0; k < l; k++) {
-            auto &ij(eidx[k]);
+            auto& ij(eidx[k]);
             Edge ei(*cubes[ij[0]], ij[1], true), ej(*cubes[ij[2]], ij[3], true);
             double d = ipc::edge_edge_distance(ei.e0, ei.e1, ej.e0, ej.e1);
             e += barrier_function(d);
@@ -514,15 +515,15 @@ void implicit_euler(vector<unique_ptr<AffineBody>>& cubes, double dt)
 #endif
             }
         }
-        
-        for (int k = 0; k< n_ee; k ++) {
-            auto &ee(ees[k]);
-            auto &ij(eidx[k]);
+
+        for (int k = 0; k < n_ee; k++) {
+            auto& ee(ees[k]);
+            auto& ij(eidx[k]);
             int i = ij[0], j = ij[2];
             auto &ci(*cubes[i]), &cj(*cubes[j]);
             auto ee_type = ipc::edge_edge_distance_type(ee[0], ee[1], ee[2], ee[3]);
             double d = edge_edge_distance(ee[0], ee[1], ee[2], ee[3], ee_type);
-            if(d < barrier::d_hat) {
+            if (d < barrier::d_hat) {
 
 #ifdef _FRICTION_
                 auto v_stack = ee_vstack(ci, cj, ij[1], ij[3]);
@@ -669,7 +670,7 @@ void implicit_euler(vector<unique_ptr<AffineBody>>& cubes, double dt)
                     *cubes[j], ij[3]);
                 toi = min(toi, t);
             }
-            //#pragma omp parallel for schedule(dynamic) reduction(min: toi)
+            // #pragma omp parallel for schedule(dynamic) reduction(min: toi)
             for (int k = 0; k < n_ee; k++) {
                 auto& ee(ees[k]);
                 const auto& ij(eidx[k]);
@@ -686,7 +687,9 @@ void implicit_euler(vector<unique_ptr<AffineBody>>& cubes, double dt)
 
         {
             MatrixXd big_hess;
-            clear(sparse_hess);
+            // clear(sparse_hess);
+            SparseMatrix<double> sparse_hess(hess_dim, hess_dim);
+
             big_hess.setZero(hess_dim, hess_dim);
             VectorXd r, q0_cat, q_tile_cat, dq;
             r.setZero(hess_dim);
@@ -862,9 +865,8 @@ void implicit_euler(vector<unique_ptr<AffineBody>>& cubes, double dt)
             auto iter_duration = DURATION_TO_DOUBLE (high_resolution_clock::now() - newton_iter_start);
             spdlog::info("iter {}, time = {} ms, IPC term time = {} \n e0 = {}, e1 = {}, norm_dq = {}\n", iter, iter_duration * 1000, ipc_duration
                  * 1000, E0, E1, norm_dq);
-            
         }
-        #pragma omp parallel for schedule(dynamic)
+#pragma omp parallel for schedule(dynamic)
         for (int k = 0; k < n_pt; k++) {
             auto& ij = idx[k];
             Face f(*cubes[ij[2]], ij[3]);
