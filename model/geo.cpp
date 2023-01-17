@@ -28,7 +28,7 @@ MatrixXd PSD_projection(const MatrixXd& A12x12)
     for (int i = 0; i < 12; i++) {
         lam(i) = max(lam(i), 0.0);
     }
-    return U * lam.asDiagonal() * U.adjoint();
+    return U * lam.asDiagonal() * U.transpose();
 }
 Eigen::MatrixXd project_to_psd(
     const Eigen::MatrixXd& A)
@@ -182,17 +182,17 @@ void ipc_term(
 
     mat12 ipc_hess;
     ipc_hess.setZero(12, 12);
-    // ipc_hess = PSD_projection(pt_hess  * B_) + pt_grad * pt_grad.adjoint() * B__;
-    ipc_hess = project_to_psd(pt_hess * B_) + pt_grad * pt_grad.adjoint() * B__;
+    // ipc_hess = PSD_projection(pt_hess  * B_) + pt_grad * pt_grad.transpose() * B__;
+    ipc_hess = project_to_psd(pt_hess * B_) + pt_grad * pt_grad.transpose() * B__;
     // psd project
     // ipc_hess = PSD_projection(ipc_hess);
 
     int ii = _i, jj = _j;
-    mat12 hess_p = Jp.adjoint() * ipc_hess.block<3, 3>(0, 0) * Jp;
-    mat12 hess_t = Jt.adjoint() * ipc_hess.block<9, 9>(3, 3) * Jt;
+    mat12 hess_p = Jp.transpose() * ipc_hess.block<3, 3>(0, 0) * Jp;
+    mat12 hess_t = Jt.transpose() * ipc_hess.block<9, 9>(3, 3) * Jt;
 
-    off_diag += Jp.adjoint() * ipc_hess.block<3, 9>(0, 3) * Jt;
-    mat12 off_T = off_diag.adjoint();
+    off_diag = Jp.transpose() * ipc_hess.block<3, 9>(0, 3) * Jt;
+    mat12 off_T = off_diag.transpose();
 
     pt_grad *= B_;
 #ifdef _FRICTION_
@@ -222,8 +222,8 @@ void ipc_term(
     // globals.hess_triplets.push_back({jj * 12, ii * 12, off_T});
 
 #endif
-    grad_p += Jp.adjoint() * pt_grad.segment<3>(0);
-    grad_t += Jt.adjoint() * pt_grad.segment<9>(3);
+    grad_p += Jp.transpose() * pt_grad.segment<3>(0);
+    grad_t += Jt.transpose() * pt_grad.segment<9>(3);
 }
 
 void ipc_term_ee(
@@ -275,15 +275,11 @@ void ipc_term_ee(
 
     Matrix<double, 6, 12> J0;
     Matrix<double, 6, 12> J1;
-    mat12 off_diag;
     auto ei0_tile = ci.vertices(eidxi[2 * _ei]), ei1_tile = ci.vertices(eidxi[2 * _ei + 1]),
          ej0_tile = cj.vertices(eidxj[2 * _ej]), ej1_tile = cj.vertices(eidxj[2 * _ej + 1]);
     // auto ei0_tile = vnp[eidx[2 * _ei]], ei1_tile = vnp[eidx[2 * _ei + 1]],
     //     ej0_tile = vnp[eidx[2 * _ej]], ej1_tile = vnp[eidx[2 * _ej + 1]];
 
-    J0.setZero(6, 12);
-    J1.setZero(6, 12);
-    off_diag.setZero(12, 12);
     J0.block<3, 12>(0, 0) = barrier::x_jacobian_q(ei0_tile);
     J0.block<3, 12>(3, 0) = barrier::x_jacobian_q(ei1_tile);
     J1.block<3, 12>(0, 0) = barrier::x_jacobian_q(ej0_tile);
@@ -302,10 +298,10 @@ void ipc_term_ee(
 #endif
 
     int ii = _i, jj = _j;
-    mat12 hess_0 = J0.adjoint() * ipc_hess.block<6, 6>(0, 0) * J0;
-    mat12 hess_1 = J1.adjoint() * ipc_hess.block<6, 6>(6, 6) * J1;
-    off_diag += J0.adjoint() * ipc_hess.block<6, 6>(0, 6) * J1;
-    mat12 off_T = off_diag.adjoint();
+    mat12 hess_0 = J0.transpose() * ipc_hess.block<6, 6>(0, 0) * J0;
+    mat12 hess_1 = J1.transpose() * ipc_hess.block<6, 6>(6, 6) * J1;
+    mat12 off_diag = J0.transpose() * ipc_hess.block<6, 6>(0, 6) * J1;
+    mat12 off_T = off_diag.transpose();
     #ifdef _SM_
     auto outers = sparse_hess.outerIndexPtr();
     auto values = sparse_hess.valuePtr();
@@ -329,7 +325,7 @@ void ipc_term_ee(
     }
 
 #endif
-    grad_0 += J0.adjoint() * ee_grad.segment<6>(0);
-    grad_1 += J1.adjoint() * ee_grad.segment<6>(6);
+    grad_0 += J0.transpose() * ee_grad.segment<6>(0);
+    grad_1 += J1.transpose() * ee_grad.segment<6>(6);
 }
 

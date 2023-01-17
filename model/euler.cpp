@@ -45,7 +45,7 @@ VectorXd AffineBody::q_tile(double dt, const vec3& f) const
 
 void implicit_euler(vector<unique_ptr<AffineBody>>& cubes, double dt)
 {
-
+    spdlog::set_level(spdlog::level::err);
     bool term_cond;
     static int ts = 0;
     int iter = 0;
@@ -179,6 +179,7 @@ void implicit_euler(vector<unique_ptr<AffineBody>>& cubes, double dt)
                     }
                 }
             }
+            spatial_hashing::remove_all_entries();
 #else
 #pragma omp parallel for schedule(dynamic)
             for (int I = 0; I < nsqr; I++) {
