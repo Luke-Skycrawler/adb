@@ -288,9 +288,11 @@ void implicit_euler(vector<unique_ptr<AffineBody>>& cubes, double dt)
     if (globals.col_set)
         gen_collision_set(cubes);
 
-        // SparseMatrix<double> sparse_hess(hess_dim, hess_dim);
 #ifdef _SM_
-    gen_empty_sm(n_cubes, idx, eidx, sparse_hess);
+    map<array<int, 2>, int> lut;
+    // look-up table
+    SparseMatrix<double> sparse_hess(hess_dim, hess_dim);
+    gen_empty_sm(n_cubes, idx, eidx, sparse_hess, lut);
 #endif
     const int n_pt = idx.size(), n_ee = eidx.size(), n_g = vidx.size();
     globals.hess_triplets.reserve(((n_pt + n_ee) * 2 + n_cubes) * 12);
@@ -441,7 +443,11 @@ void implicit_euler(vector<unique_ptr<AffineBody>>& cubes, double dt)
 #endif
             }
         }
-
+        
+        #ifdef _SM_
+        clear(sparse_hess);
+        #endif
+        
         auto ipc_start = high_resolution_clock::now();
         for (int k = 0; k < n_pt; k++) {
             auto& pt(pts[k]);
@@ -505,13 +511,25 @@ void implicit_euler(vector<unique_ptr<AffineBody>>& cubes, double dt)
                 // auto contact_force_lam = - barrier_derivative_d(d) / (dt * dt) * 2 * sqrt(d);
                 Vector2d uk = Tk_T * v_stack;
                 auto contact_force = -barrier_derivative_d(d) / (dt * dt) * 2 * sqrt(d);
+                pt_tk[k] = Tk_T;
 
                 ipc_term(
-                    pt, ij, globals.hess_triplets, ci.grad, cj.grad,
-                    uk, contact_force, Tk_T.transpose());
-                ee_tk[k] = Tk_T;
+                    pt, ij,
+#ifdef _SM_
+                    lut, sparse_hess,
 #else
-                ipc_term(pt, ij, globals.hess_triplets, ci.grad, cj.grad);
+                    globals.hess_triplets,
+#endif
+                    ci.grad, cj.grad,
+                    uk, contact_force, Tk_T.transpose());
+#else
+                ipc_term(pt, ij,
+#ifdef _SM_
+                    lut, sparse_hess,
+#else
+                    globals.hess_triplets,
+#endif
+                    ci.grad, cj.grad);
 #endif
             }
         }
@@ -605,14 +623,28 @@ void implicit_euler(vector<unique_ptr<AffineBody>>& cubes, double dt)
                 // auto contact_force_lam = barrier_derivative_d(d) / (dt * dt) * 2 * sqrt(d);
                 Vector2d uk = Tk_T * v_stack;
                 auto contact_force = -barrier_derivative_d(d) / (dt * dt) * 2 * sqrt(d);
+                ee_tk[k] = Tk_T;
 
                 ipc_term_ee(
-                    ee, ij, globals.hess_triplets, ci.grad, cj.grad,
+                    ee, ij,
+#ifdef _SM_
+                    lut, sparse_hess,
+#else
+                    globals.hess_triplets,
+#endif
+                    ci.grad, cj.grad,
                     uk, contact_force, Tk_T.transpose());
 
-                ee_tk[k] = Tk_T;
+
+
 #else
-                ipc_term_ee(ee, ij, globals.hess_triplets, ci.grad, cj.grad);
+                ipc_term_ee(ee, ij,
+#ifdef _SM_
+                    lut, sparse_hess,
+#else
+                    globals.hess_triplets,
+#endif
+                    ci.grad, cj.grad);
 #endif
             }
         }
@@ -687,8 +719,6 @@ void implicit_euler(vector<unique_ptr<AffineBody>>& cubes, double dt)
 
         {
             MatrixXd big_hess;
-            // clear(sparse_hess);
-            SparseMatrix<double> sparse_hess(hess_dim, hess_dim);
 
             big_hess.setZero(hess_dim, hess_dim);
             VectorXd r, q0_cat, q_tile_cat, dq;
@@ -705,6 +735,7 @@ void implicit_euler(vector<unique_ptr<AffineBody>>& cubes, double dt)
             }
 
 #ifndef _SM_
+            SparseMatrix<double> sparse_hess(hess_dim, hess_dim);
             vector<int> starting_point;
             starting_point.resize(n_cubes * 12);
             static const auto merge_triplets = [&](vector<HessBlock>& triplets) {
@@ -785,8 +816,21 @@ void implicit_euler(vector<unique_ptr<AffineBody>>& cubes, double dt)
                     // insert(bht, triplet.block, triplet.i * 12, triplet.j * 12);
                     insert2(sparse_hess, k);
             }
-#endif
 
+#else 
+            for (int k = 0; k < n_cubes; k++) {
+                auto& c = *cubes[k];
+                double * values = sparse_hess.valuePtr();
+                int * outers = sparse_hess.outerIndexPtr();
+                int offset = starting_offset(k, k, lut, outers);
+                int _stride = stride(k, outers);
+                for (int j = 0; j < 12; j++)
+                    for (int i = 0; i < 12; i++) {
+                        values[offset + _stride * j + i] += c.hess(i, j);
+                    }
+            }
+
+#endif
             const auto damping_dense = [&]() {
                 MatrixXd D = globals.beta * big_hess;
                 for (int i = 0; i < n_cubes; i++) {

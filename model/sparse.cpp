@@ -10,7 +10,9 @@ void gen_empty_sm(
     int n_cubes,
     vector<array<int, 4>>& idx,
     vector<array<int, 4>>& eidx,
-    SparseMatrix<double>& sparse_hess)
+    SparseMatrix<double>& sparse_hess,
+    map<array<int, 2>, int>& lut
+    )
 {
     set<array<int, 2>> cset;
     const auto insert = [&](int a, int b) {
@@ -31,7 +33,9 @@ void gen_empty_sm(
                 for (int c = 0; c < 12; c++) {
                     auto cc = c + col * 12;
                     sparse_hess.startVec(cc);
+                    int k = 0;
                     for (auto kt = it; kt != jt; ++kt) {
+                        lut[*kt] = k++;
                         auto row = (*kt)[1];
                         for (int r = 0; r < 12; r++) {
                             auto rr = row * 12 + r;
@@ -43,7 +47,6 @@ void gen_empty_sm(
         }
     }
     sparse_hess.makeCompressed();
-    exit(0);
 }
 
 void clear(SparseMatrix<double>& sm)
