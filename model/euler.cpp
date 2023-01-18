@@ -843,14 +843,15 @@ void implicit_euler(vector<unique_ptr<AffineBody>>& cubes, double dt)
 
             const auto damping_sparse = [&]() {
                 SparseMatrix<double> D = globals.beta * sparse_hess;
+                double dab = globals.alpha - globals.beta;
                 for (int i = 0; i < n_cubes; i++) {
-                    for (int j = 0; j < 3; j++) { D.coeffRef(i * 12 + j, i * 12 + j) += cubes[i]->mass; }
-                    for (int j = 3; j < 12; j++) { D.coeffRef(i * 12 + j, i * 12 + j) += cubes[i]->Ic; }
+                    for (int j = 0; j < 3; j++) { D.coeffRef(i * 12 + j, i * 12 + j) += cubes[i]->mass * dab; }
+                    for (int j = 3; j < 12; j++) { D.coeffRef(i * 12 + j, i * 12 + j) += cubes[i]->Ic * dab; }
                 }
-                big_hess += D / dt;
+                sparse_hess += D / dt;
             };
 
-            // damping();
+            damping_sparse();
             auto solver_start = high_resolution_clock::now();
 
             if (globals.dense)

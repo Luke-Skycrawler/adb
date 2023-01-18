@@ -4,7 +4,7 @@
     "predefined_case" : {
         "enable": false,
         "id" : 2,
-        "custom": "../test_cases/blocks.json"
+        "custom": "../test_cases/case.json"
     },
     "solver": "sparse",
     "gravity": true, 
@@ -17,8 +17,15 @@
     "uppper_bound": true, 
     "mu": 0.0,
     "damping": {
-        "alpha": 0.0,
-        "beta": 0.0
+        "alpha": 2.3e-5,
+        "beta": 2.5e-5
     },
-    "psd": false
+    "psd": false,
+    "spatial hashing": {
+        "min_xyz": -2.0,
+        "max_xyz": 2.0,
+        "dx": 0.02,
+        "n_buffer": 64,
+        "xyz_bits": 7
+    }
 }
