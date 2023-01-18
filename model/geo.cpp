@@ -16,6 +16,7 @@ void put(double* values, int offset, int _stride, Matrix<double, 12, 12>& block)
 {
     for (int j = 0; j < 12; j++)
         for (int i = 0; i < 12; i++) {
+#pragma omp atomic
             values[offset + _stride * j + i] += block(i, j);
         }
 }
@@ -183,7 +184,10 @@ void ipc_term(
     mat12 ipc_hess;
     ipc_hess.setZero(12, 12);
     // ipc_hess = PSD_projection(pt_hess  * B_) + pt_grad * pt_grad.transpose() * B__;
-    ipc_hess = project_to_psd(pt_hess * B_) + pt_grad * pt_grad.transpose() * B__;
+    if (globals.psd)
+        ipc_hess = project_to_psd(pt_hess * B_) + pt_grad * pt_grad.transpose() * B__;
+    else
+        ipc_hess = pt_hess * B_ + pt_grad * pt_grad.transpose() * B__;
     // psd project
     // ipc_hess = PSD_projection(ipc_hess);
 
@@ -205,10 +209,6 @@ void ipc_term(
 
     auto stride_j = stride(jj, outers), stride_i = stride(ii, outers);
     auto oii = starting_offset(ii, ii, lut, outers), ojj = starting_offset(jj, jj, lut, outers), oij = starting_offset(ii, jj, lut, outers), oji = starting_offset(jj, ii, lut, outers);
-    put(values, oij, stride_j, off_diag);
-    put(values, oji, stride_i, off_T);
-    put(values, oii, stride_i, hess_p);
-    put(values, ojj, stride_j, hess_t);
 #endif
 #ifdef _TRIPLETS_
 
@@ -222,8 +222,21 @@ void ipc_term(
     // globals.hess_triplets.push_back({jj * 12, ii * 12, off_T});
 
 #endif
-    grad_p += Jp.transpose() * pt_grad.segment<3>(0);
-    grad_t += Jt.transpose() * pt_grad.segment<9>(3);
+    Vector<double, 12> dgp, dgt;
+    dgp = Jp.transpose() * pt_grad.segment<3>(0);
+    dgt = Jt.transpose() * pt_grad.segment<9>(3);
+    {
+        for (int i = 0; i < 12; i++) {
+#pragma omp atomic
+            grad_p(i) += dgp(i);
+#pragma omp atomic
+            grad_t(i) += dgt(i);
+        }
+        put(values, oij, stride_j, off_diag);
+        put(values, oji, stride_i, off_T);
+        put(values, oii, stride_i, hess_p);
+        put(values, ojj, stride_j, hess_t);
+    }
 }
 
 void ipc_term_ee(
@@ -249,7 +262,7 @@ void ipc_term_ee(
     auto *eidxi = ci.edges, *eidxj = cj.edges;
 
     auto ei0 = ee[0], ei1 = ee[1],
-        ej0 = ee[2], ej1 = ee[3];
+         ej0 = ee[2], ej1 = ee[3];
     Vector<double, 12> ee_grad, p_grad;
     Matrix<double, 12, 12> ee_hess, p_hess;
     double eps_x = 1e-3;
@@ -269,9 +282,8 @@ void ipc_term_ee(
     double B_ = barrier::barrier_derivative_d(dist);
     double B__ = barrier::barrier_second_derivative(dist);
     double B = barrier::barrier_function(dist);
-    
 
-    //spdlog::info("dist = {}, B = {}, B__ = {}", dist, B_, B__);
+    // spdlog::info("dist = {}, B = {}, B__ = {}", dist, B_, B__);
 
     Matrix<double, 6, 12> J0;
     Matrix<double, 6, 12> J1;
@@ -289,7 +301,8 @@ void ipc_term_ee(
     ipc_hess.setZero(12, 12);
     ipc_hess = p_hess * B + B_ * (p_grad * ee_grad.transpose() + ee_grad * p_grad.transpose()) + p * (B__ * ee_grad * ee_grad.transpose() + B_ * ee_hess);
     // ipc_hess = B__ * ee_grad * ee_grad.transpose() + project_to_psd(B_ * ee_hess);
-    ipc_hess = project_to_psd(ipc_hess);
+    if (globals.psd)
+        ipc_hess = project_to_psd(ipc_hess);
 
     ee_grad = p * ee_grad * B_ + p_grad * B;
 
@@ -302,22 +315,18 @@ void ipc_term_ee(
     mat12 hess_1 = J1.transpose() * ipc_hess.block<6, 6>(6, 6) * J1;
     mat12 off_diag = J0.transpose() * ipc_hess.block<6, 6>(0, 6) * J1;
     mat12 off_T = off_diag.transpose();
-    #ifdef _SM_
+#ifdef _SM_
     auto outers = sparse_hess.outerIndexPtr();
     auto values = sparse_hess.valuePtr();
 
     auto stride_j = stride(jj, outers), stride_i = stride(ii, outers);
     auto oii = starting_offset(ii, ii, lut, outers), ojj = starting_offset(jj, jj, lut, outers), oij = starting_offset(ii, jj, lut, outers), oji = starting_offset(jj, ii, lut, outers);
-    put(values, oij, stride_j, off_diag);
-    put(values, oji, stride_i, off_T);
-    put(values, oii, stride_i, hess_0);
-    put(values, ojj, stride_j, hess_1);
 
 #endif
 #ifdef _TRIPLETS_
 
 #pragma omp critical
-    for (int i = 0; i < 12; i++ ){
+    for (int i = 0; i < 12; i++) {
         triplets.push_back(HessBlock(ii * 12, jj * 12 + i, off_diag.block<12, 1>(0, i)));
         triplets.push_back(HessBlock(jj * 12, ii * 12 + i, off_T.block<12, 1>(0, i)));
         triplets.push_back(HessBlock(ii * 12, ii * 12 + i, hess_0.block<12, 1>(0, i)));
@@ -325,7 +334,20 @@ void ipc_term_ee(
     }
 
 #endif
-    grad_0 += J0.transpose() * ee_grad.segment<6>(0);
-    grad_1 += J1.transpose() * ee_grad.segment<6>(6);
+    Vector<double, 12> d0, d1;
+    d0 = J0.transpose() * ee_grad.segment<6>(0);
+    d1 = J1.transpose() * ee_grad.segment<6>(6);
+    {
+        for (int i = 0; i < 12; i++) {
+#pragma omp atomic
+            grad_0(i) += d0(i);
+#pragma omp atomic
+            grad_1(i) += d1(i);
+        }
+        put(values, oij, stride_j, off_diag);
+        put(values, oji, stride_i, off_T);
+        put(values, oii, stride_i, hess_0);
+        put(values, ojj, stride_j, hess_1);
+        // FIXME: atomic add
+    }
 }
-

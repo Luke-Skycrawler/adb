@@ -4,7 +4,7 @@
 #include <array>
 #include <map>
 #include "../view/global_variables.h"
-#define _FRICTION_
+// #define _FRICTION_
 #define _SM_
 // #define _TRIPLETS_
 // double vf_collision_time(const vec3& x, const vec3& p, const mat3& q, const vec3& p_next, const mat3& q_next);
@@ -57,3 +57,4 @@ void ipc_term_ee(
 );
 
 double D_f0(double uk, double lam);
+double collision_time (AffineBody& c, int i);

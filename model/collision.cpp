@@ -60,6 +60,28 @@ double ee_collision_detect(const AffineBody& ci, const AffineBody& cj, int eid_i
     return toi;
 }
 
+double collision_time(AffineBody& c, int i)
+{
+    double toi = 1.0;
+    const vec3 v_t2(c.vt2(i));
+    const vec3 v_t1(c.vt1(i));
+
+    double d2 = vg_distance(v_t2);
+    double d1 = vg_distance(v_t1);
+    assert(d1 > 0);
+    if (d2 < 0) {
+
+        double t = d1 / (d1 - d2);
+        auto vtoi = v_t2 * (t * 0.8) + v_t1 * (1 - t * 0.8);
+        double dtoi = vg_distance(vtoi);
+        spdlog::error("dtoi = {}, d0 = {}, d1 = {}, toi = {}", dtoi, d1, d2, t);
+
+        assert(dtoi > 0.0);
+        assert(t > 0.0 && t < 1.0);
+        toi = min(toi, t);
+    }
+    return toi;
+};
 // vector<pair<vec3, Face>> vf_colliding_set(const Cube &ci, const Cube &cj) {
 
 // int vf_colliding_response(int __i, int __j)

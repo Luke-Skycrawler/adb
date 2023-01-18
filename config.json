@@ -8,7 +8,7 @@
     },
     "solver": "sparse",
     "gravity": true, 
-    "line_search": false,
+    "line_search": true,
     "col_set": true,
     "ee": true,
     "pt": true,
@@ -19,5 +19,6 @@
     "damping": {
         "alpha": 0.0,
         "beta": 0.0
-    }
+    },
+    "psd": false
 }

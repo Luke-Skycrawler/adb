@@ -12,6 +12,7 @@
 #include <algorithm>
 #include <chrono>
 #include "spatial_hashing.h"
+#include <Eigen/PardisoSupport>
 using namespace std;
 using namespace barrier;
 using namespace Eigen;
@@ -45,7 +46,7 @@ VectorXd AffineBody::q_tile(double dt, const vec3& f) const
 
 void implicit_euler(vector<unique_ptr<AffineBody>>& cubes, double dt)
 {
-    spdlog::set_level(spdlog::level::err);
+    // spdlog::set_level(spdlog::level::err);
     bool term_cond;
     static int ts = 0;
     int iter = 0;
@@ -147,7 +148,7 @@ void implicit_euler(vector<unique_ptr<AffineBody>>& cubes, double dt)
         if (globals.pt) {
 #ifdef SPATIAL_HASHING_H
 // #pragma omp parallel for schedule(dynamic)
-            for (unsigned I = 0; I < n_cubes; I++) {
+            for (int I = 0; I < n_cubes; I++) {
                 auto& ci(*cubes[I]);
                 for (unsigned v = 0; v < ci.n_vertices; v++) {
                     vec3 p = ci.vt1(v);
@@ -155,7 +156,7 @@ void implicit_euler(vector<unique_ptr<AffineBody>>& cubes, double dt)
                 }
             }
 #pragma omp parallel for schedule(dynamic)
-            for (unsigned J = 0; J < n_cubes; J++) {
+            for (int J = 0; J < n_cubes; J++) {
                 auto& cj(*cubes[J]);
                 for (unsigned f = 0; f < cj.n_faces; f++) {
                     Face _f(cj, f);
@@ -227,7 +228,7 @@ void implicit_euler(vector<unique_ptr<AffineBody>>& cubes, double dt)
                 }
             }
 #pragma omp parallel for schedule(dynamic)
-            for (unsigned J = 0; J < n_cubes; J++) {
+            for (int J = 0; J < n_cubes; J++) {
                 auto& cj(*cubes[J]);
                 for (unsigned ej = 0; ej < cj.n_edges; ej++) {
                     Edge e{ cj, ej };
@@ -335,7 +336,7 @@ void implicit_euler(vector<unique_ptr<AffineBody>>& cubes, double dt)
     // };
     const auto E_global = [&](const VectorXd& q_plus_dq, const VectorXd& dq) -> double {
         double e = 0.0;
-        const int n = cubes.size(), m = idx.size(), l = eidx.size();
+        const int n = cubes.size(), m = idx.size(), l = eidx.size(), n_vidx = vidx.size();
 // inertia energy
 #pragma omp parallel for schedule(dynamic) reduction(+ \
                                                      : e)
@@ -350,7 +351,8 @@ void implicit_euler(vector<unique_ptr<AffineBody>>& cubes, double dt)
         }
 
 // point-triangle energy
-#pragma omp parallel for schedule(dynamic)
+#pragma omp parallel for schedule(dynamic) reduction(+ \
+                                                     : e)
         for (int k = 0; k < m; k++) {
             auto& ij = idx[k];
             Face f(*cubes[ij[2]], ij[3], true);
@@ -367,6 +369,8 @@ void implicit_euler(vector<unique_ptr<AffineBody>>& cubes, double dt)
         }
 
         // ee ipc energy
+#pragma omp parallel for schedule(dynamic) reduction(+ \
+                                                     : e)
         for (int k = 0; k < l; k++) {
             auto& ij(eidx[k]);
             Edge ei(*cubes[ij[0]], ij[1], true), ej(*cubes[ij[2]], ij[3], true);
@@ -381,18 +385,23 @@ void implicit_euler(vector<unique_ptr<AffineBody>>& cubes, double dt)
         }
 
         // vertex-ground ipc energy
-        for (auto v : vidx) {
+#pragma omp parallel for schedule(dynamic) reduction(+ \
+                                                     : e)
+        for (int k = 0; k < n_vidx; k++) {
+            auto& v{
+                vidx[k]
+            };
             double e_ground = E_ground(*cubes[v[0]], v[1]);
             e += e_ground;
         }
         return e;
     };
 
-    const auto line_search = [&](const VectorXd& dq, const VectorXd& grad, VectorXd& q0) -> double {
+    const auto line_search = [&](const VectorXd& dq, const VectorXd& grad, VectorXd& q0, double& E0, double& E1) -> double {
         const double c1 = 1e-4;
         double alpha = 1.0;
         bool wolfe = false;
-        double E0 = E_global(q0, 0.0 * dq);
+        E0 = E_global(q0, 0.0 * dq);
         double qdg = dq.dot(grad);
         // double E0 = E(q0, q_tiled, c);
         VectorXd q1;
@@ -400,7 +409,7 @@ void implicit_euler(vector<unique_ptr<AffineBody>>& cubes, double dt)
             q1 = q0 + dq * alpha;
             auto dqk = dq * alpha;
 
-            double E1 = E_global(q1, dqk);
+            E1 = E_global(q1, dqk);
             wolfe = E1 <= E0 + c1 * alpha * qdg;
             // spdlog::info("wanted descend = {}, E1 - E0 = {}, E1 = {}, E0 = {}, alpha = {}", c1 * alpha * qdg, E1 - E0, E1, E0, alpha);
             alpha /= 2;
@@ -450,6 +459,8 @@ void implicit_euler(vector<unique_ptr<AffineBody>>& cubes, double dt)
         #endif
         
         auto ipc_start = high_resolution_clock::now();
+#pragma omp parallel for schedule(dynamic)
+
         for (int k = 0; k < n_pt; k++) {
             auto& pt(pts[k]);
             auto& ij(idx[k]);
@@ -527,16 +538,16 @@ void implicit_euler(vector<unique_ptr<AffineBody>>& cubes, double dt)
 #else
                 ipc_term(pt, ij,
 #ifdef _SM_
-#ifdef _TRIPLETS_
                     lut, sparse_hess,
 #endif
+#ifdef _TRIPLETS_
                     globals.hess_triplets,
 #endif
                     ci.grad, cj.grad);
 #endif
             }
         }
-
+#pragma omp parallel for schedule(dynamic)
         for (int k = 0; k < n_ee; k++) {
             auto& ee(ees[k]);
             auto& ij(eidx[k]);
@@ -656,27 +667,6 @@ void implicit_euler(vector<unique_ptr<AffineBody>>& cubes, double dt)
 
         auto ipc_duration = DURATION_TO_DOUBLE(high_resolution_clock::now() - ipc_start);
 
-        const auto collision_time = [&](AffineBody& c, int i) {
-            double toi = 1.0;
-            const vec3 v_t2(c.vt2(i));
-            const vec3 v_t1(c.vt1(i));
-
-            double d2 = vg_distance(v_t2);
-            double d1 = vg_distance(v_t1);
-            assert(d1 > 0);
-            if (d2 < 0) {
-
-                double t = d1 / (d1 - d2);
-                auto vtoi = v_t2 * (t * 0.8) + v_t1 * (1 - t * 0.8);
-                double dtoi = vg_distance(vtoi);
-                spdlog::error("dtoi = {}, d0 = {}, d1 = {}, toi = {}", dtoi, d1, d2, t);
-
-                assert(dtoi > 0.0);
-                assert(t > 0.0 && t < 1.0);
-                toi = min(toi, t);
-            }
-            return toi;
-        };
         const auto norm_1 = [&](VectorXd& dq) -> double {
             double norm = 0.0;
             for (int i = 0; i < n_cubes; i++) {
@@ -694,7 +684,9 @@ void implicit_euler(vector<unique_ptr<AffineBody>>& cubes, double dt)
                 double t = collision_time(*cubes[v[0]], v[1]);
                 toi = min(t, toi);
             }
-            // #pragma omp parallel for schedule(dynamic) reduction(min: toi)
+            vector<double> tois;
+            tois.resize(n_pt + n_ee);
+#pragma omp parallel for schedule(dynamic)
             for (int k = 0; k < n_pt; k++) {
                 auto& pt(pts[k]);
                 const auto& ij(idx[k]);
@@ -705,17 +697,20 @@ void implicit_euler(vector<unique_ptr<AffineBody>>& cubes, double dt)
                 vec3 p_t1 = cubes[i]->vt1(ij[1]);
                 double t = vf_collision_detect(p_t1, p_t2,
                     *cubes[j], ij[3]);
-                toi = min(toi, t);
+                tois[k] = t;
+                // toi = min(toi, t);
             }
-            // #pragma omp parallel for schedule(dynamic) reduction(min: toi)
+#pragma omp parallel for schedule(dynamic)
             for (int k = 0; k < n_ee; k++) {
                 auto& ee(ees[k]);
                 const auto& ij(eidx[k]);
 
                 auto &ci(*cubes[ij[0]]), &cj(*cubes[ij[2]]);
                 double t = ee_collision_detect(ci, cj, ij[1], ij[3]);
-                toi = min(toi, t);
+                tois[k + n_pt] = t;
+                // toi = min(toi, t);
             }
+            for (auto t : tois) toi = min(toi, t);
             auto _duration = DURATION_TO_DOUBLE(high_resolution_clock::now() - start);
             spdlog::info("time: step size upper bound = {:0.6f} ms", _duration * 1000);
             return toi;
@@ -863,7 +858,8 @@ void implicit_euler(vector<unique_ptr<AffineBody>>& cubes, double dt)
             else if (globals.sparse) {
                 // sparse_hess.setFromTriplets(bht.begin(), bht.end());
                 // sparse_hess.finalize();
-                SimplicialLDLT<SparseMatrix<double>> ldlt_solver;
+                // SimplicialLDLT<SparseMatrix<double>> ldlt_solver;
+                PardisoLDLT<SparseMatrix<double>> ldlt_solver;
                 ldlt_solver.compute(sparse_hess);
                 dq = -ldlt_solver.solve(r);
 #ifdef _TRIPLET_
@@ -908,11 +904,11 @@ void implicit_euler(vector<unique_ptr<AffineBody>>& cubes, double dt)
             dq *= factor * toi;
 
             alpha = 1.0;
+            double E0 = 0.0, E1 = 0.0;
             if (globals.line_search)
-                alpha = line_search(dq, r, q0_cat);
+                alpha = line_search(dq, r, q0_cat, E0, E1);
             spdlog::info("alpha = {}", alpha);
             dq *= alpha;
-            double E0 = E_global(q0_cat, dq * 0.0), E1 = E_global(q0_cat + dq, dq);
             double norm_dq = dq.norm();
             sup_dq = norm_dq;
             #pragma omp parallel for schedule(dynamic)

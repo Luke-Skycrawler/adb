@@ -21,6 +21,7 @@ void reset(){
     globals.ee = data["ee"];
     globals.pt = data["pt"];
     globals.ground = data["ground"];
+    globals.psd = data["psd"];
     if (predefined) {
         int id = data["predefined_case"]["id"];
         if (id == 1) {

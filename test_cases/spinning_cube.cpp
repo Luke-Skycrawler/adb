@@ -37,6 +37,7 @@ unique_ptr<Cube> spinning_cube()
 
 void cube_blocks(int n)
 {
+    globals.cubes.clear();
     for (int i = 0; i < n; i++) {
         auto _cube = make_unique<Cube>();
         auto& cube = *_cube;
@@ -55,6 +56,7 @@ void customize(string file)
     vector<Cube> cubes;
     std::fstream f(file);
     json data = json::parse(f);
+    globals.cubes.clear();
     for (auto &it: data) {
         bool isobj = it.find("obj") != it.end();
         string objfile = isobj ? it["obj"] : "";
