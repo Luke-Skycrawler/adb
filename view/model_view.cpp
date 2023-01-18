@@ -36,8 +36,8 @@ void render_cubes(Shader shader, vector<unique_ptr<AffineBody>> &cubes)
 int main()
 {
     Cube::gen_indices();
-    omp_set_num_threads(8);
-    setNbThreads(8);
+    omp_set_num_threads(16);
+    setNbThreads(16);
     initParallel();
     // glfw: initialize and configure
     // ------------------------------
@@ -221,7 +221,7 @@ int main()
 
     lightingShader.setFloat("material.shininess", 64);
 
-    reset();
+    reset(true);
     // be sure to call after glfw intiailzation 
 
     // render loop

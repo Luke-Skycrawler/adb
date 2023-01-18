@@ -6,23 +6,7 @@
 #include <spdlog/spdlog.h>
 
 using namespace std;
-using namespace spatial_hashing;
-
-namespace spatial_hashing {
-
-// static unordered_map<hi, unique_ptr<BodyGroup>> pt_table;
-// static unordered_map<hi, unique_ptr<BodyGroup>> ee_table;
-
-static const int vec3_compressed_bits = 8, n_entries = 1 << (vec3_compressed_bits * 3), n_overflow_buffer = 8,
-                 n_l1_bitmap = n_entries >> 10, n_l2_bitmap = n_entries >> 5, n_buffer = 16;
-static element_type count[n_entries], count_overflow;
-static Primitive overflow[n_overflow_buffer], hashtable[n_entries * n_buffer];
-
-static bool bitmap_l1[n_l1_bitmap], bitmap_l2[n_l2_bitmap];
-
-static const double MIN_XYZ = -10.0f, MAX_XYZ = 10.0f, dx = 0.2;
-
-hi hash(const vec3i& grid_index)
+hi spatial_hashing::hash(const vec3i& grid_index)
 {
     static const hi mask = (1 << vec3_compressed_bits) - 1;
     hi ret = 0;
@@ -33,13 +17,20 @@ hi hash(const vec3i& grid_index)
     return ret;
 }
 
-vec3i tovec3i(const vec3& f)
+vec3i spatial_hashing::tovec3i(const vec3& f)
 {
     vec3i u = ((f.array() - MIN_XYZ).max(0.0) / dx).cast<int>();
     return u;
 }
 
-void register_interval(const vec3i& l, const vec3i& u, const Primitive& t)
+spatial_hashing::spatial_hashing(
+    int vec3_compressed_bits, int n_buffer,
+    double MIN_XYZ, double MAX_XYZ, double dx)
+    : vec3_compressed_bits(vec3_compressed_bits), n_entries(1 << (vec3_compressed_bits * 3)), n_overflow_buffer(8), n_l1_bitmap(n_entries >> 10), n_l2_bitmap(n_entries >> 5), n_buffer(n_buffer), MIN_XYZ(MIN_XYZ), MAX_XYZ(MAX_XYZ), dx(dx), count(new element_type[n_entries]), overflow(new Primitive[n_overflow_buffer]), hashtable(new Primitive[n_entries * n_buffer]), bitmap_l1(new bool[n_l1_bitmap]), bitmap_l2(new bool[n_l2_bitmap])
+{
+}
+
+void spatial_hashing::register_interval(const vec3i& l, const vec3i& u, const Primitive& t)
 {
     for (int i = l(0); i <= u(0); i++)
         for (int j = l(1); j <= u(1); j++)
@@ -62,7 +53,7 @@ void register_interval(const vec3i& l, const vec3i& u, const Primitive& t)
             }
 }
 
-vector<Primitive> query_interval(const vec3i& l, const vec3i& u, element_type body_exl)
+vector<Primitive> spatial_hashing::query_interval(const vec3i& l, const vec3i& u, element_type body_exl)
 {
     const auto cmp = [](const Primitive& a, const Primitive& b) {
         return a.body < b.body || (a.body == b.body && a.pid < b.pid);
@@ -90,7 +81,7 @@ vector<Primitive> query_interval(const vec3i& l, const vec3i& u, element_type bo
     return val;
 }
 
-void remove_all_entries()
+void spatial_hashing::remove_all_entries()
 {
     count_overflow = 0;
     for (int i = 0; i < n_l1_bitmap; i++)
@@ -104,7 +95,7 @@ void remove_all_entries()
         }
 }
 
-void register_edge(const vec3& a, const vec3& b, element_type body, element_type pid)
+void spatial_hashing::register_edge(const vec3& a, const vec3& b, element_type body, element_type pid)
 {
     vec3i ia(tovec3i(a)), ib(tovec3i(b));
     vec3i u = ia.cwiseMax(ib);
@@ -112,7 +103,7 @@ void register_edge(const vec3& a, const vec3& b, element_type body, element_type
     register_interval(l, u, { pid, body });
 }
 
-vector<Primitive> query_edge(const vec3& a, const vec3& b, element_type group_exl, double dhat)
+vector<Primitive> spatial_hashing::query_edge(const vec3& a, const vec3& b, element_type group_exl, double dhat)
 {
     vec3 _u = a.cwiseMax(b).array() + dhat;
     vec3 _l = a.cwiseMin(b).array() - dhat;
@@ -121,13 +112,13 @@ vector<Primitive> query_edge(const vec3& a, const vec3& b, element_type group_ex
     return query_interval(l, u, group_exl);
 }
 
-void register_vertex(const vec3& a, element_type body, element_type pid)
+void spatial_hashing::register_vertex(const vec3& a, element_type body, element_type pid)
 {
     vec3i ia(tovec3i(a));
     register_interval(ia, ia, { pid, body });
 }
 
-vector<Primitive> query_triangle(const vec3& a, const vec3& b, const vec3& c, element_type group_exl, double dhat)
+vector<Primitive> spatial_hashing::query_triangle(const vec3& a, const vec3& b, const vec3& c, element_type group_exl, double dhat)
 {
     vec3 _u = a.cwiseMax(b).cwiseMax(c).array() + dhat;
     vec3 _l = a.cwiseMin(b).cwiseMin(c).array() - dhat;
@@ -135,4 +126,3 @@ vector<Primitive> query_triangle(const vec3& a, const vec3& b, const vec3& c, el
     vec3i l = tovec3i(_l);
     return query_interval(l, u, group_exl);
 }
-};

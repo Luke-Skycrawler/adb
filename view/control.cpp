@@ -6,7 +6,8 @@
 #include <fstream> 
 #include <nlohmann/json.hpp>
 using json = nlohmann::json;
-void reset(){
+void reset(bool init)
+{
     std::ifstream f("../config.json");
     json data = json::parse(f);
     double dt = data["dt"];
@@ -44,6 +45,10 @@ void reset(){
         globals.beta = data["damping"]["beta"];
         globals.safe_factor = data["safe_factor"];
         globals.mu = data["mu"];
+    }
+    if (init) {
+        auto sh_args = data["spatial hashing"];
+        globals.sh = make_unique<spatial_hashing>(sh_args["xyz_bits"], sh_args["n_buffer"], sh_args["min_xyz"], sh_args["max_xyz"], sh_args["dx"]);
     }
 }
 // process all input: query GLFW whether relevant keys are pressed/released this frame and react accordingly
