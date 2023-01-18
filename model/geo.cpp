@@ -133,7 +133,7 @@ void ipc_term_vg(AffineBody& c, int v
 void ipc_term(
     array<vec3, 4> pt, array<int, 4> ij,
 #ifdef _SM_
-    std::map<std::array<int, 2>, int>& lut,
+    const std::map<std::array<int, 2>, int>& lut,
     SparseMatrix<double>& sparse_hess,
 #endif
 #ifdef _TRIPLETS_
@@ -242,7 +242,7 @@ void ipc_term(
 void ipc_term_ee(
     array<vec3, 4> ee, array<int, 4> ij,
 #ifdef _SM_
-    std::map<std::array<int, 2>, int>& lut,
+    const std::map<std::array<int, 2>, int>& lut,
     SparseMatrix<double>& sparse_hess,
 #endif
 #ifdef _TRIPLETS_

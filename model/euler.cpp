@@ -46,7 +46,7 @@ VectorXd AffineBody::q_tile(double dt, const vec3& f) const
 
 void implicit_euler(vector<unique_ptr<AffineBody>>& cubes, double dt)
 {
-    // spdlog::set_level(spdlog::level::err);
+    spdlog::set_level(spdlog::level::err);
     bool term_cond;
     static int ts = 0;
     int iter = 0;
@@ -174,7 +174,9 @@ void implicit_euler(vector<unique_ptr<AffineBody>>& cubes, double dt)
                             {
                                 pts.push_back(pt);
                                 idx.push_back(ij);
+                                #ifdef _FRICTION_
                                 pt_tk.push_back(MatrixXd::Zero(2, 12));
+                                #endif
                             }
                         }
                     }
@@ -246,7 +248,9 @@ void implicit_euler(vector<unique_ptr<AffineBody>>& cubes, double dt)
                             {
                                 ees.push_back(ee);
                                 eidx.push_back(ij);
+                                #ifdef _FRICTION_
                                 ee_tk.push_back(MatrixXd::Zero(2, 12));
+                                #endif
                             }
                         }
                     }
@@ -425,12 +429,8 @@ void implicit_euler(vector<unique_ptr<AffineBody>>& cubes, double dt)
 #pragma omp parallel for schedule(dynamic)
         for (int k = 0; k < n_cubes; k++) {
             auto& c(*cubes[k]);
-            VectorXd r = grad_residue_per_body(c);
-            MatrixXd hess = hess_inertia_per_body(c);
-            // barrier_grad_hess_per_body(c, r, hess);
-
-            c.grad = r;
-            c.hess = hess;
+            c.grad = grad_residue_per_body(c);
+            c.hess = hess_inertia_per_body(c);
         }
         for (auto _v : vidx) {
             int i = _v[0], v = _v[1];
@@ -719,8 +719,8 @@ void implicit_euler(vector<unique_ptr<AffineBody>>& cubes, double dt)
 
         {
             MatrixXd big_hess;
-
-            big_hess.setZero(hess_dim, hess_dim);
+            if (globals.dense)
+                big_hess.setZero(hess_dim, hess_dim);
             VectorXd r, q0_cat, q_tile_cat, dq;
             r.setZero(hess_dim);
             dq.setZero(hess_dim);

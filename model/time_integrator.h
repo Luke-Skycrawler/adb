@@ -15,9 +15,10 @@ void gen_empty_sm(
     );
 
 void clear(SparseMatrix<double>& sm);
-inline int starting_offset(int i, int j, std::map<std::array<int, 2>, int>& lut, int* outers)
+inline int starting_offset(int i, int j, const std::map<std::array<int, 2>, int>& lut, int* outers)
 {
-    int k = lut[{i, j}];
+    auto it = lut.find({i, j});
+    int k = it->second;
     return k * 12 + outers[j * 12];
 }
 
