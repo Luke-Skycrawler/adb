@@ -4,7 +4,7 @@
     "predefined_case" : {
         "enable": false,
         "id" : 2,
-        "custom": "../test_cases/case.json"
+        "custom": "../test_cases/static_friction.json"
     },
     "solver": "sparse",
     "gravity": true, 
@@ -15,12 +15,12 @@
     "ground": true,
     "safe_factor": 3.0,
     "uppper_bound": true, 
-    "mu": 0.0,
+    "mu": 0.45,
     "damping": {
-        "alpha": 2.3e-5,
-        "beta": 2.5e-5
+        "alpha": 0,
+        "beta": 0
     },
-    "psd": false,
+    "psd": true,
     "spatial hashing": {
         "min_xyz": -2.0,
         "max_xyz": 2.0,

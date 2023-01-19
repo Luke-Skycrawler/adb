@@ -66,7 +66,7 @@ double D_f0(double uk, double lam)
 
 void friction(
     const Vector2d& _uk, double contact_lambda, const Matrix<double, 12, 2>& Tk,
-    Vector<double, 12> g, Matrix<double, 12, 12>& H)
+    Vector<double, 12>& g, Matrix<double, 12, 12>& H)
 {
     static double mu = globals.mu;
     static const double evh = globals.dt * 1e-2, h2 = globals.dt * globals.dt;
@@ -76,18 +76,21 @@ void friction(
     Vector<double, 12> F_k = -mu * contact_lambda * Tk * f1 * _uk;
     // double D_k = mu * contact_lambda * ipc::f0_SF(uk, evh);
     double df1_term = ipc::df1_x_minus_f1_over_x3(uk, evh);
-    Matrix2d M2x2 = (df1_term * _uk * _uk.transpose() + f1 * Matrix2d::Identity(2, 2));
+    Matrix2d M2x2 = (df1_term * _uk * _uk.transpose());
+    M2x2+= f1 * Matrix2d::Identity(2, 2);
     M2x2 = project_to_psd(M2x2);
     Matrix<double, 12, 12> D_k_hessian = mu * contact_lambda * Tk * M2x2 * Tk.transpose();
 
-    g += F_k * h2;
+    g -= F_k * h2;
     H += D_k_hessian * h2;
 }
 
 // void friction(
 //     const Vector2d& _uk, double contact_lambda, const Matrix<double, 3, 2>& Tk,
-//     Vector<double, 3> g, Matrix<double, 3, 3>& H)
+//     vec3& g, mat3& H)
 // {
+//     static double mu = globals.mu;
+
 //     static const double evh = globals.dt * 1e-2, h2 = globals.dt * globals.dt;
 //     auto uk = _uk.norm();
 //     if (uk < 1e-10) return;

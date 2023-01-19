@@ -397,6 +397,15 @@ void implicit_euler(vector<unique_ptr<AffineBody>>& cubes, double dt)
             };
             double e_ground = E_ground(*cubes[v[0]], v[1]);
             e += e_ground;
+#ifdef _FRICTION_
+            auto& c{ *cubes[v[0]] };
+            auto vt2 = c.vt2(v[1]), vt0 = c.vt0(v[1]);
+            double d = vg_distance(vt2);
+            auto contact_force = -barrier_derivative_d(d * d) / (dt * dt) * 2 * d;
+            vec3 _uk = vt2 - vt0;
+            double uk = sqrt(_uk(0) * _uk(0) + _uk(1) * _uk(1));
+            e += D_f0(uk, contact_force);
+#endif
         }
         return e;
     };
@@ -877,11 +886,10 @@ void implicit_euler(vector<unique_ptr<AffineBody>>& cubes, double dt)
             auto solver_duration = DURATION_TO_DOUBLE (high_resolution_clock::now() - solver_start);
             spdlog::info("solver time = {:0.6f} ms", solver_duration);
 
-            double dif = (sparse_hess - big_hess).norm();
             spdlog::info("norms: dq = {}, grad = {}, big_hess = {}", dq.norm(), r.norm(), globals.sparse ? sparse_hess.norm(): big_hess.norm());
             // spdlog::warn("dense norms: dq = {}, grad = {}, big_hess = {}, difference = {}", dq.norm(), r.norm(), big_hess.norm(), dif);
             spdlog::info("dq dot grad = {}, cos = {}", dq.dot(r), dq.dot(r) / (dq.norm() * r.norm()));
-            if (globals.sparse && globals.dense && dif > 1e-6) {
+            if (globals.sparse && globals.dense && (sparse_hess - big_hess).norm() > 1e-6) {
                 spdlog::error("diff too large");
                 cout << big_hess << "\n\n"
                      << sparse_hess;
