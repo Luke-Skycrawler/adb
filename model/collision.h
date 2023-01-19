@@ -4,8 +4,10 @@
 #include <array>
 #include <map>
 #include "../view/global_variables.h"
+#include <ipc/distance/distance_type.hpp>
 #define _FRICTION_
 #define _SM_
+// #define NO_MOLLIFIER
 // #define _TRIPLETS_
 double vf_collision_detect(vec3& p_t0, vec3& p_t1, const AffineBody& cube, int id);
 // x: vertex position in the static frame;
@@ -20,7 +22,7 @@ void ipc_term_vg(AffineBody& c, int v
 #endif
 );
 void ipc_term(
-    std::array<vec3, 4> pt, std::array<int, 4> ij,
+    std::array<vec3, 4> pt, std::array<int, 4> ij, ipc::PointTriangleDistanceType pt_type, double dist, 
 #ifdef _SM_
     const std::map<std::array<int, 2>, int>& lut,
     SparseMatrix<double>& sparse_hess,
@@ -38,7 +40,7 @@ void ipc_term(
     // , vector<Cube> &cubes
 );
 void ipc_term_ee(
-    std::array<vec3, 4> ee, std::array<int, 4> ij,
+    std::array<vec3, 4> ee, std::array<int, 4> ij, ipc::EdgeEdgeDistanceType ee_type, double dist, 
 
 #ifdef _SM_
     const std::map<std::array<int, 2>, int>& lut,

@@ -380,10 +380,14 @@ void implicit_euler(vector<unique_ptr<AffineBody>>& cubes, double dt)
         for (int k = 0; k < l; k++) {
             auto& ij(eidx[k]);
             Edge ei(*cubes[ij[0]], ij[1], true), ej(*cubes[ij[2]], ij[3], true);
-
-            double p = ipc::edge_edge_mollifier(ei.e0, ei.e1, ej.e0, ej.e1, 1e-3);
+            double eps_x = (ei.e0 - ei.e1).squaredNorm() * (ej.e0 - ej.e1).squaredNorm() * globals.eps_x; 
+            double p = ipc::edge_edge_mollifier(ei.e0, ei.e1, ej.e0, ej.e1, eps_x);
             double d = ipc::edge_edge_distance(ei.e0, ei.e1, ej.e0, ej.e1);
+            #ifdef NO_MOLLIFIER
+            e += barrier_function(d);
+            #else 
             e += barrier_function(d) * p;
+            #endif
 #ifdef _FRICTION_
             auto contact_force = -barrier_derivative_d(d) / (dt * dt) * 2 * sqrt(d);
             auto v_stack = ee_vstack(*cubes[ij[0]], *cubes[ij[0]], ij[1], ij[3]);
@@ -539,7 +543,7 @@ void implicit_euler(vector<unique_ptr<AffineBody>>& cubes, double dt)
                 pt_tk[k] = Tk_T;
 
                 ipc_term(
-                    pt, ij,
+                    pt, ij, pt_type, d,
 #ifdef _SM_
                     lut, sparse_hess,
 #endif
@@ -549,7 +553,7 @@ void implicit_euler(vector<unique_ptr<AffineBody>>& cubes, double dt)
                     ci.grad, cj.grad,
                     uk, contact_force, Tk_T.transpose());
 #else
-                ipc_term(pt, ij,
+                ipc_term(pt, ij, pt_type, d,
 #ifdef _SM_
                     lut, sparse_hess,
 #endif
@@ -653,7 +657,7 @@ void implicit_euler(vector<unique_ptr<AffineBody>>& cubes, double dt)
                 ee_tk[k] = Tk_T;
 
                 ipc_term_ee(
-                    ee, ij,
+                    ee, ij, ee_type, d, 
 #ifdef _SM_
                     lut, sparse_hess,
 #endif
@@ -666,7 +670,7 @@ void implicit_euler(vector<unique_ptr<AffineBody>>& cubes, double dt)
 
 
 #else
-                ipc_term_ee(ee, ij,
+                ipc_term_ee(ee, ij, ee_type, d
 #ifdef _SM_
                     lut, sparse_hess,
 #endif

@@ -44,6 +44,7 @@ void reset(){
         globals.beta = data["damping"]["beta"];
         globals.safe_factor = data["safe_factor"];
         globals.mu = data["mu"];
+        globals.eps_x = data["eps_x"];
     }
 }
 // process all input: query GLFW whether relevant keys are pressed/released this frame and react accordingly

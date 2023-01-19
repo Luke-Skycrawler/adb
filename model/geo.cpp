@@ -134,7 +134,7 @@ void ipc_term_vg(AffineBody& c, int v
 };
 
 void ipc_term(
-    array<vec3, 4> pt, array<int, 4> ij,
+    array<vec3, 4> pt, array<int, 4> ij, ipc::PointTriangleDistanceType pt_type, double dist,
 #ifdef _SM_
     const std::map<std::array<int, 2>, int>& lut,
     SparseMatrix<double>& sparse_hess,
@@ -161,12 +161,9 @@ void ipc_term(
     auto* tidx = cj.indices;
     Vector<double, 12> pt_grad;
     Matrix<double, 12, 12> pt_hess;
-    ipc::point_triangle_distance_gradient(p, t0, t1, t2, pt_grad);
-    ipc::point_triangle_distance_hessian(p, t0, t1, t2, pt_hess);
+    ipc::point_triangle_distance_gradient(p, t0, t1, t2, pt_grad, pt_type);
+    ipc::point_triangle_distance_hessian(p, t0, t1, t2, pt_hess, pt_type);
 
-    double dist = 0.0;
-
-    dist = ipc::point_triangle_distance(p, t0, t1, t2);
     double B_ = barrier::barrier_derivative_d(dist);
     double B__ = barrier::barrier_second_derivative(dist);
     //spdlog::info("dist = {}, B = {}, B__ = {}", dist, B_, B__);
@@ -243,7 +240,7 @@ void ipc_term(
 }
 
 void ipc_term_ee(
-    array<vec3, 4> ee, array<int, 4> ij,
+    array<vec3, 4> ee, array<int, 4> ij, ipc::EdgeEdgeDistanceType ee_type, double dist,
 #ifdef _SM_
     const std::map<std::array<int, 2>, int>& lut,
     SparseMatrix<double>& sparse_hess,
@@ -268,20 +265,18 @@ void ipc_term_ee(
          ej0 = ee[2], ej1 = ee[3];
     Vector<double, 12> ee_grad, p_grad;
     Matrix<double, 12, 12> ee_hess, p_hess;
-    double eps_x = 1e-3;
+    double eps_x = globals.eps_x * (ei0 - ei1).squaredNorm() * (ej0 - ej1).squaredNorm();
+
     // 1e-3 * edge length square
 
     double p = ipc::edge_edge_mollifier(ei0, ei1, ej0, ej1, eps_x);
     ipc::edge_edge_mollifier_gradient(ei0, ei1, ej0, ej1, eps_x, p_grad);
     ipc::edge_edge_mollifier_hessian(ei0, ei1, ej0, ej1, eps_x, p_hess);
 
-    ipc::edge_edge_distance_gradient(ei0, ei1, ej0, ej1, ee_grad);
-    ipc::edge_edge_distance_hessian(ei0, ei1, ej0, ej1, ee_hess);
+    ipc::edge_edge_distance_gradient(ei0, ei1, ej0, ej1, ee_grad, ee_type);
+    ipc::edge_edge_distance_hessian(ei0, ei1, ej0, ej1, ee_hess, ee_type);
 
-    double dist = 0.0;
 
-    // dist = ipc::edge_edge_mollifier(ei0, ei1, ej0, ej1, eps_x);
-    dist = ipc::edge_edge_distance(ei0, ei1, ej0, ej1);
     double B_ = barrier::barrier_derivative_d(dist);
     double B__ = barrier::barrier_second_derivative(dist);
     double B = barrier::barrier_function(dist);
@@ -304,10 +299,16 @@ void ipc_term_ee(
     ipc_hess.setZero(12, 12);
     ipc_hess = p_hess * B + B_ * (p_grad * ee_grad.transpose() + ee_grad * p_grad.transpose()) + p * (B__ * ee_grad * ee_grad.transpose() + B_ * ee_hess);
     // ipc_hess = B__ * ee_grad * ee_grad.transpose() + project_to_psd(B_ * ee_hess);
+    
+    #ifdef NO_MOLLIFIER
+    ipc_hess = B__ * ee_grad * ee_grad.transpose() + B_ * ee_hess;
+    
+    #else 
+    ee_grad = p * ee_grad * B_ + p_grad * B;
+    #endif
     if (globals.psd)
         ipc_hess = project_to_psd(ipc_hess);
 
-    ee_grad = p * ee_grad * B_ + p_grad * B;
 
 #ifdef _FRICTION_
     friction(_uk, contact_lambda, Tk, ee_grad, ipc_hess);

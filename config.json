@@ -4,7 +4,7 @@
     "predefined_case" : {
         "enable": false,
         "id" : 2,
-        "custom": "../test_cases/empty.json"
+        "custom": "../test_cases/blocks.json"
     },
     "solver": "sparse",
     "gravity": true, 
@@ -20,6 +20,7 @@
         "alpha": 0,
         "beta": 0
     },
+    "eps_x": 1e-3,
     "psd": true,
     "spatial hashing": {
         "min_xyz": -2.0,
