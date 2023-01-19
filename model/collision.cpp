@@ -74,7 +74,8 @@ double collision_time(AffineBody& c, int i)
         double t = d1 / (d1 - d2);
         auto vtoi = v_t2 * (t * 0.8) + v_t1 * (1 - t * 0.8);
         double dtoi = vg_distance(vtoi);
-        spdlog::error("dtoi = {}, d0 = {}, d1 = {}, toi = {}", dtoi, d1, d2, t);
+        if(dtoi < 0.0)
+            spdlog::error("dtoi = {}, d0 = {}, d1 = {}, toi = {}", dtoi, d1, d2, t);
 
         assert(dtoi > 0.0);
         assert(t > 0.0 && t < 1.0);

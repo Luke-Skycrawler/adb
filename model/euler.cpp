@@ -13,6 +13,8 @@
 #include <chrono>
 #include "spatial_hashing.h"
 #include <Eigen/PardisoSupport>
+#include <ipc/distance/edge_edge_mollifier.hpp>
+
 using namespace std;
 using namespace barrier;
 using namespace Eigen;
@@ -378,8 +380,10 @@ void implicit_euler(vector<unique_ptr<AffineBody>>& cubes, double dt)
         for (int k = 0; k < l; k++) {
             auto& ij(eidx[k]);
             Edge ei(*cubes[ij[0]], ij[1], true), ej(*cubes[ij[2]], ij[3], true);
+
+            double p = ipc::edge_edge_mollifier(ei.e0, ei.e1, ej.e0, ej.e1, 1e-3);
             double d = ipc::edge_edge_distance(ei.e0, ei.e1, ej.e0, ej.e1);
-            e += barrier_function(d);
+            e += barrier_function(d) * p;
 #ifdef _FRICTION_
             auto contact_force = -barrier_derivative_d(d) / (dt * dt) * 2 * sqrt(d);
             auto v_stack = ee_vstack(*cubes[ij[0]], *cubes[ij[0]], ij[1], ij[3]);
@@ -918,6 +922,9 @@ void implicit_euler(vector<unique_ptr<AffineBody>>& cubes, double dt)
                 alpha = line_search(dq, r, q0_cat, E0, E1);
             spdlog::info("alpha = {}", alpha);
             dq *= alpha;
+            if (alpha < 1e-6) {
+                spdlog::error("alpha = {}, E0 = {}, E1 = {}", alpha, E0, E1);
+            }
             double norm_dq = dq.norm();
             sup_dq = norm_dq;
             #pragma omp parallel for schedule(dynamic)

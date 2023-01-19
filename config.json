@@ -4,18 +4,18 @@
     "predefined_case" : {
         "enable": false,
         "id" : 2,
-        "custom": "../test_cases/static_friction.json"
+        "custom": "../test_cases/empty.json"
     },
     "solver": "sparse",
     "gravity": true, 
     "line_search": true,
     "col_set": true,
     "ee": true,
-    "pt": true,
+    "pt": false,
     "ground": true,
     "safe_factor": 3.0,
     "uppper_bound": true, 
-    "mu": 0.45,
+    "mu": 0.0,
     "damping": {
         "alpha": 0,
         "beta": 0
