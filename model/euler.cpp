@@ -581,7 +581,7 @@ void implicit_euler(vector<unique_ptr<AffineBody>>& cubes, double dt)
                 auto cnorm = rei.cross(rej).squaredNorm();
                 auto sin2 = cnorm / rei.squaredNorm() / rej.squaredNorm();
                 Matrix<double, 3, 2> degeneracy;
-                degeneracy.col(0) = rei;
+                degeneracy.col(0) = rei.normalized();
                 degeneracy.col(1) = (ej0 - ei0).cross(rei).normalized();
                 bool par = sin2 < 1e-8;
 
@@ -948,6 +948,12 @@ void implicit_euler(vector<unique_ptr<AffineBody>>& cubes, double dt)
             Face f(*cubes[ij[2]], ij[3]);
             vec3 v(cubes[ij[0]]->vt1(ij[1]));
             pts[k] = { v, f.t0, f.t1, f.t2 };
+        }
+#pragma omp parallel for schedule(dynamic)
+        for (int k = 0; k < n_ee; k++) {
+            auto& ij = eidx[k];
+            Edge ei(*cubes[ij[0]], ij[1]), ej(*cubes[ij[2]], ij[3]);
+            ees[k] = { ei.e0, ei.e1, ej.e0, ej.e1 };
         }
         term_cond = sup_dq < 1e-6 || iter++ > globals.max_iter;
         sup_dq = 0.0;

@@ -255,7 +255,7 @@ void ipc_term_ee(
 #endif
 )
 {
-    static auto vnp = Cube::_vertices();
+    // static auto vnp = Cube::_vertices();
 
     int _i = ij[0], _ei = ij[1], _j = ij[2], _ej = ij[3];
     auto &ci(*globals.cubes[_i]), &cj(*globals.cubes[_j]);
