@@ -2,7 +2,7 @@
 #include "global_variables.h"
 #include "../test_cases/tests.h"
 
-#include "../model/marcros_settings.h"
+
 #include <fstream> 
 #include <nlohmann/json.hpp>
 using json = nlohmann::json;
@@ -18,6 +18,10 @@ void reset(){
     globals.upper_bound = data["uppper_bound"];
     globals.sparse = data["solver"] != "dense";
     globals.dense = data["solver"] != "sparse";
+    globals.ee = data["ee"];
+    globals.pt = data["pt"];
+    globals.ground = data["ground"];
+    globals.psd = data["psd"];
     if (predefined) {
         int id = data["predefined_case"]["id"];
         if (id == 1) {
@@ -25,12 +29,12 @@ void reset(){
         }
         else {
             globals.cubes.clear();
-            globals.cubes = cube_blocks(2);
+            cube_blocks(2);
         }
     }
     else {
         globals.cubes.clear();
-        globals.cubes = customize(data["predefined_case"]["custom"]);
+        customize(data["predefined_case"]["custom"]);
     }
 
     {
@@ -38,6 +42,9 @@ void reset(){
         globals.max_iter = data["max_iter"];
         globals.alpha = data["damping"]["alpha"];
         globals.beta = data["damping"]["beta"];
+        globals.safe_factor = data["safe_factor"];
+        globals.mu = data["mu"];
+        globals.eps_x = data["eps_x"];
     }
 }
 // process all input: query GLFW whether relevant keys are pressed/released this frame and react accordingly

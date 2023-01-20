@@ -1,6 +1,7 @@
 #pragma once
 #include <string>
 #include "../model/cube.h"
-Cube spinning_cube();
-std::vector<Cube> cube_blocks(int n);
-std::vector<Cube> customize(std::string file);
+#include "../view/global_variables.h"
+unique_ptr<Cube> spinning_cube();
+void cube_blocks(int n);
+void customize(std::string file);

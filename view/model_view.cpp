@@ -9,11 +9,10 @@
 #include "../model/time_integrator.h"
 #include "../model/glue.h"
 #include <glm/gtx/string_cast.hpp>
-#include "../model/marcros_settings.h"
 #include <fstream>
 #include <nlohmann/json.hpp>
 #include <omp.h>
-
+//#define FEATURE_MODEL
 using namespace std;
 //------------------ optional features ----------------------------
 // #define FEATURE_MODEL
@@ -21,21 +20,17 @@ using namespace std;
 // #define FEATURE_POSTRENDER
 //-----------------------------------------------------------------
 
-int Cube::indices[] = { 0 };
-int Cube::edges[] = { 0 };
-
-void render_cubes(Shader shader, vector<Cube> cubes)
+unsigned *Cube::_edges = nullptr, *Cube::_indices = nullptr;
+void render_cubes(Shader shader, vector<unique_ptr<AffineBody>> &cubes)
 {
-    for (auto &c : cubes)
+    for (int i = 0; i < cubes.size(); i++)
     {
+        auto& c {*cubes[i]};
         glm::mat4 A(from_eigen(c.A));
-        // cout << c.A << endl;
-        // cout << glm::to_string(A) << endl;
-        // A = glm::translate(A, from_eigen(c.p));
         for (int i = 0; i < 3; i++)
             A[3][i] = c.p(i);
         shader.setMat4("model", A);
-        renderCube();
+        c.draw(shader);
     }
 }
 int main()
@@ -44,8 +39,6 @@ int main()
     omp_set_num_threads(8);
     setNbThreads(8);
     initParallel();
-    reset();
-    double dt = globals.dt;
     // glfw: initialize and configure
     // ------------------------------
     glfwInit();
@@ -168,8 +161,10 @@ int main()
 
 #ifdef FEATURE_MODEL
     // load models
-    Model temple("nanosuit/nanosuit.obj");
-    // Model temple("mods/gallery/gallery.obj");
+    Model b_model("assets/bunny.obj");
+    auto &b_mesh = b_model.meshes[0];
+    auto bunny = make_unique<AffineObject>(b_mesh);
+    globals.cubes.push_back(move(bunny));
 #endif
     Light lights(LightPositions, 4);
 
@@ -225,6 +220,10 @@ int main()
     lightingShader.setInt("shadowMap", 2);
 
     lightingShader.setFloat("material.shininess", 64);
+
+    reset();
+    // be sure to call after glfw intiailzation 
+
     // render loop
     // -----------
     while (!glfwWindowShouldClose(window))
@@ -269,7 +268,7 @@ int main()
         glm::vec3 box2Pos(0.3, 0.0, 1.2);
         glm::mat4 lightSpaceTrans = glm::lookAt(lightPos, glm::vec3(0.0f), globals.camera.WorldUp);
         for (int i = 0; i < 1; i++)
-            implicit_euler(globals.cubes, dt);
+            implicit_euler(globals.cubes, globals.dt);
         if (globals.display_corner)
         {
             glBindFramebuffer(GL_FRAMEBUFFER, globals.depthMapFBO);
@@ -290,17 +289,6 @@ int main()
             renderPlane();
             render_cubes(depthShader, globals.cubes);
 
-            // model = glm::translate(model, box2Pos);
-            // depthShader.setMat4("model", model);
-            // renderCube();
-
-#ifdef FEATURE_MODEL
-            if (globals.model_draw)
-            {
-                depthShader.setMat4("model", glm::translate(glm::mat4(1.0f), glm::vec3(0.0f, -1.1f, 0.0f)));
-                temple.Draw(depthShader);
-            }
-#endif
 #ifdef FEATURE_POSTRENDER
             glBindFramebuffer(GL_FRAMEBUFFER, globals.postrender ? framebuffer : 0);
 #endif
@@ -350,28 +338,7 @@ int main()
         // FIXME: should do the select pass in reverse order
         lightingShader.setInt("alias", 5);
         renderPlane();
-        // render the cube
-        // lightingShader.setInt("alias", 3);
-        // renderCube();
-        // // glBindVertexArray(cubeVAO);
-        // // glDrawArrays(GL_TRIANGLES, 0, 36);
-
-        // glActiveTexture(GL_TEXTURE0);
-        // lightingShader.use();
-        // model = glm::translate(model, box2Pos);
-        // lightingShader.setMat4("model", model);
-        // glDrawArrays(GL_TRIANGLES, 0, 36);
         render_cubes(lightingShader, globals.cubes);
-
-#ifdef FEATURE_MODEL
-        if (globals.model_draw)
-        {
-            // lightingShader.use();
-            lightingShader.setInt("alias", 2);
-            lightingShader.setMat4("model", glm::translate(glm::mat4(1.0f), glm::vec3(0.0f, -1.1f, 0.0f)));
-            temple.Draw(lightingShader);
-        }
-#endif
         if (!globals.cursor_hidden && globals.objectType)
         {
             model = glm::mat4(glm::mat3(globals.camera.Right, globals.camera.Up, -globals.camera.Front));

@@ -1,20 +1,32 @@
 {
-    "dt": 1e-3,
+    "dt": 5e-3,
     "max_iter": 10,
     "predefined_case" : {
         "enable": false,
         "id" : 2,
-        "custom": "../test_cases/case.json"
+        "custom": "../test_cases/blocks.json"
     },
     "solver": "sparse",
     "gravity": true, 
-    "kappa": 1e3,
-    "dhat": 1e-3,
     "line_search": true,
     "col_set": true,
+    "ee": true,
+    "pt": false,
+    "ground": true,
+    "safe_factor": 3.0,
     "uppper_bound": true, 
+    "mu": 0.0,
     "damping": {
-        "alpha": 2.5e-2,
-        "beta": 2.3e-2
+        "alpha": 0,
+        "beta": 0
+    },
+    "eps_x": 1e-3,
+    "psd": true,
+    "spatial hashing": {
+        "min_xyz": -2.0,
+        "max_xyz": 2.0,
+        "dx": 0.02,
+        "n_buffer": 64,
+        "xyz_bits": 7
     }
 }

@@ -61,7 +61,7 @@ using namespace barrier;
 using namespace Eigen;
 int Cube::indices[] = { 0 };
 int Cube::edges[] = { 0 };
-double vf_collision_detect(vec3& p_t0, vec3& p_t1, const Cube& c, int id){
+double vf_collision_detect(vec3& p_t0, vec3& p_t1, const AffineBody& c, int id){
     return 1.0;
 }
 double Cube::vf_collision_detect(const vec3& dp, const mat3& dq){

@@ -1,7 +1,8 @@
 #include "othogonal_energy.h"
 #include <cmath>
-#include "marcros_settings.h"
+
 using namespace othogonal_energy;
+#define TEST_PYTHON
 namespace othogonal_energy {
 
     static const double kappa = 1e9;
