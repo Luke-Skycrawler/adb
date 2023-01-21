@@ -12,10 +12,10 @@ namespace othogonal_energy {
     {
         return i == j ? 1.0 : 0.0;
     }
-    
-    VectorXd grad(const q4 &q)
+
+    vec12 grad(const q4& q)
     {
-        Vector<double, 12> ret;
+        vec12 ret;
         ret.setZero(12);
         for (int i = 1; i < 4; i++) {
             vec3 g(0.0, 0.0, 0.0);
@@ -45,8 +45,9 @@ namespace othogonal_energy {
     //    }
     //    return H;
     //}
-    MatrixXd hessian(const q4 &q) {
-        Matrix<double, 12, 12> H;
+    mat12 hessian(const q4& q)
+    {
+        mat12 H;
         H.setZero(12, 12);
         for (int i= 1; i < 4;i++)for(int j = 1; j < 4;j ++) {
             mat3 h;

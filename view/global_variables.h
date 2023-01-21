@@ -56,7 +56,7 @@ struct GlobalVariableMainCPP{
     double alpha, beta;
     double kappa, d_hat, safe_factor, mu, eps_x;
 
-    bool col_set, upper_bound, line_search, sparse, dense, ee, pt, ground, psd;
+    bool col_set, upper_bound, line_search, sparse, dense, ee, pt, ground, psd, damp;
 };
 #ifndef GOOGLE_TEST
 #ifdef _MAIN_CPP

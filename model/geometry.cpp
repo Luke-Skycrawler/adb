@@ -2,10 +2,21 @@
 #include <Eigen/Geometry>
 #include <cmath>
 using namespace std;
-Edge::Edge(const AffineBody& c, unsigned id, bool b): 
-    e0(b? c.vt2(c.edges[id * 2]): c.vt1(c.edges[id * 2])), 
-    e1(b? c.vt2(c.edges[id * 2 + 1]): c.vt1(c.edges[id * 2  + 1]))
+Edge::Edge(const AffineBody& c, unsigned id, bool b, bool batch)
 {
+    unsigned _0 = c.edges[id * 2], _1 = c.edges[id * 2 + 1];
+    if (batch) {
+        e0 = c.v_transformed[_0];
+        e1 = c.v_transformed[_1];
+    }
+    else if (b) {
+        e0 = c.vt2(_0);
+        e1 = c.vt2(_1);
+    }
+    else {
+        e0 = c.vt1(_0);
+        e1 = c.vt1(_1);
+    }
 }
 
 vec3 Face::normal() const
@@ -19,14 +30,19 @@ vec3 Face::unit_normal() const
     return n / sqrt(n.dot(n));
 }
 
-Face::Face(const AffineBody& c, unsigned id, bool b)
+Face::Face(const AffineBody& c, unsigned id, bool b, bool batch)
 {
 
-    int _a = c.indices[id * 3 + 0],
-        _b = c.indices[id * 3 + 1],
-        _c = c.indices[id * 3 + 2];
+    unsigned _a = c.indices[id * 3 + 0],
+             _b = c.indices[id * 3 + 1],
+             _c = c.indices[id * 3 + 2];
 
-    if (b) {
+    if (batch) {
+        t0 = c.v_transformed[_a];
+        t1 = c.v_transformed[_b];
+        t2 = c.v_transformed[_c];
+    }
+    else if (b) {
         t0 = c.vt2(_a);
         t1 = c.vt2(_b);
         t2 = c.vt2(_c);

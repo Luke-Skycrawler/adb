@@ -22,6 +22,7 @@ void reset(){
     globals.pt = data["pt"];
     globals.ground = data["ground"];
     globals.psd = data["psd"];
+    globals.damp = data["damping"]["enable"];
     if (predefined) {
         int id = data["predefined_case"]["id"];
         if (id == 1) {
