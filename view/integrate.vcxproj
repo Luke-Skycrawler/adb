@@ -146,6 +146,7 @@
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClCompile Include="..\model\affine_obj.cpp" />
+    <ClCompile Include="..\model\col_set.cpp" />
     <ClCompile Include="..\model\geo.cpp" />
     <ClCompile Include="..\model\othogonal_energy.cpp" />
     <ClCompile Include="..\model\barrier.cpp" />

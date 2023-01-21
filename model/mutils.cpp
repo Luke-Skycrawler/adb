@@ -1,7 +1,7 @@
 #include "time_integrator.h"
 #include "../view/global_variables.h"
+#include <algorithm>
 #include "othogonal_energy.h"
-
 using namespace std;
 using namespace Eigen;
 using namespace utils;
@@ -60,8 +60,8 @@ mat12 hess_inertia_per_body(AffineBody& c, double dt)
 {
     mat12 H;
     H.setZero(12, 12);
-    for (int i = 0; i < 3; i++) H(i, i) = c.Ic;
-    for (int i = 3; i < 12; i++) H(i, i) = c.mass;
+    for (int i = 0; i < 3; i++) H(i, i) = c.mass;
+    for (int i = 3; i < 12; i++) H(i, i) = c.Ic;
     auto hess_otho = othogonal_energy::hessian(c.q);
     return H + hess_otho * dt * dt;
 }
@@ -185,6 +185,10 @@ void build_from_triplets(SparseMatrix<double>& sparse_hess_trip, MatrixXd& big_h
             insert2(sparse_hess_trip, k);
     }
 }
+double E(const vec12& q, const vec12& q_tiled, const AffineBody& c, double dt)
+{
+    return othogonal_energy::otho_energy(q) * dt * dt + 0.5 * norm_M(q - q_tiled, c);
+};
 };
 
 vec12 AffineBody::q_tile(double dt, const vec3& f) const

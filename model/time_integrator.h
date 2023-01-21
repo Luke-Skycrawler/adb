@@ -6,6 +6,17 @@
 #include <map>
 
 void implicit_euler(std::vector<std::unique_ptr<AffineBody>>& cubes, double dt);
+void gen_collision_set(
+    int n_cubes,
+    const std::vector<std::unique_ptr<AffineBody>>& cubes,
+    std::vector<std::array<vec3, 4>>& pts,
+    std::vector<std::array<int, 4>>& idx,
+    std::vector<std::array<vec3, 4>>& ees,
+    std::vector<std::array<int, 4>>& eidx,
+    std::vector<std::array<int, 2>>& vidx,
+    std::vector<Matrix<double, 2, 12>>& pt_tk,
+    std::vector<Matrix<double, 2, 12>>& ee_tk);
+
 inline int starting_offset(int i, int j, const std::map<std::array<int, 2>, int>& lut, int* outers)
 {
     auto it = lut.find({ i, j });
@@ -42,6 +53,5 @@ void damping_dense(MatrixXd& big_hess, double dt, int n_cubes);
 
 void damping_sparse(SparseMatrix<double>& sparse_hess, double dt, int n_cubes);
 void build_from_triplets(SparseMatrix<double>& sparse_hess_trip, MatrixXd& big_hess, int hess_dim, int n_cubes);
-
-
+double E(const vec12& q, const vec12& q_tiled, const AffineBody& c, double dt);
 }
