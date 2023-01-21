@@ -155,11 +155,12 @@
     <ClCompile Include="..\model\sparse.cpp" />
     <ClCompile Include="..\model\spatial_hashing.cpp" />
     <ClCompile Include="..\model\geometry.cpp" />
+    <ClCompile Include="..\model\mutils.cpp" />
     <ClCompile Include="..\test_cases\spinning_cube.cpp" />
     <ClCompile Include="..\view\control.cpp" />
     <ClCompile Include="..\view\light.cpp" />
     <ClCompile Include="..\view\model_view.cpp" />
-    <ClCompile Include="..\view\utils.cpp" />
+    <ClCompile Include="utils.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\model\affine_body.h" />

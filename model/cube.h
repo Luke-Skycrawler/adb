@@ -1,9 +1,6 @@
 #pragma once
 #include "affine_body.h"
 using namespace Eigen;
-// using vec3 = Vector3d;
-// using mat3 = Matrix3d;
-// using q4 = std::array<vec3, 4>;
 struct Cube: AffineBody {
     double scale, toi;
     static const int n_vertices = 8, n_faces = 12, n_edges = 12;

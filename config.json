@@ -1,10 +1,10 @@
 {
-    "dt": 1e-2,
+    "dt": 5e-3,
     "max_iter": 10,
     "predefined_case" : {
         "enable": false,
         "id" : 2,
-        "custom": "../test_cases/blocks.json"
+        "custom": "../test_cases/case2.json"
     },
     "solver": "sparse",
     "gravity": true, 

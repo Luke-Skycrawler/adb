@@ -7,6 +7,8 @@
 using mat3 = Eigen::Matrix3d;
 using vec3 = Eigen::Vector3d;
 using q4 = std::array<vec3, 4>;
+using vec12 = Eigen::Vector<double, 12>;
+using mat12 = Eigen::Matrix<double, 12, 12>;
 
 struct AffineBody {
     mat3 A;
@@ -18,10 +20,10 @@ struct AffineBody {
     const int n_vertices, n_faces;
     vec3* v_transformed;
     int n_edges;
-    Eigen::Vector<double, 12> dq, grad;
-    Eigen::Matrix<double, 12, 12> hess;
+    vec12 dq, grad;
+    mat12 hess;
     q4 q, q0, dqdt;
-    Eigen::VectorXd q_tile(double dt, const vec3 &f) const;
+    vec12 q_tile(double dt, const vec3 &f) const;
     inline vec3 vt0(int i) const {
         mat3 a;
         vec3 b = q0[0];
