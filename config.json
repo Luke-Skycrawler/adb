@@ -1,5 +1,5 @@
 {
-    "dt": 5e-3,
+    "dt": 1e-2,
     "max_iter": 10,
     "predefined_case" : {
         "enable": false,
@@ -11,12 +11,13 @@
     "line_search": true,
     "col_set": true,
     "ee": true,
-    "pt": false,
+    "pt": true,
     "ground": true,
     "safe_factor": 3.0,
     "uppper_bound": true, 
     "mu": 0.0,
     "damping": {
+        "enable": false,
         "alpha": 0,
         "beta": 0
     },

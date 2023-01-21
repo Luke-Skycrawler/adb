@@ -40,8 +40,7 @@ struct Cube: AffineBody {
         : scale(scale), AffineBody(8, 12, 12, _indices, _edges){
         Ic = mass * scale * scale / 12;
     }
-    
-    
+
     static unsigned * _indices, *_edges;
     static void gen_indices()
     {
