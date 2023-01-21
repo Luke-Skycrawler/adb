@@ -1,5 +1,5 @@
 {
-    "dt": 1e-2,
+    "dt": 5e-3,
     "max_iter": 10,
     "predefined_case" : {
         "enable": false,
@@ -17,9 +17,9 @@
     "uppper_bound": true, 
     "mu": 0.0,
     "damping": {
-        "enable": false,
-        "alpha": 0,
-        "beta": 0
+        "enable": true,
+        "alpha": 2.3e-5,
+        "beta": 2.5e-5
     },
     "eps_x": 1e-3,
     "psd": true,

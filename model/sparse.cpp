@@ -6,6 +6,9 @@
 #include <set>
 using namespace std;
 using namespace Eigen;
+using namespace utils;
+
+namespace utils {
 
 void gen_empty_sm(
     int n_cubes,
@@ -60,3 +63,5 @@ void clear(SparseMatrix<double>& sm)
             it.valueRef() = 0.0;
         }
 }
+
+};
