@@ -20,6 +20,17 @@ void put(double* values, int offset, int _stride, Matrix<double, 12, 12>& block)
             values[offset + _stride * j + i] += block(i, j);
         }
 }
+
+void put2(double* values, int offset, int _stride, mat3 block[4][4])
+{
+    for (int j = 0; j < 12; j++)
+        for (int i = 0; i < 12; i++) {
+            double db = block[i / 3][j / 3](i % 3, j % 3);
+            int ofs = offset + _stride * j + i;
+#pragma omp atomic
+            values[ofs] += db;
+        }
+}
 MatrixXd PSD_projection(const MatrixXd& A12x12)
 {
 
@@ -77,7 +88,7 @@ void friction(
     // double D_k = mu * contact_lambda * ipc::f0_SF(uk, evh);
     double df1_term = ipc::df1_x_minus_f1_over_x3(uk, evh);
     Matrix2d M2x2 = (df1_term * _uk * _uk.transpose());
-    M2x2+= f1 * Matrix2d::Identity(2, 2);
+    M2x2 += f1 * Matrix2d::Identity(2, 2);
     M2x2 = project_to_psd(M2x2);
     Matrix<double, 12, 12> D_k_hessian = mu * contact_lambda * Tk * M2x2 * Tk.transpose();
 
@@ -114,7 +125,7 @@ void ipc_term_vg(AffineBody& c, int v
 
 )
 {
-    auto v_tile{ c.vertices(v) }, p{c.vt1(v)};
+    auto v_tile{ c.vertices(v) }, p{ c.vt1(v) };
 
     c.grad += barrier::barrier_gradient_q(v_tile, p);
     c.hess += barrier::barrier_hessian_q(v_tile, p);
@@ -126,7 +137,7 @@ void ipc_term_vg(AffineBody& c, int v
     // auto J = barrier::x_jacobian_q(c.vertices(v));
     // c.grad += g * J;
     // c.hess += J.transpose() * H * J;
-    
+
     auto J = barrier::x_jacobian_q(v_tile);
     friction(_uk, contact_lambda,
         J.transpose() * Tk, c.grad, c.hess);
@@ -166,20 +177,20 @@ void ipc_term(
 
     double B_ = barrier::barrier_derivative_d(dist);
     double B__ = barrier::barrier_second_derivative(dist);
-    //spdlog::info("dist = {}, B = {}, B__ = {}", dist, B_, B__);
+    // spdlog::info("dist = {}, B = {}, B__ = {}", dist, B_, B__);
 
-    Matrix<double, 9, 12> Jt;
-    Matrix<double, 3, 12> Jp;
-    mat12 off_diag;
+    // Matrix<double, 9, 12> Jt;
+    // Matrix<double, 3, 12> Jp;
+    // mat12 off_diag;
     auto p_tile = ci.vertices(v), t0_tile = cj.vertices(tidx[3 * f]), t1_tile = cj.vertices(tidx[3 * f + 1]), t2_tile = ci.vertices(tidx[3 * f + 2]);
     // auto p_tile = vnp[v], t0_tile = vnp[tidx[3 * f]], t1_tile = vnp[tidx[3 * f + 1]], t2_tile = vnp[tidx[3 * f + 2]];
-    Jt.setZero(9, 12);
-    Jp.setZero(3, 12);
-    off_diag.setZero(12, 12);
-    Jt.block<3, 12>(0, 0) = barrier::x_jacobian_q(t0_tile);
-    Jt.block<3, 12>(3, 0) = barrier::x_jacobian_q(t1_tile);
-    Jt.block<3, 12>(6, 0) = barrier::x_jacobian_q(t2_tile);
-    Jp = barrier::x_jacobian_q(p_tile);
+    // Jt.setZero(9, 12);
+    // Jp.setZero(3, 12);
+    // off_diag.setZero(12, 12);
+    // Jt.block<3, 12>(0, 0) = barrier::x_jacobian_q(t0_tile);
+    // Jt.block<3, 12>(3, 0) = barrier::x_jacobian_q(t1_tile);
+    // Jt.block<3, 12>(6, 0) = barrier::x_jacobian_q(t2_tile);
+    // Jp = barrier::x_jacobian_q(p_tile);
 
     mat12 ipc_hess;
     ipc_hess.setZero(12, 12);
@@ -192,11 +203,61 @@ void ipc_term(
     // ipc_hess = PSD_projection(ipc_hess);
 
     int ii = _i, jj = _j;
-    mat12 hess_p = Jp.transpose() * ipc_hess.block<3, 3>(0, 0) * Jp;
-    mat12 hess_t = Jt.transpose() * ipc_hess.block<9, 9>(3, 3) * Jt;
+    // mat12 hess_p = Jp.transpose() * ipc_hess.block<3, 3>(0, 0) * Jp;
+    // mat12 hess_t = Jt.transpose() * ipc_hess.block<9, 9>(3, 3) * Jt;
 
-    off_diag = Jp.transpose() * ipc_hess.block<3, 9>(0, 3) * Jt;
+    // mat12 off_diag = Jp.transpose() * ipc_hess.block<3, 9>(0, 3) * Jt;
+
+    Vector4d kerp;
+    kerp << 1.0, p_tile;
+    Vector4d ker0;
+    ker0 << 1.0, t0_tile;
+    Vector4d ker1;
+    ker1 << 1.0, t1_tile;
+    Vector4d ker2;
+    ker2 << 1.0, t2_tile;
+    Matrix<double, 4, 3> kert;
+    kert << ker0, ker1, ker2;
+
+    Matrix4d blkp = kerp * kerp.transpose();
+    mat12 hess_p, hess_t, off_diag;
+    // mat12 hess_p, hess_t, hess__off;
+    for (int i = 0; i < 4; i++)
+        for (int j = 0; j < 4; j++) {
+            hess_p.block<3, 3>(i * 3, j * 3) = blkp(i, j) * ipc_hess.block<3, 3>(0, 0);
+
+            mat3 hij;
+            hij.setZero(3, 3);
+            for (int k = 0; k < 3; k++)
+                for (int l = 0; l < 3; l++) {
+                    mat3 Akl = ipc_hess.block<3, 3>((k + 1) * 3, (l + 1) * 3);
+                    hij += Akl * (kert(i, k) * kert(j, l));
+                }
+            hess_t.block<3, 3>(i * 3, j * 3) = hij;
+
+            mat3 offd_ij;
+            offd_ij.setZero(3, 3);
+            for (int l = 0; l < 3; l++) {
+                mat3 Akl = ipc_hess.block<3, 3>(0, (l + 1) * 3);
+                offd_ij += Akl * (kerp(i) * kert(j, l));
+            }
+            off_diag.block<3, 3>(i * 3, j * 3) = offd_ij;
+        }
     mat12 off_T = off_diag.transpose();
+
+    // double np = (testp - hess_p).norm();
+    // double nt = (testt - hess_t).norm();
+    // double noff = (test_off - off_diag).norm();
+    // if (np > 1e-6 || nt > 1e-5 || noff > 1e-6) {
+    //     spdlog::info("");
+    // }    mat12 off_T = off_diag.transpose();
+
+    // for (int i = 0; i < 10; i++){
+    //     double sgn = i % 2 == 0? 1: -1;
+    //     hess_p += sgn * Jp.transpose() * ipc_hess.block<3, 3>(0, 0) * Jp;
+    //     hess_t += sgn * Jt.transpose() * ipc_hess.block<9, 9>(3, 3) * Jt;
+    //     off_diag += sgn * Jp.transpose() * ipc_hess.block<3, 9>(0, 3) * Jt;
+    // }
 
     pt_grad *= B_;
 #ifdef _FRICTION_
@@ -223,8 +284,14 @@ void ipc_term(
 
 #endif
     Vector<double, 12> dgp, dgt;
-    dgp = Jp.transpose() * pt_grad.segment<3>(0);
-    dgt = Jt.transpose() * pt_grad.segment<9>(3);
+    vec3 seg = pt_grad.segment<3>(0);
+    vec3 _0 = pt_grad.segment<3>(3), _1 = pt_grad.segment<3>(6), _2 = pt_grad.segment<3>(9);
+    dgp << seg, seg * p_tile(0), seg * p_tile(1), seg * p_tile(2);
+    dgt << _0 + _1 + _2,
+        _0 * t0_tile(0) + _1 * t1_tile(0) + _2 * t2_tile(0),
+        _0 * t0_tile(1) + _1 * t1_tile(1) + _2 * t2_tile(1),
+        _0 * t0_tile(2) + _1 * t1_tile(2) + _2 * t2_tile(2);
+
     {
         for (int i = 0; i < 12; i++) {
 #pragma omp atomic
@@ -276,49 +343,103 @@ void ipc_term_ee(
     ipc::edge_edge_distance_gradient(ei0, ei1, ej0, ej1, ee_grad, ee_type);
     ipc::edge_edge_distance_hessian(ei0, ei1, ej0, ej1, ee_hess, ee_type);
 
-
     double B_ = barrier::barrier_derivative_d(dist);
     double B__ = barrier::barrier_second_derivative(dist);
     double B = barrier::barrier_function(dist);
 
     // spdlog::info("dist = {}, B = {}, B__ = {}", dist, B_, B__);
 
-    Matrix<double, 6, 12> J0;
-    Matrix<double, 6, 12> J1;
+    // Matrix<double, 6, 12> J0;
+    // Matrix<double, 6, 12> J1;
     auto ei0_tile = ci.vertices(eidxi[2 * _ei]), ei1_tile = ci.vertices(eidxi[2 * _ei + 1]),
          ej0_tile = cj.vertices(eidxj[2 * _ej]), ej1_tile = cj.vertices(eidxj[2 * _ej + 1]);
     // auto ei0_tile = vnp[eidx[2 * _ei]], ei1_tile = vnp[eidx[2 * _ei + 1]],
     //     ej0_tile = vnp[eidx[2 * _ej]], ej1_tile = vnp[eidx[2 * _ej + 1]];
 
-    J0.block<3, 12>(0, 0) = barrier::x_jacobian_q(ei0_tile);
-    J0.block<3, 12>(3, 0) = barrier::x_jacobian_q(ei1_tile);
-    J1.block<3, 12>(0, 0) = barrier::x_jacobian_q(ej0_tile);
-    J1.block<3, 12>(3, 0) = barrier::x_jacobian_q(ej1_tile);
+    // J0.block<3, 12>(0, 0) = barrier::x_jacobian_q(ei0_tile);
+    // J0.block<3, 12>(3, 0) = barrier::x_jacobian_q(ei1_tile);
+    // J1.block<3, 12>(0, 0) = barrier::x_jacobian_q(ej0_tile);
+    // J1.block<3, 12>(3, 0) = barrier::x_jacobian_q(ej1_tile);
 
     mat12 ipc_hess;
     ipc_hess.setZero(12, 12);
     ipc_hess = p_hess * B + B_ * (p_grad * ee_grad.transpose() + ee_grad * p_grad.transpose()) + p * (B__ * ee_grad * ee_grad.transpose() + B_ * ee_hess);
     // ipc_hess = B__ * ee_grad * ee_grad.transpose() + project_to_psd(B_ * ee_hess);
-    
-    #ifdef NO_MOLLIFIER
+
+#ifdef NO_MOLLIFIER
     ipc_hess = B__ * ee_grad * ee_grad.transpose() + B_ * ee_hess;
-    
-    #else 
+
+#else
     ee_grad = p * ee_grad * B_ + p_grad * B;
-    #endif
+#endif
     if (globals.psd)
         ipc_hess = project_to_psd(ipc_hess);
-
 
 #ifdef _FRICTION_
     friction(_uk, contact_lambda, Tk, ee_grad, ipc_hess);
 #endif
 
     int ii = _i, jj = _j;
-    mat12 hess_0 = J0.transpose() * ipc_hess.block<6, 6>(0, 0) * J0;
-    mat12 hess_1 = J1.transpose() * ipc_hess.block<6, 6>(6, 6) * J1;
-    mat12 off_diag = J0.transpose() * ipc_hess.block<6, 6>(0, 6) * J1;
-    mat12 off_T = off_diag.transpose();
+    // mat12 hess_p = Jp.transpose() * ipc_hess.block<3, 3>(0, 0) * Jp;
+    // mat12 hess_t = Jt.transpose() * ipc_hess.block<9, 9>(3, 3) * Jt;
+
+    // mat12 off_diag = Jp.transpose() * ipc_hess.block<3, 9>(0, 3) * Jt;
+
+    // Vector4d keri0;
+    // keri0 << 1.0, ei0_tile;
+    // Vector4d keri1;
+    // keri1 << 1.0, ei1_tile;
+    // Vector4d kerj0;
+    // kerj0 << 1.0, ej0_tile;
+    // Vector4d kerj1;
+    // kerj1 << 1.0, ej1_tile;
+    // Matrix<double, 4, 2> ker0, ker1;
+    // ker0 << keri0, keri1;
+    // ker1 << kerj0, kerj1;
+    double ker0[4][2], ker1[4][2];
+
+    for (int i = 0; i < 4; i++) {
+        ker0[i][0] = i == 0 ? 1.0 : ei0_tile(i - 1);
+        ker0[i][1] = i == 0 ? 1.0 : ei1_tile(i - 1);
+        ker1[i][0] = i == 0 ? 1.0 : ej0_tile(i - 1);
+        ker1[i][1] = i == 0 ? 1.0 : ej1_tile(i - 1);
+    }
+
+    // Matrix4d blk0 = ker0 * ker0.transpose();
+    // Matrix4d blk1 = ker0 * ker1.transpose();
+
+    mat3 hess_0[4][4], hess_1[4][4], off_diag[4][4], off_T[4][4];
+    mat3 Akl[4][4];
+    for (int i = 0; i < 4; i++)
+        for (int j = 0; j < 4; j++) Akl[i][j] = ipc_hess.block<3, 3>(i * 3, j * 3);
+    // mat12 hess_p, hess_t, hess__off;
+    for (int i = 0; i < 4; i++)
+        for (int j = 0; j < 4; j++) {
+            hess_0[i][j].setZero(3, 3);
+            for (int k = 0; k < 2; k++)
+                for (int l = 0; l < 2; l++) {
+                    hess_0[i][j] += Akl[k][l] * (ker0[i][k] * ker0[j][l]);
+                }
+
+            hess_1[i][j].setZero(3, 3);
+            for (int k = 0; k < 2; k++)
+                for (int l = 0; l < 2; l++) {
+                    hess_1[i][j] += Akl[k + 2][l + 2] * (ker1[i][k] * ker1[j][l]);
+                }
+
+            off_diag[i][j].setZero(3, 3);
+            for (int k = 0; k < 2; k++)
+                for (int l = 0; l < 2; l++) {
+                    off_diag[i][j] += Akl[k][l + 2] * (ker0[i][k] * ker1[j][l]);
+                }
+            off_T[j][i] = off_diag[i][j].transpose();
+        }
+        // mat12 off_T = off_diag.transpose();
+
+        // mat12 hess_0 = J0.transpose() * ipc_hess.block<6, 6>(0, 0) * J0;
+        // mat12 hess_1 = J1.transpose() * ipc_hess.block<6, 6>(6, 6) * J1;
+        // mat12 off_diag = J0.transpose() * ipc_hess.block<6, 6>(0, 6) * J1;
+        // mat12 off_T = off_diag.transpose();
 #ifdef _SM_
     auto outers = sparse_hess.outerIndexPtr();
     auto values = sparse_hess.valuePtr();
@@ -338,9 +459,29 @@ void ipc_term_ee(
     }
 
 #endif
+    // Vector<double, 12> d0, d1;
+    // d0 = J0.transpose() * ee_grad.segment<6>(0);
+    // d1 = J1.transpose() * ee_grad.segment<6>(6);
+
     Vector<double, 12> d0, d1;
-    d0 = J0.transpose() * ee_grad.segment<6>(0);
-    d1 = J1.transpose() * ee_grad.segment<6>(6);
+    vec3 i0 = ee_grad.segment<3>(0), i1 = ee_grad.segment<3>(3);
+    vec3 j0 = ee_grad.segment<3>(6), j1 = ee_grad.segment<3>(9);
+    // d0 << i0 + i1,
+    //     i0 * ei0_tile(0) + i1 * ei1_tile(0),
+    //     i0 * ei0_tile(1) + i1 * ei1_tile(1),
+    //     i0 * ei0_tile(2) + i1 * ei1_tile(2);
+    for (int i = 0; i < 12; i++) {
+        d0(i) = ker0[i / 3][0] * i0(i % 3)
+            + ker0[i / 3][1] * i1(i % 3);
+
+        d1(i) = ker1[i / 3][0] * j0(i % 3)
+            + ker1[i / 3][1] * j1(i % 3);
+    }
+    // d1 << j0 + j1,
+    //     j0 * ej0_tile(0) + j1 * ej1_tile(0),
+    //     j0 * ej0_tile(1) + j1 * ej1_tile(1),
+    //     j0 * ej0_tile(2) + j1 * ej1_tile(2);
+
     {
         for (int i = 0; i < 12; i++) {
 #pragma omp atomic
@@ -348,10 +489,10 @@ void ipc_term_ee(
 #pragma omp atomic
             grad_1(i) += d1(i);
         }
-        put(values, oij, stride_j, off_diag);
-        put(values, oji, stride_i, off_T);
-        put(values, oii, stride_i, hess_0);
-        put(values, ojj, stride_j, hess_1);
+        put2(values, oij, stride_j, off_diag);
+        put2(values, oji, stride_i, off_T);
+        put2(values, oii, stride_i, hess_0);
+        put2(values, ojj, stride_j, hess_1);
         // FIXME: atomic add
     }
 }

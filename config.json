@@ -11,7 +11,7 @@
     "line_search": true,
     "col_set": true,
     "ee": true,
-    "pt": true,
+    "pt": false,
     "ground": true,
     "safe_factor": 3.0,
     "uppper_bound": true, 
