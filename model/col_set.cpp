@@ -68,9 +68,8 @@ void gen_collision_set(
                 for (auto& c : collisions) {
                     unsigned I = c.body, v = c.pid;
                     vec3 p = cubes[I]->v_transformed[v];
-                    auto pt_type = ipc::point_triangle_distance_type(p, _f.t0, _f.t1, _f.t2);
-
-                    double d = ipc::point_triangle_distance(p, _f.t0, _f.t1, _f.t2, pt_type);
+                    ipc::PointTriangleDistanceType pt_type;
+                    double d = vf_distance(p, _f, pt_type);
                     if (d < barrier::d_hat * (globals.safe_factor * globals.safe_factor)) {
                         array<vec3, 4> pt = { p, _f.t0, _f.t1, _f.t2 };
                         array<int, 4> ij = { I, v, J, f };

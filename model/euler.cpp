@@ -33,8 +33,7 @@ double E_global(const VectorXd& q_plus_dq, const VectorXd& dq, int n_cubes, int 
 {
     double e = 0.0;
 // inertia energy
-#pragma omp parallel for schedule(dynamic) reduction(+ \
-                                                     : e)
+#pragma omp parallel for schedule(dynamic) reduction(+ : e)
     for (int i = 0; i < n_cubes; i++) {
         auto& c(*cubes[i]);
         c.dq = dq.segment<12>(i * 12);
@@ -43,19 +42,19 @@ double E_global(const VectorXd& q_plus_dq, const VectorXd& dq, int n_cubes, int 
         auto _q = q_plus_dq.segment<12>(12 * i);
         double e_inert = E(_q, q_tiled, c, dt);
         c.project_vt2();
-
         e += e_inert;
     }
 
 // point-triangle energy
-#pragma omp parallel for schedule(dynamic) reduction(+ \
-                                                     : e)
+#pragma omp parallel for schedule(dynamic) reduction(+ : e)
     for (int k = 0; k < n_pt; k++) {
         auto& ij = idx[k];
         Face f(*cubes[ij[2]], ij[3], true, true);
         vec3 v(cubes[ij[0]]->v_transformed[ij[1]]);
         // array<vec3, 4> a = {v, f.t0, f.t1, f.t2};
-        double d = ipc::point_triangle_distance(v, f.t0, f.t1, f.t2);
+        ipc::PointTriangleDistanceType pt_type;
+        double d = vf_distance(v, f, pt_type);
+        // double d = ipc::point_triangle_distance(v, f.t0, f.t1, f.t2);
         e += barrier::barrier_function(d);
 #ifdef _FRICTION_
         auto contact_force = -barrier_derivative_d(d) / (dt * dt) * 2 * sqrt(d);
@@ -66,8 +65,7 @@ double E_global(const VectorXd& q_plus_dq, const VectorXd& dq, int n_cubes, int 
     }
 
     // ee ipc energy
-#pragma omp parallel for schedule(dynamic) reduction(+ \
-                                                     : e)
+#pragma omp parallel for schedule(dynamic) reduction(+ : e)
     for (int k = 0; k < n_ee; k++) {
         auto& ij(eidx[k]);
         Edge ei(*cubes[ij[0]], ij[1], true, true), ej(*cubes[ij[2]], ij[3], true, true);
@@ -88,8 +86,7 @@ double E_global(const VectorXd& q_plus_dq, const VectorXd& dq, int n_cubes, int 
     }
 
     // vertex-ground ipc energy
-#pragma omp parallel for schedule(dynamic) reduction(+ \
-                                                     : e)
+#pragma omp parallel for schedule(dynamic) reduction(+ : e)
     for (int k = 0; k < n_g; k++) {
         auto& v{
             vidx[k]
@@ -255,8 +252,9 @@ void implicit_euler(vector<unique_ptr<AffineBody>>& cubes, double dt)
 
             int i = ij[0], j = ij[2];
             auto &ci(*cubes[i]), &cj(*cubes[j]);
-            auto pt_type = ipc::point_triangle_distance_type(pt[0], pt[1], pt[2], pt[3]);
-            double d = ipc::point_triangle_distance(pt[0], pt[1], pt[2], pt[3]);
+            // auto pt_type = ipc::point_triangle_distance_type(pt[0], pt[1], pt[2], pt[3]);
+            ipc::PointTriangleDistanceType pt_type;
+            double d = vf_distance(pt[0], Face{pt[1], pt[2], pt[3]}, pt_type);
             if (d < barrier::d_hat) {
 #ifdef _FRICTION_
 
