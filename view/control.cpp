@@ -5,6 +5,9 @@
 
 #include <fstream> 
 #include <nlohmann/json.hpp>
+#include <spdlog/spdlog.h>
+#include <chrono>
+#define DURATION_TO_DOUBLE(X) duration_cast<duration<double>>((X)).count()
 using json = nlohmann::json;
 void reset(){
     std::ifstream f("../config.json");
@@ -37,7 +40,15 @@ void reset(){
         globals.cubes.clear();
         customize(data["predefined_case"]["custom"]);
     }
-
+    int n_cubes = globals.cubes.size();
+    globals.writelock_cols.resize(n_cubes);
+    auto ptr = globals.writelock_cols.data();
+    for(int i = 0; i < n_cubes; i++){
+        omp_init_lock(ptr + i);
+    }
+    globals.tot_iter = 0;
+    globals.ts = 0;
+    glfwSetTime(0.0);
     {
         globals.dt = data["dt"];
         globals.max_iter = data["max_iter"];
@@ -74,8 +85,11 @@ void processInput(GLFWwindow *window)
         if (glfwGetKey(window, GLFW_KEY_D) == GLFW_PRESS)
             globals.camera.ProcessKeyboard(RIGHT, globals.deltaTime);
     }
-    if (glfwGetKey(window, GLFW_KEY_ESCAPE) == GLFW_PRESS)
+    if (glfwGetKey(window, GLFW_KEY_ESCAPE) == GLFW_PRESS){
+        double t = glfwGetTime();
+        spdlog::error("running time = {}, ts = {}, #iters = {}, fps = {}", t, globals.ts, globals.tot_iter, globals.ts / t);
         glfwSetWindowShouldClose(window, true);
+    }
 
     // if (glfwGetKey(window, GLFW_KEY_R) == GLFW_PRESS)
     //     globals.postrender = !globals.postrender;

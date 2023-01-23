@@ -9,7 +9,7 @@
 #include "../view/global_variables.h"
 #include "collision.h"
 #include "time_integrator.h"
-
+#include <omp.h>
 using namespace std;
 using mat12 = Matrix<double, 12, 12>;
 void put(double* values, int offset, int _stride, Matrix<double, 12, 12>& block)
@@ -27,7 +27,7 @@ void put2(double* values, int offset, int _stride, mat3 block[4][4])
         for (int i = 0; i < 12; i++) {
             double db = block[i / 3][j / 3](i % 3, j % 3);
             int ofs = offset + _stride * j + i;
-#pragma omp atomic
+            // #pragma omp atomic
             values[ofs] += db;
         }
 }
@@ -481,18 +481,21 @@ void ipc_term_ee(
     //     j0 * ej0_tile(0) + j1 * ej1_tile(0),
     //     j0 * ej0_tile(1) + j1 * ej1_tile(1),
     //     j0 * ej0_tile(2) + j1 * ej1_tile(2);
-
+    auto ptr = globals.writelock_cols.data();
     {
-        for (int i = 0; i < 12; i++) {
-#pragma omp atomic
-            grad_0(i) += d0(i);
-#pragma omp atomic
-            grad_1(i) += d1(i);
-        }
+
+        omp_set_lock(ptr + jj);
         put2(values, oij, stride_j, off_diag);
+        put2(values, ojj, stride_j, hess_1);
+        grad_1 += d1;
+        omp_unset_lock(ptr + jj);
+
+        omp_set_lock(ptr + jj);
         put2(values, oji, stride_i, off_T);
         put2(values, oii, stride_i, hess_0);
-        put2(values, ojj, stride_j, hess_1);
+        grad_0 += d0;
+        omp_unset_lock(ptr + jj);
+
         // FIXME: atomic add
     }
 }

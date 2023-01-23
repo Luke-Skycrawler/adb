@@ -164,7 +164,7 @@ void implicit_euler(vector<unique_ptr<AffineBody>>& cubes, double dt)
 {
     spdlog::set_level(spdlog::level::err);
     bool term_cond;
-    static int ts = 0;
+    int& ts = globals.ts;
     int iter = 0;
     double sup_dq = 0.0;
     for (int k = 0; k < cubes.size(); k++) {
@@ -439,9 +439,9 @@ void implicit_euler(vector<unique_ptr<AffineBody>>& cubes, double dt)
                     uk, contact_force, Tk_T.transpose());
 
 #else
-                ipc_term_ee(ee, ij, ee_type, d
+                ipc_term_ee(ee, ij, ee_type, d,
 #ifdef _SM_
-                                                 lut,
+                    lut,
                     sparse_hess,
 #endif
 #ifdef _TRIPLETS_
@@ -634,7 +634,8 @@ void implicit_euler(vector<unique_ptr<AffineBody>>& cubes, double dt)
         sup_dq = 0.0;
     } while (!term_cond);
     spdlog::info("\n  converge at iter {}, ts = {} \n", iter, ts++);
-    #pragma omp parallel for schedule(dynamic)
+    globals.tot_iter += iter;
+#pragma omp parallel for schedule(dynamic)
     for (int k = 0; k < n_cubes; k++) {
         auto& c(*cubes[k]);
         for (int i = 0; i < 4; i++) {

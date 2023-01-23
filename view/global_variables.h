@@ -16,6 +16,7 @@ static const unsigned int SCR_HEIGHT = 600;
 #include <map>
 #include "model.h"
 #include <string>
+#include <omp.h>
 
 struct HessBlock {
     int i, j;
@@ -47,7 +48,7 @@ struct GlobalVariableMainCPP{
     }
     #endif
     double dt;
-    int max_iter;
+    int max_iter, tot_iter, ts;
     std::vector<HessBlock> hess_triplets;
     std::vector<unique_ptr<AffineBody>> cubes;
         std::map<std::string, unique_ptr<Model>> loaded_models;
@@ -57,6 +58,7 @@ struct GlobalVariableMainCPP{
     double kappa, d_hat, safe_factor, mu, eps_x;
 
     bool col_set, upper_bound, line_search, sparse, dense, ee, pt, ground, psd, damp;
+    vector<omp_lock_t> writelock_cols;
 };
 #ifndef GOOGLE_TEST
 #ifdef _MAIN_CPP
