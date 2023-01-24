@@ -7,14 +7,14 @@
         "custom": "../test_cases/blocks.json"
     },
     "solver": "sparse",
-    "gravity": true, 
+    "gravity": false, 
     "line_search": true,
     "col_set": true,
     "ee": true,
     "pt": true,
     "ground": true,
     "safe_factor": 50.0,
-    "uppper_bound": false, 
+    "uppper_bound": true, 
     "mu": 0.0,
     "damping": {
         "enable": true,

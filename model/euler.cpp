@@ -33,7 +33,7 @@ double E_global(const VectorXd& q_plus_dq, const VectorXd& dq, int n_cubes, int 
 {
     double e = 0.0;
 // inertia energy
-#pragma omp parallel for schedule(dynamic) reduction(+ : e)
+#pragma omp parallel for schedule(static) reduction(+ : e)
     for (int i = 0; i < n_cubes; i++) {
         auto& c(*cubes[i]);
         c.dq = dq.segment<12>(i * 12);
@@ -46,7 +46,7 @@ double E_global(const VectorXd& q_plus_dq, const VectorXd& dq, int n_cubes, int 
     }
 
 // point-triangle energy
-#pragma omp parallel for schedule(dynamic) reduction(+ : e)
+#pragma omp parallel for schedule(static) reduction(+ : e)
     for (int k = 0; k < n_pt; k++) {
         auto& ij = idx[k];
         Face f(*cubes[ij[2]], ij[3], true, true);
@@ -65,7 +65,7 @@ double E_global(const VectorXd& q_plus_dq, const VectorXd& dq, int n_cubes, int 
     }
 
     // ee ipc energy
-#pragma omp parallel for schedule(dynamic) reduction(+ : e)
+#pragma omp parallel for schedule(static) reduction(+ : e)
     for (int k = 0; k < n_ee; k++) {
         auto& ij(eidx[k]);
         Edge ei(*cubes[ij[0]], ij[1], true, true), ej(*cubes[ij[2]], ij[3], true, true);
@@ -86,7 +86,7 @@ double E_global(const VectorXd& q_plus_dq, const VectorXd& dq, int n_cubes, int 
     }
 
     // vertex-ground ipc energy
-#pragma omp parallel for schedule(dynamic) reduction(+ : e)
+#pragma omp parallel for schedule(static) reduction(+ : e)
     for (int k = 0; k < n_g; k++) {
         auto& v{
             vidx[k]
@@ -211,7 +211,7 @@ void implicit_euler(vector<unique_ptr<AffineBody>>& cubes, double dt)
     do {
         globals.hess_triplets.clear();
         auto newton_iter_start = high_resolution_clock::now();
-#pragma omp parallel for schedule(dynamic)
+#pragma omp parallel for schedule(static)
         for (int k = 0; k < n_cubes; k++) {
             auto& c(*cubes[k]);
             c.grad = grad_residue_per_body(c, dt);
@@ -245,7 +245,7 @@ void implicit_euler(vector<unique_ptr<AffineBody>>& cubes, double dt)
 
         auto ipc_start = high_resolution_clock::now();
 
-#pragma omp parallel for schedule(dynamic)
+#pragma omp parallel for schedule(static)
         for (int k = 0; k < n_pt; k++) {
             auto& pt(pts[k]);
             auto& ij(idx[k]);
@@ -333,7 +333,7 @@ void implicit_euler(vector<unique_ptr<AffineBody>>& cubes, double dt)
 #endif
             }
         }
-#pragma omp parallel for schedule(dynamic)
+#pragma omp parallel for schedule(static)
         for (int k = 0; k < n_ee; k++) {
             auto& ee(ees[k]);
             auto& ij(eidx[k]);
@@ -463,7 +463,7 @@ void implicit_euler(vector<unique_ptr<AffineBody>>& cubes, double dt)
             }
             vector<double> tois;
             tois.resize(n_pt + n_ee);
-#pragma omp parallel for schedule(dynamic)
+#pragma omp parallel for schedule(static)
             for (int k = 0; k < n_pt; k++) {
                 auto& pt(pts[k]);
                 const auto& ij(idx[k]);
@@ -479,7 +479,7 @@ void implicit_euler(vector<unique_ptr<AffineBody>>& cubes, double dt)
                 tois[k] = t;
                 // toi = min(toi, t);
             }
-#pragma omp parallel for schedule(dynamic)
+#pragma omp parallel for schedule(static)
             for (int k = 0; k < n_ee; k++) {
                 auto& ee(ees[k]);
                 const auto& ij(eidx[k]);
@@ -518,7 +518,7 @@ void implicit_euler(vector<unique_ptr<AffineBody>>& cubes, double dt)
             build_from_triplets(sparse_hess_trip, big_hess, hess_dim, n_cubes);
 #endif
 #ifdef _SM_
-            #pragma omp parallel for schedule(dynamic)
+            #pragma omp parallel for schedule(static)
             for (int k = 0; k < n_cubes; k++) {
                 auto& c = *cubes[k];
                 double * values = sparse_hess.valuePtr();
@@ -572,7 +572,7 @@ void implicit_euler(vector<unique_ptr<AffineBody>>& cubes, double dt)
             }
 
             toi = 1.0;
-            #pragma omp parallel for schedule(dynamic)
+            #pragma omp parallel for schedule(static)
             for (int k = 0; k < n_cubes; k++) {
                 auto& c(*cubes[k]);
                 c.dq = dq.segment<12>(k * 12);
@@ -606,7 +606,7 @@ void implicit_euler(vector<unique_ptr<AffineBody>>& cubes, double dt)
             }
             double norm_dq = dq.norm();
             sup_dq = norm_dq;
-            #pragma omp parallel for schedule(dynamic)
+            #pragma omp parallel for schedule(static)
             for (int i = 0; i < n_cubes; i++) {
                 for (int j = 0; j < 4; j++)
                     cubes[i]->q[j] += dq.segment<3>(i * 12 + j * 3);
@@ -617,18 +617,18 @@ void implicit_euler(vector<unique_ptr<AffineBody>>& cubes, double dt)
             spdlog::info("iter {}, time = {} ms, IPC term time = {} \n e0 = {}, e1 = {}, norm_dq = {}\n", iter, iter_duration * 1000, ipc_duration
                  * 1000, E0, E1, norm_dq);
         }
-#pragma omp parallel for schedule(dynamic)
+#pragma omp parallel for schedule(static)
         for (int k = 0; k < n_cubes; k++){
             cubes[k]->project_vt1();
         }
-#pragma omp parallel for schedule(dynamic)
+#pragma omp parallel for schedule(static)
         for (int k = 0; k < n_pt; k++) {
             auto& ij = idx[k];
             Face f(*cubes[ij[2]], ij[3], false, true);
             vec3 v(cubes[ij[0]]->v_transformed[ij[1]]);
             pts[k] = { v, f.t0, f.t1, f.t2 };
         }
-#pragma omp parallel for schedule(dynamic)
+#pragma omp parallel for schedule(static)
         for (int k = 0; k < n_ee; k++) {
             auto& ij = eidx[k];
             Edge ei(*cubes[ij[0]], ij[1], false, true), ej(*cubes[ij[2]], ij[3], false, true);
@@ -639,7 +639,7 @@ void implicit_euler(vector<unique_ptr<AffineBody>>& cubes, double dt)
     } while (!term_cond);
     spdlog::info("\n  converge at iter {}, ts = {} \n", iter, ts++);
     globals.tot_iter += iter;
-#pragma omp parallel for schedule(dynamic)
+#pragma omp parallel for schedule(static)
     for (int k = 0; k < n_cubes; k++) {
         auto& c(*cubes[k]);
         for (int i = 0; i < 4; i++) {

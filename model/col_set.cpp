@@ -35,7 +35,7 @@ void gen_collision_set(
     // };
     if (globals.ground) {
 
-#pragma omp parallel for schedule(dynamic)
+#pragma omp parallel for schedule(static)
         for (int i = 0; i < n_cubes; i++) {
             cubes[i]->project_vt1();
             for (int v = 0; v < cubes[i]->n_vertices; v++) {
@@ -51,7 +51,7 @@ void gen_collision_set(
     }
     if (globals.pt) {
 #ifdef SPATIAL_HASHING_H
-        // #pragma omp parallel for schedule(dynamic)
+        // #pragma omp parallel for schedule(static)
         for (int I = 0; I < n_cubes; I++) {
             auto& ci(*cubes[I]);
             for (unsigned v = 0; v < ci.n_vertices; v++) {
@@ -59,7 +59,7 @@ void gen_collision_set(
                 spatial_hashing::register_vertex(p, I, v);
             }
         }
-#pragma omp parallel for schedule(dynamic)
+#pragma omp parallel for schedule(static)
         for (int J = 0; J < n_cubes; J++) {
             auto& cj(*cubes[J]);
             for (unsigned f = 0; f < cj.n_faces; f++) {
@@ -87,7 +87,7 @@ void gen_collision_set(
         }
         spatial_hashing::remove_all_entries();
 #else
-#pragma omp parallel for schedule(dynamic)
+#pragma omp parallel for schedule(static)
         for (int I = 0; I < nsqr; I++) {
             int i = I / n_cubes, j = I % n_cubes;
             auto &ci(*cubes[i]), &cj(*cubes[j]);
@@ -123,7 +123,7 @@ void gen_collision_set(
     if (globals.ee) {
 
 #ifdef SPATIAL_HASHING_H
-        // #pragma omp parallel for schedule(dynamic)
+        // #pragma omp parallel for schedule(static)
         for (unsigned I = 0; I < n_cubes; I++) {
             auto& ci(*cubes[I]);
             for (unsigned ei = 0; ei < ci.n_edges; ei++) {
@@ -131,7 +131,7 @@ void gen_collision_set(
                 spatial_hashing::register_edge(e.e0, e.e1, I, ei);
             }
         }
-#pragma omp parallel for schedule(dynamic)
+#pragma omp parallel for schedule(static)
         for (int J = 0; J < n_cubes; J++) {
             auto& cj(*cubes[J]);
             for (unsigned ej = 0; ej < cj.n_edges; ej++) {
