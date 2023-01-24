@@ -15,6 +15,7 @@ double vf_collision_detect(vec3& p_t0, vec3& p_t1, const AffineBody& cube, int i
 // x: vertex position in the static frame;
 // p: affine body translation
 // q: affine matrix
+double vf_collision_detect(vec3& p_t0, vec3& p_t1, const Face &f_t0, const Face &f_t1);
 double ee_collision_detect(const AffineBody& ci, const AffineBody& cj, int eid_i, int eid_j);
 
 void ipc_term_vg(AffineBody& c, int v

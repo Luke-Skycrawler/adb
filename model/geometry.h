@@ -8,3 +8,5 @@ double ee_distance(const Edge& ei, const Edge& ej);
 vec3 vg_distance_gradient_x(const vec3& vertex);
 double vg_distance(const vec3& vertex);
 double E_ground(const vec3& v);
+bool inside(const Face &f, const vec3 &p);
+Face linerp(const Face &t_t1, const Face &t_t0, double t);

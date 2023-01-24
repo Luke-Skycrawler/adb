@@ -1,5 +1,6 @@
 #include "collision.h"
 #include "barrier.h"
+#include "geometry.h"
 #define TIGHT_INCLUSION_DOUBLE
 #include <tight_inclusion/ccd.hpp>
 #include <tight_inclusion/interval_root_finder.hpp>
@@ -12,9 +13,14 @@ using namespace std;
 double vf_collision_detect(vec3& p_t0, vec3& p_t1, const AffineBody& c, int id)
 {
     Face f_t0(c, id, false), f_t1(c, id, true);
+    vf_collision_detect(p_t0, p_t1, f_t0, f_t1);
+}
+double vf_collision_detect(vec3& p_t0, vec3& p_t1, const Face& f_t0, const Face& f_t1)
+{
+    // Face f_t0(c, id, false), f_t1(c, id, true);
     ticcd::Scalar toi = 1.0, output_tolerance;
     std::vector<ticcd::Vector3> bounding_box;
-   
+
     double min_distance = 1e-6, tmax = 1, adjusted_tolerance = 1e-6;
     long max_iterations = 1e6;
 
@@ -36,6 +42,10 @@ double vf_collision_detect(vec3& p_t0, vec3& p_t1, const AffineBody& c, int id)
 
 double ee_collision_detect(const AffineBody& ci, const AffineBody& cj, int eid_i, int eid_j)
 {
+    //     Edge ei_t1(ci, eid_i, true), ej_t1(cj, eid_j, true), ei_t0(ci, eid_i), ej_t0(cj, eid_j);
+    //     ee_collision_detect(ei_t0, ei_t1, )
+    // }
+    // double ee_collision_detect(const Edge &ei_t0, const Edge &ej_t0, const Edge &ei_t1, const Edge &ej_t1)
     ticcd::Scalar toi = 1.0, output_tolerance;
     double min_distance = 1e-6, tmax = 1, adjusted_tolerance = 1e-6;
     long max_iterations = 1e6;
@@ -73,7 +83,7 @@ double collision_time(AffineBody& c, int i)
         double t = d1 / (d1 - d2);
         auto vtoi = v_t2 * (t * 0.8) + v_t1 * (1 - t * 0.8);
         double dtoi = vg_distance(vtoi);
-        if(dtoi < 0.0)
+        if (dtoi < 0.0)
             spdlog::error("dtoi = {}, d0 = {}, d1 = {}, toi = {}", dtoi, d1, d2, t);
 
         assert(dtoi > 0.0);
@@ -150,7 +160,30 @@ Vector4d det_polynomial(const mat3& a, const mat3& b)
     for (int i = 0; i < 4; i++) ret(i) = pos_polynomial[i] - neg_polynomial[i];
     return ret;
 }
+bool verify_root(const vec3& _v, const Face& f)
+{
+    auto n = f.unit_normal();
+    double d = n.dot(_v - f.t0);
+
+    vec3 v = _v - d * n;
+    d = d * d;
+    return inside(f, v);
+}
 #include "../cyCodeBase/cyPolynomial.h"
+
+inline vec3 linerp(const vec3& p_t1, const vec3& p_t0, double t)
+{
+    return t * p_t1 + (1 - t) * p_t0;
+}
+Face linerp(const Face& t_t1, const Face& t_t0, double t)
+{
+    return Face{
+        linerp(t_t1.t0, t_t0.t0, t),
+        linerp(t_t1.t1, t_t0.t1, t),
+        linerp(t_t1.t2, t_t0.t2, t),
+    };
+}
+
 double pt_collision_time(
     const vec3& p0,
     const Face& t0,
@@ -177,6 +210,14 @@ double pt_collision_time(
 
     Vector4d t = det_polynomial(a1, b1) - det_polynomial(a2, b2) + det_polynomial(a3, b3) - det_polynomial(a4, b4);
     double root = 1.0;
-    bool found = cy::CubicFirstRoot(root, t.data(), 0.0, 1.0);
-    return found ? root : 1.0;
+    double roots[3]{ 1.0 };
+    // bool found = cy::CubicFirstRoot(root, t.data(), 0.0, 1.0);
+    int found = cy::CubicRoots(roots, t.data(), 0.0, 1.0);
+    bool true_root = false;
+    for (int i = 0; i < found && !true_root; i++) {
+        root = roots[i];
+        true_root = verify_root(linerp(p1, p0, root), linerp(t1, t0, root));
+    }
+    // bool true_root = verify_root(linerp(p1, p0, root), linerp(t1, t0, root));
+    return found && true_root ? root : 1.0;
 }

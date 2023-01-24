@@ -2,6 +2,7 @@
 #include "../model/affine_body.h"
 #include "../model/collision.h"
 #include <random>
+#include <spdlog/spdlog.h>
 using namespace std;
 using namespace Eigen;
 TEST(set_triangle_moving_point, deliberate_collide)
@@ -56,6 +57,31 @@ TEST(det_poly, Eigen_ref)
         EXPECT_TRUE(abs(tt - dett) < 1e-6) << "t = " << w << " \ndet = " << dett << " computed = " << tt;
     }
 }
+
+TEST(random, tight_inclusion_ref)
+{
+    static const int n_pts = 1000;
+    array<vec3, 8> pts[n_pts];
+    double tois[n_pts];
+    default_random_engine gen;
+    uniform_real_distribution<double> dist(0.0, 1.0);
+    for (int i = 0; i < n_pts; i++) {
+        for (int j = 0; j < 24; j++) {
+            pts[i][j / 3](j % 3) = dist(gen);
+        }
+    }
+    for (int i = 0; i < n_pts; i++) {
+        auto& pt{ pts[i] };
+        Face f0{ pt[1], pt[2], pt[3] }, f1{ pt[5], pt[6], pt[7] };
+        double ticcdt = vf_collision_detect(pt[0], pt[4], f0, f1);
+        ticcdt = min(ticcdt, 1.0);
+        double selft = pt_collision_time(pt[0], f0, pt[4], f1);
+        EXPECT_TRUE(abs(ticcdt - selft) < 1e-4) << "computed = " << selft << " truth = " << ticcdt << "\n"
+                                                << pt[0].transpose() << " " << pt[1].transpose() << " " << pt[2].transpose() << " " << pt[3].transpose();
+    }
+}
+
+
 int main(int argc, char** argv)
 {
     ::testing::InitGoogleTest(&argc, argv);

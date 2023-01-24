@@ -102,12 +102,10 @@ double vf_distance(const vec3& _v, const Face& f, PointTriangleDistanceType &pt_
     auto n = f.unit_normal();
     double d = n.dot(_v - f.t0);
 
-    double a1 = area(f.t1, f.t0, f.t2);
     vec3 v = _v - d * n;
     d = d * d;
     // double a2 = ((f.t0 - v).cross(f.t1 - v).norm() + (f.t1 - v).cross(f.t2 - v).norm() + (f.t2 - v).cross(f.t0 - v).norm());
-    double a2 = area(f.t0, f.t1, v) + area(f.t1, f.t2, v) + area(f.t2, f.t0, v);
-    if (a2 > a1 + 1e-8) {
+    if (!inside(f, v)) {
         // projection outside of triangle
 
         double d_ab = h(f.t0, f.t1, v);
@@ -136,37 +134,42 @@ double vf_distance(const vec3& _v, const Face& f, PointTriangleDistanceType &pt_
     else pt_type = PointTriangleDistanceType::P_T;
     return d;
 }
-PointTriangleDistanceType pt_distance_type(const vec3& _v, const Face& f)
-{
-    auto n = f.unit_normal();
-    double d = n.dot(_v - f.t0);
 
+bool inside(const Face &f, const vec3 &v){
     double a1 = area(f.t1, f.t0, f.t2);
-    vec3 v = _v - d * n;
     double a2 = area(f.t0, f.t1, v) + area(f.t1, f.t2, v) + area(f.t2, f.t0, v);
-
-    if (a2 <= a1 + 1e-8) return PointTriangleDistanceType::P_T;
-
-    double d_ab = h(f.t0, f.t1, v);
-    double d_bc = h(f.t1, f.t2, v);
-    double d_ac = h(f.t0, f.t2, v);
-
-    double d_a = ab(v, f.t0);
-    double d_b = ab(v, f.t1);
-    double d_c = ab(v, f.t2);
-
-    double _d_ab = is_obtuse_triangle(f.t0, f.t1, v) ? min(d_a, d_b) : d_ab;
-    double _d_bc = is_obtuse_triangle(f.t2, f.t1, v) ? min(d_c, d_b) : d_bc;
-    double _d_ac = is_obtuse_triangle(f.t0, f.t2, v) ? min(d_a, d_c) : d_ac;
-
-    double d_projected = min(_d_ab, min(_d_bc, _d_ac));
-    if (d_projected == d_ab) return PointTriangleDistanceType::P_E0;
-    if (d_projected == d_bc) return PointTriangleDistanceType::P_E1;
-    if (d_projected == d_ac) return PointTriangleDistanceType::P_E2;
-    if (d_projected == d_a) return PointTriangleDistanceType::P_T0;
-    if (d_projected == d_b) return PointTriangleDistanceType::P_T1;
-    return PointTriangleDistanceType::P_T2;
+    return a2 <= a1 + 1e-8;
 }
+
+// PointTriangleDistanceType pt_distance_type(const vec3& _v, const Face& f)
+// {
+//     auto n = f.unit_normal();
+//     double d = n.dot(_v - f.t0);
+
+//     vec3 v = _v - d * n;
+
+//     if (inside(f, v)) return PointTriangleDistanceType::P_T;
+
+//     double d_ab = h(f.t0, f.t1, v);
+//     double d_bc = h(f.t1, f.t2, v);
+//     double d_ac = h(f.t0, f.t2, v);
+
+//     double d_a = ab(v, f.t0);
+//     double d_b = ab(v, f.t1);
+//     double d_c = ab(v, f.t2);
+
+//     double _d_ab = is_obtuse_triangle(f.t0, f.t1, v) ? min(d_a, d_b) : d_ab;
+//     double _d_bc = is_obtuse_triangle(f.t2, f.t1, v) ? min(d_c, d_b) : d_bc;
+//     double _d_ac = is_obtuse_triangle(f.t0, f.t2, v) ? min(d_a, d_c) : d_ac;
+
+//     double d_projected = min(_d_ab, min(_d_bc, _d_ac));
+//     if (d_projected == d_ab) return PointTriangleDistanceType::P_E0;
+//     if (d_projected == d_bc) return PointTriangleDistanceType::P_E1;
+//     if (d_projected == d_ac) return PointTriangleDistanceType::P_E2;
+//     if (d_projected == d_a) return PointTriangleDistanceType::P_T0;
+//     if (d_projected == d_b) return PointTriangleDistanceType::P_T1;
+//     return PointTriangleDistanceType::P_T2;
+// }
 
 double ee_distance(const Edge& ei, const Edge& ej)
 {
