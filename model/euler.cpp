@@ -454,7 +454,7 @@ void implicit_euler(vector<unique_ptr<AffineBody>>& cubes, double dt)
 
         const auto step_size_upper_bound = [&](VectorXd& dq, vector<unique_ptr<AffineBody>>& cubes) -> double {
             auto start = high_resolution_clock::now();
-            double toi = barrier::d_sqrt / 2.0 / norm_1(dq, n_cubes);
+            double toi = barrier::d_sqrt / 2.0 / norm_1(dq, n_cubes) * globals.safe_factor;
             toi = min(1.0, toi);
 
             for (auto v : vidx) {
