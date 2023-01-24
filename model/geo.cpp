@@ -16,7 +16,7 @@ void put(double* values, int offset, int _stride, Matrix<double, 12, 12>& block)
 {
     for (int j = 0; j < 12; j++)
         for (int i = 0; i < 12; i++) {
-#pragma omp atomic
+//#pragma omp atomic
             values[offset + _stride * j + i] += block(i, j);
         }
 }
@@ -292,17 +292,34 @@ void ipc_term(
         _0 * t0_tile(1) + _1 * t1_tile(1) + _2 * t2_tile(1),
         _0 * t0_tile(2) + _1 * t1_tile(2) + _2 * t2_tile(2);
 
+//     {
+//         for (int i = 0; i < 12; i++) {
+// #pragma omp atomic
+//             grad_p(i) += dgp(i);
+// #pragma omp atomic
+//             grad_t(i) += dgt(i);
+//         }
+//         put(values, oij, stride_j, off_diag);
+//         put(values, oji, stride_i, off_T);
+//         put(values, oii, stride_i, hess_p);
+//         put(values, ojj, stride_j, hess_t);
+//     }
+    auto ptr = globals.writelock_cols.data();
     {
-        for (int i = 0; i < 12; i++) {
-#pragma omp atomic
-            grad_p(i) += dgp(i);
-#pragma omp atomic
-            grad_t(i) += dgt(i);
-        }
+
+        omp_set_lock(ptr + jj);
         put(values, oij, stride_j, off_diag);
+        put(values, ojj, stride_j, hess_t);
+        grad_t += dgt;
+        omp_unset_lock(ptr + jj);
+
+        omp_set_lock(ptr + ii);
         put(values, oji, stride_i, off_T);
         put(values, oii, stride_i, hess_p);
-        put(values, ojj, stride_j, hess_t);
+        grad_p += dgp;
+        omp_unset_lock(ptr + ii);
+
+        // FIXME: atomic add
     }
 }
 
@@ -490,13 +507,11 @@ void ipc_term_ee(
         grad_1 += d1;
         omp_unset_lock(ptr + jj);
 
-        omp_set_lock(ptr + jj);
+        omp_set_lock(ptr + ii);
         put2(values, oji, stride_i, off_T);
         put2(values, oii, stride_i, hess_0);
         grad_0 += d0;
-        omp_unset_lock(ptr + jj);
-
-        // FIXME: atomic add
+        omp_unset_lock(ptr + ii);
     }
 }
 double E_ground(const vec3& v)

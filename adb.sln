@@ -15,6 +15,8 @@ Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "spatial hashing", "spatial 
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "ptdistance", "ptdistance\ptdistance.vcxproj", "{C77A3A1A-0537-40A7-83C7-FDDCCC803FEF}"
 EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "Sample-Test1", "Sample-Test1\Sample-Test1.vcxproj", "{87F7C3EC-8A8D-44B1-BA32-9B215C0849AE}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|x64 = Debug|x64
@@ -71,6 +73,14 @@ Global
 		{C77A3A1A-0537-40A7-83C7-FDDCCC803FEF}.Release|x64.Build.0 = Release|x64
 		{C77A3A1A-0537-40A7-83C7-FDDCCC803FEF}.Release|x86.ActiveCfg = Release|Win32
 		{C77A3A1A-0537-40A7-83C7-FDDCCC803FEF}.Release|x86.Build.0 = Release|Win32
+		{87F7C3EC-8A8D-44B1-BA32-9B215C0849AE}.Debug|x64.ActiveCfg = Debug|x64
+		{87F7C3EC-8A8D-44B1-BA32-9B215C0849AE}.Debug|x64.Build.0 = Debug|x64
+		{87F7C3EC-8A8D-44B1-BA32-9B215C0849AE}.Debug|x86.ActiveCfg = Debug|Win32
+		{87F7C3EC-8A8D-44B1-BA32-9B215C0849AE}.Debug|x86.Build.0 = Debug|Win32
+		{87F7C3EC-8A8D-44B1-BA32-9B215C0849AE}.Release|x64.ActiveCfg = Release|x64
+		{87F7C3EC-8A8D-44B1-BA32-9B215C0849AE}.Release|x64.Build.0 = Release|x64
+		{87F7C3EC-8A8D-44B1-BA32-9B215C0849AE}.Release|x86.ActiveCfg = Release|Win32
+		{87F7C3EC-8A8D-44B1-BA32-9B215C0849AE}.Release|x86.Build.0 = Release|Win32
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

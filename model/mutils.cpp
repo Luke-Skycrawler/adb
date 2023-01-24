@@ -96,13 +96,13 @@ void damping_dense(MatrixXd& big_hess, double dt, int n_cubes)
 
 void damping_sparse(SparseMatrix<double>& sparse_hess, double dt, int n_cubes)
 {
-    SparseMatrix<double> D = globals.beta * sparse_hess;
+    SparseMatrix<double>& D = sparse_hess;
+    sparse_hess *= (1 + globals.beta);
     double dab = globals.alpha - globals.beta;
     for (int i = 0; i < n_cubes; i++) {
         for (int j = 0; j < 3; j++) { D.coeffRef(i * 12 + j, i * 12 + j) += globals.cubes[i]->mass * dab; }
         for (int j = 3; j < 12; j++) { D.coeffRef(i * 12 + j, i * 12 + j) += globals.cubes[i]->Ic * dab; }
     }
-    sparse_hess += D / dt;
 }
 
 void build_from_triplets(SparseMatrix<double>& sparse_hess_trip, MatrixXd& big_hess, int hess_dim, int n_cubes)

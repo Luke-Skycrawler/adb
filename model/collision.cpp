@@ -5,7 +5,6 @@
 #include <tight_inclusion/interval_root_finder.hpp>
 #include <iostream>
 #include <spdlog/spdlog.h>
-#include "../view/global_variables.h"
 
 using namespace barrier;
 using namespace std;
@@ -83,3 +82,101 @@ double collision_time(AffineBody& c, int i)
     }
     return toi;
 };
+
+void cubic_binomial(const double a[3], const double b[3], double polynomial[4])
+{
+    for (int i = 0; i < 2; i++)
+        for (int j = 0; j < 2; j++)
+            for (int k = 0; k < 2; k++) {
+                double c11 = i ? a[0] : b[0];
+                double c22 = j ? a[1] : b[1];
+                double c33 = k ? a[2] : b[2];
+                // int I = (i<< 2) + (j << 1) + k;
+                double t = c11 * c22 * c33;
+                int J = i + k + j;
+                polynomial[J] += t;
+            }
+}
+
+Vector4d det_polynomial(const mat3& a, const mat3& b)
+{
+    double pos_polynomial[4]{ 0.0 }, neg_polynomial[4]{ 0.0 };
+    double c11c22c33[2][3]{
+        { a(0, 0), a(1, 1), a(2, 2) },
+        { b(0, 0), b(1, 1), b(2, 2) }
+    },
+        c12c23c31[2][3]{
+            { a(0, 1), a(1, 2), a(2, 0) },
+            { b(0, 1), b(1, 2), b(2, 0) }
+        },
+        c13c21c32[2][3]{
+            { a(0, 2), a(1, 0), a(2, 1) },
+            { b(0, 2), b(1, 0), b(2, 1) }
+        };
+    double c11c23c32[2][3]{
+        { a(0, 0), a(1, 2), a(2, 1) }, { b(0, 0), b(1, 2), b(2, 1) }
+    },
+        c12c21c33[2][3]{
+            { a(0, 1), a(1, 0), a(2, 2) }, { b(0, 1), b(1, 0), b(2, 2) }
+        },
+        c13c22c31[2][3]{
+            { a(0, 2), a(1, 1), a(2, 0) }, { b(0, 2), b(1, 1), b(2, 0) }
+        };
+    cubic_binomial(
+        c11c22c33[0],
+        c11c22c33[1],
+        pos_polynomial);
+    cubic_binomial(
+        c12c23c31[0],
+        c12c23c31[1],
+        pos_polynomial);
+    cubic_binomial(
+        c13c21c32[0],
+        c13c21c32[1],
+        pos_polynomial);
+    cubic_binomial(
+        c11c23c32[0],
+        c11c23c32[1],
+        neg_polynomial);
+    cubic_binomial(
+        c12c21c33[0],
+        c12c21c33[1],
+        neg_polynomial);
+    cubic_binomial(
+        c13c22c31[0],
+        c13c22c31[1],
+        neg_polynomial);
+    Vector4d ret;
+    for (int i = 0; i < 4; i++) ret(i) = pos_polynomial[i] - neg_polynomial[i];
+    return ret;
+}
+#include "../cyCodeBase/cyPolynomial.h"
+double pt_collision_time(
+    const vec3& p0,
+    const Face& t0,
+    const vec3& p1,
+    const Face& t1)
+{
+    mat3 a1, a2, a3, a4;
+    mat3 b1, b2, b3, b4;
+
+    b1 << t0.t0, t0.t1, t0.t2;
+    b2 << p0, t0.t1, t0.t2;
+    b3 << p0, t0.t0, t0.t2;
+    b4 << p0, t0.t0, t0.t1;
+
+    a1 << t1.t0, t1.t1, t1.t2;
+    a2 << p1, t1.t1, t1.t2;
+    a3 << p1, t1.t0, t1.t2;
+    a4 << p1, t1.t0, t1.t1;
+
+    a1 -= b1;
+    a2 -= b2;
+    a3 -= b3;
+    a4 -= b4;
+
+    Vector4d t = det_polynomial(a1, b1) - det_polynomial(a2, b2) + det_polynomial(a3, b3) - det_polynomial(a4, b4);
+    double root = 1.0;
+    bool found = cy::CubicFirstRoot(root, t.data(), 0.0, 1.0);
+    return found ? root : 1.0;
+}

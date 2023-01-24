@@ -229,7 +229,7 @@ void implicit_euler(vector<unique_ptr<AffineBody>>& cubes, double dt)
                 Pk.col(0) = vec3(1.0, 0.0, 0.0);
                 Pk.col(1) = vec3(0.0, 0.0, 1.0);
 
-                Vector2d uk = Pk.transpose() * (c.vt1(v) - c.vt0(v));
+                Vector2d uk = Pk.transpose() * (p - c.vt0(v));
                 auto contact_force = -barrier_derivative_d(d) / (dt * dt) * 2 * _d;
 
                 ipc_term_vg(c, v, uk, contact_force, Pk);
@@ -616,16 +616,20 @@ void implicit_euler(vector<unique_ptr<AffineBody>>& cubes, double dt)
                  * 1000, E0, E1, norm_dq);
         }
 #pragma omp parallel for schedule(dynamic)
+        for (int k = 0; k < n_cubes; k++){
+            cubes[k]->project_vt1();
+        }
+#pragma omp parallel for schedule(dynamic)
         for (int k = 0; k < n_pt; k++) {
             auto& ij = idx[k];
-            Face f(*cubes[ij[2]], ij[3]);
-            vec3 v(cubes[ij[0]]->vt1(ij[1]));
+            Face f(*cubes[ij[2]], ij[3], false, true);
+            vec3 v(cubes[ij[0]]->v_transformed[ij[1]]);
             pts[k] = { v, f.t0, f.t1, f.t2 };
         }
 #pragma omp parallel for schedule(dynamic)
         for (int k = 0; k < n_ee; k++) {
             auto& ij = eidx[k];
-            Edge ei(*cubes[ij[0]], ij[1]), ej(*cubes[ij[2]], ij[3]);
+            Edge ei(*cubes[ij[0]], ij[1], false, true), ej(*cubes[ij[2]], ij[3], false, true);
             ees[k] = { ei.e0, ei.e1, ej.e0, ej.e1 };
         }
         term_cond = sup_dq < 1e-6 || iter++ > globals.max_iter;

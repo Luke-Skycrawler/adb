@@ -1,7 +1,9 @@
 #pragma once
 #include <vector>
 #include <array>
-// #define EIGEN_USE_MKL_ALL
+//#ifndef TESTING
+//#define EIGEN_USE_MKL_ALL
+//#endif
 #include <Eigen/Eigen>
 #include "../view/shader.h"
 using mat3 = Eigen::Matrix3d;
