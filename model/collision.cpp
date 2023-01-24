@@ -13,11 +13,12 @@ using namespace std;
 double vf_collision_detect(vec3& p_t0, vec3& p_t1, const AffineBody& c, int id)
 {
     Face f_t0(c, id, false), f_t1(c, id, true);
-    vf_collision_detect(p_t0, p_t1, f_t0, f_t1);
+        vf_collision_detect(p_t0, p_t1, f_t0, f_t1);
 }
 double vf_collision_detect(vec3& p_t0, vec3& p_t1, const Face& f_t0, const Face& f_t1)
 {
     // Face f_t0(c, id, false), f_t1(c, id, true);
+
     ticcd::Scalar toi = 1.0, output_tolerance;
     std::vector<ticcd::Vector3> bounding_box;
 
@@ -42,10 +43,6 @@ double vf_collision_detect(vec3& p_t0, vec3& p_t1, const Face& f_t0, const Face&
 
 double ee_collision_detect(const AffineBody& ci, const AffineBody& cj, int eid_i, int eid_j)
 {
-    //     Edge ei_t1(ci, eid_i, true), ej_t1(cj, eid_j, true), ei_t0(ci, eid_i), ej_t0(cj, eid_j);
-    //     ee_collision_detect(ei_t0, ei_t1, )
-    // }
-    // double ee_collision_detect(const Edge &ei_t0, const Edge &ej_t0, const Edge &ei_t1, const Edge &ej_t1)
     ticcd::Scalar toi = 1.0, output_tolerance;
     double min_distance = 1e-6, tmax = 1, adjusted_tolerance = 1e-6;
     long max_iterations = 1e6;
@@ -95,17 +92,29 @@ double collision_time(AffineBody& c, int i)
 
 void cubic_binomial(const double a[3], const double b[3], double polynomial[4])
 {
-    for (int i = 0; i < 2; i++)
-        for (int j = 0; j < 2; j++)
-            for (int k = 0; k < 2; k++) {
-                double c11 = i ? a[0] : b[0];
-                double c22 = j ? a[1] : b[1];
-                double c33 = k ? a[2] : b[2];
-                // int I = (i<< 2) + (j << 1) + k;
-                double t = c11 * c22 * c33;
-                int J = i + k + j;
-                polynomial[J] += t;
-            }
+    // for (int i = 0; i < 2; i++)
+    //     for (int j = 0; j < 2; j++)
+    //         for (int k = 0; k < 2; k++) {
+    //             double c11 = i ? a[0] : b[0];
+    //             double c22 = j ? a[1] : b[1];
+    //             double c33 = k ? a[2] : b[2];
+    //             // int I = (i<< 2) + (j << 1) + k;
+    //             double t = c11 * c22 * c33;
+    //             int J = i + k + j;
+    //             polynomial[J] += t;
+    //         }
+    polynomial[0] += b[0] * b[1] * b[2];
+    polynomial[3] += a[0] * a[1] * a[2];
+    polynomial[2] += 
+        a[0] * a[1] * b[2] + 
+        b[0] * a[1] * a[2] + 
+        a[0] * b[1] * a[2];
+         
+    polynomial[1] += 
+        a[0] * b[1] * b[2] + 
+        b[0] * b[1] * a[2] + 
+        b[0] * a[1] * b[2];
+
 }
 
 Vector4d det_polynomial(const mat3& a, const mat3& b)

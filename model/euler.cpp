@@ -472,9 +472,9 @@ void implicit_euler(vector<unique_ptr<AffineBody>>& cubes, double dt)
                 // Face f(cubes[j], ij[3], true);
                 vec3 p_t2 = cubes[i]->vt2(ij[1]);
                 vec3 p_t1 = cubes[i]->vt1(ij[1]);
-                double t = vf_collision_detect(p_t1, p_t2,
-                    *cubes[j], ij[3]);
-                // double t = pt_collision_time(p_t1, Face(*cubes[j], ij[3]), p_t2, Face(*cubes[i], ij[1], true));
+                // double t = vf_collision_detect(p_t1, p_t2,
+                //     *cubes[j], ij[3]);
+                double t = pt_collision_time(p_t1, Face(*cubes[j], ij[3]), p_t2, Face(*cubes[j], ij[3], true));
                 // double t = vf_collision_detect(p_t1, p_t2, Face(*cubes[j], ij[3]), Face(*cubes[j], ij[3], true));
                 tois[k] = t;
                 // toi = min(toi, t);
