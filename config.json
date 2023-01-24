@@ -7,7 +7,7 @@
         "custom": "../test_cases/blocks.json"
     },
     "solver": "sparse",
-    "gravity": false, 
+    "gravity": true, 
     "line_search": true,
     "col_set": true,
     "ee": true,

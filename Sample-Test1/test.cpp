@@ -81,7 +81,27 @@ TEST(random, tight_inclusion_ref)
     }
 }
 
-
+TEST(random_ee, tight_inclusion_ref) {
+    static const int n_pts = 1000;
+    array<vec3, 8> pts[n_pts];
+    double tois[n_pts];
+    default_random_engine gen;
+    uniform_real_distribution<double> dist(0.0, 1.0);
+    for (int i = 0; i < n_pts; i++) {
+        for (int j = 0; j < 24; j++) {
+            pts[i][j / 3](j % 3) = dist(gen);
+        }
+    }
+    for (int i = 0; i < n_pts; i++) {
+        auto& pt{ pts[i] };
+        Edge ei0{ pt[0], pt[1]}, ej0{pt[2], pt[3] }, ei1{ pt[4], pt[5]}, ej1{pt[6], pt[7] };
+        double ticcdt = ee_collision_detect(ei0,ej0, ei1, ej1);
+        ticcdt = min(ticcdt, 1.0);
+        double selft = ee_collision_time(ei0, ej0, ei1, ej1);
+        EXPECT_TRUE(abs(ticcdt - selft) < 1e-4) << "computed = " << selft << " truth = " << ticcdt << "\n"
+                                                << pt[0].transpose() << " " << pt[1].transpose() << " " << pt[2].transpose() << " " << pt[3].transpose();
+    }
+}
 int main(int argc, char** argv)
 {
     ::testing::InitGoogleTest(&argc, argv);

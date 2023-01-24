@@ -485,7 +485,10 @@ void implicit_euler(vector<unique_ptr<AffineBody>>& cubes, double dt)
                 const auto& ij(eidx[k]);
 
                 auto &ci(*cubes[ij[0]]), &cj(*cubes[ij[2]]);
-                double t = ee_collision_detect(ci, cj, ij[1], ij[3]);
+                // double t = ee_collision_detect(ci, cj, ij[1], ij[3]);
+                Edge ei0 (ci, ij[1]), ei1 (ci, ij[1], true);
+                Edge ej0 (cj, ij[3]), ej1 (cj, ij[3], true);
+                double t = ee_collision_time(ei0, ej0, ei1, ej1);
                 tois[k + n_pt] = t;
                 // toi = min(toi, t);
             }
