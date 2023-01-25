@@ -201,9 +201,11 @@ void implicit_euler(vector<unique_ptr<AffineBody>>& cubes, double dt)
     SparseMatrix<double> sparse_hess(hess_dim, hess_dim);
     gen_empty_sm(n_cubes, idx, eidx, sparse_hess, lut);
 #endif
-    const int n_pt = idx.size(), n_ee = eidx.size(), n_g = vidx.size();
+#ifdef _TRIPLETS_
     globals.hess_triplets.reserve(((n_pt + n_ee) * 2 + n_cubes) * 12);
+#endif
 
+    const int n_pt = idx.size(), n_ee = eidx.size(), n_g = vidx.size();
     spdlog::info("constraint size = {}, {}", n_pt, n_ee);
 
     
@@ -289,10 +291,16 @@ void implicit_euler(vector<unique_ptr<AffineBody>>& cubes, double dt)
                 assert(abs(d - closest) < 1e-8);
                 auto Pk = ipc::point_triangle_tangent_basis(pt[0], pt[1], pt[2], pt[3]);
                 Matrix<double, 3, 12> gamma;
-                gamma.block<3, 3>(0, 0) = Matrix3d::Identity(3, 3) * -1.0;
-                gamma.block<3, 3>(0, 3) = Matrix3d::Identity(3, 3) * tlams[0];
-                gamma.block<3, 3>(0, 6) = Matrix3d::Identity(3, 3) * tlams[1];
-                gamma.block<3, 3>(0, 9) = Matrix3d::Identity(3, 3) * tlams[2];
+                gamma.setZero(3, 12);
+                for (int i = 0; i < 3; i++) {
+                    gamma(i, i) = -1.0;
+                    for (int j = 0; j < 3; j++)
+                        gamma(i, i + 3 + 3 * j) = tlams[j];
+                }
+                // gamma.block<3, 3>(0, 0) = Matrix3d::Identity(3, 3) * -1.0;
+                // gamma.block<3, 3>(0, 3) = Matrix3d::Identity(3, 3) * tlams[0];
+                // gamma.block<3, 3>(0, 6) = Matrix3d::Identity(3, 3) * tlams[1];
+                // gamma.block<3, 3>(0, 9) = Matrix3d::Identity(3, 3) * tlams[2];
 
                 Matrix<double, 2, 12> Tk_T = Pk.transpose() * gamma;
 
@@ -401,10 +409,17 @@ void implicit_euler(vector<unique_ptr<AffineBody>>& cubes, double dt)
 
                 auto Pk = par ? degeneracy : ipc::edge_edge_tangent_basis(ei0, ei1, ej0, ej1);
                 Matrix<double, 3, 12> gamma;
-                gamma.block<3, 3>(0, 0) = Matrix3d::Identity(3, 3) * -lambdas[0];
-                gamma.block<3, 3>(0, 3) = Matrix3d::Identity(3, 3) * -lambdas[1];
-                gamma.block<3, 3>(0, 6) = Matrix3d::Identity(3, 3) * lambdas[2];
-                gamma.block<3, 3>(0, 9) = Matrix3d::Identity(3, 3) * lambdas[3];
+                gamma.setZero(3, 12);
+                for (int i = 0; i < 3; i++) {
+                    gamma(i, i) = -lambdas[0];
+                    gamma(i, i + 3) = -lambdas[1];
+                    gamma(i, i + 6) = lambdas[2];
+                    gamma(i, i + 9) = lambdas[3];
+                }
+                // gamma.block<3, 3>(0, 0) = Matrix3d::Identity(3, 3) * -lambdas[0];
+                // gamma.block<3, 3>(0, 3) = Matrix3d::Identity(3, 3) * -lambdas[1];
+                // gamma.block<3, 3>(0, 6) = Matrix3d::Identity(3, 3) * lambdas[2];
+                // gamma.block<3, 3>(0, 9) = Matrix3d::Identity(3, 3) * lambdas[3];
 
                 Matrix<double, 2, 12> Tk_T = Pk.transpose() * gamma;
 
@@ -592,7 +607,7 @@ void implicit_euler(vector<unique_ptr<AffineBody>>& cubes, double dt)
 
             if (toi < 1.0) {
                 spdlog::warn("collision at {}, toi = {}", iter, toi);
-                factor = 0.8;
+                factor = 0.95;
             }
 
             dq *= factor * toi;
@@ -643,7 +658,7 @@ void implicit_euler(vector<unique_ptr<AffineBody>>& cubes, double dt)
             Edge ei(*cubes[ij[0]], ij[1], false, true), ej(*cubes[ij[2]], ij[3], false, true);
             ees[k] = { ei.e0, ei.e1, ej.e0, ej.e1 };
         }
-        term_cond = sup_dq < 1e-6 || iter++ > globals.max_iter;
+        term_cond = sup_dq < 1e-4 || ++iter >= globals.max_iter;
         sup_dq = 0.0;
     } while (!term_cond);
     spdlog::info("\n  converge at iter {}, ts = {} \n", iter, ts++);

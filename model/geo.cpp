@@ -196,7 +196,8 @@ void ipc_term(
     ipc_hess.setZero(12, 12);
     // ipc_hess = PSD_projection(pt_hess  * B_) + pt_grad * pt_grad.transpose() * B__;
     if (globals.psd)
-        ipc_hess = project_to_psd(pt_hess * B_) + pt_grad * pt_grad.transpose() * B__;
+        ipc_hess = project_to_psd(pt_hess * B_ + pt_grad * pt_grad.transpose() * B__);
+    //ipc_hess = project_to_psd(pt_hess * B_) + pt_grad * pt_grad.transpose() * B__;
     else
         ipc_hess = pt_hess * B_ + pt_grad * pt_grad.transpose() * B__;
     // psd project

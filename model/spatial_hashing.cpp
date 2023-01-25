@@ -13,14 +13,14 @@ namespace spatial_hashing {
 // static unordered_map<hi, unique_ptr<BodyGroup>> pt_table;
 // static unordered_map<hi, unique_ptr<BodyGroup>> ee_table;
 
-static const int vec3_compressed_bits = 8, n_entries = 1 << (vec3_compressed_bits * 3), n_overflow_buffer = 8,
-                 n_l1_bitmap = n_entries >> 10, n_l2_bitmap = n_entries >> 5, n_buffer = 16;
+static const int vec3_compressed_bits = 7, n_entries = 1 << (vec3_compressed_bits * 3), n_overflow_buffer = 8,
+                 n_l1_bitmap = n_entries >> 10, n_l2_bitmap = n_entries >> 5, n_buffer = 128;
 static atomic<element_type> count[n_entries]{0}, count_overflow {0};
 static Primitive overflow[n_overflow_buffer], hashtable[n_entries * n_buffer];
 
 static bool bitmap_l1[n_l1_bitmap], bitmap_l2[n_l2_bitmap];
 
-static const double MIN_XYZ = -1.0f, MAX_XYZ = 10.0f, dx = 0.2;
+static const double MIN_XYZ = -10.0f, MAX_XYZ = 10.0f, dx = 0.2;
 
 hi hash(const vec3i& grid_index)
 {
@@ -57,7 +57,9 @@ void register_interval(const vec3i& l, const vec3i& u, const Primitive& t)
                 }
                 else {
                     spdlog::error("overflow at {},{},{}", i, j, k);
-                    overflow[count_overflow++] = t;
+                    int c = count_overflow++;
+                    if (c < n_overflow_buffer)
+                        overflow[c] = t;
                 }
             }
 }

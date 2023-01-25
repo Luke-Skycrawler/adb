@@ -40,7 +40,7 @@ struct GlobalVariableMainCPP{
     Camera camera;
     float lastX, lastY;
     bool firstMouse;
-    GlobalVariableMainCPP(): camera(glm::vec3(0.0f, 0.0f, 3.0f)){
+    GlobalVariableMainCPP(): camera(glm::vec3(0.0f, 0.0f, 6.0f)){
         postrender = false, edge = false, skybox = false, model_draw = false, display_corner = true, motion = false, feedback = false, cursor_hidden = true;        
         lastX = SCR_WIDTH / 2.0f;
         lastY = SCR_HEIGHT / 2.0f;
@@ -65,7 +65,7 @@ struct GlobalVariableMainCPP{
 #define VARIABLE_LOCATOR
 VARIABLE_LOCATOR glm::vec3 LightPositions[]
 = {
-   glm::vec3(5.0f, 5.0f, 3.0f),
+   glm::vec3(5.0f, 5.0f, 6.0f),
    glm::vec3(1.2f, 2.0f, 0.0f),
    glm::vec3(-1.2f, 2.0f, 2.0f),
    glm::vec3(-1.2f, 2.0f, 0.0f)};

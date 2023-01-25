@@ -80,7 +80,13 @@ void customize(string file)
         auto p_dot = it["p_dot"];
         double theta = it["theta"] / 180.0 * M_PI;
 
-
+        bool mass_ = it.find("mass") != end(it);
+        if (mass_) {
+            double m = it["mass"];
+            a.mass = m;
+            a.Ic = m / 12;
+        }
+        
         a.dqdt[0] = vec3(p_dot[0], p_dot[1], p_dot[2]);
         a.q[0] = vec3(p[0], p[1], p[2]);
         auto R = skew(vec3(omega[0], omega[1], omega[2]));

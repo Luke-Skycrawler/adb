@@ -4,6 +4,7 @@
 #include <vector>
 #include <array>
 #include <set>
+#include <spdlog/spdlog.h>
 using namespace std;
 using namespace Eigen;
 using namespace utils;
@@ -52,6 +53,7 @@ void gen_empty_sm(
         }
     }
     sparse_hess.makeCompressed();
+    spdlog::info("\nsparse matrix : #non-zero blocks = {}", cset.size());
     // cout << sparse_hess;
 }
 
