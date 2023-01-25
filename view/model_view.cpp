@@ -36,8 +36,9 @@ void render_cubes(Shader shader, vector<unique_ptr<AffineBody>> &cubes)
 int main()
 {
     Cube::gen_indices();
-    omp_set_num_threads(16);
-    setNbThreads(16);
+    int n_proc = omp_get_num_procs();
+    omp_set_num_threads(n_proc);
+    setNbThreads(n_proc);
     initParallel();
     // glfw: initialize and configure
     // ------------------------------

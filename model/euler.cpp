@@ -457,7 +457,13 @@ void implicit_euler(vector<unique_ptr<AffineBody>>& cubes, double dt)
             double toi = barrier::d_sqrt / 2.0 / norm_1(dq, n_cubes) * globals.safe_factor;
             toi = min(1.0, toi);
 
-            for (auto v : vidx) {
+#pragma omp parallel for schedule(static)
+            for (int k = 0; k < n_cubes; k ++ ){
+                cubes[k] -> project_vt2();
+            }
+#pragma omp parallel for schedule(static)
+            for (int k = 0; k < n_g; k ++) {
+                auto & v {vidx[k]};
                 double t = collision_time(*cubes[v[0]], v[1]);
                 toi = min(t, toi);
             }
@@ -470,11 +476,11 @@ void implicit_euler(vector<unique_ptr<AffineBody>>& cubes, double dt)
 
                 int i = ij[0], j = ij[2];
                 // Face f(cubes[j], ij[3], true);
-                vec3 p_t2 = cubes[i]->vt2(ij[1]);
+                vec3 p_t2 = cubes[i]->v_transformed[ij[1]];
                 vec3 p_t1 = cubes[i]->vt1(ij[1]);
                 // double t = vf_collision_detect(p_t1, p_t2,
                 //     *cubes[j], ij[3]);
-                double t = pt_collision_time(p_t1, Face(*cubes[j], ij[3]), p_t2, Face(*cubes[j], ij[3], true));
+                double t = pt_collision_time(p_t1, Face(*cubes[j], ij[3]), p_t2, Face(*cubes[j], ij[3], true, true));
                 // double t = vf_collision_detect(p_t1, p_t2, Face(*cubes[j], ij[3]), Face(*cubes[j], ij[3], true));
                 tois[k] = t;
                 // toi = min(toi, t);
@@ -486,8 +492,8 @@ void implicit_euler(vector<unique_ptr<AffineBody>>& cubes, double dt)
 
                 auto &ci(*cubes[ij[0]]), &cj(*cubes[ij[2]]);
                 // double t = ee_collision_detect(ci, cj, ij[1], ij[3]);
-                Edge ei0 (ci, ij[1]), ei1 (ci, ij[1], true);
-                Edge ej0 (cj, ij[3]), ej1 (cj, ij[3], true);
+                Edge ei0 (ci, ij[1]), ei1 (ci, ij[1], true, true);
+                Edge ej0 (cj, ij[3]), ej1 (cj, ij[3], true, true);
                 double t = ee_collision_time(ei0, ej0, ei1, ej1);
                 tois[k + n_pt] = t;
                 // toi = min(toi, t);

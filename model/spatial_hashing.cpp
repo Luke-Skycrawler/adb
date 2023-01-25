@@ -4,7 +4,7 @@
 #include <set>
 #include <unordered_map>
 #include <spdlog/spdlog.h>
-
+#include <atomic>
 using namespace std;
 using namespace spatial_hashing;
 
@@ -15,7 +15,7 @@ namespace spatial_hashing {
 
 static const int vec3_compressed_bits = 8, n_entries = 1 << (vec3_compressed_bits * 3), n_overflow_buffer = 8,
                  n_l1_bitmap = n_entries >> 10, n_l2_bitmap = n_entries >> 5, n_buffer = 16;
-static element_type count[n_entries], count_overflow;
+static atomic<element_type> count[n_entries]{0}, count_overflow {0};
 static Primitive overflow[n_overflow_buffer], hashtable[n_entries * n_buffer];
 
 static bool bitmap_l1[n_l1_bitmap], bitmap_l2[n_l2_bitmap];
@@ -44,8 +44,8 @@ void register_interval(const vec3i& l, const vec3i& u, const Primitive& t)
     for (int i = l(0); i <= u(0); i++)
         for (int j = l(1); j <= u(1); j++)
             for (int k = l(2); k <= u(2); k++) {
-                auto idx = hash(vec3i(i, j, k));
-                auto& c = count[idx];
+                auto idx = hash(vec3i(i, j, k));          
+                element_type c = count[idx] ++;
                 if (c < n_buffer - 1) {
                     if (c == 0) {
                         // new entry on the bitmaps
@@ -53,7 +53,7 @@ void register_interval(const vec3i& l, const vec3i& u, const Primitive& t)
                         bitmap_l1[l1_pos] = true;
                         bitmap_l2[l2_pos] = true;
                     }
-                    hashtable[idx * n_buffer + c++] = t;
+                    hashtable[idx * n_buffer + c] = t;
                 }
                 else {
                     spdlog::error("overflow at {},{},{}", i, j, k);
