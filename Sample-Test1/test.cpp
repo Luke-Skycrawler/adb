@@ -3,6 +3,7 @@
 #include "../model/collision.h"
 #include <random>
 #include <spdlog/spdlog.h>
+
 using namespace std;
 using namespace Eigen;
 TEST(set_triangle_moving_point, deliberate_collide)

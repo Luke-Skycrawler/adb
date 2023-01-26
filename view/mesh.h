@@ -48,6 +48,7 @@ public:
 
         // now that we have all the required data, set the vertex buffers and its attribute pointers.
         setupMesh();
+        align_com();
     }
 
     // render the mesh
@@ -87,6 +88,7 @@ public:
         // always good practice to set everything back to defaults once configured.
         glActiveTexture(GL_TEXTURE0);
     }
+    double Ic[6];
 
 private:
     // render data 
@@ -130,5 +132,7 @@ private:
 
         glBindVertexArray(0);
     }
+
+    void align_com();
 };
 #endif

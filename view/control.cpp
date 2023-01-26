@@ -26,6 +26,7 @@ void reset(){
     globals.ground = data["ground"];
     globals.psd = data["psd"];
     globals.damp = data["damping"]["enable"];
+    globals.backoff = data["backoff"];
     if (predefined) {
         int id = data["predefined_case"]["id"];
         if (id == 1) {

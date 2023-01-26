@@ -416,11 +416,6 @@ void implicit_euler(vector<unique_ptr<AffineBody>>& cubes, double dt)
                     gamma(i, i + 6) = lambdas[2];
                     gamma(i, i + 9) = lambdas[3];
                 }
-                // gamma.block<3, 3>(0, 0) = Matrix3d::Identity(3, 3) * -lambdas[0];
-                // gamma.block<3, 3>(0, 3) = Matrix3d::Identity(3, 3) * -lambdas[1];
-                // gamma.block<3, 3>(0, 6) = Matrix3d::Identity(3, 3) * lambdas[2];
-                // gamma.block<3, 3>(0, 9) = Matrix3d::Identity(3, 3) * lambdas[3];
-
                 Matrix<double, 2, 12> Tk_T = Pk.transpose() * gamma;
 
                 // Matrix<double, 12, 24> jacobian;
@@ -566,9 +561,9 @@ void implicit_euler(vector<unique_ptr<AffineBody>>& cubes, double dt)
                 // sparse_hess.setFromTriplets(bht.begin(), bht.end());
                 // sparse_hess.finalize();
 #ifdef EIGEN_USE_MKL_ALL
-                PardisoLDLT<SparseMatrix<double>> ldlt_solver;
+                PardisoLLT<SparseMatrix<double>> ldlt_solver;
 #else
-                SimplicialLDLT<SparseMatrix<double>> ldlt_solver;
+                SimplicialLLT<SparseMatrix<double>> ldlt_solver;
 #endif
                 ldlt_solver.compute(sparse_hess);
                 dq = -ldlt_solver.solve(r);
@@ -607,7 +602,7 @@ void implicit_euler(vector<unique_ptr<AffineBody>>& cubes, double dt)
 
             if (toi < 1.0) {
                 spdlog::warn("collision at {}, toi = {}", iter, toi);
-                factor = 0.95;
+                factor = globals.backoff;
             }
 
             dq *= factor * toi;
@@ -658,7 +653,7 @@ void implicit_euler(vector<unique_ptr<AffineBody>>& cubes, double dt)
             Edge ei(*cubes[ij[0]], ij[1], false, true), ej(*cubes[ij[2]], ij[3], false, true);
             ees[k] = { ei.e0, ei.e1, ej.e0, ej.e1 };
         }
-        term_cond = sup_dq < 1e-4 || ++iter >= globals.max_iter;
+        term_cond = sup_dq < 1e-6 || ++iter >= globals.max_iter;
         sup_dq = 0.0;
     } while (!term_cond);
     spdlog::info("\n  converge at iter {}, ts = {} \n", iter, ts++);
