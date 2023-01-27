@@ -1,4 +1,4 @@
-#include "time_integrator.h"
+ #include "time_integrator.h"
 #include "../view/global_variables.h"
 #include <algorithm>
 #include "othogonal_energy.h"
@@ -46,6 +46,8 @@ vec12 cat(const q4& q)
 
 vec12 grad_residue_per_body(AffineBody& c, double dt)
 {
+    if (c.mass < 0.0) 
+    return vec12::Zero(12);
     vec12 grad = othogonal_energy::grad(c.q);
     const auto M = [&](const vec12& dq) -> vec12 {
         auto ret = dq;
@@ -60,6 +62,7 @@ mat12 hess_inertia_per_body(AffineBody& c, double dt)
 {
     mat12 H;
     H.setZero(12, 12);
+    if (c.mass < 0.0) return mat12::Identity(12, 12);
     for (int i = 0; i < 3; i++) H(i, i) = c.mass;
     for (int i = 3; i < 12; i++) H(i, i) = c.Ic;
     auto hess_otho = othogonal_energy::hessian(c.q);
@@ -187,6 +190,7 @@ void build_from_triplets(SparseMatrix<double>& sparse_hess_trip, MatrixXd& big_h
 }
 double E(const vec12& q, const vec12& q_tiled, const AffineBody& c, double dt)
 {
+    if(c.mass < 0.0) return 0.0;
     return othogonal_energy::otho_energy(q) * dt * dt + 0.5 * norm_M(q - q_tiled, c);
 };
 };

@@ -96,27 +96,6 @@ void friction(
     H += D_k_hessian * h2;
 }
 
-// void friction(
-//     const Vector2d& _uk, double contact_lambda, const Matrix<double, 3, 2>& Tk,
-//     vec3& g, mat3& H)
-// {
-//     static double mu = globals.mu;
-
-//     static const double evh = globals.dt * 1e-2, h2 = globals.dt * globals.dt;
-//     auto uk = _uk.norm();
-//     if (uk < 1e-10) return;
-//     auto f1 = ipc::f1_SF_over_x(uk, evh);
-//     Vector<double, 3> F_k = -mu * contact_lambda * Tk * f1 * _uk;
-//     double D_k = mu * contact_lambda * ipc::f0_SF(uk, evh);
-//     double df1_term = ipc::df1_x_minus_f1_over_x3(uk, evh);
-//     Matrix2d M2x2 = (df1_term * _uk * _uk.transpose() + f1 * Matrix2d::Identity(2, 2));
-//     M2x2 = project_to_psd(M2x2);
-//     Matrix<double, 3, 3> D_k_hessian = mu * contact_lambda * Tk * M2x2 * Tk.transpose();
-
-//     g += F_k * h2;
-//     H += D_k_hessian * h2;
-// }
-
 void ipc_term_vg(AffineBody& c, int v
 #ifdef _FRICTION_
     ,
@@ -125,19 +104,11 @@ void ipc_term_vg(AffineBody& c, int v
 
 )
 {
+    if (c.mass < 0.0) return;
     auto v_tile{ c.vertices(v) }, p{ c.vt1(v) };
-
     c.grad += barrier::barrier_gradient_q(v_tile, p);
     c.hess += barrier::barrier_hessian_q(v_tile, p);
 #ifdef _FRICTION_
-
-    // auto g = barrier::barrier_gradient_x;
-    // auto H = barrier::barrier_second_derivative(d) * g * g.transpose();
-    // friction(_uk, contact_lambda, Tk, g, H);
-    // auto J = barrier::x_jacobian_q(c.vertices(v));
-    // c.grad += g * J;
-    // c.hess += J.transpose() * H * J;
-
     auto J = barrier::x_jacobian_q(v_tile);
     friction(_uk, contact_lambda,
         J.transpose() * Tk, c.grad, c.hess);
@@ -162,8 +133,6 @@ void ipc_term(
 #endif
 )
 {
-    // static const vec3* vnp = Cube::_vertices();
-    // static unsigned* tidx = Cube::_indices;
 
     int _i = ij[0], v = ij[1], _j = ij[2], f = ij[3];
 
@@ -197,7 +166,7 @@ void ipc_term(
     // ipc_hess = PSD_projection(pt_hess  * B_) + pt_grad * pt_grad.transpose() * B__;
     if (globals.psd)
         ipc_hess = project_to_psd(pt_hess * B_ + pt_grad * pt_grad.transpose() * B__);
-    //ipc_hess = project_to_psd(pt_hess * B_) + pt_grad * pt_grad.transpose() * B__;
+    // ipc_hess = project_to_psd(pt_hess * B_) + pt_grad * pt_grad.transpose() * B__;
     else
         ipc_hess = pt_hess * B_ + pt_grad * pt_grad.transpose() * B__;
     // psd project
@@ -246,20 +215,6 @@ void ipc_term(
         }
     mat12 off_T = off_diag.transpose();
 
-    // double np = (testp - hess_p).norm();
-    // double nt = (testt - hess_t).norm();
-    // double noff = (test_off - off_diag).norm();
-    // if (np > 1e-6 || nt > 1e-5 || noff > 1e-6) {
-    //     spdlog::info("");
-    // }    mat12 off_T = off_diag.transpose();
-
-    // for (int i = 0; i < 10; i++){
-    //     double sgn = i % 2 == 0? 1: -1;
-    //     hess_p += sgn * Jp.transpose() * ipc_hess.block<3, 3>(0, 0) * Jp;
-    //     hess_t += sgn * Jt.transpose() * ipc_hess.block<9, 9>(3, 3) * Jt;
-    //     off_diag += sgn * Jp.transpose() * ipc_hess.block<3, 9>(0, 3) * Jt;
-    // }
-
     pt_grad *= B_;
 #ifdef _FRICTION_
     friction(_uk, contact_lambda, Tk, pt_grad, ipc_hess);
@@ -292,35 +247,24 @@ void ipc_term(
         _0 * t0_tile(0) + _1 * t1_tile(0) + _2 * t2_tile(0),
         _0 * t0_tile(1) + _1 * t1_tile(1) + _2 * t2_tile(1),
         _0 * t0_tile(2) + _1 * t1_tile(2) + _2 * t2_tile(2);
-
-//     {
-//         for (int i = 0; i < 12; i++) {
-// #pragma omp atomic
-//             grad_p(i) += dgp(i);
-// #pragma omp atomic
-//             grad_t(i) += dgt(i);
-//         }
-//         put(values, oij, stride_j, off_diag);
-//         put(values, oji, stride_i, off_T);
-//         put(values, oii, stride_i, hess_p);
-//         put(values, ojj, stride_j, hess_t);
-//     }
     auto ptr = globals.writelock_cols.data();
     {
-
-        omp_set_lock(ptr + jj);
-        put(values, oij, stride_j, off_diag);
-        put(values, ojj, stride_j, hess_t);
-        grad_t += dgt;
-        omp_unset_lock(ptr + jj);
-
-        omp_set_lock(ptr + ii);
-        put(values, oji, stride_i, off_T);
-        put(values, oii, stride_i, hess_p);
-        grad_p += dgp;
-        omp_unset_lock(ptr + ii);
-
-        // FIXME: atomic add
+        if (cj.mass > 0.0) {
+            omp_set_lock(ptr + jj);
+            if (ci.mass > 0.0)
+                put(values, oij, stride_j, off_diag);
+            put(values, ojj, stride_j, hess_t);
+            grad_t += dgt;
+            omp_unset_lock(ptr + jj);
+        }
+        if (ci.mass > 0.0) {
+            omp_set_lock(ptr + ii);
+            if (cj.mass > 0.0)
+                put(values, oji, stride_i, off_T);
+            put(values, oii, stride_i, hess_p);
+            grad_p += dgp;
+            omp_unset_lock(ptr + ii);
+        }
     }
 }
 
@@ -501,18 +445,22 @@ void ipc_term_ee(
     //     j0 * ej0_tile(2) + j1 * ej1_tile(2);
     auto ptr = globals.writelock_cols.data();
     {
-
-        omp_set_lock(ptr + jj);
-        put2(values, oij, stride_j, off_diag);
-        put2(values, ojj, stride_j, hess_1);
-        grad_1 += d1;
-        omp_unset_lock(ptr + jj);
-
-        omp_set_lock(ptr + ii);
-        put2(values, oji, stride_i, off_T);
-        put2(values, oii, stride_i, hess_0);
-        grad_0 += d0;
-        omp_unset_lock(ptr + ii);
+        if (cj.mass > 0.0) {
+            omp_set_lock(ptr + jj);
+            if (ci.mass > 0.0)
+                put2(values, oij, stride_j, off_diag);
+            put2(values, ojj, stride_j, hess_1);
+            grad_1 += d1;
+            omp_unset_lock(ptr + jj);
+        }
+        if (ci.mass > 0.0) {
+            omp_set_lock(ptr + ii);
+            if (cj.mass > 0.0)
+                put2(values, oji, stride_i, off_T);
+            put2(values, oii, stride_i, hess_0);
+            grad_0 += d0;
+            omp_unset_lock(ptr + ii);
+        }
     }
 }
 double E_ground(const vec3& v)
