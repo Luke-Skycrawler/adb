@@ -7,6 +7,24 @@
 using namespace std;
 using json = nlohmann::json;
 
+mat3 rotation(double a, double b, double c)
+{
+    auto s1 = sin(a);
+    auto s2 = sin(b);
+    auto s3 = sin(c);
+
+    auto c1 = cos(a);
+    auto c2 = cos(b);
+    auto c3 = cos(c);
+
+    mat3 R;
+    R << c1 * c2, c1 * s2 * s3 - c3 * s1, s1 * s3 + c1 * c3 * s2,
+        c2 * s1, c1 * c3 + s1 * s2 * s3, c3 * s1 * s2 - c1 * s3,
+        -s2, c2 * s3, c2 * c3;
+    R = R.transpose();
+    return R;
+}
+
 inline mat3 cross_matrix(const vec3& a)
 {
     mat3 ret;
@@ -50,7 +68,6 @@ void cube_blocks(int n)
         globals.cubes.push_back(move(_cube));
     }
 }
-
 void customize(string file)
 {
     vector<Cube> cubes;
@@ -78,7 +95,7 @@ void customize(string file)
         omega = it["omega"];
         auto p = it["p"];
         auto p_dot = it["p_dot"];
-        double theta = it["theta"] / 180.0 * M_PI;
+        bool use_euler = it.find("euler") != it.end();
 
         bool mass_ = it.find("mass") != end(it);
         if (mass_) {
@@ -91,11 +108,22 @@ void customize(string file)
         a.q[0] = vec3(p[0], p[1], p[2]);
         auto R = skew(vec3(omega[0], omega[1], omega[2]));
         for (int i = 0; i < 3; i++) a.dqdt[i + 1] = R[i];
-        double s = sin(theta), c = cos(theta);
-        a.q[1](0) = c;
-        a.q[2](1) = c;
-        a.q[2](0) = -s;
-        a.q[1](1) = s;
+        if (use_euler) {
+            auto ds = it["euler"];
+            double  aa = ds[0] / 180.0 * M_PI, 
+                    bb = ds[1] / 180.0 * M_PI, 
+                    cc = ds[2] / 180.0 * M_PI;
+            mat3 rotate = rotation(aa, bb, cc);
+            for (int i = 0; i < 3; i++) a.q[i + 1] = rotate.col(i);
+        }
+        else {
+            double theta = use_euler ? 0.0 : it["theta"] / 180.0 * M_PI;
+            double s = sin(theta), c = cos(theta);
+            a.q[1](0) = c;
+            a.q[2](1) = c;
+            a.q[2](0) = -s;
+            a.q[1](1) = s;
+        }
         a.q0 = a.q;
         globals.cubes.push_back(move(_a));
     }
