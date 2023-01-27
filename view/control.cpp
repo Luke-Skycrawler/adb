@@ -9,7 +9,8 @@
 #include <chrono>
 #define DURATION_TO_DOUBLE(X) duration_cast<duration<double>>((X)).count()
 using json = nlohmann::json;
-void reset(){
+void reset(bool init)
+{
     std::ifstream f("../config.json");
     json data = json::parse(f);
     double dt = data["dt"];
@@ -58,6 +59,10 @@ void reset(){
         globals.safe_factor = data["safe_factor"];
         globals.mu = data["mu"];
         globals.eps_x = data["eps_x"];
+    }
+    if (init) {
+        auto sh_args = data["spatial hashing"];
+        globals.sh = make_unique<spatial_hashing>(sh_args["xyz_bits"], sh_args["n_buffer"], sh_args["min_xyz"], sh_args["max_xyz"], sh_args["dx"]);
     }
 }
 // process all input: query GLFW whether relevant keys are pressed/released this frame and react accordingly

@@ -222,7 +222,7 @@ int main()
 
     lightingShader.setFloat("material.shininess", 64);
 
-    reset();
+    reset(true);
     // be sure to call after glfw intiailzation 
 
     // render loop

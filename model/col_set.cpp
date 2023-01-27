@@ -56,7 +56,7 @@ void gen_collision_set(
             auto& ci(*cubes[I]);
             for (unsigned v = 0; v < ci.n_vertices; v++) {
                 vec3 p = ci.v_transformed[v];
-                spatial_hashing::register_vertex(p, I, v);
+                globals.sh -> register_vertex(p, I, v);
             }
         }
 #pragma omp parallel
@@ -70,7 +70,7 @@ void gen_collision_set(
                 auto& cj(*cubes[J]);
                 for (unsigned f = 0; f < cj.n_faces; f++) {
                     Face _f(cj, f, false, true);
-                    auto collisions = spatial_hashing::query_triangle(_f.t0, _f.t1, _f.t2, J, barrier::d_sqrt * globals.safe_factor);
+                    auto collisions = globals.sh -> query_triangle(_f.t0, _f.t1, _f.t2, J, barrier::d_sqrt * globals.safe_factor);
                     for (auto& c : collisions) {
                         unsigned I = c.body, v = c.pid;
                         vec3 p = cubes[I]->v_transformed[v];
@@ -99,7 +99,7 @@ void gen_collision_set(
             pt_tk.insert(pt_tk.end(), pt_tk_private.begin(), pt_tk_private.end());
 #endif
         }
-        spatial_hashing::remove_all_entries();
+        globals.sh -> remove_all_entries();
 #else
 #pragma omp parallel for schedule(static)
         for (int I = 0; I < nsqr; I++) {
@@ -142,7 +142,7 @@ void gen_collision_set(
             auto& ci(*cubes[I]);
             for (unsigned ei = 0; ei < ci.n_edges; ei++) {
                 Edge e{ ci, ei, false, true };
-                spatial_hashing::register_edge(e.e0, e.e1, I, ei);
+                globals.sh -> register_edge(e.e0, e.e1, I, ei);
             }
         }
 
@@ -165,7 +165,7 @@ void gen_collision_set(
                 auto& cj(*cubes[J]);
                 for (unsigned ej = 0; ej < cj.n_edges; ej++) {
                     Edge e{ cj, ej, false, true };
-                    auto collisions = spatial_hashing::query_edge(e.e0, e.e1, J, barrier::d_sqrt * globals.safe_factor);
+                    auto collisions = globals.sh -> query_edge(e.e0, e.e1, J, barrier::d_sqrt * globals.safe_factor);
                     for (auto& c : collisions) {
                         unsigned I = c.body, ei = c.pid;
                         if (I > J) continue;
@@ -213,7 +213,7 @@ void gen_collision_set(
             // #endif
         }
         delete[] cnt;
-        spatial_hashing::remove_all_entries();
+        globals.sh -> remove_all_entries();
 #else
         for (int i = 0; i < n_cubes; i++)
             for (int j = i + 1; j < n_cubes; j++) {
