@@ -4,7 +4,7 @@
     "predefined_case" : {
         "enable": false,
         "id" : 2,
-        "custom": "../test_cases/links.json"
+        "custom": "../test_cases/empty.json"
     },
     "solver": "sparse",
     "gravity": true, 
@@ -13,7 +13,7 @@
     "ee": true,
     "pt": true,
     "ground": true,
-    "safe_factor": 2.0,
+    "safe_factor": 3.0,
     "uppper_bound": true, 
     "mu": 0.0,
     "backoff": 0.95,
@@ -27,8 +27,8 @@
     "spatial hashing": {
         "min_xyz": -2.0,
         "max_xyz": 2.0,
-        "dx": 0.1,
-        "n_buffer": 64,
+        "dx": 0.04,
+        "n_buffer": 128,
         "xyz_bits": 7
     },
     "_spatial hashing": {
