@@ -46,4 +46,18 @@ struct spatial_hashing {
     std::vector<Primitive> query_edge(const vec3& a, const vec3& b, element_type group_exl, double dhat = 1e-2);
     void register_vertex(const vec3& a, element_type body, element_type pid);
     std::vector<Primitive> query_triangle(const vec3& a, const vec3& b, const vec3& c, element_type group_exl, double dhat = 1e-2);
+    void register_edge_trajectory(
+        const vec3& a0, const vec3& b0,
+        const vec3& a1, const vec3& b1,
+        element_type body, element_type pid);
+        
+    std::vector<Primitive> query_edge_trajectory(
+        const vec3& a0, const vec3& b0,
+        const vec3& a1, const vec3& b1,
+        element_type group_exl);
+
+    std::vector<Primitive> query_triangle_trajectory(
+        const vec3& a0, const vec3& b0, const vec3& c0,
+        const vec3& a1, const vec3& b1, const vec3& c1,
+        element_type group_exl);
 };

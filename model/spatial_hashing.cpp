@@ -105,6 +105,18 @@ void spatial_hashing::register_edge(const vec3& a, const vec3& b, element_type b
     register_interval(l, u, { pid, body });
 }
 
+void spatial_hashing::register_edge_trajectory(
+    const vec3& a0, const vec3& b0,
+    const vec3& a1, const vec3& b1,
+    element_type body, element_type pid)
+{
+    vec3i ia0(tovec3i(a0)), ib0(tovec3i(b0));
+    vec3i ia1(tovec3i(a0)), ib1(tovec3i(b0));
+    vec3i u = ia0.cwiseMax(ib0).cwiseMax(ia1).cwiseMax(ib1);
+    vec3i l = ia0.cwiseMin(ib0).cwiseMin(ia1).cwiseMin(ib1);
+    register_interval(l, u, { pid, body });
+}
+
 vector<Primitive> spatial_hashing::query_edge(const vec3& a, const vec3& b, element_type group_exl, double dhat)
 {
     vec3 _u = a.cwiseMax(b).array() + dhat;
@@ -124,6 +136,34 @@ vector<Primitive> spatial_hashing::query_triangle(const vec3& a, const vec3& b, 
 {
     vec3 _u = a.cwiseMax(b).cwiseMax(c).array() + dhat;
     vec3 _l = a.cwiseMin(b).cwiseMin(c).array() - dhat;
+    vec3i u = tovec3i(_u);
+    vec3i l = tovec3i(_l);
+    return query_interval(l, u, group_exl);
+}
+
+vector<Primitive> spatial_hashing::query_triangle_trajectory(
+    const vec3& a0, const vec3& b0, const vec3& c0,
+    const vec3& a1, const vec3& b1, const vec3& c1,
+    element_type group_exl)
+{
+    vec3 _u0 = a0.cwiseMax(b0).cwiseMax(c0);
+    vec3 _l0 = a0.cwiseMin(b0).cwiseMin(c0);
+
+    vec3 _u1 = a1.cwiseMax(b1).cwiseMax(c1);
+    vec3 _l1 = a1.cwiseMin(b1).cwiseMin(c1);
+
+    vec3i u = tovec3i(_u0.cwiseMax(_u1));
+    vec3i l = tovec3i(_l0.cwiseMin(_l1));
+    return query_interval(l, u, group_exl);
+}
+
+vector<Primitive> spatial_hashing::query_edge_trajectory(
+    const vec3& a0, const vec3& b0,
+    const vec3& a1, const vec3& b1,
+    element_type group_exl)
+{
+    vec3 _u = a0.cwiseMax(b0).cwiseMax(a1).cwiseMax(b1);
+    vec3 _l = a0.cwiseMin(b0).cwiseMin(a1).cwiseMin(b1);
     vec3i u = tovec3i(_u);
     vec3i l = tovec3i(_l);
     return query_interval(l, u, group_exl);

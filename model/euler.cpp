@@ -462,57 +462,6 @@ void implicit_euler(vector<unique_ptr<AffineBody>>& cubes, double dt)
 
         auto ipc_duration = DURATION_TO_DOUBLE(high_resolution_clock::now() - ipc_start);
 
-        const auto step_size_upper_bound = [&](VectorXd& dq, vector<unique_ptr<AffineBody>>& cubes) -> double {
-            auto start = high_resolution_clock::now();
-            double toi = barrier::d_sqrt / 2.0 / norm_1(dq, n_cubes) * globals.safe_factor;
-            toi = min(1.0, toi);
-
-#pragma omp parallel for schedule(static)
-            for (int k = 0; k < n_cubes; k ++ ){
-                cubes[k] -> project_vt2();
-            }
-#pragma omp parallel for schedule(static)
-            for (int k = 0; k < n_g; k ++) {
-                auto & v {vidx[k]};
-                double t = collision_time(*cubes[v[0]], v[1]);
-                toi = min(t, toi);
-            }
-            vector<double> tois;
-            tois.resize(n_pt + n_ee);
-#pragma omp parallel for schedule(static)
-            for (int k = 0; k < n_pt; k++) {
-                auto& pt(pts[k]);
-                const auto& ij(idx[k]);
-
-                int i = ij[0], j = ij[2];
-                // Face f(cubes[j], ij[3], true);
-                vec3 p_t2 = cubes[i]->v_transformed[ij[1]];
-                vec3 p_t1 = cubes[i]->vt1(ij[1]);
-                // double t = vf_collision_detect(p_t1, p_t2,
-                //     *cubes[j], ij[3]);
-                double t = pt_collision_time(p_t1, Face(*cubes[j], ij[3]), p_t2, Face(*cubes[j], ij[3], true, true));
-                // double t = vf_collision_detect(p_t1, p_t2, Face(*cubes[j], ij[3]), Face(*cubes[j], ij[3], true));
-                tois[k] = t;
-                // toi = min(toi, t);
-            }
-#pragma omp parallel for schedule(static)
-            for (int k = 0; k < n_ee; k++) {
-                auto& ee(ees[k]);
-                const auto& ij(eidx[k]);
-
-                auto &ci(*cubes[ij[0]]), &cj(*cubes[ij[2]]);
-                // double t = ee_collision_detect(ci, cj, ij[1], ij[3]);
-                Edge ei0 (ci, ij[1]), ei1 (ci, ij[1], true, true);
-                Edge ej0 (cj, ij[3]), ej1 (cj, ij[3], true, true);
-                double t = ee_collision_time(ei0, ej0, ei1, ej1);
-                tois[k + n_pt] = t;
-                // toi = min(toi, t);
-            }
-            for (auto t : tois) toi = min(toi, t);
-            auto _duration = DURATION_TO_DOUBLE(high_resolution_clock::now() - start);
-            spdlog::info("time: step size upper bound = {:0.6f} ms", _duration * 1000);
-            return toi;
-        };
         double toi = 1.0, factor = 1.0, alpha = 1.0;
 
         {
@@ -598,7 +547,7 @@ void implicit_euler(vector<unique_ptr<AffineBody>>& cubes, double dt)
             }
 
             if (globals.upper_bound)
-                toi = step_size_upper_bound(dq, cubes);
+                toi = step_size_upper_bound(dq, cubes, n_cubes, n_pt, n_ee, n_g, pts, idx, ees, eidx, vidx);
 
             if (toi < 1.0) {
                 spdlog::warn("collision at {}, toi = {}", iter, toi);
