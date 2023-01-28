@@ -86,7 +86,8 @@ int main()
     // Shader lightingShader("shaders/cursor.vert", "shaders/cursor.frag", "shaders/cursor.geom");
     // version 2
 
-    Shader lightingShader("shaders/1.color.vert", "shaders/1.color.frag");
+    // Shader lightingShader("shaders/1.color.vert", "shaders/1.color.frag");
+     Shader lightingShader("shaders/shadow/shadow.vert", "shaders/shadow/shadow.frag");
     // shadow shader
 
     // Shader lightingShader("shaders/1.color_.vert", "shaders/1.color_.frag","shaders/pass_through.geom");
@@ -246,7 +247,8 @@ int main()
 #endif
 
         // glBindFramebuffer(GL_FRAMEBUFFER,0);
-        glClearColor(0.1f, 0.1f, 0.1f, 1.0f);
+        // glClearColor(0.1f, 0.1f, 0.1f, 1.0f);
+        glClearColor(0.9f, 0.9f, 0.9f, 1.0f);
         glEnable(GL_DEPTH_TEST);
         glEnable(GL_STENCIL_TEST);
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT | GL_STENCIL_BUFFER_BIT);
@@ -314,7 +316,6 @@ int main()
         }
         lightingShader.setMat4("lightView", glm::perspective(glm::radians(89.0f), (float)SHADOW_WIDTH / SHADOW_HEIGHT, 0.1f, 10.0f) * lightSpaceTrans);
         view = globals.camera.GetViewMatrix();
-        lightingShader.setVec3("objectColor", 1.0f, 0.5f, 0.31f);
         lightingShader.setVec3("lightColor", 1.0f, 1.0f, 1.0f);
         lightingShader.setVec3("lightPos", lightPos);
         lightingShader.setVec3("viewPos", globals.camera.Position);
@@ -338,7 +339,11 @@ int main()
         }
         // FIXME: should do the select pass in reverse order
         lightingShader.setInt("alias", 5);
+        lightingShader.setVec3("objectColor", 0.0f, 0.5f, 1.0f);
+
         renderPlane();
+        lightingShader.setVec3("objectColor", 1.0f, 0.5f, 0.31f);
+
         render_cubes(lightingShader, globals.cubes);
         if (!globals.cursor_hidden && globals.objectType)
         {
