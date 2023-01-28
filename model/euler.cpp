@@ -211,7 +211,9 @@ void implicit_euler(vector<unique_ptr<AffineBody>>& cubes, double dt)
     
 
     do {
+#ifdef _TRIPLETS_
         globals.hess_triplets.clear();
+#endif
         auto newton_iter_start = high_resolution_clock::now();
 #pragma omp parallel for schedule(static)
         for (int k = 0; k < n_cubes; k++) {
@@ -585,22 +587,27 @@ void implicit_euler(vector<unique_ptr<AffineBody>>& cubes, double dt)
             spdlog::info("iter {}, time = {} ms, IPC term time = {} \n e0 = {}, e1 = {}, norm_dq = {}\n", iter, iter_duration * 1000, ipc_duration
                  * 1000, E0, E1, norm_dq);
         }
+        {
+            // updating collision set
+            pts.resize(idx.size());
+            ees.resize(eidx.size());
 #pragma omp parallel for schedule(static)
-        for (int k = 0; k < n_cubes; k++){
-            cubes[k]->project_vt1();
-        }
+            for (int k = 0; k < n_cubes; k++) {
+                cubes[k]->project_vt1();
+            }
 #pragma omp parallel for schedule(static)
-        for (int k = 0; k < n_pt; k++) {
-            auto& ij = idx[k];
-            Face f(*cubes[ij[2]], ij[3], false, true);
-            vec3 v(cubes[ij[0]]->v_transformed[ij[1]]);
-            pts[k] = { v, f.t0, f.t1, f.t2 };
-        }
+            for (int k = 0; k < n_pt; k++) {
+                auto& ij = idx[k];
+                Face f(*cubes[ij[2]], ij[3], false, true);
+                vec3 v(cubes[ij[0]]->v_transformed[ij[1]]);
+                pts[k] = { v, f.t0, f.t1, f.t2 };
+            }
 #pragma omp parallel for schedule(static)
-        for (int k = 0; k < n_ee; k++) {
-            auto& ij = eidx[k];
-            Edge ei(*cubes[ij[0]], ij[1], false, true), ej(*cubes[ij[2]], ij[3], false, true);
-            ees[k] = { ei.e0, ei.e1, ej.e0, ej.e1 };
+            for (int k = 0; k < n_ee; k++) {
+                auto& ij = eidx[k];
+                Edge ei(*cubes[ij[0]], ij[1], false, true), ej(*cubes[ij[2]], ij[3], false, true);
+                ees[k] = { ei.e0, ei.e1, ej.e0, ej.e1 };
+            }
         }
         term_cond = sup_dq < 1e-6 || ++iter >= globals.max_iter;
         sup_dq = 0.0;

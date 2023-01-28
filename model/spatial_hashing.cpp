@@ -66,15 +66,17 @@ vector<Primitive> spatial_hashing::query_interval(const vec3i& l, const vec3i& u
         for (int j = l(1); j <= u(1); j++)
             for (int k = l(2); k <= u(2); k++) {
                 auto h = hash(vec3i(i, j, k));
-                for (int _i = 0; _i < count[h]; _i++) {
+                int cnt = count[h];
+                for (int _i = 0; _i < min(cnt, n_buffer); _i++) {
                     auto offset = h * n_buffer + _i;
                     if (hashtable[offset].body != body_exl)
                         ret.insert(hashtable[offset]);
                 }
-                if (count[h] == n_buffer - 1) {
+                if (count[h] > n_buffer) {
                     spdlog::error("hash table overflow occured at {}, {}, {}", i, j, k);
                     // hack, dump the whole overflow buffer
-                    for (int i = 0; i < count_overflow; i++)
+                    int cnt = count_overflow;
+                    for (int i = 0; i < min(cnt, n_overflow_buffer); i++)
                         if (overflow[i].body != body_exl)
                             ret.insert(overflow[i]);
                 }
