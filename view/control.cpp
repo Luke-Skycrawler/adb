@@ -5,8 +5,12 @@
 
 #include <fstream> 
 #include <nlohmann/json.hpp>
+#include <spdlog/spdlog.h>
+#include <chrono>
+#define DURATION_TO_DOUBLE(X) duration_cast<duration<double>>((X)).count()
 using json = nlohmann::json;
-void reset(){
+void reset(bool init)
+{
     std::ifstream f("../config.json");
     json data = json::parse(f);
     double dt = data["dt"];
@@ -23,6 +27,8 @@ void reset(){
     globals.ground = data["ground"];
     globals.psd = data["psd"];
     globals.damp = data["damping"]["enable"];
+    globals.backoff = data["backoff"];
+    globals.full_ccd = data["full_ccd"];
     if (predefined) {
         int id = data["predefined_case"]["id"];
         if (id == 1) {
@@ -37,7 +43,15 @@ void reset(){
         globals.cubes.clear();
         customize(data["predefined_case"]["custom"]);
     }
-
+    int n_cubes = globals.cubes.size();
+    globals.writelock_cols.resize(n_cubes);
+    auto ptr = globals.writelock_cols.data();
+    for(int i = 0; i < n_cubes; i++){
+        omp_init_lock(ptr + i);
+    }
+    globals.tot_iter = 0;
+    globals.ts = 0;
+    glfwSetTime(0.0);
     {
         globals.dt = data["dt"];
         globals.max_iter = data["max_iter"];
@@ -46,6 +60,10 @@ void reset(){
         globals.safe_factor = data["safe_factor"];
         globals.mu = data["mu"];
         globals.eps_x = data["eps_x"];
+    }
+    if (init) {
+        auto sh_args = data["spatial hashing"];
+        globals.sh = make_unique<spatial_hashing>(sh_args["xyz_bits"], sh_args["n_buffer"], sh_args["min_xyz"], sh_args["max_xyz"], sh_args["dx"]);
     }
 }
 // process all input: query GLFW whether relevant keys are pressed/released this frame and react accordingly
@@ -74,8 +92,11 @@ void processInput(GLFWwindow *window)
         if (glfwGetKey(window, GLFW_KEY_D) == GLFW_PRESS)
             globals.camera.ProcessKeyboard(RIGHT, globals.deltaTime);
     }
-    if (glfwGetKey(window, GLFW_KEY_ESCAPE) == GLFW_PRESS)
+    if (glfwGetKey(window, GLFW_KEY_ESCAPE) == GLFW_PRESS){
+        double t = glfwGetTime();
+        spdlog::error("running time = {}, ts = {}, #iters = {}, fps = {}", t, globals.ts, globals.tot_iter, globals.ts / t);
         glfwSetWindowShouldClose(window, true);
+    }
 
     // if (glfwGetKey(window, GLFW_KEY_R) == GLFW_PRESS)
     //     globals.postrender = !globals.postrender;

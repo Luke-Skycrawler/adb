@@ -1,0 +1,166 @@
+#include "time_integrator.h"
+#include "../view/global_variables.h"
+#include "barrier.h"
+#include <chrono>
+#include <spdlog/spdlog.h>
+#include "collision.h"
+using namespace std;
+using namespace std::chrono;
+using namespace utils;
+#define DURATION_TO_DOUBLE(X) duration_cast<duration<double>>(high_resolution_clock::now() - (X)).count()
+double step_size_upper_bound(VectorXd& dq, vector<unique_ptr<AffineBody>>& cubes,
+    int n_cubes, int n_pt, int n_ee, int n_g,
+    vector<array<vec3, 4>>& pts,
+    vector<array<int, 4>>& idx,
+    vector<array<vec3, 4>>& ees,
+    vector<array<int, 4>>& eidx,
+    vector<array<int, 2>>& vidx
+)
+{
+    auto start = high_resolution_clock::now();
+    double toi = 1.0;
+#pragma omp parallel for schedule(static)
+    for (int k = 0; k < n_cubes; k++) {
+        cubes[k]->project_vt2();
+    }
+    if (globals.full_ccd) {
+        if (globals.ground) {
+
+#pragma omp parallel for schedule(static) 
+            for (int i = 0; i < n_cubes; i++) {
+                // cubes[i]->project_vt1();
+                double toi_private = 1.0;
+                for (int v = 0; v < cubes[i]->n_vertices; v++) {
+                    auto p = cubes[i]->v_transformed[v];
+                    double d = vg_distance(p);
+                    if (d < 0) {
+                        double t = collision_time(*cubes[i], v);
+                        toi_private = min(toi_private, t);
+                    }
+                }
+                #pragma omp critical
+                toi = min(toi, toi_private);
+            }
+        }
+        if (globals.pt) {
+
+#pragma omp parallel for schedule(static)
+            for (int I = 0; I < n_cubes; I++) {
+                auto& ci(*cubes[I]);
+                for (unsigned v = 0; v < ci.n_vertices; v++) {
+                    vec3 p1 = ci.v_transformed[v];
+                    vec3 p0 = ci.vt1(v);
+                    globals.sh->register_edge(p0, p1, I, v);
+                }
+            }
+
+#pragma omp parallel for schedule(static)
+            for (int J = 0; J < n_cubes; J++) {
+                auto& cj(*cubes[J]);
+                double toi_private = 1.0;
+                for (unsigned f = 0; f < cj.n_faces; f++) {
+                    Face f0(cj, f, false);
+                    Face f1(cj, f, true, true);
+                    auto collisions = globals.sh->query_triangle_trajectory(
+                        f0.t0, f0.t1, f0.t2,
+                        f1.t0, f1.t1, f1.t2,
+                        J);
+                    for (auto& c : collisions) {
+                        unsigned I = c.body, v = c.pid;
+                        vec3 p1 = cubes[I]->v_transformed[v];
+                        vec3 p0 = cubes[I]->vt1(v);
+
+                        double t = pt_collision_time(p0, f0, p1, f1);
+                        toi_private = min(toi_private, t);
+                    }
+                }
+                #pragma omp critical
+                toi = min(toi_private, toi);
+            }
+            globals.sh->remove_all_entries();
+        }
+        if (globals.ee) {
+#pragma omp parallel for schedule(static)
+            for (int I = 0; I < n_cubes; I++) {
+                auto& ci(*cubes[I]);
+                for (unsigned ei = 0; ei < ci.n_edges; ei++) {
+                    Edge e1{ ci, ei, true, true };
+                    Edge e0{ ci, ei, false };
+                    globals.sh->register_edge_trajectory(e0.e0, e0.e1, e1.e0, e1.e1, I, ei);
+                }
+            }
+
+#pragma omp parallel for schedule(static)
+            for (int J = 0; J < n_cubes; J++) {
+                auto& cj(*cubes[J]);
+
+                double toi_private = 1.0;
+                for (unsigned ej = 0; ej < cj.n_edges; ej++) {
+                    Edge e1{ cj, ej, true, true };
+
+                    Edge e0{ cj, ej, false };
+                    auto collisions = globals.sh->query_edge_trajectory(e0.e0, e0.e1, e1.e0, e1.e1, J);
+
+                    for (auto& c : collisions) {
+                        unsigned I = c.body, ei = c.pid;
+                        if (I > J) continue;
+                        Edge ei1{ *cubes[I], ei, true, true };
+                        Edge ei0{ *cubes[I], ei, false };
+                        auto t = ee_collision_time(ei0, e0, ei1, e1);
+                        toi_private = min(toi_private, t);
+                    }
+                }
+                #pragma omp critical
+                toi = min(toi, toi_private);
+            }
+            globals.sh->remove_all_entries();
+        }
+        return toi;
+    }
+
+    toi = barrier::d_sqrt / 2.0 / norm_1(dq, n_cubes) * globals.safe_factor;
+    toi = min(1.0, toi);
+    vector<double> tois;
+    tois.resize(n_pt + n_ee + n_g);
+
+#pragma omp parallel for schedule(static)
+    for (int k = 0; k < n_g; k++) {
+        auto& v{ vidx[k] };
+        double t = collision_time(*cubes[v[0]], v[1]);
+        tois[k + n_pt + n_ee] = t;
+        // toi = min(t, toi);
+    }
+#pragma omp parallel for schedule(static)
+    for (int k = 0; k < n_pt; k++) {
+        auto& pt(pts[k]);
+        const auto& ij(idx[k]);
+
+        int i = ij[0], j = ij[2];
+        // Face f(cubes[j], ij[3], true);
+        vec3 p_t2 = cubes[i]->v_transformed[ij[1]];
+        vec3 p_t1 = cubes[i]->vt1(ij[1]);
+        // double t = vf_collision_detect(p_t1, p_t2,
+        //     *cubes[j], ij[3]);
+        double t = pt_collision_time(p_t1, Face(*cubes[j], ij[3]), p_t2, Face(*cubes[j], ij[3], true, true));
+        // double t = vf_collision_detect(p_t1, p_t2, Face(*cubes[j], ij[3]), Face(*cubes[j], ij[3], true));
+        tois[k] = t;
+        // toi = min(toi, t);
+    }
+#pragma omp parallel for schedule(static)
+    for (int k = 0; k < n_ee; k++) {
+        auto& ee(ees[k]);
+        const auto& ij(eidx[k]);
+
+        auto &ci(*cubes[ij[0]]), &cj(*cubes[ij[2]]);
+        // double t = ee_collision_detect(ci, cj, ij[1], ij[3]);
+        Edge ei0(ci, ij[1]), ei1(ci, ij[1], true, true);
+        Edge ej0(cj, ij[3]), ej1(cj, ij[3], true, true);
+        double t = ee_collision_time(ei0, ej0, ei1, ej1);
+        tois[k + n_pt] = t;
+        // toi = min(toi, t);
+    }
+    for (auto t : tois) toi = min(toi, t);
+    auto _duration = DURATION_TO_DOUBLE(start);
+    spdlog::info("time: step size upper bound = {:0.6f} ms", _duration * 1000);
+    return toi;
+}

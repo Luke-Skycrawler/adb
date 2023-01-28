@@ -1,7 +1,9 @@
 #pragma once
 #include <vector>
 #include <array>
-// #define EIGEN_USE_MKL_ALL
+#ifndef TESTING
+#define EIGEN_USE_MKL_ALL
+#endif
 #include <Eigen/Eigen>
 #include "../view/shader.h"
 using mat3 = Eigen::Matrix3d;
@@ -18,7 +20,7 @@ struct AffineBody {
     virtual const vec3 vertices(int i) const = 0;
     virtual void draw(Shader& shader) const = 0;
     const int n_vertices, n_faces;
-    vec3* v_transformed;
+    vec3* v_transformed, *vt0_transformed;
     int n_edges;
     vec12 dq, grad;
     mat12 hess;
@@ -81,7 +83,8 @@ struct AffineBody {
         }
     }
     AffineBody(int n_vertices, int n_faces, int n_edges, unsigned* indices = nullptr, unsigned* edges = nullptr)
-        : mass(1000.0), Ic(1000.0), p(0.0f, 0.0f, 0.0f), indices(indices), edges(edges), n_vertices(n_vertices), n_edges(n_edges), n_faces(n_faces), v_transformed(new vec3[n_vertices])
+        : mass(1000.0), Ic(1000.0), p(0.0f, 0.0f, 0.0f), indices(indices), edges(edges), n_vertices(n_vertices), n_edges(n_edges), n_faces(n_faces), 
+        v_transformed(new vec3[n_vertices])
     {
         A.setIdentity(3, 3);
         q = {

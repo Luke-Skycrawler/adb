@@ -1,6 +1,6 @@
 {
     "dt": 5e-3,
-    "max_iter": 10,
+    "max_iter": 100,
     "predefined_case" : {
         "enable": false,
         "id" : 2,
@@ -13,9 +13,10 @@
     "ee": true,
     "pt": true,
     "ground": true,
-    "safe_factor": 3.0,
+    "safe_factor": 1.0,
     "uppper_bound": true, 
     "mu": 0.0,
+    "backoff": 0.95,
     "damping": {
         "enable": true,
         "alpha": 2.3e-5,
@@ -23,11 +24,19 @@
     },
     "eps_x": 1e-3,
     "psd": true,
-    "spatial hashing": {
+    "_spatial hashing": {
         "min_xyz": -2.0,
         "max_xyz": 2.0,
-        "dx": 0.02,
-        "n_buffer": 64,
+        "dx": 0.04,
+        "n_buffer": 128,
         "xyz_bits": 7
-    }
+    },
+    "spatial hashing": {
+        "min_xyz": -10.0,
+        "max_xyz": 10.0,
+        "dx": 0.2,
+        "n_buffer": 128,
+        "xyz_bits": 7
+    },
+    "full_ccd": true
 }

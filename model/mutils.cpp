@@ -1,4 +1,4 @@
-#include "time_integrator.h"
+ #include "time_integrator.h"
 #include "../view/global_variables.h"
 #include <algorithm>
 #include "othogonal_energy.h"
@@ -46,6 +46,8 @@ vec12 cat(const q4& q)
 
 vec12 grad_residue_per_body(AffineBody& c, double dt)
 {
+    if (c.mass < 0.0) 
+    return vec12::Zero(12);
     vec12 grad = othogonal_energy::grad(c.q);
     const auto M = [&](const vec12& dq) -> vec12 {
         auto ret = dq;
@@ -60,6 +62,7 @@ mat12 hess_inertia_per_body(AffineBody& c, double dt)
 {
     mat12 H;
     H.setZero(12, 12);
+    if (c.mass < 0.0) return mat12::Identity(12, 12);
     for (int i = 0; i < 3; i++) H(i, i) = c.mass;
     for (int i = 3; i < 12; i++) H(i, i) = c.Ic;
     auto hess_otho = othogonal_energy::hessian(c.q);
@@ -96,13 +99,13 @@ void damping_dense(MatrixXd& big_hess, double dt, int n_cubes)
 
 void damping_sparse(SparseMatrix<double>& sparse_hess, double dt, int n_cubes)
 {
-    SparseMatrix<double> D = globals.beta * sparse_hess;
+    SparseMatrix<double>& D = sparse_hess;
+    sparse_hess *= (1 + globals.beta);
     double dab = globals.alpha - globals.beta;
     for (int i = 0; i < n_cubes; i++) {
         for (int j = 0; j < 3; j++) { D.coeffRef(i * 12 + j, i * 12 + j) += globals.cubes[i]->mass * dab; }
         for (int j = 3; j < 12; j++) { D.coeffRef(i * 12 + j, i * 12 + j) += globals.cubes[i]->Ic * dab; }
     }
-    sparse_hess += D / dt;
 }
 
 void build_from_triplets(SparseMatrix<double>& sparse_hess_trip, MatrixXd& big_hess, int hess_dim, int n_cubes)
@@ -187,6 +190,7 @@ void build_from_triplets(SparseMatrix<double>& sparse_hess_trip, MatrixXd& big_h
 }
 double E(const vec12& q, const vec12& q_tiled, const AffineBody& c, double dt)
 {
+    if(c.mass < 0.0) return 0.0;
     return othogonal_energy::otho_energy(q) * dt * dt + 0.5 * norm_M(q - q_tiled, c);
 };
 };

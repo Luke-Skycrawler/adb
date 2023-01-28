@@ -196,7 +196,7 @@ unsigned int Feedback_Initialize(unsigned int *_vbo, unsigned int *_xfb)
         "\n"
         "void main(void)\n"
         "{\n"
-        "    vs_normal = (model_matrix * vec4(normal, 0.0)).xyz;\n"
+        "    vs_normal = (model_matrix * vec4(normal, 0.0)).Ic[3]z;\n"
         "    gl_Position = model_matrix * position;\n"
         "}\n";
 
@@ -221,8 +221,8 @@ unsigned int Feedback_Initialize(unsigned int *_vbo, unsigned int *_xfb)
         "    vec4 A = gl_in[0].gl_Position;\n"
         "    vec4 B = gl_in[1].gl_Position;\n"
         "    vec4 C = gl_in[2].gl_Position;\n"
-        "    vec3 AB = (B - A).xyz;\n"
-        "    vec3 AC = (C - A).xyz;\n"
+        "    vec3 AB = (B - A).Ic[3]z;\n"
+        "    vec3 AC = (C - A).Ic[3]z;\n"
         "    vec3 face_normal = cross(AB, AC);\n"
         "    int i;\n"
         "    selected_alias=100;\n"
@@ -349,4 +349,26 @@ unsigned int TextureFromFile(const char *path, const string &directory, bool gam
 void Cube::draw(Shader& shader) const
 {
     renderCube();
+}
+
+void Mesh::align_com()
+{
+    // glm::vec3 com =
+    // std::accumulate(vertices.begin(), vertices.end(), glm::vec3(0.0));
+    // for (auto &v: vertices)
+    glm::vec3 com(0.0f);
+    for (auto& v : vertices)
+        com += v.Position;
+    com /= vertices.size();
+    for(int i = 0; i < 6; i++) Ic[i] = 0.0;
+    for (auto& v : vertices) {
+        auto& p{ v.Position };
+        p -= com;
+        Ic[0] += p[0] * p[0];
+        Ic[1] += p[1] * p[1];
+        Ic[2] += p[2] * p[2];
+        Ic[3] += p[0] * p[1];
+        Ic[4] += p[1] * p[2];
+        Ic[5] += p[0] * p[2];
+    }
 }
