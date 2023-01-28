@@ -116,6 +116,7 @@
       <PreprocessorDefinitions>_DEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
       <AdditionalOptions>/bigobj %(AdditionalOptions)</AdditionalOptions>
+      <LanguageStandard>stdcpp17</LanguageStandard>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
@@ -134,6 +135,7 @@
       <AdditionalIncludeDirectories>%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <OpenMPSupport>true</OpenMPSupport>
       <AdditionalOptions>/openmp:experimental %(AdditionalOptions)</AdditionalOptions>
+      <LanguageStandard>stdcpp17</LanguageStandard>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
@@ -157,6 +159,7 @@
     <ClCompile Include="..\model\spatial_hashing.cpp" />
     <ClCompile Include="..\model\geometry.cpp" />
     <ClCompile Include="..\model\mutils.cpp" />
+    <ClCompile Include="..\model\upper_bound.cpp" />
     <ClCompile Include="..\test_cases\spinning_cube.cpp" />
     <ClCompile Include="..\view\control.cpp" />
     <ClCompile Include="..\view\light.cpp" />
@@ -164,6 +167,8 @@
     <ClCompile Include="utils.cpp" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="..\cyCodeBase\cyCore.h" />
+    <ClInclude Include="..\cyCodeBase\cyPolynomial.h" />
     <ClInclude Include="..\model\affine_body.h" />
     <ClInclude Include="..\model\affine_obj.h" />
     <ClInclude Include="..\model\cube.h" />

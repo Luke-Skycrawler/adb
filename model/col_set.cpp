@@ -35,7 +35,7 @@ void gen_collision_set(
     // };
     if (globals.ground) {
 
-#pragma omp parallel for schedule(dynamic)
+#pragma omp parallel for schedule(static)
         for (int i = 0; i < n_cubes; i++) {
             cubes[i]->project_vt1();
             for (int v = 0; v < cubes[i]->n_vertices; v++) {
@@ -51,44 +51,57 @@ void gen_collision_set(
     }
     if (globals.pt) {
 #ifdef SPATIAL_HASHING_H
-        // #pragma omp parallel for schedule(dynamic)
+#pragma omp parallel for schedule(static)
         for (int I = 0; I < n_cubes; I++) {
             auto& ci(*cubes[I]);
             for (unsigned v = 0; v < ci.n_vertices; v++) {
                 vec3 p = ci.v_transformed[v];
-                spatial_hashing::register_vertex(p, I, v);
+                globals.sh -> register_vertex(p, I, v);
             }
         }
-#pragma omp parallel for schedule(dynamic)
-        for (int J = 0; J < n_cubes; J++) {
-            auto& cj(*cubes[J]);
-            for (unsigned f = 0; f < cj.n_faces; f++) {
-                Face _f(cj, f, false, true);
-                auto collisions = spatial_hashing::query_triangle(_f.t0, _f.t1, _f.t2, J, barrier::d_sqrt * globals.safe_factor);
-                for (auto& c : collisions) {
-                    unsigned I = c.body, v = c.pid;
-                    vec3 p = cubes[I]->v_transformed[v];
-                    auto pt_type = ipc::point_triangle_distance_type(p, _f.t0, _f.t1, _f.t2);
+#pragma omp parallel
+        {
+            vector<array<vec3, 4>> pts_private;
+            vector<array<int, 4>> idx_private;
+            vector<Matrix<double, 2, 12>> pt_tk_private;
 
-                    double d = ipc::point_triangle_distance(p, _f.t0, _f.t1, _f.t2, pt_type);
-                    if (d < barrier::d_hat * (globals.safe_factor * globals.safe_factor)) {
-                        array<vec3, 4> pt = { p, _f.t0, _f.t1, _f.t2 };
-                        array<int, 4> ij = { I, v, J, f };
-#pragma omp critical
-                        {
-                            pts.push_back(pt);
-                            idx.push_back(ij);
+#pragma omp for schedule(static) nowait
+            for (int J = 0; J < n_cubes; J++) {
+                auto& cj(*cubes[J]);
+                for (unsigned f = 0; f < cj.n_faces; f++) {
+                    Face _f(cj, f, false, true);
+                    auto collisions = globals.sh -> query_triangle(_f.t0, _f.t1, _f.t2, J, barrier::d_sqrt * globals.safe_factor);
+                    for (auto& c : collisions) {
+                        unsigned I = c.body, v = c.pid;
+                        vec3 p = cubes[I]->v_transformed[v];
+                        ipc::PointTriangleDistanceType pt_type;
+                        double d = vf_distance(p, _f, pt_type);
+                        if (d < barrier::d_hat * (globals.safe_factor * globals.safe_factor)) {
+                            array<vec3, 4> pt = { p, _f.t0, _f.t1, _f.t2 };
+                            array<int, 4> ij = { I, v, J, f };
+                            {
+                                pts_private.push_back(pt);
+                                idx_private.push_back(ij);
 #ifdef _FRICTION_
-                            pt_tk.push_back(MatrixXd::Zero(2, 12));
+                                pt_tk_private.push_back(MatrixXd::Zero(2, 12));
 #endif
+                            }
                         }
                     }
                 }
             }
+#pragma omp critical
+            pts.insert(pts.end(), pts_private.begin(), pts_private.end());
+#pragma omp critical
+            idx.insert(idx.end(), idx_private.begin(), idx_private.end());
+#ifdef _FRICTION_
+#pragma omp critical
+            pt_tk.insert(pt_tk.end(), pt_tk_private.begin(), pt_tk_private.end());
+#endif
         }
-        spatial_hashing::remove_all_entries();
+        globals.sh -> remove_all_entries();
 #else
-#pragma omp parallel for schedule(dynamic)
+#pragma omp parallel for schedule(static)
         for (int I = 0; I < nsqr; I++) {
             int i = I / n_cubes, j = I % n_cubes;
             auto &ci(*cubes[i]), &cj(*cubes[j]);
@@ -124,42 +137,83 @@ void gen_collision_set(
     if (globals.ee) {
 
 #ifdef SPATIAL_HASHING_H
-        // #pragma omp parallel for schedule(dynamic)
-        for (unsigned I = 0; I < n_cubes; I++) {
+#pragma omp parallel for schedule(static)
+        for (int I = 0; I < n_cubes; I++) {
             auto& ci(*cubes[I]);
             for (unsigned ei = 0; ei < ci.n_edges; ei++) {
                 Edge e{ ci, ei, false, true };
-                spatial_hashing::register_edge(e.e0, e.e1, I, ei);
+                globals.sh -> register_edge(e.e0, e.e1, I, ei);
             }
         }
-#pragma omp parallel for schedule(dynamic)
-        for (int J = 0; J < n_cubes; J++) {
-            auto& cj(*cubes[J]);
-            for (unsigned ej = 0; ej < cj.n_edges; ej++) {
-                Edge e{ cj, ej, false, true };
-                auto collisions = spatial_hashing::query_edge(e.e0, e.e1, J, barrier::d_sqrt * globals.safe_factor);
-                for (auto& c : collisions) {
-                    unsigned I = c.body, ei = c.pid;
-                    if (I > J) continue;
-                    Edge _ei{ *cubes[I], ei };
 
-                    double d = ipc::edge_edge_distance(_ei.e0, _ei.e1, e.e0, e.e1);
-                    if (d < barrier::d_hat * (globals.safe_factor * globals.safe_factor)) {
-                        array<vec3, 4> ee = { _ei.e0, _ei.e1, e.e0, e.e1 };
-                        array<int, 4> ij = { I, ei, J, ej };
-#pragma omp critical
-                        {
-                            ees.push_back(ee);
-                            eidx.push_back(ij);
+        size_t* cnt;
+#pragma omp parallel
+        {
+            int ithread = omp_get_thread_num();
+            int nthreads = omp_get_num_threads();
+
+            vector<array<vec3, 4>> ees_private;
+            vector<array<int, 4>> eidx_private;
+            vector<Matrix<double, 2, 12>> ee_tk_private;
+#pragma omp single
+            {
+                cnt = new size_t[nthreads + 1];
+                cnt[0] = 0;
+            }
+#pragma omp for schedule(static) nowait
+            for (int J = 0; J < n_cubes; J++) {
+                auto& cj(*cubes[J]);
+                for (unsigned ej = 0; ej < cj.n_edges; ej++) {
+                    Edge e{ cj, ej, false, true };
+                    auto collisions = globals.sh -> query_edge(e.e0, e.e1, J, barrier::d_sqrt * globals.safe_factor);
+                    for (auto& c : collisions) {
+                        unsigned I = c.body, ei = c.pid;
+                        if (I > J) continue;
+                        Edge _ei{ *cubes[I], ei };
+
+                        double d = ipc::edge_edge_distance(_ei.e0, _ei.e1, e.e0, e.e1);
+                        if (d < barrier::d_hat * (globals.safe_factor * globals.safe_factor)) {
+                            array<vec3, 4> ee = { _ei.e0, _ei.e1, e.e0, e.e1 };
+                            array<int, 4> ij = { I, ei, J, ej };
+                            {
+                                ees_private.push_back(ee);
+                                eidx_private.push_back(ij);
 #ifdef _FRICTION_
-                            ee_tk.push_back(MatrixXd::Zero(2, 12));
+                                ee_tk_private.push_back(MatrixXd::Zero(2, 12));
 #endif
+                            }
                         }
                     }
                 }
+    
             }
+            cnt[ithread + 1] = ees_private.size();
+#pragma omp barrier
+#pragma omp single
+            {
+                for (int i = 1; i < nthreads + 1; i++) cnt[i] += cnt[i - 1];
+                ees.resize(cnt[nthreads]);
+                eidx.resize(cnt[nthreads]);
+#ifdef _FRICTION_
+                ee_tk.resize(cnt[nthreads]);
+#endif
+            }
+            std::copy(ees_private.begin(), ees_private.end(), ees.begin() + cnt[ithread]);
+            std::copy(eidx_private.begin(), eidx_private.end(), eidx.begin() + cnt[ithread]);
+            #ifdef _FRICTION_
+            std::copy(ee_tk_private.begin(), ee_tk_private.end(), ee_tk.begin() + cnt[ithread]);
+            #endif
+            // #pragma omp critical
+            //             ees.insert(ees.end(), ees_private.begin(), ees_private.end());
+            // #pragma omp critical
+            //             eidx.insert(eidx.end(), eidx_private.begin(), eidx_private.end());
+            // #ifdef _FRICTION_
+            // #pragma omp critical
+            //             ee_tk.insert(ee_tk.end(), ee_tk_private.begin(), ee_tk_private.end());
+            // #endif
         }
-        spatial_hashing::remove_all_entries();
+        delete[] cnt;
+        globals.sh -> remove_all_entries();
 #else
         for (int i = 0; i < n_cubes; i++)
             for (int j = i + 1; j < n_cubes; j++) {

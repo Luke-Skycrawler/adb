@@ -16,7 +16,9 @@ static const unsigned int SCR_HEIGHT = 600;
 #include <map>
 #include "model.h"
 #include <string>
+#include <omp.h>
 
+#include "../model/spatial_hashing.h"
 struct HessBlock {
     int i, j;
     Matrix<double, 12, 1> block;
@@ -39,7 +41,7 @@ struct GlobalVariableMainCPP{
     Camera camera;
     float lastX, lastY;
     bool firstMouse;
-    GlobalVariableMainCPP(): camera(glm::vec3(0.0f, 0.0f, 3.0f)){
+    GlobalVariableMainCPP(): camera(glm::vec3(0.0f, 0.0f, 6.0f)){
         postrender = false, edge = false, skybox = false, model_draw = false, display_corner = true, motion = false, feedback = false, cursor_hidden = true;        
         lastX = SCR_WIDTH / 2.0f;
         lastY = SCR_HEIGHT / 2.0f;
@@ -47,23 +49,25 @@ struct GlobalVariableMainCPP{
     }
     #endif
     double dt;
-    int max_iter;
+    int max_iter, tot_iter, ts;
     std::vector<HessBlock> hess_triplets;
     std::vector<unique_ptr<AffineBody>> cubes;
         std::map<std::string, unique_ptr<Model>> loaded_models;
 
     vec3 gravity;
     double alpha, beta;
-    double kappa, d_hat, safe_factor, mu, eps_x;
+    double kappa, d_hat, safe_factor, mu, eps_x, backoff;
 
-    bool col_set, upper_bound, line_search, sparse, dense, ee, pt, ground, psd, damp;
+    bool col_set, upper_bound, line_search, sparse, dense, ee, pt, ground, psd, damp, full_ccd;
+    vector<omp_lock_t> writelock_cols;
+    unique_ptr<spatial_hashing> sh;
 };
 #ifndef GOOGLE_TEST
 #ifdef _MAIN_CPP
 #define VARIABLE_LOCATOR
 VARIABLE_LOCATOR glm::vec3 LightPositions[]
 = {
-   glm::vec3(5.0f, 5.0f, 3.0f),
+   glm::vec3(5.0f, 5.0f, 6.0f),
    glm::vec3(1.2f, 2.0f, 0.0f),
    glm::vec3(-1.2f, 2.0f, 2.0f),
    glm::vec3(-1.2f, 2.0f, 0.0f)};

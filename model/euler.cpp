@@ -33,8 +33,7 @@ double E_global(const VectorXd& q_plus_dq, const VectorXd& dq, int n_cubes, int 
 {
     double e = 0.0;
 // inertia energy
-#pragma omp parallel for schedule(dynamic) reduction(+ \
-                                                     : e)
+#pragma omp parallel for schedule(static) reduction(+ : e)
     for (int i = 0; i < n_cubes; i++) {
         auto& c(*cubes[i]);
         c.dq = dq.segment<12>(i * 12);
@@ -43,19 +42,19 @@ double E_global(const VectorXd& q_plus_dq, const VectorXd& dq, int n_cubes, int 
         auto _q = q_plus_dq.segment<12>(12 * i);
         double e_inert = E(_q, q_tiled, c, dt);
         c.project_vt2();
-
         e += e_inert;
     }
 
 // point-triangle energy
-#pragma omp parallel for schedule(dynamic) reduction(+ \
-                                                     : e)
+#pragma omp parallel for schedule(static) reduction(+ : e)
     for (int k = 0; k < n_pt; k++) {
         auto& ij = idx[k];
         Face f(*cubes[ij[2]], ij[3], true, true);
         vec3 v(cubes[ij[0]]->v_transformed[ij[1]]);
         // array<vec3, 4> a = {v, f.t0, f.t1, f.t2};
-        double d = ipc::point_triangle_distance(v, f.t0, f.t1, f.t2);
+        ipc::PointTriangleDistanceType pt_type;
+        double d = vf_distance(v, f, pt_type);
+        // double d = ipc::point_triangle_distance(v, f.t0, f.t1, f.t2);
         e += barrier::barrier_function(d);
 #ifdef _FRICTION_
         auto contact_force = -barrier_derivative_d(d) / (dt * dt) * 2 * sqrt(d);
@@ -66,8 +65,7 @@ double E_global(const VectorXd& q_plus_dq, const VectorXd& dq, int n_cubes, int 
     }
 
     // ee ipc energy
-#pragma omp parallel for schedule(dynamic) reduction(+ \
-                                                     : e)
+#pragma omp parallel for schedule(static) reduction(+ : e)
     for (int k = 0; k < n_ee; k++) {
         auto& ij(eidx[k]);
         Edge ei(*cubes[ij[0]], ij[1], true, true), ej(*cubes[ij[2]], ij[3], true, true);
@@ -88,8 +86,7 @@ double E_global(const VectorXd& q_plus_dq, const VectorXd& dq, int n_cubes, int 
     }
 
     // vertex-ground ipc energy
-#pragma omp parallel for schedule(dynamic) reduction(+ \
-                                                     : e)
+#pragma omp parallel for schedule(static) reduction(+ : e)
     for (int k = 0; k < n_g; k++) {
         auto& v{
             vidx[k]
@@ -164,7 +161,7 @@ void implicit_euler(vector<unique_ptr<AffineBody>>& cubes, double dt)
 {
     spdlog::set_level(spdlog::level::err);
     bool term_cond;
-    static int ts = 0;
+    int& ts = globals.ts;
     int iter = 0;
     double sup_dq = 0.0;
     for (int k = 0; k < cubes.size(); k++) {
@@ -204,17 +201,21 @@ void implicit_euler(vector<unique_ptr<AffineBody>>& cubes, double dt)
     SparseMatrix<double> sparse_hess(hess_dim, hess_dim);
     gen_empty_sm(n_cubes, idx, eidx, sparse_hess, lut);
 #endif
-    const int n_pt = idx.size(), n_ee = eidx.size(), n_g = vidx.size();
+#ifdef _TRIPLETS_
     globals.hess_triplets.reserve(((n_pt + n_ee) * 2 + n_cubes) * 12);
+#endif
 
+    const int n_pt = idx.size(), n_ee = eidx.size(), n_g = vidx.size();
     spdlog::info("constraint size = {}, {}", n_pt, n_ee);
 
     
 
     do {
+#ifdef _TRIPLETS_
         globals.hess_triplets.clear();
+#endif
         auto newton_iter_start = high_resolution_clock::now();
-#pragma omp parallel for schedule(dynamic)
+#pragma omp parallel for schedule(static)
         for (int k = 0; k < n_cubes; k++) {
             auto& c(*cubes[k]);
             c.grad = grad_residue_per_body(c, dt);
@@ -232,7 +233,7 @@ void implicit_euler(vector<unique_ptr<AffineBody>>& cubes, double dt)
                 Pk.col(0) = vec3(1.0, 0.0, 0.0);
                 Pk.col(1) = vec3(0.0, 0.0, 1.0);
 
-                Vector2d uk = Pk.transpose() * (c.vt1(v) - c.vt0(v));
+                Vector2d uk = Pk.transpose() * (p - c.vt0(v));
                 auto contact_force = -barrier_derivative_d(d) / (dt * dt) * 2 * _d;
 
                 ipc_term_vg(c, v, uk, contact_force, Pk);
@@ -248,15 +249,16 @@ void implicit_euler(vector<unique_ptr<AffineBody>>& cubes, double dt)
 
         auto ipc_start = high_resolution_clock::now();
 
-#pragma omp parallel for schedule(dynamic)
+#pragma omp parallel for schedule(static)
         for (int k = 0; k < n_pt; k++) {
             auto& pt(pts[k]);
             auto& ij(idx[k]);
 
             int i = ij[0], j = ij[2];
             auto &ci(*cubes[i]), &cj(*cubes[j]);
-            auto pt_type = ipc::point_triangle_distance_type(pt[0], pt[1], pt[2], pt[3]);
-            double d = ipc::point_triangle_distance(pt[0], pt[1], pt[2], pt[3]);
+            // auto pt_type = ipc::point_triangle_distance_type(pt[0], pt[1], pt[2], pt[3]);
+            ipc::PointTriangleDistanceType pt_type;
+            double d = vf_distance(pt[0], Face{pt[1], pt[2], pt[3]}, pt_type);
             if (d < barrier::d_hat) {
 #ifdef _FRICTION_
 
@@ -291,10 +293,16 @@ void implicit_euler(vector<unique_ptr<AffineBody>>& cubes, double dt)
                 assert(abs(d - closest) < 1e-8);
                 auto Pk = ipc::point_triangle_tangent_basis(pt[0], pt[1], pt[2], pt[3]);
                 Matrix<double, 3, 12> gamma;
-                gamma.block<3, 3>(0, 0) = Matrix3d::Identity(3, 3) * -1.0;
-                gamma.block<3, 3>(0, 3) = Matrix3d::Identity(3, 3) * tlams[0];
-                gamma.block<3, 3>(0, 6) = Matrix3d::Identity(3, 3) * tlams[1];
-                gamma.block<3, 3>(0, 9) = Matrix3d::Identity(3, 3) * tlams[2];
+                gamma.setZero(3, 12);
+                for (int i = 0; i < 3; i++) {
+                    gamma(i, i) = -1.0;
+                    for (int j = 0; j < 3; j++)
+                        gamma(i, i + 3 + 3 * j) = tlams[j];
+                }
+                // gamma.block<3, 3>(0, 0) = Matrix3d::Identity(3, 3) * -1.0;
+                // gamma.block<3, 3>(0, 3) = Matrix3d::Identity(3, 3) * tlams[0];
+                // gamma.block<3, 3>(0, 6) = Matrix3d::Identity(3, 3) * tlams[1];
+                // gamma.block<3, 3>(0, 9) = Matrix3d::Identity(3, 3) * tlams[2];
 
                 Matrix<double, 2, 12> Tk_T = Pk.transpose() * gamma;
 
@@ -335,7 +343,7 @@ void implicit_euler(vector<unique_ptr<AffineBody>>& cubes, double dt)
 #endif
             }
         }
-#pragma omp parallel for schedule(dynamic)
+#pragma omp parallel for schedule(static)
         for (int k = 0; k < n_ee; k++) {
             auto& ee(ees[k]);
             auto& ij(eidx[k]);
@@ -403,11 +411,13 @@ void implicit_euler(vector<unique_ptr<AffineBody>>& cubes, double dt)
 
                 auto Pk = par ? degeneracy : ipc::edge_edge_tangent_basis(ei0, ei1, ej0, ej1);
                 Matrix<double, 3, 12> gamma;
-                gamma.block<3, 3>(0, 0) = Matrix3d::Identity(3, 3) * -lambdas[0];
-                gamma.block<3, 3>(0, 3) = Matrix3d::Identity(3, 3) * -lambdas[1];
-                gamma.block<3, 3>(0, 6) = Matrix3d::Identity(3, 3) * lambdas[2];
-                gamma.block<3, 3>(0, 9) = Matrix3d::Identity(3, 3) * lambdas[3];
-
+                gamma.setZero(3, 12);
+                for (int i = 0; i < 3; i++) {
+                    gamma(i, i) = -lambdas[0];
+                    gamma(i, i + 3) = -lambdas[1];
+                    gamma(i, i + 6) = lambdas[2];
+                    gamma(i, i + 9) = lambdas[3];
+                }
                 Matrix<double, 2, 12> Tk_T = Pk.transpose() * gamma;
 
                 // Matrix<double, 12, 24> jacobian;
@@ -439,9 +449,9 @@ void implicit_euler(vector<unique_ptr<AffineBody>>& cubes, double dt)
                     uk, contact_force, Tk_T.transpose());
 
 #else
-                ipc_term_ee(ee, ij, ee_type, d
+                ipc_term_ee(ee, ij, ee_type, d,
 #ifdef _SM_
-                                                 lut,
+                    lut,
                     sparse_hess,
 #endif
 #ifdef _TRIPLETS_
@@ -454,46 +464,6 @@ void implicit_euler(vector<unique_ptr<AffineBody>>& cubes, double dt)
 
         auto ipc_duration = DURATION_TO_DOUBLE(high_resolution_clock::now() - ipc_start);
 
-        const auto step_size_upper_bound = [&](VectorXd& dq, vector<unique_ptr<AffineBody>>& cubes) -> double {
-            auto start = high_resolution_clock::now();
-            double toi = barrier::d_sqrt / 2.0 / norm_1(dq, n_cubes);
-            toi = min(1.0, toi);
-
-            for (auto v : vidx) {
-                double t = collision_time(*cubes[v[0]], v[1]);
-                toi = min(t, toi);
-            }
-            vector<double> tois;
-            tois.resize(n_pt + n_ee);
-#pragma omp parallel for schedule(dynamic)
-            for (int k = 0; k < n_pt; k++) {
-                auto& pt(pts[k]);
-                const auto& ij(idx[k]);
-
-                int i = ij[0], j = ij[2];
-                // Face f(cubes[j], ij[3], true);
-                vec3 p_t2 = cubes[i]->vt2(ij[1]);
-                vec3 p_t1 = cubes[i]->vt1(ij[1]);
-                double t = vf_collision_detect(p_t1, p_t2,
-                    *cubes[j], ij[3]);
-                tois[k] = t;
-                // toi = min(toi, t);
-            }
-#pragma omp parallel for schedule(dynamic)
-            for (int k = 0; k < n_ee; k++) {
-                auto& ee(ees[k]);
-                const auto& ij(eidx[k]);
-
-                auto &ci(*cubes[ij[0]]), &cj(*cubes[ij[2]]);
-                double t = ee_collision_detect(ci, cj, ij[1], ij[3]);
-                tois[k + n_pt] = t;
-                // toi = min(toi, t);
-            }
-            for (auto t : tois) toi = min(toi, t);
-            auto _duration = DURATION_TO_DOUBLE(high_resolution_clock::now() - start);
-            spdlog::info("time: step size upper bound = {:0.6f} ms", _duration * 1000);
-            return toi;
-        };
         double toi = 1.0, factor = 1.0, alpha = 1.0;
 
         {
@@ -518,7 +488,7 @@ void implicit_euler(vector<unique_ptr<AffineBody>>& cubes, double dt)
             build_from_triplets(sparse_hess_trip, big_hess, hess_dim, n_cubes);
 #endif
 #ifdef _SM_
-            #pragma omp parallel for schedule(dynamic)
+            #pragma omp parallel for schedule(static)
             for (int k = 0; k < n_cubes; k++) {
                 auto& c = *cubes[k];
                 double * values = sparse_hess.valuePtr();
@@ -542,9 +512,9 @@ void implicit_euler(vector<unique_ptr<AffineBody>>& cubes, double dt)
                 // sparse_hess.setFromTriplets(bht.begin(), bht.end());
                 // sparse_hess.finalize();
 #ifdef EIGEN_USE_MKL_ALL
-                PardisoLDLT<SparseMatrix<double>> ldlt_solver;
+                PardisoLLT<SparseMatrix<double>> ldlt_solver;
 #else
-                SimplicialLDLT<SparseMatrix<double>> ldlt_solver;
+                SimplicialLLT<SparseMatrix<double>> ldlt_solver;
 #endif
                 ldlt_solver.compute(sparse_hess);
                 dq = -ldlt_solver.solve(r);
@@ -572,18 +542,18 @@ void implicit_euler(vector<unique_ptr<AffineBody>>& cubes, double dt)
             }
 
             toi = 1.0;
-            #pragma omp parallel for schedule(dynamic)
+            #pragma omp parallel for schedule(static)
             for (int k = 0; k < n_cubes; k++) {
                 auto& c(*cubes[k]);
                 c.dq = dq.segment<12>(k * 12);
             }
 
             if (globals.upper_bound)
-                toi = step_size_upper_bound(dq, cubes);
+                toi = step_size_upper_bound(dq, cubes, n_cubes, n_pt, n_ee, n_g, pts, idx, ees, eidx, vidx);
 
             if (toi < 1.0) {
                 spdlog::warn("collision at {}, toi = {}", iter, toi);
-                factor = 0.8;
+                factor = globals.backoff;
             }
 
             dq *= factor * toi;
@@ -606,7 +576,7 @@ void implicit_euler(vector<unique_ptr<AffineBody>>& cubes, double dt)
             }
             double norm_dq = dq.norm();
             sup_dq = norm_dq;
-            #pragma omp parallel for schedule(dynamic)
+            #pragma omp parallel for schedule(static)
             for (int i = 0; i < n_cubes; i++) {
                 for (int j = 0; j < 4; j++)
                     cubes[i]->q[j] += dq.segment<3>(i * 12 + j * 3);
@@ -617,24 +587,34 @@ void implicit_euler(vector<unique_ptr<AffineBody>>& cubes, double dt)
             spdlog::info("iter {}, time = {} ms, IPC term time = {} \n e0 = {}, e1 = {}, norm_dq = {}\n", iter, iter_duration * 1000, ipc_duration
                  * 1000, E0, E1, norm_dq);
         }
-#pragma omp parallel for schedule(dynamic)
-        for (int k = 0; k < n_pt; k++) {
-            auto& ij = idx[k];
-            Face f(*cubes[ij[2]], ij[3]);
-            vec3 v(cubes[ij[0]]->vt1(ij[1]));
-            pts[k] = { v, f.t0, f.t1, f.t2 };
+        {
+            // updating collision set
+            pts.resize(idx.size());
+            ees.resize(eidx.size());
+#pragma omp parallel for schedule(static)
+            for (int k = 0; k < n_cubes; k++) {
+                cubes[k]->project_vt1();
+            }
+#pragma omp parallel for schedule(static)
+            for (int k = 0; k < n_pt; k++) {
+                auto& ij = idx[k];
+                Face f(*cubes[ij[2]], ij[3], false, true);
+                vec3 v(cubes[ij[0]]->v_transformed[ij[1]]);
+                pts[k] = { v, f.t0, f.t1, f.t2 };
+            }
+#pragma omp parallel for schedule(static)
+            for (int k = 0; k < n_ee; k++) {
+                auto& ij = eidx[k];
+                Edge ei(*cubes[ij[0]], ij[1], false, true), ej(*cubes[ij[2]], ij[3], false, true);
+                ees[k] = { ei.e0, ei.e1, ej.e0, ej.e1 };
+            }
         }
-#pragma omp parallel for schedule(dynamic)
-        for (int k = 0; k < n_ee; k++) {
-            auto& ij = eidx[k];
-            Edge ei(*cubes[ij[0]], ij[1]), ej(*cubes[ij[2]], ij[3]);
-            ees[k] = { ei.e0, ei.e1, ej.e0, ej.e1 };
-        }
-        term_cond = sup_dq < 1e-6 || iter++ > globals.max_iter;
+        term_cond = sup_dq < 1e-6 || ++iter >= globals.max_iter;
         sup_dq = 0.0;
     } while (!term_cond);
     spdlog::info("\n  converge at iter {}, ts = {} \n", iter, ts++);
-    #pragma omp parallel for schedule(dynamic)
+    globals.tot_iter += iter;
+#pragma omp parallel for schedule(static)
     for (int k = 0; k < n_cubes; k++) {
         auto& c(*cubes[k]);
         for (int i = 0; i < 4; i++) {
