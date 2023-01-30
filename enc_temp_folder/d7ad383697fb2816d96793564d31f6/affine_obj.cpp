@@ -24,7 +24,7 @@ void AffineObject::extract_edges() {
 
 const vec3 AffineObject::vertices(int i) const{
     glm::vec3 &p = mesh.vertices[i].Position;
-     return vec3(p[0], p[1], p[2]);
+    return vec3(p[0], p[1], p[2]);
 }
 
 void AffineObject::draw(Shader& shader) const

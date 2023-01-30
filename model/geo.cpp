@@ -151,7 +151,7 @@ void ipc_term(
     // Matrix<double, 9, 12> Jt;
     // Matrix<double, 3, 12> Jp;
     // mat12 off_diag;
-    auto p_tile = ci.vertices(v), t0_tile = cj.vertices(tidx[3 * f]), t1_tile = cj.vertices(tidx[3 * f + 1]), t2_tile = ci.vertices(tidx[3 * f + 2]);
+    auto p_tile = ci.vertices(v), t0_tile = cj.vertices(tidx[3 * f]), t1_tile = cj.vertices(tidx[3 * f + 1]), t2_tile = cj.vertices(tidx[3 * f + 2]);
     // auto p_tile = vnp[v], t0_tile = vnp[tidx[3 * f]], t1_tile = vnp[tidx[3 * f + 1]], t2_tile = vnp[tidx[3 * f + 2]];
     // Jt.setZero(9, 12);
     // Jp.setZero(3, 12);

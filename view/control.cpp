@@ -29,6 +29,7 @@ void reset(bool init)
     globals.damp = data["damping"]["enable"];
     globals.backoff = data["backoff"];
     globals.full_ccd = data["full_ccd"];
+    globals.align_com = data["align_com"];
     if (predefined) {
         int id = data["predefined_case"]["id"];
         if (id == 1) {

@@ -4,7 +4,7 @@
     "predefined_case" : {
         "enable": false,
         "id" : 2,
-        "custom": "../test_cases/blocks.json"
+        "custom": "../test_cases/bolt.json"
     },
     "solver": "sparse",
     "gravity": true, 
@@ -34,9 +34,10 @@
     "spatial hashing": {
         "min_xyz": -10.0,
         "max_xyz": 10.0,
-        "dx": 0.2,
+        "dx": 0.1,
         "n_buffer": 128,
         "xyz_bits": 7
     },
-    "full_ccd": true
+    "full_ccd": true,
+    "align_com": false
 }

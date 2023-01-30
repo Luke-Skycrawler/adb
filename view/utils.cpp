@@ -356,6 +356,7 @@ void Mesh::align_com()
     // glm::vec3 com =
     // std::accumulate(vertices.begin(), vertices.end(), glm::vec3(0.0));
     // for (auto &v: vertices)
+    if (!globals.align_com) return;
     glm::vec3 com(0.0f);
     for (auto& v : vertices)
         com += v.Position;

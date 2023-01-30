@@ -58,7 +58,7 @@ struct GlobalVariableMainCPP{
     double alpha, beta;
     double kappa, d_hat, safe_factor, mu, eps_x, backoff;
 
-    bool col_set, upper_bound, line_search, sparse, dense, ee, pt, ground, psd, damp, full_ccd;
+    bool col_set, upper_bound, line_search, sparse, dense, ee, pt, ground, psd, damp, full_ccd, align_com;
     vector<omp_lock_t> writelock_cols;
     unique_ptr<spatial_hashing> sh;
 };

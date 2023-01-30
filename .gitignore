@@ -22,9 +22,6 @@ google_test.*
 *.idb
 *.fs
 *.vs
-*.frag
-*.vert
-*.geom
 *.jpg
 *.png
 test/
