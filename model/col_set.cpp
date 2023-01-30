@@ -277,7 +277,7 @@ void gen_collision_set(
 
         int n_edges = globals.edges.size();
 #pragma omp parallel for schedule(static)
-        for (int i = 0; i < n_cubes; i++) {
+        for (int i = 0; i < n_edges; i++) {
             auto idx{ globals.edges[i] };
             auto I{ idx[0] }, ei{ idx[1] };
             auto& ci(*cubes[I]);
