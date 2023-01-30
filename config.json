@@ -4,7 +4,7 @@
     "predefined_case" : {
         "enable": false,
         "id" : 2,
-        "custom": "../test_cases/bolt.json"
+        "custom": "../test_cases/cubic.json"
     },
     "solver": "sparse",
     "gravity": true, 
@@ -12,15 +12,15 @@
     "col_set": true,
     "ee": true,
     "pt": true,
-    "ground": false,
-    "safe_factor": 5.0,
+    "ground": true,
+    "safe_factor": 1.0,
     "uppper_bound": true, 
     "mu": 0.0,
-    "backoff": 0.8,
+    "backoff": 0.95,
     "damping": {
-        "enable": true,
-        "alpha": 5e-2,
-        "beta": 5e-2
+        "enable": false,
+        "alpha": 2.3e-2,
+        "beta": 2.5e-2
     },
     "eps_x": 1e-3,
     "psd": true,
@@ -35,7 +35,7 @@
         "min_xyz": -10.0,
         "max_xyz": 10.0,
         "dx": 0.2,
-        "n_buffer": 128,
+        "n_buffer": 256,
         "xyz_bits": 7
     },
     "full_ccd": true,

@@ -12,7 +12,7 @@
 #include <omp.h>
 using namespace std;
 using mat12 = Matrix<double, 12, 12>;
-void put(double* values, int offset, int _stride, Matrix<double, 12, 12>& block)
+void put(double* values, int offset, int _stride, const Matrix<double, 12, 12>& block)
 {
     for (int j = 0; j < 12; j++)
         for (int i = 0; i < 12; i++) {

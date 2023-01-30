@@ -15,7 +15,7 @@ using namespace utils;
 #define DURATION_TO_DOUBLE(X) duration_cast<duration<double>>((X)).count()
 
 void gen_collision_set(
-    int n_cubes,
+    bool vt2, int n_cubes,
     const vector<unique_ptr<AffineBody>>& cubes,
     vector<array<vec3, 4>>& pts,
     vector<array<int, 4>>& idx,
@@ -35,7 +35,10 @@ void gen_collision_set(
     // };
 #pragma omp parallel for schedule(static)
     for (int i = 0; i < n_cubes; i++) {
-        cubes[i]->project_vt1();
+        if (vt2)
+            cubes[i]->project_vt2();
+        else
+            cubes[i]->project_vt1();
     }
 
     if (globals.ground) {

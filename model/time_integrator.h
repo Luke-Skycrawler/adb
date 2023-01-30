@@ -7,7 +7,7 @@
 
 void implicit_euler(std::vector<std::unique_ptr<AffineBody>>& cubes, double dt);
 void gen_collision_set(
-    int n_cubes,
+    bool vt2, int n_cubes,
     const std::vector<std::unique_ptr<AffineBody>>& cubes,
     std::vector<std::array<vec3, 4>>& pts,
     std::vector<std::array<int, 4>>& idx,

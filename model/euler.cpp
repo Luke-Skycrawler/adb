@@ -112,14 +112,15 @@ double E_global(const VectorXd& q_plus_dq, const VectorXd& dq, int n_cubes, int 
 }
 double line_search(const VectorXd& dq, const VectorXd& grad, VectorXd& q0, double& E0, double& E1,
     int n_cubes, int n_pt, int n_ee, int n_g,
-    const vector<array<int, 4>>& idx,
-    const vector<array<int, 4>>& eidx,
-    const vector<array<int, 2>>& vidx,
-    const vector<Matrix<double, 2, 12>>& pt_tk,
-    const vector<Matrix<double, 2, 12>>& ee_tk,
+    vector<array<vec3, 4>>& pts,
+    vector<array<int, 4>>& idx,
+    vector<array<vec3, 4>>& ees,
+    vector<array<int, 4>>& eidx,
+    vector<array<int, 2>>& vidx,
+    vector<Matrix<double, 2, 12>>& pt_tk,
+    vector<Matrix<double, 2, 12>>& ee_tk,
     const vector<unique_ptr<AffineBody>>& cubes,
-    double dt
-)
+    double dt)
 {
     const double c1 = 1e-4;
     double alpha = 1.0;
@@ -139,6 +140,30 @@ double line_search(const VectorXd& dq, const VectorXd& grad, VectorXd& q0, doubl
         q1 = q0 + dq * alpha;
         auto dqk = dq * alpha;
 
+        pts.resize(0);
+        idx.resize(0);
+        ees.resize(0);
+        eidx.resize(0);
+        vidx.resize(0);
+        pt_tk.resize(0);
+        ee_tk.resize(0);
+
+        for (int i = 0; i < n_cubes; i++) {
+        auto& c(*cubes[i]);
+        c.dq = dqk.segment<12>(i * 12);
+        }
+        gen_collision_set(true, n_cubes, cubes,
+            pts,
+            idx,
+            ees,
+            eidx,
+            vidx,
+            pt_tk,
+            ee_tk);
+
+        n_pt = idx.size();
+        n_ee = eidx.size();
+        n_g = vidx.size();
         E1 = E_global(q1, dqk,
             n_cubes, n_pt, n_ee, n_g,
             idx,
@@ -188,7 +213,7 @@ void implicit_euler(vector<unique_ptr<AffineBody>>& cubes, double dt)
     const int n_cubes = cubes.size(), nsqr = n_cubes * n_cubes, hess_dim = n_cubes * 12;
 
     if (globals.col_set)
-        gen_collision_set(n_cubes, cubes,
+        gen_collision_set(false, n_cubes, cubes,
             pts,
             idx,
             ees,
@@ -207,7 +232,7 @@ void implicit_euler(vector<unique_ptr<AffineBody>>& cubes, double dt)
     globals.hess_triplets.reserve(((n_pt + n_ee) * 2 + n_cubes) * 12);
 #endif
 
-    const int n_pt = idx.size(), n_ee = eidx.size(), n_g = vidx.size();
+    int n_pt = idx.size(), n_ee = eidx.size(), n_g = vidx.size();
     spdlog::info("constraint size = {}, {}", n_pt, n_ee);
 
     
@@ -246,7 +271,15 @@ void implicit_euler(vector<unique_ptr<AffineBody>>& cubes, double dt)
         }
 
 #ifdef _SM_
-        clear(sparse_hess);
+        if (iter) {
+            lut.clear();
+            sparse_hess.setZero();
+            gen_empty_sm(n_cubes, idx, eidx, sparse_hess, lut);
+            n_pt = idx.size();
+            n_ee = eidx.size();
+            n_g = vidx.size();
+        }
+        // clear(sparse_hess);
 #endif
 
         auto ipc_start = high_resolution_clock::now();
@@ -565,7 +598,9 @@ void implicit_euler(vector<unique_ptr<AffineBody>>& cubes, double dt)
             if (globals.line_search)
                 alpha = line_search(dq, r, q0_cat, E0, E1,
                     n_cubes, n_pt, n_ee, n_g,
+                    pts,
                     idx,
+                    ees,
                     eidx,
                     vidx,
                     pt_tk,
@@ -589,28 +624,28 @@ void implicit_euler(vector<unique_ptr<AffineBody>>& cubes, double dt)
             spdlog::info("iter {}, time = {} ms, IPC term time = {} \n e0 = {}, e1 = {}, norm_dq = {}\n", iter, iter_duration * 1000, ipc_duration
                  * 1000, E0, E1, norm_dq);
         }
-        {
-            // updating collision set
-            pts.resize(idx.size());
-            ees.resize(eidx.size());
-#pragma omp parallel for schedule(static)
-            for (int k = 0; k < n_cubes; k++) {
-                cubes[k]->project_vt1();
-            }
-#pragma omp parallel for schedule(static)
-            for (int k = 0; k < n_pt; k++) {
-                auto& ij = idx[k];
-                Face f(*cubes[ij[2]], ij[3], false, true);
-                vec3 v(cubes[ij[0]]->v_transformed[ij[1]]);
-                pts[k] = { v, f.t0, f.t1, f.t2 };
-            }
-#pragma omp parallel for schedule(static)
-            for (int k = 0; k < n_ee; k++) {
-                auto& ij = eidx[k];
-                Edge ei(*cubes[ij[0]], ij[1], false, true), ej(*cubes[ij[2]], ij[3], false, true);
-                ees[k] = { ei.e0, ei.e1, ej.e0, ej.e1 };
-            }
-        }
+//         {
+//             // updating collision set
+//             pts.resize(idx.size());
+//             ees.resize(eidx.size());
+// #pragma omp parallel for schedule(static)
+//             for (int k = 0; k < n_cubes; k++) {
+//                 cubes[k]->project_vt1();
+//             }
+// #pragma omp parallel for schedule(static)
+//             for (int k = 0; k < n_pt; k++) {
+//                 auto& ij = idx[k];
+//                 Face f(*cubes[ij[2]], ij[3], false, true);
+//                 vec3 v(cubes[ij[0]]->v_transformed[ij[1]]);
+//                 pts[k] = { v, f.t0, f.t1, f.t2 };
+//             }
+// #pragma omp parallel for schedule(static)
+//             for (int k = 0; k < n_ee; k++) {
+//                 auto& ij = eidx[k];
+//                 Edge ei(*cubes[ij[0]], ij[1], false, true), ej(*cubes[ij[2]], ij[3], false, true);
+//                 ees[k] = { ei.e0, ei.e1, ej.e0, ej.e1 };
+//             }
+//         }
         term_cond = sup_dq < 1e-6 || ++iter >= globals.max_iter;
         sup_dq = 0.0;
     } while (!term_cond);
