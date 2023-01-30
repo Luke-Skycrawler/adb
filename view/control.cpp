@@ -64,7 +64,7 @@ void reset(bool init)
     }
     if (init) {
         auto sh_args = data["spatial hashing"];
-        globals.sh = make_unique<spatial_hashing>(sh_args["xyz_bits"], sh_args["n_buffer"], sh_args["min_xyz"], sh_args["max_xyz"], sh_args["dx"]);
+        globals.sh = make_unique<spatial_hashing>(sh_args["xyz_bits"], sh_args["n_buffer"], sh_args["min_xyz"], sh_args["max_xyz"], sh_args["dx"], sh_args["set_size"]);
     }
 }
 // process all input: query GLFW whether relevant keys are pressed/released this frame and react accordingly

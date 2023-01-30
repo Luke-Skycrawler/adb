@@ -49,7 +49,7 @@ struct GlobalVariableMainCPP{
     }
     #endif
     double dt;
-    int max_iter, tot_iter, ts;
+    int max_iter, tot_iter, ts, set_size;
     std::vector<HessBlock> hess_triplets;
     std::vector<unique_ptr<AffineBody>> cubes;
         std::map<std::string, unique_ptr<Model>> loaded_models;

@@ -34,9 +34,10 @@
     "spatial hashing": {
         "min_xyz": -10.0,
         "max_xyz": 10.0,
-        "dx": 0.2,
+        "dx": 0.4,
         "n_buffer": 256,
-        "xyz_bits": 7
+        "xyz_bits": 7,
+        "set_size": 1
     },
     "full_ccd": true,
     "align_com": false

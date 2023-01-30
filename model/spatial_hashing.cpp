@@ -5,6 +5,7 @@
 #include <unordered_map>
 #include <spdlog/spdlog.h>
 #include <atomic>
+#include <unordered_set>
 using namespace std;
 hi spatial_hashing::hash(const vec3i& grid_index)
 {
@@ -25,8 +26,8 @@ vec3i spatial_hashing::tovec3i(const vec3& f)
 
 spatial_hashing::spatial_hashing(
     int vec3_compressed_bits, int n_buffer,
-    double MIN_XYZ, double MAX_XYZ, double dx)
-    : vec3_compressed_bits(vec3_compressed_bits), n_entries(1 << (vec3_compressed_bits * 3)), n_overflow_buffer(8), n_l1_bitmap(n_entries >> 10), n_l2_bitmap(n_entries >> 5), n_buffer(n_buffer), MIN_XYZ(MIN_XYZ), MAX_XYZ(MAX_XYZ), dx(dx), count(new atomic<element_type>[n_entries]), overflow(new Primitive[n_overflow_buffer]), hashtable(new Primitive[n_entries * n_buffer]), bitmap_l1(new bool[n_l1_bitmap]), bitmap_l2(new bool[n_l2_bitmap])
+    double MIN_XYZ, double MAX_XYZ, double dx, int set_size)
+    : vec3_compressed_bits(vec3_compressed_bits), n_entries(1 << (vec3_compressed_bits * 3)), n_overflow_buffer(8), n_l1_bitmap(n_entries >> 10), n_l2_bitmap(n_entries >> 5), n_buffer(n_buffer), MIN_XYZ(MIN_XYZ), MAX_XYZ(MAX_XYZ), dx(dx), count(new atomic<element_type>[n_entries]), overflow(new Primitive[n_overflow_buffer]), hashtable(new Primitive[n_entries * n_buffer]), bitmap_l1(new bool[n_l1_bitmap]), bitmap_l2(new bool[n_l2_bitmap]), set_size(set_size)
 {
 }
 
@@ -57,10 +58,12 @@ void spatial_hashing::register_interval(const vec3i& l, const vec3i& u, const Pr
 
 vector<Primitive> spatial_hashing::query_interval(const vec3i& l, const vec3i& u, element_type body_exl)
 {
-    const auto cmp = [](const Primitive& a, const Primitive& b) {
-        return a.body < b.body || (a.body == b.body && a.pid < b.pid);
-    };
-    set<Primitive, decltype(cmp)> ret(cmp);
+    // const auto cmp = [](const Primitive& a, const Primitive& b) {
+    //     return a.body < b.body || (a.body == b.body && a.pid < b.pid);
+    // };
+    // unordered_set<Primitive, decltype(cmp)> ret(cmp);
+    unordered_set<unsigned> ret;
+    ret.reserve(n_buffer * set_size);
     vector<Primitive> val;
     for (int i = l(0); i <= u(0); i++)
         for (int j = l(1); j <= u(1); j++)
@@ -69,19 +72,25 @@ vector<Primitive> spatial_hashing::query_interval(const vec3i& l, const vec3i& u
                 int cnt = count[h];
                 for (int _i = 0; _i < min(cnt, n_buffer); _i++) {
                     auto offset = h * n_buffer + _i;
-                    if (hashtable[offset].body != body_exl)
-                        ret.insert(hashtable[offset]);
+                    auto p = hashtable[offset];
+                    if (p.body != body_exl) {
+                        ret.insert({ (static_cast<unsigned>(p.body) << 16) | p.pid });
+                    }
                 }
                 if (count[h] > n_buffer) {
                     spdlog::error("hash table overflow occured at {}, {}, {}", i, j, k);
                     // hack, dump the whole overflow buffer
                     int cnt = count_overflow;
                     for (int i = 0; i < min(cnt, n_overflow_buffer); i++)
-                        if (overflow[i].body != body_exl)
-                            ret.insert(overflow[i]);
+                    {
+                        auto o = overflow[i];
+                        if (o.body != body_exl)
+                            ret.insert({(static_cast<unsigned>(o.body) << 16) | o.pid});
+                    }
                 }
             }
-    for (auto& a : ret) val.push_back(a);
+    val.reserve(ret.size());
+    for (auto& a : ret) val.push_back({ static_cast<element_type>(a & 0xffff), static_cast<element_type> (a >> 16)});
     return val;
 }
 
