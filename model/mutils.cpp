@@ -192,7 +192,47 @@ double E(const vec12& q, const vec12& q_tiled, const AffineBody& c, double dt)
 {
     if(c.mass < 0.0) return 0.0;
     return othogonal_energy::otho_energy(q) * dt * dt + 0.5 * norm_M(q - q_tiled, c);
-};
+}
+vector<array<unsigned, 2>> gen_edge_list(
+    vector<unique_ptr<AffineBody>>& cubes, int n_cubes)
+{
+    vector<array<unsigned, 2>> ret;
+    int sz = 0;
+    for (int i = 0; i < n_cubes; i++) sz += cubes[i]->n_edges;
+    ret.reserve(sz);
+    for (unsigned i = 0; i < n_cubes; i++) {
+        for (unsigned j = 0; j < cubes[i]->n_edges; j++)
+            ret.push_back({ i, j });
+    }
+    return ret;
+}
+vector<array<unsigned, 2>> gen_point_list(
+    vector<unique_ptr<AffineBody>>& cubes, int n_cubes)
+{
+    vector<array<unsigned, 2>> ret;
+    int sz = 0;
+    for (int i = 0; i < n_cubes; i++) sz += cubes[i]->n_vertices;
+    ret.reserve(sz);
+    for (unsigned i = 0; i < n_cubes; i++) {
+        for (unsigned j = 0; j < cubes[i]->n_vertices; j++)
+            ret.push_back({ i, j });
+    }
+    return ret;
+}
+vector<array<unsigned, 2>> gen_triangle_list(
+    vector<unique_ptr<AffineBody>>& cubes, int n_cubes)
+{
+    vector<array<unsigned, 2>> ret;
+    int sz = 0;
+    for (int i = 0; i < n_cubes; i++) sz += cubes[i]->n_faces;
+    ret.reserve(sz);
+    for (unsigned i = 0; i < n_cubes; i++) {
+        for (unsigned j = 0; j < cubes[i]->n_faces; j++) {
+            ret.push_back({ i, j });
+        }
+    }
+    return ret;
+}
 };
 
 vec12 AffineBody::q_tile(double dt, const vec3& f) const

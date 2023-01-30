@@ -43,7 +43,7 @@ double step_size_upper_bound(VectorXd& dq, vector<unique_ptr<AffineBody>>& cubes
             }
         }
         if (globals.pt) {
-
+#ifdef _BODY_LEVEL_
 #pragma omp parallel for schedule(static)
             for (int I = 0; I < n_cubes; I++) {
                 auto& ci(*cubes[I]);
@@ -77,9 +77,48 @@ double step_size_upper_bound(VectorXd& dq, vector<unique_ptr<AffineBody>>& cubes
                 #pragma omp critical
                 toi = min(toi_private, toi);
             }
+#else
+            int n_points = globals.points.size(), n_edges = globals.edges.size(), n_triangles = globals.triangles.size();
+#pragma omp parallel for schedule(static)
+            for (int I = 0; I < n_points; I++) {
+                auto& idx = globals.points[I];
+                int v = idx[1];
+                auto& ci(*cubes[idx[0]]);
+                vec3 p1 = ci.v_transformed[v];
+                vec3 p0 = ci.vt1(v);
+                globals.sh->register_edge(p0, p1, idx[0], v);
+            }
+
+#pragma omp parallel for schedule(static)
+            for (int J = 0; J < n_triangles; J++) {
+                auto& idx = globals.triangles[J];
+
+                auto& cj(*cubes[idx[0]]);
+                unsigned f = idx[1];
+                double toi_private = 1.0;
+                Face f0(cj, f, false);
+                Face f1(cj, f, true, true);
+                auto collisions = globals.sh->query_triangle_trajectory(
+                    f0.t0, f0.t1, f0.t2,
+                    f1.t0, f1.t1, f1.t2,
+                    idx[0]);
+                for (auto& c : collisions) {
+                    unsigned I = c.body, v = c.pid;
+                    vec3 p1 = cubes[I]->v_transformed[v];
+                    vec3 p0 = cubes[I]->vt1(v);
+
+                    double t = pt_collision_time(p0, f0, p1, f1);
+                    toi_private = min(toi_private, t);
+                }
+#pragma omp critical
+                toi = min(toi_private, toi);
+            }
+#endif
             globals.sh->remove_all_entries();
         }
         if (globals.ee) {
+#ifdef _BODY_LEVEL_
+
 #pragma omp parallel for schedule(static)
             for (int I = 0; I < n_cubes; I++) {
                 auto& ci(*cubes[I]);
@@ -113,6 +152,43 @@ double step_size_upper_bound(VectorXd& dq, vector<unique_ptr<AffineBody>>& cubes
                 #pragma omp critical
                 toi = min(toi, toi_private);
             }
+#else
+            int n_edges = globals.edges.size();
+#pragma omp parallel for schedule(static)
+            for (int I = 0; I < n_edges; I++) {
+                auto& idx(globals.edges[I]);
+                auto& ci(*cubes[idx[0]]);
+                auto ei{ idx[1] };
+                Edge e1{ ci, ei, true, true };
+                Edge e0{ ci, ei, false };
+                globals.sh->register_edge_trajectory(e0.e0, e0.e1, e1.e0, e1.e1, idx[0], ei);
+            }
+
+#pragma omp parallel for schedule(static)
+            for (int J = 0; J < n_edges; J++) {
+                auto& idx(globals.edges[J]);
+
+                auto& cj(*cubes[idx[0]]);
+                auto ej{ idx[1] };
+                double toi_private = 1.0;
+                Edge e1{ cj, ej, true, true };
+
+                Edge e0{ cj, ej, false };
+                auto collisions = globals.sh->query_edge_trajectory(e0.e0, e0.e1, e1.e0, e1.e1, idx[0]);
+
+                for (auto& c : collisions) {
+                    unsigned I = c.body, ei = c.pid;
+                    if (I > idx[0]) continue;
+                    Edge ei1{ *cubes[I], ei, true, true };
+                    Edge ei0{ *cubes[I], ei, false };
+                    auto t = ee_collision_time(ei0, e0, ei1, e1);
+                    toi_private = min(toi_private, t);
+                }
+#pragma omp critical
+                toi = min(toi, toi_private);
+            }
+
+#endif
             globals.sh->remove_all_entries();
         }
         return toi;

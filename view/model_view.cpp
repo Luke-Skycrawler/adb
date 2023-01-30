@@ -224,6 +224,10 @@ int main()
     lightingShader.setFloat("material.shininess", 64);
 
     reset(true);
+    int n_cubes = globals.cubes.size();
+    globals.edges = utils::gen_edge_list(globals.cubes, n_cubes);
+    globals.points = utils::gen_point_list(globals.cubes, n_cubes);
+    globals.triangles = utils::gen_triangle_list(globals.cubes, n_cubes);
     // be sure to call after glfw intiailzation 
 
     // render loop
@@ -289,7 +293,8 @@ int main()
             depthShader.setMat4("model", model);
             depthShader.setVec3("viewPos", lightPos);
             // bind diffuse map
-            renderPlane();
+            if (globals.ground)
+                renderPlane();
             render_cubes(depthShader, globals.cubes);
 
 #ifdef FEATURE_POSTRENDER
@@ -304,8 +309,7 @@ int main()
         glGetIntegerv(GL_VIEWPORT, viewport);
         lightingShader.use();
         lightingShader.setVec2("pickPosition", glm::vec2(globals.lastX / viewport[2] * 2 - 1.0f, (1 - globals.lastY / viewport[3]) * 2 - 1.0f));
-        if (globals.feedback)
-        {
+        if (globals.feedback) {
             // glEnable(GL_RASTERIZER_DISCARD);
             glUseProgram(select_program);
             glBindTransformFeedback(GL_TRANSFORM_FEEDBACK, select_xfb);
@@ -332,16 +336,15 @@ int main()
         // bind specular map
         glActiveTexture(GL_TEXTURE1);
         glBindTexture(GL_TEXTURE_2D, specularMap);
-        if (globals.display_corner)
-        {
+        if (globals.display_corner) {
             glActiveTexture(GL_TEXTURE2);
             glBindTexture(GL_TEXTURE_2D, globals.depthMap);
         }
         // FIXME: should do the select pass in reverse order
         lightingShader.setInt("alias", 5);
         lightingShader.setVec3("objectColor", 0.0f, 0.5f, 1.0f);
-
-        renderPlane();
+        if (globals.ground)
+            renderPlane();
         lightingShader.setVec3("objectColor", 1.0f, 0.5f, 0.31f);
 
         render_cubes(lightingShader, globals.cubes);

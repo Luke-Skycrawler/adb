@@ -44,7 +44,7 @@ double E_global(const VectorXd& q_plus_dq, const VectorXd& dq, int n_cubes, int 
         c.project_vt2();
         e += e_inert;
     }
-
+    if (globals.pt)
 // point-triangle energy
 #pragma omp parallel for schedule(static) reduction(+ : e)
     for (int k = 0; k < n_pt; k++) {
@@ -58,13 +58,14 @@ double E_global(const VectorXd& q_plus_dq, const VectorXd& dq, int n_cubes, int 
         e += barrier::barrier_function(d);
 #ifdef _FRICTION_
         auto contact_force = -barrier_derivative_d(d) / (dt * dt) * 2 * sqrt(d);
-        auto v_stack = pt_vstack(*cubes[ij[0]], *cubes[ij[0]], ij[1], ij[3]);
+        auto v_stack = pt_vstack(*cubes[ij[0]], *cubes[ij[2]], ij[1], ij[3]);
         auto uk = (pt_tk[k] * v_stack).norm();
         e += D_f0(uk, contact_force);
 #endif
     }
 
     // ee ipc energy
+    if (globals.ee)
 #pragma omp parallel for schedule(static) reduction(+ : e)
     for (int k = 0; k < n_ee; k++) {
         auto& ij(eidx[k]);
@@ -86,6 +87,7 @@ double E_global(const VectorXd& q_plus_dq, const VectorXd& dq, int n_cubes, int 
     }
 
     // vertex-ground ipc energy
+    if (globals.ground)
 #pragma omp parallel for schedule(static) reduction(+ : e)
     for (int k = 0; k < n_g; k++) {
         auto& v{

@@ -61,6 +61,8 @@ struct GlobalVariableMainCPP{
     bool col_set, upper_bound, line_search, sparse, dense, ee, pt, ground, psd, damp, full_ccd, align_com;
     vector<omp_lock_t> writelock_cols;
     unique_ptr<spatial_hashing> sh;
+
+    std::vector<std::array<unsigned, 2>> edges, points, triangles;
 };
 #ifndef GOOGLE_TEST
 #ifdef _MAIN_CPP

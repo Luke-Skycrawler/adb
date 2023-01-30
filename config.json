@@ -12,15 +12,15 @@
     "col_set": true,
     "ee": true,
     "pt": true,
-    "ground": true,
-    "safe_factor": 1.0,
+    "ground": false,
+    "safe_factor": 5.0,
     "uppper_bound": true, 
     "mu": 0.0,
-    "backoff": 0.95,
+    "backoff": 0.8,
     "damping": {
         "enable": true,
-        "alpha": 2.3e-5,
-        "beta": 2.5e-5
+        "alpha": 5e-2,
+        "beta": 5e-2
     },
     "eps_x": 1e-3,
     "psd": true,
@@ -34,7 +34,7 @@
     "spatial hashing": {
         "min_xyz": -10.0,
         "max_xyz": 10.0,
-        "dx": 0.1,
+        "dx": 0.2,
         "n_buffer": 128,
         "xyz_bits": 7
     },

@@ -63,4 +63,12 @@ void damping_dense(MatrixXd& big_hess, double dt, int n_cubes);
 void damping_sparse(SparseMatrix<double>& sparse_hess, double dt, int n_cubes);
 void build_from_triplets(SparseMatrix<double>& sparse_hess_trip, MatrixXd& big_hess, int hess_dim, int n_cubes);
 double E(const vec12& q, const vec12& q_tiled, const AffineBody& c, double dt);
+
+std::vector<std::array<unsigned, 2>> gen_edge_list(
+    std::vector<std::unique_ptr<AffineBody>>& cubes, int n_cubes);
+std::vector<std::array<unsigned, 2>> gen_point_list(
+    std::vector<std::unique_ptr<AffineBody>>& cubes, int n_cubes);
+std::vector<std::array<unsigned, 2>> gen_triangle_list(
+    std::vector<std::unique_ptr<AffineBody>>& cubes, int n_cubes);
+
 }
