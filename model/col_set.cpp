@@ -25,6 +25,14 @@ void gen_collision_set(
     vector<Matrix<double, 2, 12>>& pt_tk,
     vector<Matrix<double, 2, 12>>& ee_tk)
 {
+
+    pts.resize(0);
+    idx.resize(0);
+    ees.resize(0);
+    eidx.resize(0);
+    vidx.resize(0);
+    pt_tk.resize(0);
+    ee_tk.resize(0);
     auto start = high_resolution_clock::now();
 
     // const auto blend_e = [=](const vec3& x, const vec3& y, double lam) -> vec3 {

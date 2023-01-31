@@ -13,9 +13,9 @@
     "ee": true,
     "pt": true,
     "ground": true,
-    "safe_factor": 2.0,
+    "safe_factor": 1.0,
     "uppper_bound": true, 
-    "mu": 0.3,
+    "mu": 0.25,
     "backoff": 0.95,
     "damping": {
         "enable": false,

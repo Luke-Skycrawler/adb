@@ -26,12 +26,12 @@ double E_global(const VectorXd& q_plus_dq, const VectorXd& dq, int n_cubes, int 
     const vector<array<int, 4>>& eidx,
     const vector<array<int, 2>>& vidx,
     const vector<Matrix<double, 2, 12>>& pt_tk,
-    const vector<Matrix<double, 2, 12>>& ee_tk, 
+    const vector<Matrix<double, 2, 12>>& ee_tk,
     const vector<unique_ptr<AffineBody>>& cubes,
-    double dt
-)
+    double dt, double& _ef, bool _vt2)
 {
     double e = 0.0;
+    double ef = 0.0;
 // inertia energy
 #pragma omp parallel for schedule(static) reduction(+ : e)
     for (int i = 0; i < n_cubes; i++) {
@@ -41,16 +41,23 @@ double E_global(const VectorXd& q_plus_dq, const VectorXd& dq, int n_cubes, int 
         auto q_tiled = c.q_tile(dt, globals.gravity);
         auto _q = q_plus_dq.segment<12>(12 * i);
         double e_inert = E(_q, q_tiled, c, dt);
+        // if (_vt2)
+        //     c.project_vt2();
+        // else
+        // c.project_vt1();
         c.project_vt2();
         e += e_inert;
     }
     if (globals.pt)
 // point-triangle energy
-#pragma omp parallel for schedule(static) reduction(+ : e)
-    for (int k = 0; k < n_pt; k++) {
+#pragma omp parallel for schedule(static) reduction(+                \
+                                                    : e) reduction(+ \
+                                                                   : ef)
+        for (int k = 0; k < n_pt; k++) {
         auto& ij = idx[k];
-        Face f(*cubes[ij[2]], ij[3], true, true);
+        Face f(*cubes[ij[2]], ij[3], _vt2, _vt2);
         vec3 v(cubes[ij[0]]->v_transformed[ij[1]]);
+        if (!_vt2) v = cubes[ij[0]] -> vt1(ij[1]);
         // array<vec3, 4> a = {v, f.t0, f.t1, f.t2};
         ipc::PointTriangleDistanceType pt_type;
         double d = vf_distance(v, f, pt_type);
@@ -60,16 +67,18 @@ double E_global(const VectorXd& q_plus_dq, const VectorXd& dq, int n_cubes, int 
         auto contact_force = -barrier_derivative_d(d) / (dt * dt) * 2 * sqrt(d);
         auto v_stack = pt_vstack(*cubes[ij[0]], *cubes[ij[2]], ij[1], ij[3]);
         auto uk = (pt_tk[k] * v_stack).norm();
-        e += D_f0(uk, contact_force);
+        ef += D_f0(uk, contact_force);
 #endif
-    }
+        }
 
     // ee ipc energy
     if (globals.ee)
-#pragma omp parallel for schedule(static) reduction(+ : e)
+#pragma omp parallel for schedule(static) reduction(+                \
+                                                    : e) reduction(+ \
+                                                                   : ef)
     for (int k = 0; k < n_ee; k++) {
         auto& ij(eidx[k]);
-        Edge ei(*cubes[ij[0]], ij[1], true, true), ej(*cubes[ij[2]], ij[3], true, true);
+        Edge ei(*cubes[ij[0]], ij[1], _vt2, _vt2), ej(*cubes[ij[2]], ij[3], _vt2, _vt2);
         double eps_x = (ei.e0 - ei.e1).squaredNorm() * (ej.e0 - ej.e1).squaredNorm() * globals.eps_x;
         double p = ipc::edge_edge_mollifier(ei.e0, ei.e1, ej.e0, ej.e1, eps_x);
         double d = ipc::edge_edge_distance(ei.e0, ei.e1, ej.e0, ej.e1);
@@ -80,34 +89,38 @@ double E_global(const VectorXd& q_plus_dq, const VectorXd& dq, int n_cubes, int 
 #endif
 #ifdef _FRICTION_
         auto contact_force = -barrier_derivative_d(d) / (dt * dt) * 2 * sqrt(d);
-        auto v_stack = ee_vstack(*cubes[ij[0]], *cubes[ij[0]], ij[1], ij[3]);
+        auto v_stack = ee_vstack(*cubes[ij[0]], *cubes[ij[2]], ij[1], ij[3]);
         auto uk = (ee_tk[k] * v_stack).norm();
-        e += D_f0(uk, contact_force);
+        ef += D_f0(uk, contact_force);
 #endif
     }
 
     // vertex-ground ipc energy
     if (globals.ground)
-#pragma omp parallel for schedule(static) reduction(+ : e)
+#pragma omp parallel for schedule(static) reduction(+                \
+                                                    : e) reduction(+ \
+                                                                   : ef)
     for (int k = 0; k < n_g; k++) {
         auto& v{
             vidx[k]
         };
         vec3 vt2 = cubes[v[0]]->v_transformed[v[1]];
-        double e_ground = E_ground(vt2);
+        vec3 vd = _vt2 ? vt2: cubes[v[0]] -> vt1(v[1]);
+        double e_ground = E_ground(vd);
         e += e_ground;
 #ifdef _FRICTION_
         auto& c{ *cubes[v[0]] };
         auto vt0 = c.vt0(v[1]);
-        double d = vg_distance(vt2);
+        double d = vg_distance(vd);
         if (d * d < barrier::d_hat) {
             auto contact_force = -barrier_derivative_d(d * d) / (dt * dt) * 2 * d;
             vec3 _uk = vt2 - vt0;
             double uk = sqrt(_uk(0) * _uk(0) + _uk(1) * _uk(1));
-            e += D_f0(uk, contact_force);
+            ef += D_f0(uk, contact_force);
         }
 #endif
     }
+    _ef = ef;
     return e;
 }
 double line_search(const VectorXd& dq, const VectorXd& grad, VectorXd& q0, double& E0, double& E1,
@@ -125,6 +138,7 @@ double line_search(const VectorXd& dq, const VectorXd& grad, VectorXd& q0, doubl
     const double c1 = 1e-4;
     double alpha = 1.0;
     bool wolfe = false;
+    double ef0 = 0.0;
     E0 = E_global(q0, 0.0 * dq,
         n_cubes, n_pt, n_ee, n_g,
         idx,
@@ -132,34 +146,24 @@ double line_search(const VectorXd& dq, const VectorXd& grad, VectorXd& q0, doubl
         vidx,
         pt_tk,
         ee_tk,
-        cubes, dt);
+        cubes, dt, ef0, true);
+    E0 += ef0;
     double qdg = dq.dot(grad);
-    // double E0 = E(q0, q_tiled, c);
     VectorXd q1;
+    vector<array<vec3, 4>> pts_new;
+    vector<array<int, 4>> idx_new;
+
+    vector<array<vec3, 4>> ees_new;
+    vector<array<int, 4>> eidx_new;
+
+    vector<array<int, 2>> vidx_new;
+
+    vector<Matrix<double, 2, 12>> pt_tk_new;
+    vector<Matrix<double, 2, 12>> ee_tk_new;
+
     do {
         q1 = q0 + dq * alpha;
         auto dqk = dq * alpha;
-
-        // pts.resize(0);
-        // idx.resize(0);
-        // ees.resize(0);
-        // eidx.resize(0);
-        // vidx.resize(0);
-        // pt_tk.resize(0);
-        // ee_tk.resize(0);
-        // pts.resize(0);
-        // idx.resize(0);
-
-        vector<array<vec3, 4>> pts_new;
-        vector<array<int, 4>> idx_new;
-
-        vector<array<vec3, 4>> ees_new;
-        vector<array<int, 4>> eidx_new;
-
-        vector<array<int, 2>> vidx_new;
-
-        vector<Matrix<double, 2, 12>> pt_tk_new;
-        vector<Matrix<double, 2, 12>> ee_tk_new;
 
         for (int i = 0; i < n_cubes; i++) {
         auto& c(*cubes[i]);
@@ -171,12 +175,10 @@ double line_search(const VectorXd& dq, const VectorXd& grad, VectorXd& q0, doubl
             ees_new,
             eidx_new,
             vidx_new,
-            pt_tk,
-            ee_tk);
+            pt_tk_new,
+            ee_tk_new);
 
-        n_pt = idx.size();
-        n_ee = eidx.size();
-        n_g = vidx.size();
+        double ef1 = 0.0, E2 = 0.0, ef2 = 0.0;
         E1 = E_global(q1, dqk,
             n_cubes, n_pt, n_ee, n_g,
             idx,
@@ -184,13 +186,25 @@ double line_search(const VectorXd& dq, const VectorXd& grad, VectorXd& q0, doubl
             vidx,
             pt_tk,
             ee_tk,
-            cubes, dt
-        );
+            cubes, dt, ef1, true);
+        E2 = E_global(q1, dqk, n_cubes, pts_new.size(), ees_new.size(), vidx_new.size(),
+            idx_new, eidx_new, vidx_new,
+            pt_tk_new,
+            ee_tk_new,
+            cubes, dt, ef2, true);
+        E1 = E2 + ef1;
         wolfe = E1 <= E0 + c1 * alpha * qdg;
         // spdlog::info("wanted descend = {}, E1 - E0 = {}, E1 = {}, E0 = {}, alpha = {}", c1 * alpha * qdg, E1 - E0, E1, E0, alpha);
         alpha /= 2;
         if (alpha < 1e-8) break;
     } while (!wolfe && grad.norm() > 1e-3);
+    pts = pts_new;
+    idx = idx_new;
+    ees = ees_new;
+    eidx = eidx_new;
+    vidx = vidx_new;
+    pt_tk = pt_tk_new;
+    ee_tk = ee_tk_new;
 
     return alpha * 2;
 }
