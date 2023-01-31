@@ -140,11 +140,15 @@ void gen_collision_set(
                     if (d < barrier::d_hat * (globals.safe_factor * globals.safe_factor)) {
                         array<vec3, 4> pt = { p, _f.t0, _f.t1, _f.t2 };
                         array<int, 4> ij = { I, v, J, f };
+                        Matrix<double, 2, 12> Tk_T;
+                        Tk_T.setZero(2, 12);
+                        Vector2d uk;
+                        pt_uktk(*cubes[I], cj, pt, ij, pt_type, Tk_T, uk, d, globals.dt);
                         {
                             pts_private.push_back(pt);
                             idx_private.push_back(ij);
 #ifdef _FRICTION_
-                            pt_tk_private.push_back(MatrixXd::Zero(2, 12));
+                            pt_tk_private.push_back(Tk_T);
 #endif
                         }
                     }
@@ -313,16 +317,19 @@ void gen_collision_set(
                     unsigned I = c.body, ei = c.pid;
                     if (I > J) continue;
                     Edge _ei{ *cubes[I], ei };
-
-                    double d = ipc::edge_edge_distance(_ei.e0, _ei.e1, e.e0, e.e1);
+                    auto ee_type = ipc::edge_edge_distance_type(_ei.e0, _ei.e1, e.e0, e.e1);
+                    double d = ipc::edge_edge_distance(_ei.e0, _ei.e1, e.e0, e.e1, ee_type);
                     if (d < barrier::d_hat * (globals.safe_factor * globals.safe_factor)) {
                         array<vec3, 4> ee = { _ei.e0, _ei.e1, e.e0, e.e1 };
                         array<int, 4> ij = { I, ei, J, ej };
+                        Matrix<double, 2, 12> Tk_T;
+                        Vector2d uk;
+                        ee_uktk(*cubes[I], cj, ee, ij, ee_type, Tk_T, uk, d, globals.dt);
                         {
                             ees_private.push_back(ee);
                             eidx_private.push_back(ij);
 #ifdef _FRICTION_
-                            ee_tk_private.push_back(MatrixXd::Zero(2, 12));
+                            ee_tk_private.push_back(Tk_T);
 #endif
                         }
                     }

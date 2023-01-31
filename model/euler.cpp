@@ -5,8 +5,8 @@
 #include "../view/global_variables.h"
 #include <assert.h>
 #include <array>
-#include <ipc/distance/point_triangle.hpp>
-#include <ipc/distance/edge_edge.hpp>
+// #include <ipc/distance/point_triangle.hpp>
+// #include <ipc/distance/edge_edge.hpp>
 #include <ipc/friction/closest_point.hpp>
 #include <ipc/friction/tangent_basis.hpp>
 #include <chrono>
@@ -140,24 +140,37 @@ double line_search(const VectorXd& dq, const VectorXd& grad, VectorXd& q0, doubl
         q1 = q0 + dq * alpha;
         auto dqk = dq * alpha;
 
-        pts.resize(0);
-        idx.resize(0);
-        ees.resize(0);
-        eidx.resize(0);
-        vidx.resize(0);
-        pt_tk.resize(0);
-        ee_tk.resize(0);
+        // pts.resize(0);
+        // idx.resize(0);
+        // ees.resize(0);
+        // eidx.resize(0);
+        // vidx.resize(0);
+        // pt_tk.resize(0);
+        // ee_tk.resize(0);
+        // pts.resize(0);
+        // idx.resize(0);
+
+        vector<array<vec3, 4>> pts_new;
+        vector<array<int, 4>> idx_new;
+
+        vector<array<vec3, 4>> ees_new;
+        vector<array<int, 4>> eidx_new;
+
+        vector<array<int, 2>> vidx_new;
+
+        vector<Matrix<double, 2, 12>> pt_tk_new;
+        vector<Matrix<double, 2, 12>> ee_tk_new;
 
         for (int i = 0; i < n_cubes; i++) {
         auto& c(*cubes[i]);
         c.dq = dqk.segment<12>(i * 12);
         }
         gen_collision_set(true, n_cubes, cubes,
-            pts,
-            idx,
-            ees,
-            eidx,
-            vidx,
+            pts_new,
+            idx_new,
+            ees_new,
+            eidx_new,
+            vidx_new,
             pt_tk,
             ee_tk);
 
@@ -172,7 +185,6 @@ double line_search(const VectorXd& dq, const VectorXd& grad, VectorXd& q0, doubl
             pt_tk,
             ee_tk,
             cubes, dt
-
         );
         wolfe = E1 <= E0 + c1 * alpha * qdg;
         // spdlog::info("wanted descend = {}, E1 - E0 = {}, E1 = {}, E0 = {}, alpha = {}", c1 * alpha * qdg, E1 - E0, E1, E0, alpha);
@@ -297,64 +309,8 @@ void implicit_euler(vector<unique_ptr<AffineBody>>& cubes, double dt)
             if (d < barrier::d_hat) {
 #ifdef _FRICTION_
 
-                Vector<double, 12> v_stack = pt_vstack(ci, cj, ij[1], ij[3]);
-
-                auto lams = ipc::point_triangle_closest_point(pt[0], pt[1], pt[2], pt[3]);
-                array<double, 3> tlams = { 1 - lams(0) - lams(1), lams(0), lams(1) };
-
-                if (pt_type == ipc::PointTriangleDistanceType::P_T)
-                    ; // do nothing
-                else if (pt_type == ipc::PointTriangleDistanceType::P_T0)
-                    tlams = { 1.0, 0.0, 0.0 };
-                else if (pt_type == ipc::PointTriangleDistanceType::P_T1)
-                    tlams = { 0.0, 1.0, 0.0 };
-                else if (pt_type == ipc::PointTriangleDistanceType::P_T2)
-                    tlams = { 0.0, 0.0, 1.0 };
-                else if (pt_type == ipc::PointTriangleDistanceType::P_E0) {
-                    auto elam = ipc::point_edge_closest_point(pt[0], pt[1], pt[2]);
-                    tlams = { 1.0 - elam, elam, 0.0 };
-                }
-                else if (pt_type == ipc::PointTriangleDistanceType::P_E1) {
-                    auto elam = ipc::point_edge_closest_point(pt[0], pt[2], pt[3]);
-                    tlams = { 0.0, 1.0 - elam, elam };
-                }
-                else if (pt_type == ipc::PointTriangleDistanceType::P_E2) {
-                    auto elam = ipc::point_edge_closest_point(pt[0], pt[3], pt[1]);
-                    tlams = { elam, 0.0, 1.0 - elam };
-                }
-
-                auto tp = (pt[1] * tlams[0] + pt[2] * tlams[1] + pt[3] * tlams[2]);
-                auto closest = (pt[0] - tp).squaredNorm();
-                assert(abs(d - closest) < 1e-8);
-                auto Pk = ipc::point_triangle_tangent_basis(pt[0], pt[1], pt[2], pt[3]);
-                Matrix<double, 3, 12> gamma;
-                gamma.setZero(3, 12);
-                for (int i = 0; i < 3; i++) {
-                    gamma(i, i) = -1.0;
-                    for (int j = 0; j < 3; j++)
-                        gamma(i, i + 3 + 3 * j) = tlams[j];
-                }
-                // gamma.block<3, 3>(0, 0) = Matrix3d::Identity(3, 3) * -1.0;
-                // gamma.block<3, 3>(0, 3) = Matrix3d::Identity(3, 3) * tlams[0];
-                // gamma.block<3, 3>(0, 6) = Matrix3d::Identity(3, 3) * tlams[1];
-                // gamma.block<3, 3>(0, 9) = Matrix3d::Identity(3, 3) * tlams[2];
-
-                Matrix<double, 2, 12> Tk_T = Pk.transpose() * gamma;
-
-                // Matrix<double, 12, 24> jacobian;
-                // auto _0 = ci.indices[f * 3], _1 = ci.indices[f * 3 + 1], _2 = ci.indices[f * 3 + 2];
-                // jacobian.setZero(12, 24);
-                // jacobian.block<3, 12>(0, 0) = x_jacobian_q(ci.vertices(v));
-                // jacobian.block<3, 12>(3, 12) = x_jacobian_q(cj.vertices(_0));
-                // jacobian.block<3, 12>(6, 12) = x_jacobian_q(cj.vertices(_1));
-                // jacobian.block<3, 12>(9, 12) = x_jacobian_q(cj.vertices(_2));
-
-                // auto Tq_k = Tk_T * jacobian;
-
-                // auto contact_force_lam = - barrier_derivative_d(d) / (dt * dt) * 2 * sqrt(d);
-                Vector2d uk = Tk_T * v_stack;
-                auto contact_force = -barrier_derivative_d(d) / (dt * dt) * 2 * sqrt(d);
-                pt_tk[k] = Tk_T;
+                Vector2d uk;
+                double contact_force = pt_uktk(ci, cj, pt, ij, pt_type, pt_tk[k], uk, d, dt);
 
                 ipc_term(
                     pt, ij, pt_type, d,
@@ -365,7 +321,7 @@ void implicit_euler(vector<unique_ptr<AffineBody>>& cubes, double dt)
                     globals.hess_triplets,
 #endif
                     ci.grad, cj.grad,
-                    uk, contact_force, Tk_T.transpose());
+                    uk, contact_force, pt_tk[k].transpose());
 #else
                 ipc_term(pt, ij, pt_type, d,
 #ifdef _SM_
@@ -389,88 +345,8 @@ void implicit_euler(vector<unique_ptr<AffineBody>>& cubes, double dt)
             if (d < barrier::d_hat) {
 
 #ifdef _FRICTION_
-                auto v_stack = ee_vstack(ci, cj, ij[1], ij[3]);
-                auto ei0 = ee[0], ei1 = ee[1], ej0 = ee[2], ej1 = ee[3];
-                auto rei = ei0 - ei1, rej = ej0 - ej1;
-                auto cnorm = rei.cross(rej).squaredNorm();
-                auto sin2 = cnorm / rei.squaredNorm() / rej.squaredNorm();
-                Matrix<double, 3, 2> degeneracy;
-                degeneracy.col(0) = rei.normalized();
-                degeneracy.col(1) = (ej0 - ei0).cross(rei).normalized();
-                bool par = sin2 < 1e-8;
-
-                auto lams = ipc::edge_edge_closest_point(ei0, ei1, ej0, ej1);
-
-                if (ee_type == ipc::EdgeEdgeDistanceType::EA_EB)
-                    ;
-
-                else if (ee_type == ipc::EdgeEdgeDistanceType::EA0_EB0)
-                    lams = { 0.0, 0.0 };
-                else if (ee_type == ipc::EdgeEdgeDistanceType::EA0_EB1)
-                    lams = { 0.0, 1.0 };
-                else if (ee_type == ipc::EdgeEdgeDistanceType::EA1_EB0)
-                    lams = { 1.0, 0.0 };
-                else if (ee_type == ipc::EdgeEdgeDistanceType::EA1_EB1)
-                    lams = { 1.0, 1.0 };
-                else if (ee_type == ipc::EdgeEdgeDistanceType::EA_EB0) {
-                    auto pe = ipc::point_edge_closest_point(ej0, ei0, ei1);
-                    lams = { pe, 0.0 };
-                }
-                else if (ee_type == ipc::EdgeEdgeDistanceType::EA_EB1) {
-                    auto pe = ipc::point_edge_closest_point(ej1, ei0, ei1);
-                    lams = { pe, 1.0 };
-                }
-                else if (ee_type == ipc::EdgeEdgeDistanceType::EA0_EB) {
-                    auto pe = ipc::point_edge_closest_point(ei0, ej0, ej1);
-                    lams = { 0.0, pe };
-                }
-                else if (ee_type == ipc::EdgeEdgeDistanceType::EA1_EB) {
-                    auto pe = ipc::point_edge_closest_point(ei1, ej0, ej1);
-                    lams = { 1.0, pe };
-                }
-                const auto clip = [&](double& a, double l, double u) {
-                    a = max(min(u, a), l);
-                };
-                clip(lams(0), 0.0, 1.0);
-                clip(lams(1), 0.0, 1.0);
-                array<double, 4> lambdas = { 1 - lams(0), lams(0), 1 - lams(1), lams(1) };
-                if (par) {
-                    // ignore this friction, already handled in point-triangle pair
-                    lambdas = { 0.0, 0.0, 0.0, 0.0 };
-                    // uk will be set to zero
-                }
-                auto pei = ei0 * lambdas[0] + ei1 * lambdas[1];
-                auto pej = ej0 * lambdas[2] + ej1 * lambdas[3];
-                auto closest = (pei - pej).squaredNorm();
-                assert(par || abs(d - closest) < 1e-8);
-
-                auto Pk = par ? degeneracy : ipc::edge_edge_tangent_basis(ei0, ei1, ej0, ej1);
-                Matrix<double, 3, 12> gamma;
-                gamma.setZero(3, 12);
-                for (int i = 0; i < 3; i++) {
-                    gamma(i, i) = -lambdas[0];
-                    gamma(i, i + 3) = -lambdas[1];
-                    gamma(i, i + 6) = lambdas[2];
-                    gamma(i, i + 9) = lambdas[3];
-                }
-                Matrix<double, 2, 12> Tk_T = Pk.transpose() * gamma;
-
-                // Matrix<double, 12, 24> jacobian;
-                // auto _i0 = ci.edges[_ei * 2], _i1 = ci.edges[_ei * 2 + 1],
-                //      _j0 = cj.edges[_ej * 2], _j1 = cj.edges[_ej * 2 + 1];
-
-                // jacobian.setZero(12, 24);
-                // jacobian.block<3, 12>(0, 0) = x_jacobian_q(ci.vertices(_i0));
-                // jacobian.block<3, 12>(3, 0) = x_jacobian_q(cj.vertices(_i1));
-                // jacobian.block<3, 12>(6, 12) = x_jacobian_q(cj.vertices(_j0));
-                // jacobian.block<3, 12>(9, 12) = x_jacobian_q(cj.vertices(_j1));
-
-                // auto Tq_k = Tk_T * jacobian;
-
-                // auto contact_force_lam = barrier_derivative_d(d) / (dt * dt) * 2 * sqrt(d);
-                Vector2d uk = Tk_T * v_stack;
-                auto contact_force = -barrier_derivative_d(d) / (dt * dt) * 2 * sqrt(d);
-                ee_tk[k] = Tk_T;
+                Vector2d uk;
+                double contact_force = ee_uktk(ci, cj, ee, ij, ee_type, ee_tk[k], uk, d, dt);
 
                 ipc_term_ee(
                     ee, ij, ee_type, d,
@@ -481,7 +357,7 @@ void implicit_euler(vector<unique_ptr<AffineBody>>& cubes, double dt)
                     globals.hess_triplets,
 #endif
                     ci.grad, cj.grad,
-                    uk, contact_force, Tk_T.transpose());
+                    uk, contact_force, ee_tk[k].transpose());
 
 #else
                 ipc_term_ee(ee, ij, ee_type, d,

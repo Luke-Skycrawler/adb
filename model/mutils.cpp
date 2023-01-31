@@ -2,6 +2,11 @@
 #include "../view/global_variables.h"
 #include <algorithm>
 #include "othogonal_energy.h"
+#include "barrier.h"
+
+#include <ipc/friction/closest_point.hpp>
+#include <ipc/friction/tangent_basis.hpp>
+#include <ipc/distance/edge_edge_mollifier.hpp>
 using namespace std;
 using namespace Eigen;
 using namespace utils;
@@ -232,6 +237,148 @@ vector<array<unsigned, 2>> gen_triangle_list(
         }
     }
     return ret;
+}
+
+double pt_uktk(
+    AffineBody& ci, AffineBody& cj,
+    array<vec3, 4>& pt, array<int, 4>& ij, ::ipc::PointTriangleDistanceType& pt_type,
+    Matrix<double, 2, 12>& Tk_T_ret, Vector2d& uk_ret, double d, double dt)
+
+{
+
+    Vector<double, 12> v_stack = pt_vstack(ci, cj, ij[1], ij[3]);
+
+    auto lams = ::ipc::point_triangle_closest_point(pt[0], pt[1], pt[2], pt[3]);
+    array<double, 3> tlams = { 1 - lams(0) - lams(1), lams(0), lams(1) };
+
+    if (pt_type == ::ipc::PointTriangleDistanceType::P_T)
+        ; // do nothing
+    else if (pt_type == ::ipc::PointTriangleDistanceType::P_T0)
+        tlams = { 1.0, 0.0, 0.0 };
+    else if (pt_type == ::ipc::PointTriangleDistanceType::P_T1)
+        tlams = { 0.0, 1.0, 0.0 };
+    else if (pt_type == ::ipc::PointTriangleDistanceType::P_T2)
+        tlams = { 0.0, 0.0, 1.0 };
+    else if (pt_type == ::ipc::PointTriangleDistanceType::P_E0) {
+        auto elam = ::ipc::point_edge_closest_point(pt[0], pt[1], pt[2]);
+        tlams = { 1.0 - elam, elam, 0.0 };
+    }
+    else if (pt_type == ::ipc::PointTriangleDistanceType::P_E1) {
+        auto elam = ::ipc::point_edge_closest_point(pt[0], pt[2], pt[3]);
+        tlams = { 0.0, 1.0 - elam, elam };
+    }
+    else if (pt_type == ::ipc::PointTriangleDistanceType::P_E2) {
+        auto elam = ::ipc::point_edge_closest_point(pt[0], pt[3], pt[1]);
+        tlams = { elam, 0.0, 1.0 - elam };
+    }
+
+    auto tp = (pt[1] * tlams[0] + pt[2] * tlams[1] + pt[3] * tlams[2]);
+    auto closest = (pt[0] - tp).squaredNorm();
+    assert(abs(d - closest) < 1e-8);
+    auto Pk = ::ipc::point_triangle_tangent_basis(pt[0], pt[1], pt[2], pt[3]);
+    Matrix<double, 3, 12> gamma;
+    gamma.setZero(3, 12);
+    for (int i = 0; i < 3; i++) {
+        gamma(i, i) = -1.0;
+        for (int j = 0; j < 3; j++)
+            gamma(i, i + 3 + 3 * j) = tlams[j];
+    }
+
+    Tk_T_ret = Pk.transpose() * gamma;
+    uk_ret = Tk_T_ret * v_stack;
+    double contact_force = -barrier::barrier_derivative_d(d) / (dt * dt) * 2 * sqrt(d);
+    return contact_force;
+}
+double ee_uktk(
+    AffineBody& ci, AffineBody& cj,
+    array<vec3, 4>& ee, array<int, 4>& ij, ::ipc::EdgeEdgeDistanceType& ee_type,
+    Matrix<double, 2, 12>& Tk_T_ret, Vector2d& uk_ret, double d, double dt)
+{
+    auto v_stack = ee_vstack(ci, cj, ij[1], ij[3]);
+    auto ei0 = ee[0], ei1 = ee[1], ej0 = ee[2], ej1 = ee[3];
+    auto rei = ei0 - ei1, rej = ej0 - ej1;
+    auto cnorm = rei.cross(rej).squaredNorm();
+    auto sin2 = cnorm / rei.squaredNorm() / rej.squaredNorm();
+    Matrix<double, 3, 2> degeneracy;
+    degeneracy.col(0) = rei.normalized();
+    degeneracy.col(1) = (ej0 - ei0).cross(rei).normalized();
+    bool par = sin2 < 1e-8;
+
+    auto lams = ::ipc::edge_edge_closest_point(ei0, ei1, ej0, ej1);
+
+    if (ee_type == ::ipc::EdgeEdgeDistanceType::EA_EB)
+        ;
+
+    else if (ee_type == ::ipc::EdgeEdgeDistanceType::EA0_EB0)
+        lams = { 0.0, 0.0 };
+    else if (ee_type == ::ipc::EdgeEdgeDistanceType::EA0_EB1)
+        lams = { 0.0, 1.0 };
+    else if (ee_type == ::ipc::EdgeEdgeDistanceType::EA1_EB0)
+        lams = { 1.0, 0.0 };
+    else if (ee_type == ::ipc::EdgeEdgeDistanceType::EA1_EB1)
+        lams = { 1.0, 1.0 };
+    else if (ee_type == ::ipc::EdgeEdgeDistanceType::EA_EB0) {
+        auto pe = ::ipc::point_edge_closest_point(ej0, ei0, ei1);
+        lams = { pe, 0.0 };
+    }
+    else if (ee_type == ::ipc::EdgeEdgeDistanceType::EA_EB1) {
+        auto pe = ::ipc::point_edge_closest_point(ej1, ei0, ei1);
+        lams = { pe, 1.0 };
+    }
+    else if (ee_type == ::ipc::EdgeEdgeDistanceType::EA0_EB) {
+        auto pe = ::ipc::point_edge_closest_point(ei0, ej0, ej1);
+        lams = { 0.0, pe };
+    }
+    else if (ee_type == ::ipc::EdgeEdgeDistanceType::EA1_EB) {
+        auto pe = ::ipc::point_edge_closest_point(ei1, ej0, ej1);
+        lams = { 1.0, pe };
+    }
+    const auto clip = [&](double& a, double l, double u) {
+        a = max(min(u, a), l);
+    };
+    clip(lams(0), 0.0, 1.0);
+    clip(lams(1), 0.0, 1.0);
+    array<double, 4> lambdas = { 1 - lams(0), lams(0), 1 - lams(1), lams(1) };
+    if (par) {
+        // ignore this friction, already handled in point-triangle pair
+        lambdas = { 0.0, 0.0, 0.0, 0.0 };
+        // uk will be set to zero
+    }
+    auto pei = ei0 * lambdas[0] + ei1 * lambdas[1];
+    auto pej = ej0 * lambdas[2] + ej1 * lambdas[3];
+    auto closest = (pei - pej).squaredNorm();
+    assert(par || abs(d - closest) < 1e-8);
+
+    auto Pk = par ? degeneracy : ::ipc::edge_edge_tangent_basis(ei0, ei1, ej0, ej1);
+    Matrix<double, 3, 12> gamma;
+    gamma.setZero(3, 12);
+    for (int i = 0; i < 3; i++) {
+        gamma(i, i) = -lambdas[0];
+        gamma(i, i + 3) = -lambdas[1];
+        gamma(i, i + 6) = lambdas[2];
+        gamma(i, i + 9) = lambdas[3];
+    }
+    Matrix<double, 2, 12> Tk_T = Pk.transpose() * gamma;
+
+    // Matrix<double, 12, 24> jacobian;
+    // auto _i0 = ci.edges[_ei * 2], _i1 = ci.edges[_ei * 2 + 1],
+    //      _j0 = cj.edges[_ej * 2], _j1 = cj.edges[_ej * 2 + 1];
+
+    // jacobian.setZero(12, 24);
+    // jacobian.block<3, 12>(0, 0) = x_jacobian_q(ci.vertices(_i0));
+    // jacobian.block<3, 12>(3, 0) = x_jacobian_q(cj.vertices(_i1));
+    // jacobian.block<3, 12>(6, 12) = x_jacobian_q(cj.vertices(_j0));
+    // jacobian.block<3, 12>(9, 12) = x_jacobian_q(cj.vertices(_j1));
+
+    // auto Tq_k = Tk_T * jacobian;
+
+    // auto contact_force_lam = barrier_derivative_d(d) / (dt * dt) * 2 * sqrt(d);
+    Vector2d uk = Tk_T * v_stack;
+    auto contact_force = -barrier::barrier_derivative_d(d) / (dt * dt) * 2 * sqrt(d);
+    Tk_T_ret = Tk_T;
+    uk_ret = uk;
+
+    return contact_force;
 }
 };
 

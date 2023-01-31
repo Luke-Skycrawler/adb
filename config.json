@@ -4,7 +4,7 @@
     "predefined_case" : {
         "enable": false,
         "id" : 2,
-        "custom": "../test_cases/cubic.json"
+        "custom": "../test_cases/static_friction.json"
     },
     "solver": "sparse",
     "gravity": true, 
@@ -13,9 +13,9 @@
     "ee": true,
     "pt": true,
     "ground": true,
-    "safe_factor": 1.0,
+    "safe_factor": 2.0,
     "uppper_bound": true, 
-    "mu": 0.0,
+    "mu": 0.3,
     "backoff": 0.95,
     "damping": {
         "enable": false,
