@@ -31,6 +31,7 @@ void reset(bool init)
     globals.full_ccd = data["full_ccd"];
     globals.align_com = data["align_com"];
     globals.log = data["log"];
+    globals.player = data["player"];
     if (predefined) {
         int id = data["predefined_case"]["id"];
         if (id == 1) {
@@ -43,7 +44,8 @@ void reset(bool init)
     }
     else {
         globals.cubes.clear();
-        customize(data["predefined_case"]["custom"]);
+        globals.scene = data["predefined_case"]["custom"];
+        customize(globals.scene);
     }
     int n_cubes = globals.cubes.size();
     globals.writelock_cols.resize(n_cubes);

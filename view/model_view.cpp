@@ -274,8 +274,15 @@ int main()
         glm::mat4 tmpmodel = glm::scale(model, glm::vec3(scale, scale, scale));
         glm::vec3 box2Pos(0.3, 0.0, 1.2);
         glm::mat4 lightSpaceTrans = glm::lookAt(lightPos, glm::vec3(0.0f), globals.camera.WorldUp);
-        for (int i = 0; i < 1; i++)
-            implicit_euler(globals.cubes, globals.dt);
+        std::string trace_folder = "trace";
+        bool init = globals.ts == 0;
+        if (!globals.player) {
+            for (int i = 0; i < 1; i++)
+                implicit_euler(globals.cubes, globals.dt);
+            player_save(trace_folder, globals.ts, globals.cubes, init);
+        }
+        else
+            player_load(trace_folder,globals.ts++, globals.cubes);
         if (globals.display_corner)
         {
             glBindFramebuffer(GL_FRAMEBUFFER, globals.depthMapFBO);

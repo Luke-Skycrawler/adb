@@ -390,3 +390,60 @@ vec12 AffineBody::q_tile(double dt, const vec3& f) const
     _q.head(3) += dt * dt * f;
     return _q;
 }
+
+#include <iostream>
+#include <fstream>
+#include <filesystem>
+void player_load(
+    std::string& path,
+    int timestep,
+    const std::vector<std::unique_ptr<AffineBody>>& cubes)
+{
+    string filename = path + "/" + to_string(timestep);
+    ifstream in(filename, ios::in | ios::binary);
+    int n_cubes = cubes.size();
+
+    for (int i = 0; i < n_cubes; i++) {
+        auto& c{ *cubes[i] };
+        for (int j = 0; j < 4; j++)
+            in.read((char*)c.q0[j].data(), 3 * sizeof(double));
+        for (int j = 0; j < 4; j++)
+            in.read((char*)c.dqdt[j].data(), 3 * sizeof(double));
+    }
+    in.close();
+}
+
+void player_save(
+    std::string& path,
+    int timestep,
+    const std::vector<std::unique_ptr<AffineBody>>& cubes,
+    bool init)
+{
+
+    if (init) {
+
+        // TODO: save config.json, scene.json along with binary files
+
+        filesystem::path folder("path");
+        filesystem::path config("../config.json");
+        filesystem::path scene(globals.scene);
+
+        if (!filesystem::exists(path)) {
+            filesystem::create_directory(path);
+        }
+        filesystem::copy(config, folder);
+        filesystem::copy(scene, folder);
+    }
+
+    string filename = path + "/" + to_string(timestep);
+    ofstream out(filename, ios::out | ios::binary | ios::trunc);
+    int n_cubes = cubes.size();
+    for (int i = 0; i < n_cubes; i++) {
+        auto& c{ *cubes[i] };
+        for (int j = 0; j < 4; j++)
+            out.write((char*)c.q0[j].data(), 3 * sizeof(double));
+        for (int j = 0; j < 4; j++)
+            out.write((char*)c.dqdt[j].data(), 3 * sizeof(double));
+    }
+    out.close();
+}

@@ -4,6 +4,7 @@
 #include <memory>
 #include <array>
 #include <map>
+#include <string>
 #include <ipc/distance/point_triangle.hpp>
 #include <ipc/distance/edge_edge.hpp>
 
@@ -28,6 +29,16 @@ double step_size_upper_bound(Eigen::VectorXd& dq, std::vector<std::unique_ptr<Af
     std::vector<std::array<int, 4>>& eidx,
     std::vector<std::array<int, 2>>& vidx);
 
+void player_load(
+    std::string& path,
+    int timestep,
+    const std::vector<std::unique_ptr<AffineBody>>& cubes);
+void player_save(
+    std::string& path,
+    int timestep,
+    const std::vector<std::unique_ptr<AffineBody>>& cubes,
+    bool init);
+
 inline int starting_offset(int i, int j, const std::map<std::array<int, 2>, int>& lut, int* outers)
 {
     auto it = lut.find({ i, j });
@@ -40,6 +51,7 @@ inline int stride(int j, int* outers)
     return outers[j * 12 + 1] - outers[j * 12];
     // full 12x12 matrix, no overflow issue
 }
+
 namespace utils {
 
 void gen_empty_sm(

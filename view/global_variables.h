@@ -17,7 +17,7 @@ static const unsigned int SCR_HEIGHT = 600;
 #include "model.h"
 #include <string>
 #include <omp.h>
-
+#include <string>
 #include "../model/spatial_hashing.h"
 struct HessBlock {
     int i, j;
@@ -58,10 +58,10 @@ struct GlobalVariableMainCPP{
     double alpha, beta;
     double kappa, d_hat, safe_factor, mu, eps_x, backoff;
 
-    bool col_set, upper_bound, line_search, sparse, dense, ee, pt, ground, psd, damp, full_ccd, align_com, log;
+    bool col_set, upper_bound, line_search, sparse, dense, ee, pt, ground, psd, damp, full_ccd, align_com, log, player;
     vector<omp_lock_t> writelock_cols;
     unique_ptr<spatial_hashing> sh;
-
+    std::string scene;
     std::vector<std::array<unsigned, 2>> edges, points, triangles;
 };
 #ifndef GOOGLE_TEST
