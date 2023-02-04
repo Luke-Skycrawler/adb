@@ -23,7 +23,8 @@ void gen_collision_set(
     vector<array<int, 4>>& eidx,
     vector<array<int, 2>>& vidx,
     vector<Matrix<double, 2, 12>>& pt_tk,
-    vector<Matrix<double, 2, 12>>& ee_tk)
+    vector<Matrix<double, 2, 12>>& ee_tk,
+    bool gen_basis)
 {
 
     pts.resize(0);
@@ -139,7 +140,8 @@ void gen_collision_set(
                 auto f{ idx[1] };
                 auto& cj(*cubes[J]);
                 Face _f(cj, f, false, true);
-                auto collisions = globals.sh->query_triangle(_f.t0, _f.t1, _f.t2, J, barrier::d_sqrt * globals.safe_factor);
+                vector<Primitive> collisions;
+                globals.sh->query_triangle(_f.t0, _f.t1, _f.t2, J, barrier::d_sqrt * globals.safe_factor, collisions);
                 for (auto& c : collisions) {
                     unsigned I = c.body, v = c.pid;
                     vec3 p = cubes[I]->v_transformed[v];
@@ -151,7 +153,8 @@ void gen_collision_set(
                         Matrix<double, 2, 12> Tk_T;
                         Tk_T.setZero(2, 12);
                         Vector2d uk;
-                        pt_uktk(*cubes[I], cj, pt, ij, pt_type, Tk_T, uk, d, globals.dt);
+                        if (gen_basis && globals.mu != 0.0)
+                            pt_uktk(*cubes[I], cj, pt, ij, pt_type, Tk_T, uk, d, globals.dt);
                         {
                             pts_private.push_back(pt);
                             idx_private.push_back(ij);
@@ -300,27 +303,28 @@ void gen_collision_set(
             globals.sh->register_edge(e.e0, e.e1, I, ei);
         }
 
-        size_t* cnt;
+        // size_t* cnt;
 #pragma omp parallel
         {
-            int ithread = omp_get_thread_num();
-            int nthreads = omp_get_num_threads();
+            // int ithread = omp_get_thread_num();
+            // int nthreads = omp_get_num_threads();
 
             vector<array<vec3, 4>> ees_private;
             vector<array<int, 4>> eidx_private;
             vector<Matrix<double, 2, 12>> ee_tk_private;
-#pragma omp single
-            {
-                cnt = new size_t[nthreads + 1];
-                cnt[0] = 0;
-            }
+// #pragma omp single
+//             {
+//                 cnt = new size_t[nthreads + 1];
+//                 cnt[0] = 0;
+//             }
 #pragma omp for schedule(static) nowait
             for (int j = 0; j < n_edges; j++) {
                 auto idx{ globals.edges[j] };
                 auto J{ idx[0] }, ej{ idx[1] };
                 auto& cj(*cubes[J]);
                 Edge e{ cj, ej, false, true };
-                auto collisions = globals.sh->query_edge(e.e0, e.e1, J, barrier::d_sqrt * globals.safe_factor);
+                vector<Primitive> collisions;
+                globals.sh->query_edge(e.e0, e.e1, J, barrier::d_sqrt * globals.safe_factor, collisions);
                 for (auto& c : collisions) {
                     unsigned I = c.body, ei = c.pid;
                     if (I > J) continue;
@@ -331,8 +335,10 @@ void gen_collision_set(
                         array<vec3, 4> ee = { _ei.e0, _ei.e1, e.e0, e.e1 };
                         array<int, 4> ij = { I, ei, J, ej };
                         Matrix<double, 2, 12> Tk_T;
+                        Tk_T.setZero(2, 12);
                         Vector2d uk;
-                        ee_uktk(*cubes[I], cj, ee, ij, ee_type, Tk_T, uk, d, globals.dt);
+                        if (gen_basis && globals.mu != 0.0)
+                            ee_uktk(*cubes[I], cj, ee, ij, ee_type, Tk_T, uk, d, globals.dt);
                         {
                             ees_private.push_back(ee);
                             eidx_private.push_back(ij);
@@ -343,24 +349,15 @@ void gen_collision_set(
                     }
                 }
             }
-            cnt[ithread + 1] = ees_private.size();
-#pragma omp barrier
-#pragma omp single
-            {
-                for (int i = 1; i < nthreads + 1; i++) cnt[i] += cnt[i - 1];
-                ees.resize(cnt[nthreads]);
-                eidx.resize(cnt[nthreads]);
+#pragma omp critical
+            ees.insert(ees.end(), ees_private.begin(), ees_private.end());
+#pragma omp critical
+            eidx.insert(eidx.end(), eidx_private.begin(), eidx_private.end());
 #ifdef _FRICTION_
-                ee_tk.resize(cnt[nthreads]);
-#endif
-            }
-            std::copy(ees_private.begin(), ees_private.end(), ees.begin() + cnt[ithread]);
-            std::copy(eidx_private.begin(), eidx_private.end(), eidx.begin() + cnt[ithread]);
-#ifdef _FRICTION_
-            std::copy(ee_tk_private.begin(), ee_tk_private.end(), ee_tk.begin() + cnt[ithread]);
+#pragma omp critical
+            ee_tk.insert(ee_tk.end(), ee_tk_private.begin(), ee_tk_private.end());
 #endif
         }
-        delete[] cnt;
 #endif
         globals.sh -> remove_all_entries();
 #else

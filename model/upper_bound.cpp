@@ -16,7 +16,7 @@ double step_size_upper_bound(VectorXd& dq, vector<unique_ptr<AffineBody>>& cubes
     vector<array<int, 4>>& eidx,
     vector<array<int, 2>>& vidx
 )
-{
+ {
     auto start = high_resolution_clock::now();
     double toi = 1.0;
 #pragma omp parallel for schedule(static)
@@ -98,10 +98,11 @@ double step_size_upper_bound(VectorXd& dq, vector<unique_ptr<AffineBody>>& cubes
                 double toi_private = 1.0;
                 Face f0(cj, f, false);
                 Face f1(cj, f, true, true);
-                auto collisions = globals.sh->query_triangle_trajectory(
+                vector<Primitive> collisions;
+                globals.sh->query_triangle_trajectory(
                     f0.t0, f0.t1, f0.t2,
                     f1.t0, f1.t1, f1.t2,
-                    idx[0]);
+                    idx[0], collisions);
                 for (auto& c : collisions) {
                     unsigned I = c.body, v = c.pid;
                     vec3 p1 = cubes[I]->v_transformed[v];
@@ -174,7 +175,9 @@ double step_size_upper_bound(VectorXd& dq, vector<unique_ptr<AffineBody>>& cubes
                 Edge e1{ cj, ej, true, true };
 
                 Edge e0{ cj, ej, false };
-                auto collisions = globals.sh->query_edge_trajectory(e0.e0, e0.e1, e1.e0, e1.e1, idx[0]);
+                vector<Primitive> collisions;
+                
+                globals.sh->query_edge_trajectory(e0.e0, e0.e1, e1.e0, e1.e1, idx[0], collisions);
 
                 for (auto& c : collisions) {
                     unsigned I = c.body, ei = c.pid;
@@ -191,6 +194,8 @@ double step_size_upper_bound(VectorXd& dq, vector<unique_ptr<AffineBody>>& cubes
 #endif
             globals.sh->remove_all_entries();
         }
+        auto _duration = DURATION_TO_DOUBLE(start);
+        spdlog::info("time: step size upper bound = {:0.6f} ms", _duration * 1000);
         return toi;
     }
 

@@ -30,6 +30,7 @@ void reset(bool init)
     globals.backoff = data["backoff"];
     globals.full_ccd = data["full_ccd"];
     globals.align_com = data["align_com"];
+    globals.log = data["log"];
     if (predefined) {
         int id = data["predefined_case"]["id"];
         if (id == 1) {

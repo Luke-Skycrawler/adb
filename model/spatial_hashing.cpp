@@ -5,6 +5,8 @@
 #include <unordered_map>
 #include <spdlog/spdlog.h>
 #include <atomic>
+#include <algorithm>
+
 using namespace std;
 hi spatial_hashing::hash(const vec3i& grid_index)
 {
@@ -26,7 +28,7 @@ vec3i spatial_hashing::tovec3i(const vec3& f)
 spatial_hashing::spatial_hashing(
     int vec3_compressed_bits, int n_buffer,
     double MIN_XYZ, double MAX_XYZ, double dx)
-    : vec3_compressed_bits(vec3_compressed_bits), n_entries(1 << (vec3_compressed_bits * 3)), n_overflow_buffer(8), n_l1_bitmap(n_entries >> 10), n_l2_bitmap(n_entries >> 5), n_buffer(n_buffer), MIN_XYZ(MIN_XYZ), MAX_XYZ(MAX_XYZ), dx(dx), count(new atomic<element_type>[n_entries]), overflow(new Primitive[n_overflow_buffer]), hashtable(new Primitive[n_entries * n_buffer]), bitmap_l1(new bool[n_l1_bitmap]), bitmap_l2(new bool[n_l2_bitmap])
+    : vec3_compressed_bits(vec3_compressed_bits), n_entries(1 << (vec3_compressed_bits * 3)), n_overflow_buffer(8), n_l1_bitmap(n_entries >> 8), n_l2_bitmap(n_entries >> 3), n_buffer(n_buffer), MIN_XYZ(MIN_XYZ), MAX_XYZ(MAX_XYZ), dx(dx), count(new atomic<element_type>[n_entries]), overflow(new Primitive[n_overflow_buffer]), hashtable(new Primitive[n_entries * n_buffer]), bitmap_l1(new bool[n_l1_bitmap]), bitmap_l2(new bool[n_l2_bitmap])
 {
 }
 
@@ -40,7 +42,7 @@ void spatial_hashing::register_interval(const vec3i& l, const vec3i& u, const Pr
                 if (c < n_buffer - 1) {
                     if (c == 0) {
                         // new entry on the bitmaps
-                        auto l1_pos = idx >> 10, l2_pos = idx >> 5;
+                        auto l1_pos = idx >> 8, l2_pos = idx >> 3;
                         bitmap_l1[l1_pos] = true;
                         bitmap_l2[l2_pos] = true;
                     }
@@ -55,13 +57,13 @@ void spatial_hashing::register_interval(const vec3i& l, const vec3i& u, const Pr
             }
 }
 
-vector<Primitive> spatial_hashing::query_interval(const vec3i& l, const vec3i& u, element_type body_exl)
+void spatial_hashing::query_interval(const vec3i& l, const vec3i& u, element_type body_exl, std::vector<Primitive>& ret)
 {
-    const auto cmp = [](const Primitive& a, const Primitive& b) {
-        return a.body < b.body || (a.body == b.body && a.pid < b.pid);
-    };
-    set<Primitive, decltype(cmp)> ret(cmp);
-    vector<Primitive> val;
+    // const auto cmp = [](const Primitive& a, const Primitive& b) {
+    //     return a.body < b.body || (a.body == b.body && a.pid < b.pid);
+    // };
+    // set<Primitive, decltype(cmp)> ret(cmp);
+    ret.reserve(n_buffer * 4);
     for (int i = l(0); i <= u(0); i++)
         for (int j = l(1); j <= u(1); j++)
             for (int k = l(2); k <= u(2); k++) {
@@ -70,7 +72,7 @@ vector<Primitive> spatial_hashing::query_interval(const vec3i& l, const vec3i& u
                 for (int _i = 0; _i < min(cnt, n_buffer); _i++) {
                     auto offset = h * n_buffer + _i;
                     if (hashtable[offset].body != body_exl)
-                        ret.insert(hashtable[offset]);
+                        ret.push_back(hashtable[offset]);
                 }
                 if (count[h] > n_buffer) {
                     spdlog::error("hash table overflow occured at {}, {}, {}", i, j, k);
@@ -78,11 +80,15 @@ vector<Primitive> spatial_hashing::query_interval(const vec3i& l, const vec3i& u
                     int cnt = count_overflow;
                     for (int i = 0; i < min(cnt, n_overflow_buffer); i++)
                         if (overflow[i].body != body_exl)
-                            ret.insert(overflow[i]);
+                            ret.push_back(overflow[i]);
                 }
             }
-    for (auto& a : ret) val.push_back(a);
-    return val;
+    // val.reserve(ret.size());
+    // val.insert(val.end(), ret.begin(), ret.end());
+    std::sort(ret.begin(), ret.end());
+    ret.erase(std::unique(ret.begin(), ret.end()), ret.end());
+
+    // for (auto& a : ret) val.push_back(a);
 }
 
 void spatial_hashing::remove_all_entries()
@@ -94,7 +100,7 @@ void spatial_hashing::remove_all_entries()
             for (int j = 0; j < 1 << 5; j++)
                 if (bitmap_l2[(i << 5) + j]) {
                     bitmap_l2[(i << 5) + j] = false;
-                    for (int k = 0; k < 1 << 5; k++) count[(i << 10) + (j << 5) + k] = 0;
+                    for (int k = 0; k < 1 << 3; k++) count[(i << 8) + (j << 3) + k] = 0;
                 }
         }
 }
@@ -119,13 +125,14 @@ void spatial_hashing::register_edge_trajectory(
     register_interval(l, u, { pid, body });
 }
 
-vector<Primitive> spatial_hashing::query_edge(const vec3& a, const vec3& b, element_type group_exl, double dhat)
+void spatial_hashing::query_edge(const vec3& a, const vec3& b, element_type group_exl, double dhat,
+    std::vector<Primitive>& ret)
 {
     vec3 _u = a.cwiseMax(b).array() + dhat;
     vec3 _l = a.cwiseMin(b).array() - dhat;
     vec3i u = tovec3i(_u);
     vec3i l = tovec3i(_l);
-    return query_interval(l, u, group_exl);
+    query_interval(l, u, group_exl, ret);
 }
 
 void spatial_hashing::register_vertex(const vec3& a, element_type body, element_type pid)
@@ -134,19 +141,21 @@ void spatial_hashing::register_vertex(const vec3& a, element_type body, element_
     register_interval(ia, ia, { pid, body });
 }
 
-vector<Primitive> spatial_hashing::query_triangle(const vec3& a, const vec3& b, const vec3& c, element_type group_exl, double dhat)
+void spatial_hashing::query_triangle(const vec3& a, const vec3& b, const vec3& c, element_type group_exl, double dhat,
+    std::vector<Primitive>& ret)
 {
     vec3 _u = a.cwiseMax(b).cwiseMax(c).array() + dhat;
     vec3 _l = a.cwiseMin(b).cwiseMin(c).array() - dhat;
     vec3i u = tovec3i(_u);
     vec3i l = tovec3i(_l);
-    return query_interval(l, u, group_exl);
+    return query_interval(l, u, group_exl, ret);
 }
 
-vector<Primitive> spatial_hashing::query_triangle_trajectory(
+void spatial_hashing::query_triangle_trajectory(
     const vec3& a0, const vec3& b0, const vec3& c0,
     const vec3& a1, const vec3& b1, const vec3& c1,
-    element_type group_exl)
+    element_type group_exl,
+    std::vector<Primitive>& ret)
 {
     vec3 _u0 = a0.cwiseMax(b0).cwiseMax(c0);
     vec3 _l0 = a0.cwiseMin(b0).cwiseMin(c0);
@@ -156,17 +165,18 @@ vector<Primitive> spatial_hashing::query_triangle_trajectory(
 
     vec3i u = tovec3i(_u0.cwiseMax(_u1));
     vec3i l = tovec3i(_l0.cwiseMin(_l1));
-    return query_interval(l, u, group_exl);
+    query_interval(l, u, group_exl, ret);
 }
 
-vector<Primitive> spatial_hashing::query_edge_trajectory(
+void spatial_hashing::query_edge_trajectory(
     const vec3& a0, const vec3& b0,
     const vec3& a1, const vec3& b1,
-    element_type group_exl)
+    element_type group_exl,
+    std::vector<Primitive>& ret)
 {
     vec3 _u = a0.cwiseMax(b0).cwiseMax(a1).cwiseMax(b1);
     vec3 _l = a0.cwiseMin(b0).cwiseMin(a1).cwiseMin(b1);
     vec3i u = tovec3i(_u);
     vec3i l = tovec3i(_l);
-    return query_interval(l, u, group_exl);
+    query_interval(l, u, group_exl, ret);
 }

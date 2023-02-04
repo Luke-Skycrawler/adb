@@ -179,14 +179,14 @@ double line_search(const VectorXd& dq, const VectorXd& grad, VectorXd& q0, doubl
             ee_tk_new);
 
         double ef1 = 0.0, E2 = 0.0, ef2 = 0.0;
-        E1 = E_global(q1, dqk,
-            n_cubes, n_pt, n_ee, n_g,
-            idx,
-            eidx,
-            vidx,
-            pt_tk,
-            ee_tk,
-            cubes, dt, ef1, true);
+         E1 = E_global(q1, dqk,
+             n_cubes, n_pt, n_ee, n_g,
+             idx,
+             eidx,
+             vidx,
+             pt_tk,
+             ee_tk,
+             cubes, dt, ef1, true);
         E2 = E_global(q1, dqk, n_cubes, pts_new.size(), ees_new.size(), vidx_new.size(),
             idx_new, eidx_new, vidx_new,
             pt_tk_new,
@@ -212,7 +212,8 @@ double line_search(const VectorXd& dq, const VectorXd& grad, VectorXd& q0, doubl
 
 void implicit_euler(vector<unique_ptr<AffineBody>>& cubes, double dt)
 {
-    spdlog::set_level(spdlog::level::err);
+    if (!globals.log)
+        spdlog::set_level(spdlog::level::err);
     bool term_cond;
     int& ts = globals.ts;
     int iter = 0;
@@ -246,7 +247,8 @@ void implicit_euler(vector<unique_ptr<AffineBody>>& cubes, double dt)
             eidx,
             vidx,
             pt_tk,
-            ee_tk);
+            ee_tk,
+            true);
 
 #ifdef _SM_
     map<array<int, 2>, int> lut;

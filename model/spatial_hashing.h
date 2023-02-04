@@ -10,6 +10,12 @@ using vec3 = Eigen::Vector3d;
 using element_type = unsigned short;
 struct Primitive {
     element_type pid, body;
+    inline bool operator==(const Primitive &b){
+        return pid == b.pid && body == b.body;
+    }
+    inline bool operator<(const Primitive& b) {
+        return body< b.body || (body == b.body && pid< b.pid);
+    }
 };
 using BodyGroup = std::map<unsigned, std::unique_ptr<std::vector<unsigned>>>;
 using vec3i = Eigen::Vector<int, 3>;
@@ -38,26 +44,30 @@ struct spatial_hashing {
     hi hash(const vec3i& grid_index);
     vec3i tovec3i(const vec3& f);
 
-    std::vector<Primitive> query_interval(const vec3i& l, const vec3i& u, element_type body_exl);
+    void query_interval(const vec3i& l, const vec3i& u, element_type body_exl, std::vector<Primitive>& ret);
     void register_interval(const vec3i& l, const vec3i& u, const Primitive& t);
 
     void remove_all_entries();
     void register_edge(const vec3& a, const vec3& b, element_type body, element_type pid);
-    std::vector<Primitive> query_edge(const vec3& a, const vec3& b, element_type group_exl, double dhat = 1e-2);
+    void query_edge(const vec3& a, const vec3& b, element_type group_exl, double dhat,
+        std::vector<Primitive> &ret);
     void register_vertex(const vec3& a, element_type body, element_type pid);
-    std::vector<Primitive> query_triangle(const vec3& a, const vec3& b, const vec3& c, element_type group_exl, double dhat = 1e-2);
+    void query_triangle(const vec3& a, const vec3& b, const vec3& c, element_type group_exl, double dhat,
+        std::vector<Primitive> &ret);
     void register_edge_trajectory(
         const vec3& a0, const vec3& b0,
         const vec3& a1, const vec3& b1,
         element_type body, element_type pid);
         
-    std::vector<Primitive> query_edge_trajectory(
+    void query_edge_trajectory(
         const vec3& a0, const vec3& b0,
         const vec3& a1, const vec3& b1,
-        element_type group_exl);
+        element_type group_exl,
+        std::vector<Primitive> &ret);
 
-    std::vector<Primitive> query_triangle_trajectory(
+    void query_triangle_trajectory(
         const vec3& a0, const vec3& b0, const vec3& c0,
         const vec3& a1, const vec3& b1, const vec3& c1,
-        element_type group_exl);
+        element_type group_exl,
+        std::vector<Primitive> &ret);
 };

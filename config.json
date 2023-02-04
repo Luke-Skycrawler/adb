@@ -1,10 +1,10 @@
 {
-    "dt": 5e-3,
+    "dt": 1e-2,
     "max_iter": 100,
     "predefined_case" : {
         "enable": false,
         "id" : 2,
-        "custom": "../test_cases/static_friction.json"
+        "custom": "../test_cases/empty.json"
     },
     "solver": "sparse",
     "gravity": true, 
@@ -15,7 +15,8 @@
     "ground": true,
     "safe_factor": 1.0,
     "uppper_bound": true, 
-    "mu": 0.25,
+    "mu": 0.0,
+    "log": false,
     "backoff": 0.95,
     "damping": {
         "enable": false,
@@ -24,14 +25,14 @@
     },
     "eps_x": 1e-3,
     "psd": true,
-    "_spatial hashing": {
+    "spatial hashing": {
         "min_xyz": -2.0,
         "max_xyz": 2.0,
         "dx": 0.04,
         "n_buffer": 128,
         "xyz_bits": 7
     },
-    "spatial hashing": {
+    "_spatial hashing": {
         "min_xyz": -10.0,
         "max_xyz": 10.0,
         "dx": 0.2,
@@ -39,5 +40,5 @@
         "xyz_bits": 7
     },
     "full_ccd": true,
-    "align_com": false
+    "align_com": true
 }

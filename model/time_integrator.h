@@ -17,7 +17,8 @@ void gen_collision_set(
     std::vector<std::array<int, 4>>& eidx,
     std::vector<std::array<int, 2>>& vidx,
     std::vector<Matrix<double, 2, 12>>& pt_tk,
-    std::vector<Matrix<double, 2, 12>>& ee_tk);
+    std::vector<Matrix<double, 2, 12>>& ee_tk,
+    bool gen_basis = false);
 
 double step_size_upper_bound(Eigen::VectorXd& dq, std::vector<std::unique_ptr<AffineBody>>& cubes,
     int n_cubes, int n_pt, int n_ee, int n_g,
