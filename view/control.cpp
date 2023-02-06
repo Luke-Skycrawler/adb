@@ -32,6 +32,7 @@ void reset(bool init)
     globals.align_com = data["align_com"];
     globals.log = data["log"];
     globals.player = data["player"];
+    globals.trace_folder = data["trace_folder"];
     if (predefined) {
         int id = data["predefined_case"]["id"];
         if (id == 1) {

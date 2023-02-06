@@ -1,5 +1,5 @@
 {
-    "player": false,
+    "player": true,
     "dt": 1e-2,
     "max_iter": 100,
     "predefined_case" : {
@@ -41,5 +41,6 @@
         "xyz_bits": 7
     },
     "full_ccd": true,
-    "align_com": true
+    "align_com": true,
+    "trace_folder": "trace"
 }

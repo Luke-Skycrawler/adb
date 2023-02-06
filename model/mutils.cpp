@@ -409,6 +409,8 @@ void player_load(
             in.read((char*)c.q0[j].data(), 3 * sizeof(double));
         for (int j = 0; j < 4; j++)
             in.read((char*)c.dqdt[j].data(), 3 * sizeof(double));
+        c.p = c.q0[0];
+        c.A << c.q0[1], c.q0[2], c.q0[3];
     }
     in.close();
 }
@@ -424,13 +426,16 @@ void player_save(
 
         // TODO: save config.json, scene.json along with binary files
 
-        filesystem::path folder("path");
-        filesystem::path config("../config.json");
-        filesystem::path scene(globals.scene);
+            filesystem::path folder(path);
+            filesystem::path config("../config.json");
+            filesystem::path scene(globals.scene);
 
-        if (!filesystem::exists(path)) {
-            filesystem::create_directory(path);
+            if (filesystem::exists(path)) {
+                    filesystem::remove_all(path);
         }
+
+        filesystem::create_directory(path);
+
         filesystem::copy(config, folder);
         filesystem::copy(scene, folder);
     }

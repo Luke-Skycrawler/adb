@@ -25,3 +25,4 @@ google_test.*
 *.jpg
 *.png
 test/
+view/trace/
