@@ -1,11 +1,11 @@
 {
     "player": true,
-    "dt": 1e-2,
+    "dt": 5e-3,
     "max_iter": 100,
     "predefined_case" : {
         "enable": false,
         "id" : 2,
-        "custom": "../test_cases/empty.json"
+        "custom": "../test_cases/chains.json"
     },
     "solver": "sparse",
     "gravity": true, 
@@ -13,7 +13,7 @@
     "col_set": true,
     "ee": true,
     "pt": true,
-    "ground": true,
+    "ground": false,
     "safe_factor": 1.0,
     "uppper_bound": true, 
     "mu": 0.0,
@@ -27,9 +27,9 @@
     "eps_x": 1e-3,
     "psd": true,
     "spatial hashing": {
-        "min_xyz": -2.0,
-        "max_xyz": 2.0,
-        "dx": 0.04,
+        "min_xyz": -5.0,
+        "max_xyz": 5.0,
+        "dx": 0.08,
         "n_buffer": 128,
         "xyz_bits": 7
     },
@@ -41,6 +41,6 @@
         "xyz_bits": 7
     },
     "full_ccd": true,
-    "align_com": true,
+    "align_com": false,
     "trace_folder": "trace"
 }

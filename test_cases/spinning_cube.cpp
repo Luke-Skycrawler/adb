@@ -21,7 +21,7 @@ mat3 rotation(double a, double b, double c)
     R << c1 * c2, c1 * s2 * s3 - c3 * s1, s1 * s3 + c1 * c3 * s2,
         c2 * s1, c1 * c3 + s1 * s2 * s3, c3 * s1 * s2 - c1 * s3,
         -s2, c2 * s3, c2 * c3;
-    R = R.transpose();
+    // R = R.transpose();
     return R;
 }
 
@@ -113,7 +113,7 @@ void customize(string file)
             double  aa = ds[0] / 180.0 * M_PI, 
                     bb = ds[1] / 180.0 * M_PI, 
                     cc = ds[2] / 180.0 * M_PI;
-            mat3 rotate = rotation(aa, bb, cc);
+            mat3 rotate = rotation(cc, bb, aa);
             for (int i = 0; i < 3; i++) a.q[i + 1] = rotate.col(i);
         }
         else {
