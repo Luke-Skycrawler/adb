@@ -7,6 +7,7 @@
 #include <nlohmann/json.hpp>
 #include <spdlog/spdlog.h>
 #include <chrono>
+#include "../model/time_integrator.h"
 #define DURATION_TO_DOUBLE(X) duration_cast<duration<double>>((X)).count()
 using json = nlohmann::json;
 void reset(bool init)
@@ -69,6 +70,11 @@ void reset(bool init)
     if (init) {
         auto sh_args = data["spatial hashing"];
         globals.sh = make_unique<spatial_hashing>(sh_args["xyz_bits"], sh_args["n_buffer"], sh_args["min_xyz"], sh_args["max_xyz"], sh_args["dx"], sh_args["set_size"]);
+    }
+    int st = data["starting_ts"];
+    if (st >= 0) {
+        globals.ts = st;
+        player_load(globals.trace_folder, st, globals.cubes);
     }
 }
 // process all input: query GLFW whether relevant keys are pressed/released this frame and react accordingly

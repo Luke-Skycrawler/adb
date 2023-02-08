@@ -500,8 +500,8 @@ void implicit_euler(vector<unique_ptr<AffineBody>>& cubes, double dt)
                     cubes, dt);
             spdlog::info("alpha = {}", alpha);
             dq *= alpha;
-            if (alpha < 1e-6) {
-                spdlog::error("alpha = {}, E0 = {}, E1 = {}", alpha, E0, E1);
+            if (alpha < 2e-8) {
+                spdlog::error("iter, ts ({}, {}), alpha = {}, E0 = {}, E1 = {}", iter, ts, alpha, E0, E1);
             }
             double norm_dq = dq.norm();
             sup_dq = norm_dq;

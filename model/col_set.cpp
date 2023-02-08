@@ -139,7 +139,7 @@ void gen_collision_set(
                 auto J{ idx[0] };
                 auto f{ idx[1] };
                 auto& cj(*cubes[J]);
-                Face _f(cj, f, false, true);
+                Face _f(cj, f, vt2, vt2);
                 vector<Primitive> collisions;
                 globals.sh->query_triangle(_f.t0, _f.t1, _f.t2, J, barrier::d_sqrt * globals.safe_factor, collisions);
                 for (auto& c : collisions) {
@@ -299,7 +299,7 @@ void gen_collision_set(
             auto idx{ globals.edges[i] };
             auto I{ idx[0] }, ei{ idx[1] };
             auto& ci(*cubes[I]);
-            Edge e{ ci, ei, false, true };
+            Edge e{ ci, ei, vt2, vt2 };
             globals.sh->register_edge(e.e0, e.e1, I, ei);
         }
 
@@ -322,13 +322,13 @@ void gen_collision_set(
                 auto idx{ globals.edges[j] };
                 auto J{ idx[0] }, ej{ idx[1] };
                 auto& cj(*cubes[J]);
-                Edge e{ cj, ej, false, true };
+                Edge e{ cj, ej, vt2, vt2 };
                 vector<Primitive> collisions;
                 globals.sh->query_edge(e.e0, e.e1, J, barrier::d_sqrt * globals.safe_factor, collisions);
                 for (auto& c : collisions) {
                     unsigned I = c.body, ei = c.pid;
                     if (I > J) continue;
-                    Edge _ei{ *cubes[I], ei };
+                    Edge _ei{ *cubes[I], ei, vt2, vt2 };
                     auto ee_type = ipc::edge_edge_distance_type(_ei.e0, _ei.e1, e.e0, e.e1);
                     double d = ipc::edge_edge_distance(_ei.e0, _ei.e1, e.e0, e.e1, ee_type);
                     if (d < barrier::d_hat * (globals.safe_factor * globals.safe_factor)) {
