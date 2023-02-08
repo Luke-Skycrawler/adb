@@ -23,7 +23,7 @@ using hi = unsigned;
 struct spatial_hashing {
 
     spatial_hashing(int vec3_compressed_bits, int n_buffer,
-        double MIN_XYZ, double MAX_XYZ, double dx);
+        double MIN_XYZ, double MAX_XYZ, double dx, int set_size);
     ~spatial_hashing() {
         delete[] count;
         delete[] hashtable;
@@ -31,7 +31,7 @@ struct spatial_hashing {
         delete[] bitmap_l1;
         delete[] bitmap_l2;
     }
-    const int vec3_compressed_bits, n_entries, n_overflow_buffer, n_l1_bitmap, n_l2_bitmap, n_buffer;
+    const int vec3_compressed_bits, n_entries, n_overflow_buffer, n_l1_bitmap, n_l2_bitmap, n_buffer, set_size;
     std::atomic<element_type>* count, count_overflow;
     Primitive *overflow, *hashtable;
 
