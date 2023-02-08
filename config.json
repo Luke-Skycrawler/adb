@@ -29,7 +29,7 @@
     "spatial hashing": {
         "min_xyz": -5.0,
         "max_xyz": 5.0,
-        "dx": 0.08,
+        "dx": 0.1,
         "n_buffer": 128,
         "xyz_bits": 7,
         "set_size": 10

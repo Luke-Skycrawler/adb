@@ -6,6 +6,7 @@
 #include <spdlog/spdlog.h>
 #include <atomic>
 #include <unordered_set>
+#include <omp.h>
 using namespace std;
 hi spatial_hashing::hash(const vec3i& grid_index)
 {
@@ -29,6 +30,12 @@ spatial_hashing::spatial_hashing(
     double MIN_XYZ, double MAX_XYZ, double dx, int set_size)
     : vec3_compressed_bits(vec3_compressed_bits), n_entries(1 << (vec3_compressed_bits * 3)), n_overflow_buffer(8), n_l1_bitmap(n_entries >> 8), n_l2_bitmap(n_entries >> 3), n_buffer(n_buffer), MIN_XYZ(MIN_XYZ), MAX_XYZ(MAX_XYZ), dx(dx), count(new atomic<element_type>[n_entries]), overflow(new Primitive[n_overflow_buffer]), hashtable(new Primitive[n_entries * n_buffer]), bitmap_l1(new bool[n_l1_bitmap]), bitmap_l2(new bool[n_l2_bitmap]), set_size(set_size)
 {
+    auto n_proc = omp_get_num_procs();
+    sets = new unordered_set<unsigned>[n_proc];
+    for (int i = 0; i < n_proc; i++) {
+        sets[i].reserve(n_buffer * set_size);
+        sets[i].max_load_factor(0.5);
+    }
 }
 
 void spatial_hashing::register_interval(const vec3i& l, const vec3i& u, const Primitive& t)
@@ -62,27 +69,30 @@ void spatial_hashing::query_interval(const vec3i& l, const vec3i& u, element_typ
     //     return a.body < b.body || (a.body == b.body && a.pid < b.pid);
     // };
     // unordered_set<Primitive, decltype(cmp)> ret(cmp);
-    unordered_set<unsigned> ret;
+    auto tid = omp_get_thread_num();
+    unordered_set<unsigned>& ret = sets[tid];
+
     ret.clear();
     ret.reserve(n_buffer * set_size);
+    ret.max_load_factor(0.5);
 
     for (int i = l(0); i <= u(0); i++)
         for (int j = l(1); j <= u(1); j++)
             for (int k = l(2); k <= u(2); k++) {
                 auto h = hash(vec3i(i, j, k));
-                int cnt = count[h];
-                for (int _i = 0; _i < min(cnt, n_buffer); _i++) {
+                int cnt = min(int(count[h]), n_buffer);
+                for (int _i = 0; _i < cnt; _i++) {
                     auto offset = h * n_buffer + _i;
                     auto p = hashtable[offset];
-                    if (p.body != body_exl) {
-                        unsigned ele = (static_cast<unsigned>(p.body) << 16) | static_cast<unsigned>(p.pid);
+                    unsigned ele = (static_cast<unsigned>(p.body) << 16) | static_cast<unsigned>(p.pid);
+                    if (p.body != body_exl  && ret.find(ele)== ret.end()) {
                         ret.insert(ele);
                     }
                 }
-                if (count[h] > n_buffer) {
+                if (cnt >= n_buffer) {
                     spdlog::error("hash table overflow occured at {}, {}, {}", i, j, k);
                     // hack, dump the whole overflow buffer
-                    int cnt = count_overflow;
+                    cnt = count_overflow;
                     for (int i = 0; i < min(cnt, n_overflow_buffer); i++)
                     {
                         auto o = overflow[i];

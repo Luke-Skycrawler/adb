@@ -3,6 +3,7 @@
 #include <vector>
 #include <memory>
 #include <atomic>
+#include <unordered_set>
 #define SPATIAL_HASHING_H
 using mat3 = Eigen::Matrix3d;
 using vec3 = Eigen::Vector3d;
@@ -21,7 +22,7 @@ using BodyGroup = std::map<unsigned, std::unique_ptr<std::vector<unsigned>>>;
 using vec3i = Eigen::Vector<int, 3>;
 using hi = unsigned;
 struct spatial_hashing {
-
+    std::unordered_set<unsigned>* sets;
     spatial_hashing(int vec3_compressed_bits, int n_buffer,
         double MIN_XYZ, double MAX_XYZ, double dx, int set_size);
     ~spatial_hashing() {
