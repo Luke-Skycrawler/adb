@@ -6,7 +6,7 @@
     "predefined_case" : {
         "enable": false,
         "id" : 2,
-        "custom": "../test_cases/chains.json"
+        "custom": "../test_cases/static_friction.json"
     },
     "solver": "sparse",
     "gravity": true, 
@@ -14,10 +14,10 @@
     "col_set": true,
     "ee": true,
     "pt": true,
-    "ground": false,
+    "ground": true,
     "safe_factor": 1.0,
     "uppper_bound": true, 
-    "mu": 0.0,
+    "mu": 0.28,
     "log": false,
     "backoff": 0.95,
     "damping": {
@@ -27,7 +27,7 @@
     },
     "eps_x": 1e-3,
     "psd": true,
-    "spatial hashing": {
+    "_spatial hashing": {
         "min_xyz": -5.0,
         "max_xyz": 5.0,
         "dx": 0.08,
@@ -35,13 +35,13 @@
         "xyz_bits": 7,
         "set_size": 8
     },
-    "_spatial hashing": {
+    "spatial hashing": {
         "min_xyz": -10.0,
         "max_xyz": 10.0,
         "dx": 0.4,
         "n_buffer": 256,
         "xyz_bits": 7,
-        "set_size": 1
+        "set_size": 4
     },
     "full_ccd": true,
     "align_com": false,

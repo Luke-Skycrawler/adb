@@ -186,7 +186,7 @@ double line_search(const VectorXd& dq, const VectorXd& grad, VectorXd& q0, doubl
              vidx,
              pt_tk,
              ee_tk,
-             cubes, dt, ef1, true);
+             cubes, dt, ef1, false);
         E2 = E_global(q1, dqk, n_cubes, pts_new.size(), ees_new.size(), vidx_new.size(),
             idx_new, eidx_new, vidx_new,
             pt_tk_new,
