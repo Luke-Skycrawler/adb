@@ -1,6 +1,6 @@
 {
     "player": false,
-    "starting_ts": 50,
+    "starting_ts": -1,
     "dt": 5e-3,
     "max_iter": 100,
     "predefined_case" : {
@@ -31,9 +31,9 @@
         "min_xyz": -5.0,
         "max_xyz": 5.0,
         "dx": 0.08,
-        "n_buffer": 512,
+        "n_buffer": 128,
         "xyz_bits": 7,
-        "set_size": 10
+        "set_size": 8
     },
     "_spatial hashing": {
         "min_xyz": -10.0,

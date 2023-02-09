@@ -140,7 +140,9 @@ void gen_collision_set(
                 auto f{ idx[1] };
                 auto& cj(*cubes[J]);
                 Face _f(cj, f, vt2, vt2);
-                vector<Primitive> collisions;
+                // vector<Primitive> collisions;
+                auto& collisions {globals.sh->collisions[omp_get_thread_num()]};
+
                 globals.sh->query_triangle(_f.t0, _f.t1, _f.t2, J, barrier::d_sqrt * globals.safe_factor, collisions);
                 for (auto& c : collisions) {
                     unsigned I = c.body, v = c.pid;
@@ -323,7 +325,8 @@ void gen_collision_set(
                 auto J{ idx[0] }, ej{ idx[1] };
                 auto& cj(*cubes[J]);
                 Edge e{ cj, ej, vt2, vt2 };
-                vector<Primitive> collisions;
+                // vector<Primitive> collisions;
+                auto& collisions {globals.sh->collisions[omp_get_thread_num()]};
                 globals.sh->query_edge(e.e0, e.e1, J, barrier::d_sqrt * globals.safe_factor, collisions);
                 for (auto& c : collisions) {
                     unsigned I = c.body, ei = c.pid;

@@ -32,9 +32,11 @@ spatial_hashing::spatial_hashing(
 {
     auto n_proc = omp_get_num_procs();
     sets = new unordered_set<unsigned>[n_proc];
+    collisions = new vector<Primitive>[n_proc];
     for (int i = 0; i < n_proc; i++) {
-        sets[i].reserve(n_buffer * set_size);
         sets[i].max_load_factor(0.5);
+        sets[i].reserve(n_buffer * set_size);
+        collisions[i].reserve(n_buffer * set_size);
     }
 }
 
@@ -73,8 +75,8 @@ void spatial_hashing::query_interval(const vec3i& l, const vec3i& u, element_typ
     unordered_set<unsigned>& ret = sets[tid];
 
     ret.clear();
-    ret.reserve(n_buffer * set_size);
-    ret.max_load_factor(0.5);
+    // ret.reserve(n_buffer * set_size);
+    // ret.max_load_factor(0.5);
 
     for (int i = l(0); i <= u(0); i++)
         for (int j = l(1); j <= u(1); j++)
@@ -101,7 +103,8 @@ void spatial_hashing::query_interval(const vec3i& l, const vec3i& u, element_typ
                     }
                 }
             }
-    val.reserve(ret.size());
+    // val.reserve(ret.size());
+    val.resize(0);
     for (auto& a : ret) val.push_back({ static_cast<element_type>(a & 0xffff), static_cast<element_type>(a >> 16) });
 }
 

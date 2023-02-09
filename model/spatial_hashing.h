@@ -22,7 +22,6 @@ using BodyGroup = std::map<unsigned, std::unique_ptr<std::vector<unsigned>>>;
 using vec3i = Eigen::Vector<int, 3>;
 using hi = unsigned;
 struct spatial_hashing {
-    std::unordered_set<unsigned>* sets;
     spatial_hashing(int vec3_compressed_bits, int n_buffer,
         double MIN_XYZ, double MAX_XYZ, double dx, int set_size);
     ~spatial_hashing() {
@@ -31,7 +30,10 @@ struct spatial_hashing {
         delete[] overflow;
         delete[] bitmap_l1;
         delete[] bitmap_l2;
+        delete[] sets;
     }
+    std::unordered_set<unsigned>* sets;
+    std::vector<Primitive> *collisions;
     const int vec3_compressed_bits, n_entries, n_overflow_buffer, n_l1_bitmap, n_l2_bitmap, n_buffer, set_size;
     std::atomic<element_type>* count, count_overflow;
     Primitive *overflow, *hashtable;
