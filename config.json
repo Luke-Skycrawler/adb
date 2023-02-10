@@ -1,12 +1,12 @@
 {
     "player": false,
     "starting_ts": -1,
-    "dt": 5e-3,
-    "max_iter": 1000,
+    "dt": 1e-2,
+    "max_iter": 100,
     "predefined_case" : {
         "enable": false,
         "id" : 2,
-        "custom": "../test_cases/chains.json"
+        "custom": "../test_cases/cards.json"
     },
     "solver": "sparse",
     "gravity": true, 
@@ -14,12 +14,12 @@
     "col_set": true,
     "ee": true,
     "pt": true,
-    "ground": false,
+    "ground": true,
     "safe_factor": 1.0,
     "uppper_bound": true, 
-    "mu": 0.0,
+    "mu": 0.4,
     "log": true,
-    "backoff": 0.95,
+    "backoff": 0.8,
     "damping": {
         "enable": false,
         "alpha": 2.3e-2,
@@ -27,7 +27,7 @@
     },
     "eps_x": 1e-3,
     "psd": true,
-    "spatial hashing": {
+    "_spatial hashing": {
         "min_xyz": -5.0,
         "max_xyz": 5.0,
         "dx": 0.12,
@@ -35,12 +35,12 @@
         "xyz_bits": 7,
         "set_size": 1
     },
-    "_spatial hashing": {
+    "spatial hashing": {
         "min_xyz": -10.0,
-        "max_xyz": 10.0,
-        "dx": 0.8,
+        "max_xyz": 20.0,
+        "dx": 1.6,
         "n_buffer": 256,
-        "xyz_bits": 6,
+        "xyz_bits": 7,
         "set_size": 1
     },
     "full_ccd": true,
