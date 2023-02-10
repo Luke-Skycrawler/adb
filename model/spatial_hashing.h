@@ -9,13 +9,23 @@ using mat3 = Eigen::Matrix3d;
 using vec3 = Eigen::Vector3d;
 
 using element_type = unsigned short;
-struct Primitive {
-    element_type pid, body;
-    inline bool operator==(const Primitive &b){
-        return pid == b.pid && body == b.body;
+union Primitive {
+    struct {
+        element_type pid, body;
+    } pbody;
+    unsigned as_uint;
+    Primitive(unsigned u)
+        : as_uint(u) {}
+    Primitive()
+        : as_uint(0) {}
+    Primitive(element_type p, element_type b)
+        : pbody({ p, b }) {}
+    inline bool operator==(const Primitive& b)
+    {
+            return as_uint == b.as_uint;
     }
     inline bool operator<(const Primitive& b) {
-        return body< b.body || (body == b.body && pid< b.pid);
+        return as_uint < b.as_uint;
     }
 };
 using BodyGroup = std::map<unsigned, std::unique_ptr<std::vector<unsigned>>>;
@@ -35,6 +45,7 @@ struct spatial_hashing {
     std::unordered_set<unsigned>* sets;
     std::vector<Primitive> *collisions;
     const int vec3_compressed_bits, n_entries, n_overflow_buffer, n_l1_bitmap, n_l2_bitmap, n_buffer, set_size;
+    element_type * count_non_atomic;
     std::atomic<element_type>* count, count_overflow;
     Primitive *overflow, *hashtable;
 

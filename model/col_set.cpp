@@ -127,13 +127,14 @@ void gen_collision_set(
             vec3 p = ci.v_transformed[v];
             globals.sh->register_vertex(p, I, v);
         }
+        globals.sh -> remove_all_entries();
 #pragma omp parallel
         {
             vector<array<vec3, 4>> pts_private;
             vector<array<int, 4>> idx_private;
             vector<Matrix<double, 2, 12>> pt_tk_private;
 
-#pragma omp for schedule(static) nowait
+#pragma omp for schedule(guided) nowait
             for (int j = 0; j < n_triangles; j++) {
                 auto idx{ globals.triangles[j] };
                 auto J{ idx[0] };
@@ -144,7 +145,8 @@ void gen_collision_set(
                 auto& collisions {globals.sh->collisions[omp_get_thread_num()]};
 
                 globals.sh->query_triangle(_f.t0, _f.t1, _f.t2, J, barrier::d_sqrt * globals.safe_factor, collisions);
-                for (auto& c : collisions) {
+                for (auto& _c : collisions) {
+                    auto& c{ _c.pbody };
                     unsigned I = c.body, v = c.pid;
                     vec3 p = cubes[I]->v_transformed[v];
                     ipc::PointTriangleDistanceType pt_type;
@@ -178,7 +180,7 @@ void gen_collision_set(
         }
 
 #endif
-        globals.sh -> remove_all_entries();
+        // globals.sh -> remove_all_entries();
 #else
 #pragma omp parallel for schedule(static)
         for (int I = 0; I < nsqr; I++) {
@@ -306,6 +308,8 @@ void gen_collision_set(
         }
 
         // size_t* cnt;
+        globals.sh -> remove_all_entries();
+
 #pragma omp parallel
         {
             // int ithread = omp_get_thread_num();
@@ -319,7 +323,7 @@ void gen_collision_set(
 //                 cnt = new size_t[nthreads + 1];
 //                 cnt[0] = 0;
 //             }
-#pragma omp for schedule(static) nowait
+#pragma omp for schedule(guided) nowait
             for (int j = 0; j < n_edges; j++) {
                 auto idx{ globals.edges[j] };
                 auto J{ idx[0] }, ej{ idx[1] };
@@ -328,7 +332,8 @@ void gen_collision_set(
                 // vector<Primitive> collisions;
                 auto& collisions {globals.sh->collisions[omp_get_thread_num()]};
                 globals.sh->query_edge(e.e0, e.e1, J, barrier::d_sqrt * globals.safe_factor, collisions);
-                for (auto& c : collisions) {
+                for (auto& _c : collisions) {
+                    auto& c{ _c.pbody };
                     unsigned I = c.body, ei = c.pid;
                     if (I > J) continue;
                     Edge _ei{ *cubes[I], ei, vt2, vt2 };
@@ -362,7 +367,7 @@ void gen_collision_set(
 #endif
         }
 #endif
-        globals.sh -> remove_all_entries();
+        // globals.sh -> remove_all_entries();
 #else
         for (int i = 0; i < n_cubes; i++)
             for (int j = i + 1; j < n_cubes; j++) {

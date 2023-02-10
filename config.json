@@ -2,11 +2,11 @@
     "player": false,
     "starting_ts": -1,
     "dt": 5e-3,
-    "max_iter": 100,
+    "max_iter": 1000,
     "predefined_case" : {
         "enable": false,
         "id" : 2,
-        "custom": "../test_cases/static_friction.json"
+        "custom": "../test_cases/chains.json"
     },
     "solver": "sparse",
     "gravity": true, 
@@ -14,11 +14,11 @@
     "col_set": true,
     "ee": true,
     "pt": true,
-    "ground": true,
+    "ground": false,
     "safe_factor": 1.0,
     "uppper_bound": true, 
-    "mu": 0.28,
-    "log": false,
+    "mu": 0.0,
+    "log": true,
     "backoff": 0.95,
     "damping": {
         "enable": false,
@@ -27,21 +27,21 @@
     },
     "eps_x": 1e-3,
     "psd": true,
-    "_spatial hashing": {
+    "spatial hashing": {
         "min_xyz": -5.0,
         "max_xyz": 5.0,
-        "dx": 0.08,
-        "n_buffer": 128,
-        "xyz_bits": 7,
-        "set_size": 8
-    },
-    "spatial hashing": {
-        "min_xyz": -10.0,
-        "max_xyz": 10.0,
-        "dx": 0.4,
+        "dx": 0.12,
         "n_buffer": 256,
         "xyz_bits": 7,
-        "set_size": 4
+        "set_size": 1
+    },
+    "_spatial hashing": {
+        "min_xyz": -10.0,
+        "max_xyz": 10.0,
+        "dx": 0.8,
+        "n_buffer": 256,
+        "xyz_bits": 6,
+        "set_size": 1
     },
     "full_ccd": true,
     "align_com": false,

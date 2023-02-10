@@ -91,11 +91,12 @@ double step_size_upper_bound(VectorXd& dq, vector<unique_ptr<AffineBody>>& cubes
                 vec3 p0 = ci.vt1(v);
                 globals.sh->register_edge(p0, p1, idx[0], v);
             }
+            globals.sh->remove_all_entries();
 
 #pragma omp parallel
             {
                 double toi_private = 1.0;
-#pragma omp for schedule(static)
+#pragma omp for schedule(guided)
                 for (int J = 0; J < n_triangles; J++) {
                     auto& idx = globals.triangles[J];
 
@@ -108,7 +109,8 @@ double step_size_upper_bound(VectorXd& dq, vector<unique_ptr<AffineBody>>& cubes
                         f0.t0, f0.t1, f0.t2,
                         f1.t0, f1.t1, f1.t2,
                         idx[0], collisions);
-                    for (auto& c : collisions) {
+                    for (auto& _c : collisions) {
+                        auto& c{ _c.pbody };
                         unsigned I = c.body, v = c.pid;
                         vec3 p1 = cubes[I]->v_transformed[v];
                         vec3 p0 = cubes[I]->vt1(v);
@@ -121,7 +123,7 @@ double step_size_upper_bound(VectorXd& dq, vector<unique_ptr<AffineBody>>& cubes
                 toi = min(toi_private, toi);
             }
 #endif
-            globals.sh->remove_all_entries();
+            // globals.sh->remove_all_entries();
         }
         if (globals.ee) {
 #ifdef _BODY_LEVEL_
@@ -170,11 +172,12 @@ double step_size_upper_bound(VectorXd& dq, vector<unique_ptr<AffineBody>>& cubes
                 Edge e0{ ci, ei, false };
                 globals.sh->register_edge_trajectory(e0.e0, e0.e1, e1.e0, e1.e1, idx[0], ei);
             }
+            globals.sh->remove_all_entries();
 
 #pragma omp parallel
             {
                 double toi_private = 1.0;
-#pragma omp for schedule(static)
+#pragma omp for schedule(guided)
                 for (int J = 0; J < n_edges; J++) {
                     auto& idx(globals.edges[J]);
 
@@ -187,7 +190,8 @@ double step_size_upper_bound(VectorXd& dq, vector<unique_ptr<AffineBody>>& cubes
 
                     globals.sh->query_edge_trajectory(e0.e0, e0.e1, e1.e0, e1.e1, idx[0], collisions);
 
-                    for (auto& c : collisions) {
+                    for (auto& _c : collisions) {
+                        auto &c{ _c.pbody };
                         unsigned I = c.body, ei = c.pid;
                         if (I > idx[0]) continue;
                         Edge ei1{ *cubes[I], ei, true, true };
@@ -201,7 +205,7 @@ double step_size_upper_bound(VectorXd& dq, vector<unique_ptr<AffineBody>>& cubes
             }
 
 #endif
-            globals.sh->remove_all_entries();
+            // globals.sh->remove_all_entries();
         }
         auto _duration = DURATION_TO_DOUBLE(start);
         spdlog::info("time: step size upper bound = {:0.6f} ms", _duration * 1000);
