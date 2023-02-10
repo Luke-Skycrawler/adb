@@ -73,7 +73,7 @@ void spatial_hashing::query_interval(const vec3i& l, const vec3i& u, element_typ
     // unordered_set<Primitive, decltype(cmp)> ret(cmp);
     auto tid = omp_get_thread_num();
     unordered_set<unsigned>& ret = sets[tid];
-
+    val.resize(0);
     ret.clear();
     // ret.reserve(n_buffer * set_size);
     // ret.max_load_factor(0.5);
@@ -89,7 +89,8 @@ void spatial_hashing::query_interval(const vec3i& l, const vec3i& u, element_typ
                     // unsigned ele = (static_cast<unsigned>(p.body) << 16) | static_cast<unsigned>(p.pid);
                     auto ele = hashtable[offset].as_uint;
                     if (p.body != body_exl  && ret.find(ele)== ret.end()) {
-                        ret.insert(ele);
+                        // ret.insert(ele);
+                        val.push_back({ele});
                     }
                 }
                 if (cnt >= n_buffer) {
@@ -101,14 +102,17 @@ void spatial_hashing::query_interval(const vec3i& l, const vec3i& u, element_typ
                         auto o = overflow[i].pbody;
                         auto ele = overflow[i].as_uint;
                         if (o.body != body_exl)
-                            ret.insert(ele);
+                            // ret.insert(ele);
+                            val.push_back({ele});
                     }
                 }
             }
+
+    std::sort(val.begin(), val.end());
+    val.erase(std::unique(val.begin(), val.end()), val.end());
     // val.reserve(ret.size());
-    val.resize(0);
     // for (auto& a : ret) val.push_back({ static_cast<element_type>(a & 0xffff), static_cast<element_type>(a >> 16) });
-    for (auto& a : ret) val.push_back({ a });
+    // for (auto& a : ret) val.push_back({ a });
 }
 
 void spatial_hashing::remove_all_entries()

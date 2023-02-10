@@ -96,6 +96,7 @@ double step_size_upper_bound(VectorXd& dq, vector<unique_ptr<AffineBody>>& cubes
 #pragma omp parallel
             {
                 double toi_private = 1.0;
+                vector<Primitive> & collisions {globals.sh -> collisions[omp_get_thread_num()]};
 #pragma omp for schedule(guided)
                 for (int J = 0; J < n_triangles; J++) {
                     auto& idx = globals.triangles[J];
@@ -104,7 +105,7 @@ double step_size_upper_bound(VectorXd& dq, vector<unique_ptr<AffineBody>>& cubes
                     unsigned f = idx[1];
                     Face f0(cj, f, false);
                     Face f1(cj, f, true, true);
-                    vector<Primitive> collisions;
+                    // vector<Primitive> collisions;
                     globals.sh->query_triangle_trajectory(
                         f0.t0, f0.t1, f0.t2,
                         f1.t0, f1.t1, f1.t2,
@@ -177,6 +178,7 @@ double step_size_upper_bound(VectorXd& dq, vector<unique_ptr<AffineBody>>& cubes
 #pragma omp parallel
             {
                 double toi_private = 1.0;
+                vector<Primitive> & collisions {globals.sh -> collisions[omp_get_thread_num()]};
 #pragma omp for schedule(guided)
                 for (int J = 0; J < n_edges; J++) {
                     auto& idx(globals.edges[J]);
@@ -186,7 +188,7 @@ double step_size_upper_bound(VectorXd& dq, vector<unique_ptr<AffineBody>>& cubes
                     Edge e1{ cj, ej, true, true };
 
                     Edge e0{ cj, ej, false };
-                    vector<Primitive> collisions;
+                    // vector<Primitive> collisions;
 
                     globals.sh->query_edge_trajectory(e0.e0, e0.e1, e1.e0, e1.e1, idx[0], collisions);
 
