@@ -1,4 +1,5 @@
 #include "tests.h"
+#include "../model/geometry.h"
 #include <nlohmann/json.hpp>
 #include <fstream>
 #define _USE_MATH_DEFINES
@@ -7,40 +8,7 @@
 using namespace std;
 using json = nlohmann::json;
 
-mat3 rotation(double a, double b, double c)
-{
-    auto s1 = sin(a);
-    auto s2 = sin(b);
-    auto s3 = sin(c);
 
-    auto c1 = cos(a);
-    auto c2 = cos(b);
-    auto c3 = cos(c);
-
-    mat3 R;
-    R << c1 * c2, c1 * s2 * s3 - c3 * s1, s1 * s3 + c1 * c3 * s2,
-        c2 * s1, c1 * c3 + s1 * s2 * s3, c3 * s1 * s2 - c1 * s3,
-        -s2, c2 * s3, c2 * c3;
-    // R = R.transpose();
-    return R;
-}
-
-inline mat3 cross_matrix(const vec3& a)
-{
-    mat3 ret;
-    ret << 0, -a[2], a[1],
-        a[2], 0, -a[0],
-        -a[1], a[0], 0;
-    return ret;
-}
-inline array<vec3, 4> skew(const vec3& a)
-{
-    return {
-        -vec3(0, -a[2], a[1]),
-        -vec3(a[2], 0, -a[0]),
-        -vec3(-a[1], a[0], 0)
-    };
-}
 static const vec3 omega(0.0, 0.0, 20.0);
 unique_ptr<Cube> spinning_cube()
 {

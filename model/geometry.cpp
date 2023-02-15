@@ -230,3 +230,21 @@ double ee_distance(const Edge& ei, const Edge& ej)
     d = d * d + _d * _d;
     return d;
 }
+
+mat3 rotation(double a, double b, double c)
+{
+    auto s1 = sin(a);
+    auto s2 = sin(b);
+    auto s3 = sin(c);
+
+    auto c1 = cos(a);
+    auto c2 = cos(b);
+    auto c3 = cos(c);
+
+    mat3 R;
+    R << c1 * c2, c1 * s2 * s3 - c3 * s1, s1 * s3 + c1 * c3 * s2,
+        c2 * s1, c1 * c3 + s1 * s2 * s3, c3 * s1 * s2 - c1 * s3,
+        -s2, c2 * s3, c2 * c3;
+    // R = R.transpose();
+    return R;
+}
