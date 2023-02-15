@@ -3,7 +3,6 @@
 #include "geometry.h"
 #include <memory>
 #include <array>
-#include <set>
 #include <algorithm>
 #include <ipc/distance/point_triangle.hpp>
 #include <ipc/distance/edge_edge.hpp>
@@ -40,9 +39,9 @@ lu affine(const lu& aabb, q4& q)
         for (int j = 0; j < 2; j++)
             for (int k = 0; k < 2; k++) {
                 auto I = (i << 2) | (j << 1) | k;
-                cull(I, 0) = i ? u(0) : l(0);
-                cull(I, 1) = j ? u(1) : l(1);
-                cull(I, 2) = k ? u(2) : l(2);
+                cull(0, I) = i ? u(0) : l(0);
+                cull(1, I) = j ? u(1) : l(1);
+                cull(2, I) = k ? u(2) : l(2);
             }
     mat3 A;
     A << q[1], q[2], q[3];
@@ -73,8 +72,8 @@ lu affine(lu aabb, AffineBody& c, int vtn)
 void intersect_brute_force(
     int n_cubes,
     const std::vector<std::unique_ptr<AffineBody>>& cubes,
-    const std::vector<lu> aabbs,
-    std::vector<Intersection> ret,
+    const std::vector<lu>& aabbs,
+    std::vector<Intersection> &ret,
     int vtn)
 {
     ret.resize(0);
@@ -89,6 +88,7 @@ void intersect_brute_force(
             lu c;
             if (intersection(bi, bj, c)) {
                 ret.push_back({ i, j, c });
+                ret.push_back({ j, i, c });
             }
         }
 }
@@ -96,12 +96,13 @@ void intersect_brute_force(
 void intersect_sort(
     int n_cubes,
     const std::vector<std::unique_ptr<AffineBody>>& cubes,
-    const std::vector<lu> aabbs,
-    std::vector<Intersection> ret,
+    const std::vector<lu> &aabbs,
+    std::vector<Intersection> &ret,
     int vtn)
 {
     ret.resize(0);
     vector<BoundingBox> bounds[3];
+    vector<Intersection> ilists[3];
     for (int dim = 0; dim < 3; dim++) {
         bounds[dim].resize(n_cubes * 2);
         for (int i = 0; i < n_cubes; i++) {
@@ -111,28 +112,39 @@ void intersect_sort(
             bounds[dim][i * 2 + 1] = { i, u(dim), false };
         }
         sort(bounds[dim].begin(), bounds[dim].end(), [](const BoundingBox& a, const BoundingBox& b) { return a.p < b.p; });
-        set<int> active;
+        vector<int> active;
         for (int i = 0; i < n_cubes * 2; i++) {
             auto& b{ bounds[dim][i] };
             auto body = b.body;
             if (b.true_for_l_false_for_u)
-                active.insert(body);
+                active.push_back(body);
             else {
-                for (auto c : active) {
+                for (auto it = active.begin(); it != active.end(); ) {
+                    if (*it == body) {
+                        it = active.erase(it);
+                        continue;
+                    }
+                    auto c{ *it };
                     lu cull;
                     auto bi = affine(aabbs[c], *cubes[c], vtn);
                     auto bj = affine(aabbs[body], *cubes[body], vtn);
-
+                    
                     intersection(bi, bj, cull);
                     // ret.push_back({ min(c, body), max(c, body), cull });
-                    ret.push_back({ c, body, cull });
-                    ret.push_back({ body, c, cull });
+                    ilists[dim].push_back({ c, body, cull });
+                    ilists[dim].push_back({ body, c, cull });
+                    ++it;
                 }
-                auto it = active.find(body);
-                active.erase(it);
             }
         }
+        const auto les = [](const Intersection& a, const Intersection& b) -> bool {
+            return a.i < b.i || (a.i == b.i && a.j < b.j);
+        };
+        sort(ilists[dim].begin(), ilists[dim].end(), les);
     }
+    vector<Intersection> tmp;
+    std::set_intersection(ilists[0].begin(), ilists[0].end(), ilists[1].begin(), ilists[1].end(), std::back_inserter(tmp)); 
+    std::set_intersection(tmp.begin(), tmp.end(), ilists[2].begin(), ilists[2].end(), std::back_inserter(ret)); 
 }
 
 inline bool filter_if_inside(lu& a, vec3& p)

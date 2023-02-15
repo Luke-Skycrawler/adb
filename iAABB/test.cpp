@@ -35,7 +35,7 @@ TEST(body_level, compute_intersection_against_brute_force)
         for (int i = 0; i < 3; i++) a->q[i + 1] = r.col(i);
         a->q[0] = vec3(p0, p1, p2);
         auto b = compute_aabb(*a);
-        aabbs.push_back(b);
+        aabbs[i] = b;
         cubes.push_back(move(a));
     }
     vector<Intersection> overlaps_bf, overlaps_sort;
@@ -46,6 +46,10 @@ TEST(body_level, compute_intersection_against_brute_force)
     };
     std::sort(overlaps_bf.begin(), overlaps_bf.end(), les);
     std::sort(overlaps_sort.begin(), overlaps_sort.end(), les);
+    //for (int i = 0; i < n_cubes; i++) {
+    //    cout << aabbs[i][0].transpose() << " , " << aabbs[i][1].transpose() << " , ";
+    //}
+    cout << "size: bf = " << overlaps_bf.size() << " sort = " << overlaps_sort.size() << "\n";
     EXPECT_EQ(overlaps_bf.size(), overlaps_sort.size())
         << "size mismatch"
         << "\n";

@@ -36,6 +36,10 @@
     <IncludePath>D:\ref_repos\ipc-toolkit\src;$(IncludePath)</IncludePath>
     <LibraryPath>D:\ref_repos\ipc-toolkit\build\temp.win-amd64-cpython-38\Release\ipctk\Release;$(LibraryPath)</LibraryPath>
   </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
+    <IncludePath>D:\ref_repos\ipc-toolkit\src;$(IncludePath)</IncludePath>
+    <LibraryPath>D:\ref_repos\ipc-toolkit\build\temp.win-amd64-cpython-38\Release\ipctk\Release;$(LibraryPath)</LibraryPath>
+  </PropertyGroup>
   <ItemGroup>
     <ClInclude Include="..\model\iaabb.h" />
     <ClInclude Include="pch.h" />

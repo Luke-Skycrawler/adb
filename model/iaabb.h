@@ -33,12 +33,12 @@ lu affine(lu aabb, AffineBody& c, int vtn);
 void intersect_brute_force(
     int n_cubes,
     const std::vector<std::unique_ptr<AffineBody>>& cubes,
-    const std::vector<lu> aabbs,
-    std::vector<Intersection> ret,
+    const std::vector<lu> &aabbs,
+    std::vector<Intersection> &ret,
     int vtn);
 void intersect_sort(
     int n_cubes,
     const std::vector<std::unique_ptr<AffineBody>>& cubes,
-    const std::vector<lu> aabbs,
-    std::vector<Intersection> ret,
+    const std::vector<lu> &aabbs,
+    std::vector<Intersection> &ret,
     int vtn);
