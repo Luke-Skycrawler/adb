@@ -10,6 +10,9 @@
 #include "time_integrator.h"
 #ifndef TESTING
 #include "../view/global_variables.h"
+#define DT globals.dt
+#else 
+#define DT 1e-2
 #endif
 using namespace std;
 using namespace Eigen;
@@ -28,6 +31,21 @@ lu compute_aabb(const AffineBody& c)
             u = u.array().max(p.array());
         }
     }
+    return { l, u };
+}
+lu compute_aabb(const Edge& e)
+{
+    vec3 l, u;
+    l = e.e0.array().min(e.e1.array());
+    u = e.e0.array().max(e.e1.array());
+    return { l, u };
+}
+
+lu compute_aabb(const Face& f)
+{
+    vec3 l, u;
+    l = f.t0.array().min(f.t1.array()).min(f.t2.array());
+    u = f.t0.array().max(f.t1.array()).max(f.t2.array());
     return { l, u };
 }
 
@@ -145,6 +163,8 @@ void intersect_sort(
     vector<Intersection> tmp;
     std::set_intersection(ilists[0].begin(), ilists[0].end(), ilists[1].begin(), ilists[1].end(), std::back_inserter(tmp)); 
     std::set_intersection(tmp.begin(), tmp.end(), ilists[2].begin(), ilists[2].end(), std::back_inserter(ret)); 
+    // TODO: change bounds[3] to static for reuse; 
+    // TODO: O(n) insertion sort 
 }
 
 inline bool filter_if_inside(lu& a, vec3& p)
@@ -154,187 +174,190 @@ inline bool filter_if_inside(lu& a, vec3& p)
 }
 inline bool filter_if_inside(lu& a, Edge& e)
 {
-    bool b1 = filter_if_inside(a, e.e0),
-         b2 = filter_if_inside(a, e.e1);
-    return b1 || b2;
-    // FIXME: true if bounding box intersects
+    lu ret;
+    return intersection(a, compute_aabb(e), ret);
+    // bool b1 = filter_if_inside(a, e.e0),
+    //      b2 = filter_if_inside(a, e.e1);
+    // return b1 || b2;
 }
 inline bool filter_if_inside(lu& a, Face& f)
 {
-    return filter_if_inside(a, f.t0) || filter_if_inside(a, f.t1) || filter_if_inside(a, f.t2);
-    // FIXME:
+    lu ret;
+    return intersection(a, compute_aabb(f), ret);
+    // return filter_if_inside(a, f.t0) || filter_if_inside(a, f.t1) || filter_if_inside(a, f.t2);
 }
 
-//void primitive_brute_force(
-//    int n_cubes,
-//    const std::vector<Intersection>& overlaps,
-//    const std::vector<std::unique_ptr<AffineBody>>& cubes,
-//    int vtn,
-//    std::vector<int>* ovi,
-//    std::vector<int>* ovj,
-//    std::vector<int>* oei,
-//    std::vector<int>* oej,
-//    std::vector<int>* ofi,
-//    std::vector<int>* ofj,
-//    vector<array<vec3, 4>>& pts,
-//    vector<array<int, 4>>& idx,
-//    vector<array<vec3, 4>>& ees,
-//    vector<array<int, 4>>& eidx,
-//    vector<array<int, 2>>& vidx,
-//    vector<Matrix<double, 2, 12>>& pt_tk,
-//    vector<Matrix<double, 2, 12>>& ee_tk,
-//    bool gen_basis)
-//{
-//    Intersection a{ 0, 0, lu{ vec3(0.0, 0.0, 0.0), vec3(0.0, 0.0, 0.0) } }, b;
-//    b = a;
-//    bool t = b == a, t1 = b < a;
-//    //std::sort(overlaps.begin(), overlaps.end(),
-//    //    [](const Intersection& a, const Intersection &b) -> bool{
-//    //        return a.i < b.i || (a.i == b.i && a.j < b.j);
-//    //    });
-//
-//    int n_overlap = overlaps.size();
-//    // vector<int>*ov, *oei, *oej, *of;
-//
-//    ovi = new vector<int>[n_overlap];
-//    ovj = new vector<int>[n_overlap];
-//    oei = new vector<int>[n_overlap];
-//    oej = new vector<int>[n_overlap];
-//    ofi = new vector<int>[n_overlap];
-//    ofj = new vector<int>[n_overlap];
-//
-//    int* starting = new int[n_cubes + 1];
-//    starting[n_cubes] = n_overlap;
-//
-//    int old_cube_index = 0;
-//    for (int i = 0; i < n_overlap; i++) {
-//
-//        auto& o{ overlaps[i] };
-//        if (o.i != old_cube_index) {
-//            for (int j = old_cube_index + 1; j <= o.i; j++)
-//                starting[j] = i;
-//            old_cube_index = o.i;
-//        }
-//    }
-//
-//    for (int I = 0; I < n_cubes; I++) {
-//        // construct the vertex, edge, and triangle list inside each overlap
-//        auto& c{ *cubes[I] };
-//        switch (vtn) {
-//        case 0: c.project_vt0(); break;
-//        case 1: c.project_vt1(); break;
-//        default: c.project_vt2();
-//        }
-//        for (int v = 0; v < c.n_vertices; v++) {
-//            auto& p{ c.v_transformed[v] };
-//            for (int o = starting[I]; o < starting[I + 1]; o++) {
-//                lu cull = overlaps[o].cull;
-//
-//                if (filter_if_inside(cull, p)) {
-//                    auto t{ overlaps[o] };
-//
-//                    if (t.i < t.j)
-//                        ovi[o].push_back(v);
-//                    else
-//                        ovj[o].push_back(v);
-//                }
-//            }
-//        }
-//
-//        for (int e = 0; e < c.n_edges; e++) {
-//            Edge ei{ c, unsigned(e), true, true };
-//            // TODO: always intialize from v_transformed
-//
-//            for (int o = starting[I]; o < starting[I + 1]; o++) {
-//                lu cull = overlaps[o].cull;
-//
-//                if (filter_if_inside(cull, ei)) {
-//                    auto t{ overlaps[o] };
-//                    if (t.i < t.j)
-//                        oei[o].push_back(e);
-//                    else
-//                        oej[o].push_back(e);
-//                }
-//            }
-//        }
-//
-//        for (int f = 0; f < c.n_vertices; f++) {
-//            Face fi{ c, unsigned(f), true, true };
-//            // TODO: always intialize from v_transformed
-//            for (int o = starting[I]; o < starting[I + 1]; o++) {
-//                lu cull = overlaps[o].cull;
-//
-//                if (filter_if_inside(cull, fi)) {
-//                    auto t{ overlaps[o] };
-//                    if (t.i < t.j)
-//                        ofi[o].push_back(f);
-//                    else
-//                        ofj[o].push_back(f);
-//                }
-//            }
-//        }
-//    }
-//
-//    for (int i = 0; i < n_overlap; i++) {
-//        int I{ overlaps[i].i }, J{ overlaps[i].j };
-//        auto &ci{ *cubes[I] }, &cj{ *cubes[J] };
-//        auto& vilist{ ovi[i] };
-//        auto& vjlist{ ovi[i] };
-//        auto& eilist{ oei[i] };
-//        auto& ejlist{ oej[i] };
-//        auto& filist{ ofi[i] };
-//        auto& fjlist{ ofj[i] };
-//        const auto vf_col_set = [&](vector<int>& vilist, vector<int>& fjlist,
-//                                    const std::vector<std::unique_ptr<AffineBody>>& cubes) {
-//            for (int vi : vilist)
-//                for (int fj : fjlist) {
-//                    vec3 v{ ci.v_transformed[vi] };
-//                    Face f{ cj, unsigned(fj), true, true };
-//                    ipc::PointTriangleDistanceType pt_type;
-//                    double d = vf_distance(v, f, pt_type);
-//                    if (d < barrier::d_hat) {
-//                        array<vec3, 4> pt = { v, f.t0, f.t1, f.t2 };
-//                        array<int, 4> ij = { I, vi, J, fj };
-//                        Matrix<double, 2, 12> Tk_T;
-//                        Tk_T.setZero(2, 12);
-//                        Vector2d uk;
-//                        if (gen_basis)
-//                            pt_uktk(*cubes[I], cj, pt, ij, pt_type, Tk_T, uk, d, globals.dt);
-//                        {
-//                            pts.push_back(pt);
-//                            idx.push_back(ij);
-//#ifdef _FRICTION_
-//                            pt_tk.push_back(Tk_T);
-//#endif
-//                        }
-//                    }
-//                }
-//        };
-//        for (auto ei : eilist)
-//            for (auto ej : ejlist) {
-//                Edge eii{ ci, unsigned(ei), true, true };
-//                Edge ejj{ cj, unsigned(ej), true, true };
-//
-//                auto ee_type = ipc::edge_edge_distance_type(eii.e0, eii.e1, ejj.e0, ejj.e1);
-//                double d = ipc::edge_edge_distance(eii.e0, eii.e1, ejj.e0, ejj.e1, ee_type);
-//                if (d < barrier::d_hat) {
-//                    array<vec3, 4> ee = { eii.e0, eii.e1, ejj.e0, ejj.e1 };
-//                    array<int, 4> ij = { I, ei, J, ej };
-//                    Matrix<double, 2, 12> Tk_T;
-//                    Tk_T.setZero(2, 12);
-//                    Vector2d uk;
-//                    if (gen_basis)
-//                        ee_uktk(*cubes[I], cj, ee, ij, ee_type, Tk_T, uk, d, globals.dt);
-//                    {
-//                        ees.push_back(ee);
-//                        eidx.push_back(ij);
-//#ifdef _FRICTION_
-//                        ee_tk.push_back(Tk_T);
-//#endif
-//                    }
-//                }
-//                vf_col_set(vilist, fjlist, cubes);
-//                vf_col_set(vjlist, filist, cubes);
-//            }
-//    }
-//}
+void primitive_brute_force(
+   int n_cubes,
+   const std::vector<Intersection>& overlaps,   // assert sorted
+   const std::vector<std::unique_ptr<AffineBody>>& cubes,
+   int vtn,
+   vector<array<vec3, 4>>& pts,
+   vector<array<int, 4>>& idx,
+   vector<array<vec3, 4>>& ees,
+   vector<array<int, 4>>& eidx,
+   vector<array<int, 2>>& vidx,
+   vector<Matrix<double, 2, 12>>& pt_tk,
+   vector<Matrix<double, 2, 12>>& ee_tk,
+   bool gen_basis)
+{
+   //Intersection a{ 0, 0, lu{ vec3(0.0, 0.0, 0.0), vec3(0.0, 0.0, 0.0) } }, b;
+   //b = a;
+   //bool t = b == a, t1 = b < a;
+    //const auto les = [](const Intersection &a, const Intersection&b) ->bool {
+    //    return a.i < b.i || (a.i == b.i && a.j < b.j);
+    //};
+    //sort(overlaps.begin(), overlaps.end(), les);
+
+   int n_overlap = overlaps.size();
+   // vector<int>*ov, *oei, *oej, *of;
+
+   auto  ovi = new vector<int>[n_overlap];
+   auto  ovj = new vector<int>[n_overlap];
+   auto  oei = new vector<int>[n_overlap];
+   auto  oej = new vector<int>[n_overlap];
+   auto  ofi = new vector<int>[n_overlap];
+   auto  ofj = new vector<int>[n_overlap];
+
+   vector<int>  starting;
+   starting.resize(n_cubes + 1);
+   starting[n_cubes] = n_overlap;
+   starting[0] = 0;
+
+   int old_cube_index = 0;
+   for (int i = 0; i < n_overlap; i++) {
+
+       auto& o{ overlaps[i] };
+       if (o.i != old_cube_index) {
+           for (int j = old_cube_index + 1; j <= o.i; j++)
+               starting[j] = i;
+           old_cube_index = o.i;
+       }
+   }
+
+   for (int I = 0; I < n_cubes; I++) {
+       // construct the vertex, edge, and triangle list inside each overlap
+       auto& c{ *cubes[I] };
+       switch (vtn) {
+       case 0: c.project_vt0(); break;
+       case 1: c.project_vt1(); break;
+       default: c.project_vt2();
+       }
+       for (int v = 0; v < c.n_vertices; v++) {
+           auto& p{ c.v_transformed[v] };
+           for (int o = starting[I]; o < starting[I + 1]; o++) {
+               lu cull = overlaps[o].cull;
+
+               if (filter_if_inside(cull, p)) {
+                   auto t{ overlaps[o] };
+
+                   if (t.i < t.j)
+                       ovi[o].push_back(v);
+                   else
+                       ovj[o].push_back(v);
+               }
+           }
+       }
+
+       for (int e = 0; e < c.n_edges; e++) {
+           Edge ei{ c, unsigned(e), true, true };
+           // TODO: always intialize from v_transformed
+
+           for (int o = starting[I]; o < starting[I + 1]; o++) {
+               lu cull = overlaps[o].cull;
+
+               if (filter_if_inside(cull, ei)) {
+                   auto t{ overlaps[o] };
+                   if (t.i < t.j)
+                       oei[o].push_back(e);
+                   else
+                       oej[o].push_back(e);
+               }
+           }
+       }
+
+       for (int f = 0; f < c.n_faces; f++) {
+           Face fi{ c, unsigned(f), true, true };
+           // TODO: always intialize from v_transformed
+           for (int o = starting[I]; o < starting[I + 1]; o++) {
+               lu cull = overlaps[o].cull;
+
+               if (filter_if_inside(cull, fi)) {
+                   auto t{ overlaps[o] };
+                   if (t.i < t.j)
+                       ofi[o].push_back(f);
+                   else
+                       ofj[o].push_back(f);
+               }
+           }
+       }
+   }
+
+   for (int i = 0; i < n_overlap; i++) {
+       int I{ overlaps[i].i }, J{ overlaps[i].j };
+       auto &ci{ *cubes[I] }, &cj{ *cubes[J] };
+       auto& vilist{ ovi[i] };
+       auto& vjlist{ ovi[i] };
+       auto& eilist{ oei[i] };
+       auto& ejlist{ oej[i] };
+       auto& filist{ ofi[i] };
+       auto& fjlist{ ofj[i] };
+       const auto vf_col_set = [&](vector<int>& vilist, vector<int>& fjlist,
+                                   const std::vector<std::unique_ptr<AffineBody>>& cubes) {
+           for (int vi : vilist)
+               for (int fj : fjlist) {
+                   vec3 v{ ci.v_transformed[vi] };
+                   Face f{ cj, unsigned(fj), true, true };
+                   ipc::PointTriangleDistanceType pt_type;
+                   double d = vf_distance(v, f, pt_type);
+                   if (d < barrier::d_hat) {
+                       array<vec3, 4> pt = { v, f.t0, f.t1, f.t2 };
+                       array<int, 4> ij = { I, vi, J, fj };
+                       Matrix<double, 2, 12> Tk_T;
+                       Tk_T.setZero(2, 12);
+                       Vector2d uk;
+                       #ifndef TESTING
+                       if (gen_basis)
+                           pt_uktk(*cubes[I], cj, pt, ij, pt_type, Tk_T, uk, d, DT);
+                       #endif
+                       {
+                           pts.push_back(pt);
+                           idx.push_back(ij);
+#ifdef _FRICTION_
+                           pt_tk.push_back(Tk_T);
+#endif
+                       }
+                   }
+               }
+       };
+       for (auto ei : eilist)
+           for (auto ej : ejlist) {
+               Edge eii{ ci, unsigned(ei), true, true };
+               Edge ejj{ cj, unsigned(ej), true, true };
+
+               auto ee_type = ipc::edge_edge_distance_type(eii.e0, eii.e1, ejj.e0, ejj.e1);
+               double d = ipc::edge_edge_distance(eii.e0, eii.e1, ejj.e0, ejj.e1, ee_type);
+               if (d < barrier::d_hat) {
+                   array<vec3, 4> ee = { eii.e0, eii.e1, ejj.e0, ejj.e1 };
+                   array<int, 4> ij = { I, ei, J, ej };
+                   Matrix<double, 2, 12> Tk_T;
+                   Tk_T.setZero(2, 12);
+                   Vector2d uk;
+                   #ifndef TESTING
+                   if (gen_basis)
+                       ee_uktk(*cubes[I], cj, ee, ij, ee_type, Tk_T, uk, d, DT);
+                   #endif
+                   {
+                       ees.push_back(ee);
+                       eidx.push_back(ij);
+#ifdef _FRICTION_
+                       ee_tk.push_back(Tk_T);
+#endif
+                   }
+               }
+           }
+       vf_col_set(vilist, fjlist, cubes);
+       vf_col_set(vjlist, filist, cubes);
+
+   }
+}

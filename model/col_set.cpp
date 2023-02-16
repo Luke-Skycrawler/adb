@@ -1,12 +1,13 @@
 #include "../view/global_variables.h"
 #include "barrier.h"
 #include "affine_body.h"
-#include <ipc/distance/point_triangle.hpp>
-#include <ipc/distance/edge_edge.hpp>
-#include <chrono>
 #include "collision.h"
 #include "time_integrator.h"
 #include "spatial_hashing.h"
+#include <ipc/distance/point_triangle.hpp>
+#include <ipc/distance/edge_edge.hpp>
+#include <chrono>
+
 using namespace std;
 using namespace barrier;
 using namespace Eigen;

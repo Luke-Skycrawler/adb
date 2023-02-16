@@ -26,6 +26,8 @@ struct BoundingBox {
 };
 
 lu compute_aabb(const AffineBody& c);
+lu compute_aabb(const Edge& c);
+lu compute_aabb(const Face& c);
 lu affine(const lu& aabb, q4& q);
 lu affine(lu aabb, AffineBody& c, int vtn);
 
@@ -42,3 +44,17 @@ void intersect_sort(
     const std::vector<lu> &aabbs,
     std::vector<Intersection> &ret,
     int vtn);
+
+void primitive_brute_force(
+    int n_cubes,
+    const std::vector<Intersection>& overlaps, // assert sorted
+    const std::vector<std::unique_ptr<AffineBody>>& cubes,
+    int vtn,
+    std::vector<std::array<vec3, 4>>& pts,
+    std::vector<std::array<int, 4>>& idx,
+    std::vector<std::array<vec3, 4>>& ees,
+    std::vector<std::array<int, 4>>& eidx,
+    std::vector<std::array<int, 2>>& vidx,
+    std::vector<Eigen::Matrix<double, 2, 12>>& pt_tk,
+    std::vector<Eigen::Matrix<double, 2, 12>>& ee_tk,
+    bool gen_basis);
