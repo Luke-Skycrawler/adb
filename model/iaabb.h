@@ -1,10 +1,14 @@
 #include "affine_body.h"
 using lu = std::array<vec3, 2>;
 
+struct PList {
+    std::vector<int> vi, vj, fi, fj, ei, ej;
+};
 
 struct Intersection {
     int i, j;
     lu cull;
+    PList* plist;
     inline bool operator==(Intersection &b) const {
         return i == b.i && j == b.j;
     }
@@ -47,7 +51,7 @@ void intersect_sort(
 
 void primitive_brute_force(
     int n_cubes,
-    const std::vector<Intersection>& overlaps, // assert sorted
+    std::vector<Intersection>& overlaps, // assert sorted
     const std::vector<std::unique_ptr<AffineBody>>& cubes,
     int vtn,
     std::vector<std::array<vec3, 4>>& pts,

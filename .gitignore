@@ -26,3 +26,6 @@ google_test.*
 *.png
 test/
 view/trace*
+*.recipe
+*.CopyComplete
+*.FileListAbsolute.*

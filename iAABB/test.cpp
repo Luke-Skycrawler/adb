@@ -4,11 +4,14 @@
 #include "../model/iaabb.h"
 #include "../model/geometry.h"
 #include "../model/spatial_hashing.h"
+#include <ipc/distance/point_triangle.hpp>
+#include <ipc/distance/edge_edge.hpp>
 #define _USE_MATH_DEFINES
 #include <math.h>
 #include <random>
 
 inline void Cube::draw(Shader& shader) const {}
+bool predefined = true;
 unsigned *Cube::_edges = nullptr, *Cube::_indices = nullptr;
 void gen_collision_set(
     bool vt2, int n_cubes,
@@ -37,18 +40,29 @@ public:
 protected:
     void SetUp() override
     {
-        n_cubes = 50;
+        n_cubes = predefined ? 2 : 50;
         Cube::gen_indices();
         aabbs.resize(n_cubes);
         for (int i = 0; i < n_cubes; i++) {
             unique_ptr<AffineBody> a;
             a = make_unique<Cube>();
-            double aa = dist(gen) * M_PI * 2, bb = dist(gen) * M_PI * 2, cc = dist(gen) * M_PI * 2;
-            mat3 r = rotation(aa, bb, cc);
+            double aa, bb, cc;
             double p0, p1, p2;
-            p0 = dist(gen) * (space_range[1] - space_range[0]) + space_range[0];
-            p1 = dist(gen) * (space_range[1] - space_range[0]) + space_range[0];
-            p2 = dist(gen) * (space_range[1] - space_range[0]) + space_range[0];
+
+            if (predefined) {
+                aa = 0.0, bb = 0.0, cc = 0.0;
+                p0 = p1 = p2 = 0.0;
+                p0 = i * (1.0 + barrier::d_sqrt / 2);
+
+            }
+            else {
+                aa = dist(gen) * M_PI * 2, bb = dist(gen) * M_PI * 2, cc = dist(gen) * M_PI * 2;
+                p0 = dist(gen) * (space_range[1] - space_range[0]) + space_range[0];
+                p1 = dist(gen) * (space_range[1] - space_range[0]) + space_range[0];
+                p2 = dist(gen) * (space_range[1] - space_range[0]) + space_range[0];
+            }
+            mat3 r = rotation(aa, bb, cc);
+
             for (int i = 0; i < 3; i++) a->q[i + 1] = r.col(i);
             a->q[0] = vec3(p0, p1, p2);
             auto b = compute_aabb(*a);
@@ -132,68 +146,59 @@ TEST_F(iAABBTest, pipelined)
                 }
             }
     }
-    cout << "size: bf = " << pts_ref.size() << " sort = " << pts.size() << "\n";
-    EXPECT_EQ(pts_ref.size(), pts.size())
-        << "size mismatch"
-        << "\n";
-    // const auto les = [] (const array<int, 4> &a, const array<int, 4> &b) {
-    //     return a.
-    // };
-    // sort(idx.begin(), idx.end());
-    // sort(idx_ref.begin(), idx_ref.end());
-    for (int i = 0; i < idx_ref.size(); i++) {
+        for (int i = 0; i < n_cubes; i++)
+        for (int j = i + 1; j < n_cubes; j++) {
+            auto &ci(*cubes[i]), &cj(*cubes[j]);
+            for (int _ei = 0; _ei < ci.n_edges; _ei++)
+                for (int _ej = 0; _ej < cj.n_edges; _ej++) {
+                    Edge ei(ci, _ei), ej(cj, _ej);
+                    auto iu = ei.e0.cwiseMax(ei.e1).array() + barrier ::d_sqrt / 2;
+                    auto il = ei.e0.cwiseMin(ei.e1).array() - barrier ::d_sqrt / 2;
+
+                    auto ju = ej.e0.cwiseMax(ej.e1).array() + barrier ::d_sqrt / 2;
+                    auto jl = ej.e0.cwiseMin(ej.e1).array() - barrier ::d_sqrt / 2;
+                    if ((iu.array() >= jl.array()).all() && (ju.array() >= il.array()).all()) {}
+                    else
+                        continue;
+                    double d = ipc::edge_edge_distance(ei.e0, ei.e1, ej.e0, ej.e1);
+                    if (d < barrier::d_hat) {
+                        array<vec3, 4> ee = { ei.e0, ei.e1, ej.e0, ej.e1 };
+                        array<int, 4> ij = { i, _ei, j, _ej };
+
+#pragma omp critical
+                        {
+                            ees_ref.push_back(ee);
+                            eidx_ref.push_back(ij);
+                        }
+                    }
+                }
+        }
+
+        cout << "pt size: bf = " << pts_ref.size() << " sort = " << pts.size() << "\n";
+        EXPECT_EQ(pts_ref.size(), pts.size())
+            << "size mismatch"
+            << "\n";
+        cout << "ee size: bf = " << ees_ref.size() << " sort = " << ees.size() << "\n";
+
+        EXPECT_EQ(ees_ref.size(), ees.size())
+            << "size mismatch"
+            << "\n";
+        // const auto les = [] (const array<int, 4> &a, const array<int, 4> &b) {
+        //     return a.
+        // };
+        // sort(idx.begin(), idx.end());
+        // sort(idx_ref.begin(), idx_ref.end());
+        int sz = min(idx.size(), idx_ref.size()), sz_ee = min(eidx.size(), eidx_ref.size());
+        for (int i = 0; i < sz; i++) {
         auto a{ idx_ref[i] }, b{ idx[i] };
-        EXPECT_TRUE(a[0] == b[0] && a[2] == b[2]) << "brute force: (" << a[0] << ", " << a[2] << "), sort: (" << b[0] << "," << b[2] << ")\n";
+        EXPECT_TRUE(a == b) << a[0] << a[1] << a[2] << a[3] << b[0] << b[1] << b[2] << b[3];
+        //EXPECT_TRUE(a[0] == b[0] && a[2] == b[2]) << "brute force: (" << a[0] << ", " << a[2] << "), sort: (" << b[0] << "," << b[2] << ")\n";
+    }
+    for (int i = 0; i < sz_ee; i++) {
+        auto a{ eidx_ref[i] }, b{ eidx[i] };
+        EXPECT_TRUE(a == b) << a[0] << a[1] << a[2] << a[3] << b[0] << b[1] << b[2] << b[3];
     }
 }
-//TEST(body_level, compute_intersection_against_brute_force)
-//{
-//
-//    int n_cubes = 100;
-//    const double space_range[2]{ -3.0, 3.0 };
-//
-//    std::vector<std::unique_ptr<AffineBody>> cubes;
-//    vector <lu> aabbs; 
-//    aabbs.resize(n_cubes);
-//
-//    default_random_engine gen;
-//    uniform_real_distribution<double> dist(0.0, 1.0);
-//    for (int i = 0; i < n_cubes; i++)
-//    {
-//        unique_ptr<AffineBody> a;
-//        a = make_unique<Cube>();
-//        double aa = dist(gen) * M_PI * 2, bb = dist(gen) * M_PI * 2, cc = dist(gen) * M_PI * 2;
-//        mat3 r = rotation(aa, bb, cc);
-//        double p0, p1, p2;
-//        p0 = dist(gen) * (space_range[1] - space_range[0]) + space_range[0];
-//        p1 = dist(gen) * (space_range[1] - space_range[0]) + space_range[0];
-//        p2 = dist(gen) * (space_range[1] - space_range[0]) + space_range[0];
-//        for (int i = 0; i < 3; i++) a->q[i + 1] = r.col(i);
-//        a->q[0] = vec3(p0, p1, p2);
-//        auto b = compute_aabb(*a);
-//        aabbs[i] = b;
-//        cubes.push_back(move(a));
-//    }
-//    vector<Intersection> overlaps_bf, overlaps_sort;
-//    intersect_brute_force(n_cubes, cubes, aabbs, overlaps_bf, 1);
-//    intersect_sort(n_cubes, cubes, aabbs, overlaps_sort, 1);
-//    const auto les = [](const Intersection &a, const Intersection&b) ->bool {
-//        return a.i < b.i || (a.i == b.i && a.j < b.j);
-//    };
-//    std::sort(overlaps_bf.begin(), overlaps_bf.end(), les);
-//    std::sort(overlaps_sort.begin(), overlaps_sort.end(), les);
-//    //for (int i = 0; i < n_cubes; i++) {
-//    //    cout << aabbs[i][0].transpose() << " , " << aabbs[i][1].transpose() << " , ";
-//    //}
-//    cout << "size: bf = " << overlaps_bf.size() << " sort = " << overlaps_sort.size() << "\n";
-//    EXPECT_EQ(overlaps_bf.size(), overlaps_sort.size())
-//        << "size mismatch"
-//        << "\n";
-//    for (int i = 0; i < overlaps_bf.size(); i++) {
-//        auto a{ overlaps_bf[i] }, b{ overlaps_sort[i] };
-//        EXPECT_TRUE(a.i == b.i && a.j == b.j) << "brute force: (" << a.i << ", " << a.j << "), sort: (" << b.i << "," << b.j << "\n";
-//    }
-//}
 
 int main(int argc, char** argv)
 {
