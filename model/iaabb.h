@@ -15,12 +15,6 @@ struct Intersection {
     inline bool operator<(Intersection& b) const {
         return i < b.i || (i == b.i && j < b.j);
     }
-    inline Intersection &operator=(const Intersection& b) {
-        i = b.i; 
-        j = b.j;
-        cull = b.cull;
-        return *this;
-    }
 };
 
 struct BoundingBox {

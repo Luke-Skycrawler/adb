@@ -6,17 +6,17 @@
     "predefined_case" : {
         "enable": false,
         "id" : 2,
-        "custom": "../test_cases/cards.json"
+        "custom": "../test_cases/vis.json"
     },
     "solver": "sparse",
-    "gravity": true, 
-    "line_search": true,
-    "col_set": true,
+    "gravity": false, 
+    "line_search": false,
+    "col_set": false,
     "ee": true,
     "pt": true,
-    "ground": true,
+    "ground": false,
     "safe_factor": 1.0,
-    "uppper_bound": true, 
+    "uppper_bound": false, 
     "mu": 0.4,
     "log": true,
     "backoff": 0.8,

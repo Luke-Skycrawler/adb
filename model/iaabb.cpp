@@ -245,8 +245,8 @@ void primitive_brute_force(
                 lu cull = overlaps[o].cull;
                 overlaps[o].plist = lists + o;
                 if (filter_if_inside(cull, p)) {
-                    auto t{ overlaps[o] };
-
+                    auto &t{ overlaps[o] };
+                    assert(t.i == I);
                     if (t.i < t.j)
                         lists[o].vi.push_back(v);
                     else
@@ -261,10 +261,9 @@ void primitive_brute_force(
 
             for (int o = starting[I]; o < starting[I + 1]; o++) {
                 lu cull = overlaps[o].cull;
-                overlaps[o].plist = lists + o;
 
                 if (filter_if_inside(cull, ei)) {
-                    auto t{ overlaps[o] };
+                    auto &t{ overlaps[o] };
                     if (t.i < t.j)
                         lists[o].ei.push_back(e);
                     else
@@ -278,7 +277,6 @@ void primitive_brute_force(
             // TODO: always intialize from v_transformed
             for (int o = starting[I]; o < starting[I + 1]; o++) {
                 lu cull = overlaps[o].cull;
-                overlaps[o].plist = lists + o;
 
                 if (filter_if_inside(cull, fi)) {
                     auto t{ overlaps[o] };
@@ -290,13 +288,18 @@ void primitive_brute_force(
             }
         }
     }
-    sort(overlaps.begin(), overlaps.end(), [](const Intersection& a, const Intersection& b) {
+    sort(overlaps.begin(), overlaps.end(), [](const Intersection& a, const Intersection& b) -> bool{
         auto ad = a.i + a.j, am = abs(a.i - a.j);
         auto bd = b.i + b.j, bm = abs(b.i - b.j);
 
-        return ad < bd || (ad == bd && am < bm);
+        return ad < bd || (ad == bd && am < bm) || (ad == bd && am == bm && a.i < b.i);
     });
+    
     for (int i = 0; i < n_overlap / 2; i++) {
+        int i0 = overlaps[i * 2].i, j0 = overlaps[i * 2].j;
+        int i1 = overlaps[i * 2 + 1].i, j1 = overlaps[i * 2 + 1].j;
+        assert(i0 == j1 && j0 == i1);
+        
         auto &p0{ overlaps[i * 2].plist }, &p1{ overlaps[i * 2 + 1].plist };
         auto
             &vi0{ p0->vi },
@@ -307,7 +310,7 @@ void primitive_brute_force(
             &vj0{ p0->vj }, &vj1{ p1->vj },
             &ej0{ p0->ej }, &ej1{ p1->ej },
             &fj0{ p0->fj }, &fj1{ p1->fj };
-
+        assert((vi0.size() == 0 && vj1.size() == 0) || (vi1.size() == 0 && vj0.size() == 0));
         vi0.insert(vi0.end(), vi1.begin(), vi1.end());
         ei0.insert(ei0.end(), ei1.begin(), ei1.end());
         fi0.insert(fi0.end(), fi1.begin(), fi1.end());
