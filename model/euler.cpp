@@ -195,54 +195,6 @@ double line_search(const VectorXd& dq, const VectorXd& grad, VectorXd& q0, doubl
                 pt_tk_new,
                 ee_tk_new);
         double ef1 = 0.0, E2 = 0.0, ef2 = 0.0;
-#ifdef IAABB_COMPARING
-        const auto compare_collision = [](
-            vector<array<int, 4>> & aidx,
-
-            vector<array<int, 4>> & bidx) -> bool{
-            // FIXME: make copy before sorting;
-            auto a_copy = aidx;
-            vector< array<int , 4>> adb, bda;
-            
-            
-            sort(aidx.begin(), aidx.end());
-            sort(bidx.begin(), bidx.end());
-            set_difference(aidx.begin(), aidx.end(), bidx.begin(), bidx.end(), back_inserter(adb));
-            set_difference(bidx.begin(), bidx.end(), aidx.begin(), aidx.end(), back_inserter(bda));
-            
-            if (adb.size()) {
-                spdlog::error("detection not detected: "); 
-                for (int i = 0; i < adb.size(); i ++) {
-                    auto &a {adb[i]};
-                    spdlog::warn("( {}, {}, {}, {})", a[0], a[1], a[2], a[3]);
-                }
-            }        
-            if (bda.size()) {
-                spdlog::error("False positive: "); 
-                for (int i = 0; i < bda.size(); i ++) {
-                    auto &a {bda[i]};
-                    spdlog::warn("( {}, {}, {}, {})", a[0], a[1], a[2], a[3]);
-                }
-            }   
-            spdlog::info("sizes: ref = {}, iaabb = {}", aidx.size(), bidx.size());
-            aidx = a_copy;
-            return !(bda.size() || adb.size());
-        };
-        spdlog::info("PT");
-        bool pt_success = compare_collision(
-            idx_new, idx_iaab
-        );
-        
-        spdlog::info("EE");
-        bool ee_success = compare_collision(
-            eidx_new, eidx_iaab
-        );
-        if (!pt_success) spdlog::error("pt fails, exiting");
-        if (!ee_success) spdlog::error("ee fails, exiting");
-        if (!(pt_success && ee_success)) exit(1);
-        else spdlog::info("pt and ee set matched");
-
-        #endif
         E1 = E_global(q1, dqk,
             n_cubes, n_pt, n_ee, n_g,
             idx,
@@ -298,6 +250,17 @@ void implicit_euler(vector<unique_ptr<AffineBody>>& cubes, double dt)
 
     vector<Matrix<double, 2, 12>> pt_tk;
     vector<Matrix<double, 2, 12>> ee_tk;
+    
+    vector<array<vec3, 4>> pts_iaabb;
+    vector<array<int, 4>> idx_iaabb;
+
+    vector<array<vec3, 4>> ees_iaabb;
+    vector<array<int, 4>> eidx_iaabb;
+
+    vector<array<int, 2>> vidx_iaabb;
+
+    vector<Matrix<double, 2, 12>> pt_tk_iaabb;
+    vector<Matrix<double, 2, 12>> ee_tk_iaabb;
 
     double D_friction;
     const int n_cubes = cubes.size(), nsqr = n_cubes * n_cubes, hess_dim = n_cubes * 12;
@@ -305,15 +268,17 @@ void implicit_euler(vector<unique_ptr<AffineBody>>& cubes, double dt)
     if (globals.col_set) {
         if (globals.iaabb)
             iaabb_brute_force(n_cubes, cubes, globals.aabbs, 1,
-                pts,
-                idx,
-                ees,
-                eidx,
-                vidx,
-                pt_tk,
-                ee_tk,
+                pts_iaabb,
+                idx_iaabb,
+                ees_iaabb,
+                eidx_iaabb,
+                vidx_iaabb,
+                pt_tk_iaabb,
+                ee_tk_iaabb,
                 true);
+#ifndef IAABB_COMPARING
         else
+    #endif
             gen_collision_set(false, n_cubes, cubes,
                 pts,
                 idx,
@@ -323,6 +288,57 @@ void implicit_euler(vector<unique_ptr<AffineBody>>& cubes, double dt)
                 pt_tk,
                 ee_tk,
                 true);
+
+        if (globals.iaabb) {
+
+#ifdef IAABB_COMPARING
+            const auto compare_collision = [](
+                                               vector<array<int, 4>>& aidx,
+
+                                               vector<array<int, 4>>& bidx) -> bool {
+                // FIXME: make copy before sorting;
+                auto a_copy = aidx;
+                vector<array<int, 4>> adb, bda;
+
+                sort(aidx.begin(), aidx.end());
+                sort(bidx.begin(), bidx.end());
+                set_difference(aidx.begin(), aidx.end(), bidx.begin(), bidx.end(), back_inserter(adb));
+                set_difference(bidx.begin(), bidx.end(), aidx.begin(), aidx.end(), back_inserter(bda));
+
+                if (adb.size()) {
+                    spdlog::error("detection not detected: ");
+                    for (int i = 0; i < adb.size(); i++) {
+                        auto& a{ adb[i] };
+                        spdlog::warn("( {}, {}, {}, {})", a[0], a[1], a[2], a[3]);
+                    }
+                }
+                if (bda.size()) {
+                    spdlog::error("False positive: ");
+                    for (int i = 0; i < bda.size(); i++) {
+                        auto& a{ bda[i] };
+                        spdlog::warn("( {}, {}, {}, {})", a[0], a[1], a[2], a[3]);
+                    }
+                }
+                spdlog::info("sizes: ref = {}, iaabb = {}", aidx.size(), bidx.size());
+                aidx = a_copy;
+                return !(bda.size() || adb.size());
+            };
+            spdlog::info("PT");
+            bool pt_success = compare_collision(
+                idx, idx_iaabb
+            );
+
+            spdlog::info("EE");
+            bool ee_success = compare_collision(
+                eidx, eidx_iaabb
+            );
+            if (!pt_success) spdlog::error("pt fails, exiting");
+            if (!ee_success) spdlog::error("ee fails, exiting");
+            if (!(pt_success && ee_success)) exit(1);
+            else spdlog::info("pt and ee set matched");
+
+#endif
+        }
     }
 
 #ifdef _SM_

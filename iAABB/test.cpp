@@ -8,26 +8,41 @@
 #include <ipc/distance/edge_edge.hpp>
 #define _USE_MATH_DEFINES
 //#define _FAILED_
+#define _LOAD_
 #include <math.h>
 #include <random>
+
+#include <iostream>
+#include <fstream>
+#include <filesystem>
 
 inline void Cube::draw(Shader& shader) const {}
 bool predefined = true;
 unsigned *Cube::_edges = nullptr, *Cube::_indices = nullptr;
-void gen_collision_set(
-    bool vt2, int n_cubes,
-    const std::vector<std::unique_ptr<AffineBody>>& cubes,
-    std::vector<std::array<vec3, 4>>& pts,
-    std::vector<std::array<int, 4>>& idx,
-    std::vector<std::array<vec3, 4>>& ees,
-    std::vector<std::array<int, 4>>& eidx,
-    std::vector<std::array<int, 2>>& vidx,
-    std::vector<Matrix<double, 2, 12>>& pt_tk,
-    std::vector<Matrix<double, 2, 12>>& ee_tk,
-    bool gen_basis = false);
+
 
 using namespace std;
 using namespace Eigen;
+
+void player_load(
+    int timestep,
+    const std::vector<std::unique_ptr<AffineBody>>& cubes)
+{
+    string filename = "../view/trace/" + to_string(timestep);
+    ifstream in(filename, ios::in | ios::binary);
+    int n_cubes = cubes.size();
+
+    for (int i = 0; i < n_cubes; i++) {
+        auto& c{ *cubes[i] };
+        for (int j = 0; j < 4; j++)
+            in.read((char*)c.q[j].data(), 3 * sizeof(double));
+        for (int j = 0; j < 4; j++)
+            in.read((char*)c.dqdt[j].data(), 3 * sizeof(double));
+        c.p = c.q[0];
+        c.A << c.q[1], c.q[2], c.q[3];
+    }
+    in.close();
+}
 
 class iAABBTest : public ::testing::Test {
 public:
@@ -44,7 +59,11 @@ public:
 protected:
     void SetUp() override
     {
+        #ifdef _LOAD_
+        n_cubes = 3;
+        #else
         n_cubes = predefined ? 6 : 100;
+        #endif
 
         Cube::gen_indices();
         aabbs.resize(n_cubes);
@@ -85,6 +104,7 @@ protected:
             cubes.push_back(move(a));
             args.push_back({aa, bb, cc, p0, p1, p2});
         }
+        player_load(40, cubes);
     }
 };
 uniform_real_distribution<double> iAABBTest ::dist(0.0, 1.0);
@@ -99,17 +119,7 @@ TEST_F(iAABBTest, sort_against_bf)
     };
     std::sort(overlaps_bf.begin(), overlaps_bf.end(), les);
     std::sort(overlaps_sort.begin(), overlaps_sort.end(), les);
-    // for (int i = 0; i < n_cubes; i++) {
-    //     cout << aabbs[i][0].transpose() << " , " << aabbs[i][1].transpose() << " , ";
-    // }
     cout << "size: bf = " << overlaps_bf.size() << " sort = " << overlaps_sort.size() << "\n";
-    //EXPECT_EQ(overlaps_bf.size(), overlaps_sort.size())
-    //    << "size mismatch"
-    //    << "\n";
-    //for (int i = 0; i < min.size(); i++) {
-    //    auto a{ overlaps_bf[i] }, b{ overlaps_sort[i] };
-    //    EXPECT_TRUE(a.i == b.i && a.j == b.j) << "brute force: (" << a.i << ", " << a.j << "), sort: (" << b.i << "," << b.j << "\n";
-    //}
     diff(overlaps_bf, overlaps_sort);
 }
 

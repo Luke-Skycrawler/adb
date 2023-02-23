@@ -221,11 +221,11 @@ void primitive_brute_force(
     auto lists = new PList[n_overlap];
     vector<int> starting;
     starting.resize(n_cubes + 1);
-    starting[n_cubes] = n_overlap;
+    for (int i = 0; i <= n_cubes; i++)
+        starting[i] = n_overlap;
     starting[0] = 0;
 
     int old_cube_index = 0;
-#pragma omp parallel for schedule(static)
     for (int i = 0; i < n_overlap; i++) {
 
         auto& o{ overlaps[i] };
