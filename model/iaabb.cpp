@@ -235,8 +235,7 @@ void primitive_brute_force(
             old_cube_index = o.i;
         }
     }
-
-//#pragma omp parallel for schedule(guided)
+#pragma omp parallel for schedule(guided)
     for (int I = 0; I < n_cubes; I++) {
         // construct the vertex, edge, and triangle list inside each overlap
         auto& c{ *cubes[I] };
@@ -245,6 +244,10 @@ void primitive_brute_force(
         case 1: c.project_vt1(); break;
         default: c.project_vt2();
         }
+    }
+#pragma omp parallel for schedule(guided)
+    for (int I = 0; I < n_cubes; I++) {
+        auto& c{ *cubes[I] };
         for (int v = 0; v < c.n_vertices; v++) {
             auto& p{ c.v_transformed[v] };
             for (int o = starting[I]; o < starting[I + 1]; o++) {
@@ -262,6 +265,7 @@ void primitive_brute_force(
             double d = vg_distance(p);
             d = d * d;
             if (d < barrier::d_hat) {
+                #pragma omp critical
                 vidx.push_back({ I, v });
             }
         }
@@ -305,9 +309,8 @@ void primitive_brute_force(
 
         return ad < bd || (ad == bd && am < bm) || (ad == bd && am == bm && a.i < b.i);
     });
-    
 
-#pragma omp parallel for schedule(static)
+#pragma omp parallel for schedule(guided)
     for (int i = 0; i < n_overlap / 2; i++) {
         int i0 = overlaps[i * 2].i, j0 = overlaps[i * 2].j;
         int i1 = overlaps[i * 2 + 1].i, j1 = overlaps[i * 2 + 1].j;
@@ -339,75 +342,95 @@ void primitive_brute_force(
         fj0.insert(fj0.end(), fj1.begin(), fj1.end());
     }
 
-    //#pragma omp parallel for schedule(guided)
-    for (int _i = 0; _i < n_overlap / 2; _i++) {
-        int i = _i * 2;
-        int I{ overlaps[i].i }, J{ overlaps[i].j };
+    const auto vf_col_set = [&](vector<int>& vilist, vector<int>& fjlist,
+                                const std::vector<std::unique_ptr<AffineBody>>& cubes,
+                                int I, int J,
+                                vector<array<vec3, 4>>& pts,
+                                vector<array<int, 4>>& idx,
+                                vector<Matrix<double, 2, 12>>& pt_tk) {
         auto &ci{ *cubes[I] }, &cj{ *cubes[J] };
-        auto& p{ *overlaps[i].plist };
-        auto& vilist{ p.vi };
-        auto& vjlist{ p.vj };
-        auto& eilist{ p.ei };
-        auto& ejlist{ p.ej };
-        auto& filist{ p.fi };
-        auto& fjlist{ p.fj };
-        const auto vf_col_set = [&](vector<int>& vilist, vector<int>& fjlist,
-                                    const std::vector<std::unique_ptr<AffineBody>>& cubes, int I, int J) {
-            auto &ci{ *cubes[I] }, &cj{ *cubes[J] };
-            for (int vi : vilist)
-                for (int fj : fjlist) {
-                    vec3 v{ ci.v_transformed[vi] };
-                    Face f{ cj, unsigned(fj), true, true };
-                    ipc::PointTriangleDistanceType pt_type;
-                    double d = vf_distance(v, f, pt_type);
-                    if (d < barrier::d_hat) {
-                        array<vec3, 4> pt = { v, f.t0, f.t1, f.t2 };
-                        array<int, 4> ij = { I, vi, J, fj };
-                        Matrix<double, 2, 12> Tk_T;
-                        Tk_T.setZero(2, 12);
-                        Vector2d uk;
-#ifndef TESTING
-                        if (gen_basis)
-                            pt_uktk(*cubes[I], cj, pt, ij, pt_type, Tk_T, uk, d, DT);
-#endif
-                        {
-                            pts.push_back(pt);
-                            idx.push_back(ij);
-#ifdef _FRICTION_
-                            pt_tk.push_back(Tk_T);
-#endif
-                        }
-                    }
-                }
-        };
-        for (auto ei : eilist)
-            for (auto ej : ejlist) {
-                Edge eii{ ci, unsigned(ei), true, true };
-                Edge ejj{ cj, unsigned(ej), true, true };
-
-                auto ee_type = ipc::edge_edge_distance_type(eii.e0, eii.e1, ejj.e0, ejj.e1);
-                double d = ipc::edge_edge_distance(eii.e0, eii.e1, ejj.e0, ejj.e1, ee_type);
+        for (int vi : vilist)
+            for (int fj : fjlist) {
+                vec3 v{ ci.v_transformed[vi] };
+                Face f{ cj, unsigned(fj), true, true };
+                ipc::PointTriangleDistanceType pt_type;
+                double d = vf_distance(v, f, pt_type);
                 if (d < barrier::d_hat) {
-                    array<vec3, 4> ee = { eii.e0, eii.e1, ejj.e0, ejj.e1 };
-                    array<int, 4> ij = { I, ei, J, ej };
+                    array<vec3, 4> pt = { v, f.t0, f.t1, f.t2 };
+                    array<int, 4> ij = { I, vi, J, fj };
                     Matrix<double, 2, 12> Tk_T;
                     Tk_T.setZero(2, 12);
                     Vector2d uk;
 #ifndef TESTING
                     if (gen_basis)
-                        ee_uktk(*cubes[I], cj, ee, ij, ee_type, Tk_T, uk, d, DT);
+                        pt_uktk(*cubes[I], cj, pt, ij, pt_type, Tk_T, uk, d, DT);
 #endif
                     {
-                        ees.push_back(ee);
-                        eidx.push_back(ij);
+                        pts.push_back(pt);
+                        idx.push_back(ij);
 #ifdef _FRICTION_
-                        ee_tk.push_back(Tk_T);
+                        pt_tk.push_back(Tk_T);
 #endif
                     }
                 }
             }
-        vf_col_set(vilist, fjlist, cubes, I, J);
-        vf_col_set(vjlist, filist, cubes, J, I);
+    };
+
+#pragma omp parallel
+    {
+        vector<array<int, 4>> idx_private, eidx_private;
+        vector<array<vec3, 4>> pts_private, ees_private;
+        vector<Matrix<double, 2, 12>> pt_tk_private, ee_tk_private;
+#pragma omp for schedule(guided) nowait
+        for (int _i = 0; _i < n_overlap / 2; _i++) {
+            int i = _i * 2;
+            int I{ overlaps[i].i }, J{ overlaps[i].j };
+            auto &ci{ *cubes[I] }, &cj{ *cubes[J] };
+            auto& p{ *overlaps[i].plist };
+            auto& vilist{ p.vi };
+            auto& vjlist{ p.vj };
+            auto& eilist{ p.ei };
+            auto& ejlist{ p.ej };
+            auto& filist{ p.fi };
+            auto& fjlist{ p.fj };
+            for (auto ei : eilist)
+                for (auto ej : ejlist) {
+                    Edge eii{ ci, unsigned(ei), true, true };
+                    Edge ejj{ cj, unsigned(ej), true, true };
+
+                    auto ee_type = ipc::edge_edge_distance_type(eii.e0, eii.e1, ejj.e0, ejj.e1);
+                    double d = ipc::edge_edge_distance(eii.e0, eii.e1, ejj.e0, ejj.e1, ee_type);
+                    if (d < barrier::d_hat) {
+                        array<vec3, 4> ee = { eii.e0, eii.e1, ejj.e0, ejj.e1 };
+                        array<int, 4> ij = { I, ei, J, ej };
+                        Matrix<double, 2, 12> Tk_T;
+                        Tk_T.setZero(2, 12);
+                        Vector2d uk;
+#ifndef TESTING
+                        if (gen_basis)
+                            ee_uktk(*cubes[I], cj, ee, ij, ee_type, Tk_T, uk, d, DT);
+#endif
+                        {
+                            ees_private.push_back(ee);
+                            eidx_private.push_back(ij);
+#ifdef _FRICTION_
+                            ee_tk_private.push_back(Tk_T);
+#endif
+                        }
+                    }
+                }
+            vf_col_set(vilist, fjlist, cubes, I, J, pts_private, idx_private, pt_tk_private);
+            vf_col_set(vjlist, filist, cubes, J, I, pts_private, idx_private, pt_tk_private);
+        }
+#pragma omp critical
+        {
+            pts.insert(pts.end(), pts_private.begin(), pts_private.end());
+            idx.insert(idx.end(), idx_private.begin(), idx_private.end());
+            pt_tk.insert(pt_tk.end(), pt_tk_private.begin(), pt_tk_private.end());
+            ees.insert(ees.end(), ees_private.begin(), ees_private.end());
+            eidx.insert(eidx.end(), eidx_private.begin(), eidx_private.end());
+            ee_tk.insert(ee_tk.end(), ee_tk_private.begin(), ee_tk_private.end());
+        }
     }
 }
 
