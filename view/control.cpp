@@ -34,6 +34,7 @@ void reset(bool init)
     globals.log = data["log"];
     globals.player = data["player"];
     globals.trace_folder = data["trace_folder"];
+    globals.iaabb = data["iaabb"];
     if (predefined) {
         int id = data["predefined_case"]["id"];
         if (id == 1) {
@@ -76,6 +77,12 @@ void reset(bool init)
         globals.ts = st;
         player_load(globals.trace_folder, st, globals.cubes);
     }
+    #ifdef _INCLUDE_IAABB_H_
+    globals.aabbs.resize(n_cubes);
+    for (int i = 0; i < n_cubes; i ++ ){
+        globals.aabbs[i] = compute_aabb(*globals.cubes[i]);
+    }
+    #endif
 }
 // process all input: query GLFW whether relevant keys are pressed/released this frame and react accordingly
 // ---------------------------------------------------------------------------------------------------------

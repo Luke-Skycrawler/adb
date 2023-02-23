@@ -1,23 +1,23 @@
 {
     "player": false,
     "starting_ts": -1,
-    "dt": 1e-2,
+    "dt": 5e-3,
     "max_iter": 100,
     "predefined_case" : {
         "enable": false,
         "id" : 2,
-        "custom": "../test_cases/vis.json"
+        "custom": "../test_cases/case2.json"
     },
     "solver": "sparse",
-    "gravity": false, 
-    "line_search": false,
-    "col_set": false,
+    "gravity": true, 
+    "line_search": true,
+    "col_set": true,
     "ee": true,
     "pt": true,
-    "ground": false,
+    "ground": true,
     "safe_factor": 1.0,
-    "uppper_bound": false, 
-    "mu": 0.4,
+    "uppper_bound": true, 
+    "mu": 0.0,
     "log": true,
     "backoff": 0.8,
     "damping": {
@@ -37,13 +37,14 @@
     },
     "spatial hashing": {
         "min_xyz": -10.0,
-        "max_xyz": 20.0,
-        "dx": 1.6,
+        "max_xyz": 10.0,
+        "dx": 0.8,
         "n_buffer": 256,
-        "xyz_bits": 7,
+        "xyz_bits": 6,
         "set_size": 1
     },
     "full_ccd": true,
     "align_com": false,
-    "trace_folder": "trace"
+    "trace_folder": "trace",
+    "iaabb": true
 }

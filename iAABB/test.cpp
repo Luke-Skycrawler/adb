@@ -12,7 +12,7 @@
 #include <random>
 
 inline void Cube::draw(Shader& shader) const {}
-bool predefined = false;
+bool predefined = true;
 unsigned *Cube::_edges = nullptr, *Cube::_indices = nullptr;
 void gen_collision_set(
     bool vt2, int n_cubes,
@@ -39,22 +39,13 @@ public:
     static uniform_real_distribution<double> dist;
     vector<array<double, 6>> args;
     void diff(vector<array<int, 4>>& a, vector<array<int, 4>>& b);
+    void diff(vector<Intersection>& a, vector<Intersection>& b);
 
 protected:
     void SetUp() override
     {
-        n_cubes = predefined ? 4 : 100;
-#ifdef _FAILED_
-        n_cubes = 19;
-        predefined = true;
-        // double args[] = {
-        //     213.417, 126.994, 145.515, -0.861929, 2.7898, -2.07337,
-        //     12.3542, 352.773, 179.476, 2.86201, -0.820881, 1.07712,
-        //     259.378, 355.817, 257.796, 2.47546, 0.032991, 0.349613,
-        //     11.9767, 123.782, 319.581, -2.02277, 2.26418, -1.73819
-        // };
-        double ags[] = {                                                                                                                       0.321802, 0.228967, 2.56813, -0.252065, -0.0745864, 1.76385,                                                            4.36828, 4.27143, 2.46502, 0.369345, -1.75159, 0.164229,                                                                2.53972, 2.21647, 3.72482, -0.861929, 2.7898, -2.07337,                                                                 5.42037, 3.89784, 0.751137, -0.168259, -0.958682, 0.179052,                                                             2.40227, 4.79043, 0.254287, -1.48226, 0.028626, 1.93563,                                                                5.57775, 2.16041, 0.209033, -2.02277, 2.26418, -1.73819,                                                                5.72125, 3.07008, 4.74877, -2.35163, -0.638461, 2.22112,                                                                3.39379, 0.11593, 5.65602, -1.83303, 2.31599, -0.352659,                                                                5.22267, 2.04181, 4.12039, -0.47886, 1.69145, -2.32084,                                                                 6.24256, 1.14086, 4.79364, -1.40448, -1.53517, -2.39557,                                                                4.81829, 2.05961, 0.810947, -1.24824, 2.08266, -1.61541,                                                                2.23272, 4.52371, 0.411203, 0.0831551, -0.45613, 1.13881,                                                               3.06872, 3.23282, 1.5395, -1.00197, 0.0141743, 0.576348,                                                                5.6985, 0.480689, 4.48559, 0.70323, -1.86549, -0.618109,                                                                1.74461, 5.3916, 5.71102, 0.703675, -1.91509, 0.0901423,                                                                3.3286, 3.12821, 2.10988, -1.48306, -1.59795, -1.96102,                                                                 3.74466, 4.5672, 5.51395, 1.24296, -1.59141, -0.132026,                                                                 4.83784, 3.08977, 3.06735, -0.425241, -0.631634, 1.65872,                                                               1.35484, 3.3945, 4.5429, -1.29784, 0.257173, 1.53555                                                                   };
-#endif
+        n_cubes = predefined ? 6 : 100;
+
         Cube::gen_indices();
         aabbs.resize(n_cubes);
         args.reserve(n_cubes);
@@ -74,8 +65,8 @@ protected:
                 p2 = ags[6 * i + 5];
 #else
                 aa = 0.0, bb = 0.0, cc = 0.0;
-                // p0 = p1 = p2 = 0.8 * i;
-                p0 = p1 = p2 = i * (1.0 + barrier::d_sqrt / 2);
+                p0 = p1 = p2 = 0.8 * i;
+                p0  = i * (1.0 + barrier::d_sqrt / 2);
 #endif
             }
             else {
@@ -112,14 +103,16 @@ TEST_F(iAABBTest, sort_against_bf)
     //     cout << aabbs[i][0].transpose() << " , " << aabbs[i][1].transpose() << " , ";
     // }
     cout << "size: bf = " << overlaps_bf.size() << " sort = " << overlaps_sort.size() << "\n";
-    EXPECT_EQ(overlaps_bf.size(), overlaps_sort.size())
-        << "size mismatch"
-        << "\n";
-    for (int i = 0; i < overlaps_bf.size(); i++) {
-        auto a{ overlaps_bf[i] }, b{ overlaps_sort[i] };
-        EXPECT_TRUE(a.i == b.i && a.j == b.j) << "brute force: (" << a.i << ", " << a.j << "), sort: (" << b.i << "," << b.j << "\n";
-    }
+    //EXPECT_EQ(overlaps_bf.size(), overlaps_sort.size())
+    //    << "size mismatch"
+    //    << "\n";
+    //for (int i = 0; i < min.size(); i++) {
+    //    auto a{ overlaps_bf[i] }, b{ overlaps_sort[i] };
+    //    EXPECT_TRUE(a.i == b.i && a.j == b.j) << "brute force: (" << a.i << ", " << a.j << "), sort: (" << b.i << "," << b.j << "\n";
+    //}
+    diff(overlaps_bf, overlaps_sort);
 }
+
 
 void iAABBTest::diff(vector<array<int, 4>>& a, vector<array<int, 4>>& b)
 {
@@ -151,6 +144,30 @@ void iAABBTest::diff(vector<array<int, 4>>& a, vector<array<int, 4>>& b)
         cout << "\n";
     }
     cout << "};\n" << cubes_set.size();
+
+}
+
+
+void iAABBTest::diff(vector<Intersection>& a, vector<Intersection>& b)
+{
+    EXPECT_EQ(a.size(), b.size()) << "size mismatch";
+    cout << a.size() << " "
+         << b.size() << "\n";
+    vector<Intersection> adb, bda;
+    set_difference(a.begin(), a.end(), b.begin(), b.end(), back_inserter(adb));
+    set_difference(b.begin(), b.end(), a.begin(), a.end(), back_inserter(bda));
+    EXPECT_EQ(adb.size(), 0) << "should include following: ";
+
+    if (adb.size())
+        for (auto& a : adb) {
+            cout << "( " << a.i << " " << a.j << ")\n";
+        }
+
+    EXPECT_EQ(bda.size(), 0) << "included extras: ";
+    if (bda.size())
+        for (auto& a : bda) {
+            cout << "( " << a.i << " " << a.j << ")\n";
+        }
 
 }
 TEST_F(iAABBTest, pipelined)

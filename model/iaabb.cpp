@@ -1,6 +1,7 @@
 
 #include "iaabb.h"
 #include "geometry.h"
+#include "collision.h"
 #include <memory>
 #include <array>
 #include <algorithm>
@@ -14,10 +15,14 @@
 #else
 #define DT 1e-2
 #endif
+#include <chrono>
+
 using namespace std;
 using namespace Eigen;
 using namespace utils;
+using namespace std::chrono;
 using lu = std::array<vec3, 2>;
+#define DURATION_TO_DOUBLE(X) duration_cast<duration<double>>(high_resolution_clock::now() - (X)).count()
 lu compute_aabb(const AffineBody& c)
 {
     vec3 l, u;
@@ -123,6 +128,7 @@ void intersect_sort(
     ret.resize(0);
     vector<BoundingBox> bounds[3];
     vector<Intersection> ilists[3];
+#pragma omp parallel for schedule(static, 1)
     for (int dim = 0; dim < 3; dim++) {
         bounds[dim].resize(n_cubes * 2);
         for (int i = 0; i < n_cubes; i++) {
@@ -203,16 +209,14 @@ void primitive_brute_force(
     vector<Matrix<double, 2, 12>>& ee_tk,
     bool gen_basis)
 {
-    // Intersection a{ 0, 0, lu{ vec3(0.0, 0.0, 0.0), vec3(0.0, 0.0, 0.0) } }, b;
-    // b = a;
-    // bool t = b == a, t1 = b < a;
-    // const auto les = [](const Intersection &a, const Intersection&b) ->bool {
-    //     return a.i < b.i || (a.i == b.i && a.j < b.j);
-    // };
-    // sort(overlaps.begin(), overlaps.end(), les);
-
+    pts.resize(0);
+    idx.resize(0);
+    ees.resize(0);
+    eidx.resize(0);
+    vidx.resize(0);
+    pt_tk.resize(0);
+    ee_tk.resize(0);
     int n_overlap = overlaps.size();
-    // vector<int>*ov, *oei, *oej, *of;
 
     auto lists = new PList[n_overlap];
     vector<int> starting;
@@ -221,6 +225,7 @@ void primitive_brute_force(
     starting[0] = 0;
 
     int old_cube_index = 0;
+#pragma omp parallel for schedule(static)
     for (int i = 0; i < n_overlap; i++) {
 
         auto& o{ overlaps[i] };
@@ -231,6 +236,7 @@ void primitive_brute_force(
         }
     }
 
+//#pragma omp parallel for schedule(guided)
     for (int I = 0; I < n_cubes; I++) {
         // construct the vertex, edge, and triangle list inside each overlap
         auto& c{ *cubes[I] };
@@ -252,6 +258,11 @@ void primitive_brute_force(
                     else
                         lists[o].vj.push_back(v);
                 }
+            }
+            double d = vg_distance(p);
+            d = d * d;
+            if (d < barrier::d_hat) {
+                vidx.push_back({ I, v });
             }
         }
 
@@ -295,6 +306,8 @@ void primitive_brute_force(
         return ad < bd || (ad == bd && am < bm) || (ad == bd && am == bm && a.i < b.i);
     });
     
+
+#pragma omp parallel for schedule(static)
     for (int i = 0; i < n_overlap / 2; i++) {
         int i0 = overlaps[i * 2].i, j0 = overlaps[i * 2].j;
         int i1 = overlaps[i * 2 + 1].i, j1 = overlaps[i * 2 + 1].j;
@@ -310,7 +323,13 @@ void primitive_brute_force(
             &vj0{ p0->vj }, &vj1{ p1->vj },
             &ej0{ p0->ej }, &ej1{ p1->ej },
             &fj0{ p0->fj }, &fj1{ p1->fj };
+
         assert((vi0.size() == 0 && vj1.size() == 0) || (vi1.size() == 0 && vj0.size() == 0));
+
+        vi0.reserve(vi0.size() + vi1.size());
+        ei0.reserve(ei0.size() + ei1.size());
+        fi0.reserve(fi0.size() + fi1.size());
+        
         vi0.insert(vi0.end(), vi1.begin(), vi1.end());
         ei0.insert(ei0.end(), ei1.begin(), ei1.end());
         fi0.insert(fi0.end(), fi1.begin(), fi1.end());
@@ -319,6 +338,8 @@ void primitive_brute_force(
         ej0.insert(ej0.end(), ej1.begin(), ej1.end());
         fj0.insert(fj0.end(), fj1.begin(), fj1.end());
     }
+
+    //#pragma omp parallel for schedule(guided)
     for (int _i = 0; _i < n_overlap / 2; _i++) {
         int i = _i * 2;
         int I{ overlaps[i].i }, J{ overlaps[i].j };
@@ -388,4 +409,34 @@ void primitive_brute_force(
         vf_col_set(vilist, fjlist, cubes, I, J);
         vf_col_set(vjlist, filist, cubes, J, I);
     }
+}
+
+void iaabb_brute_force(
+    int n_cubes,
+    const std::vector<std::unique_ptr<AffineBody>>& cubes,
+    const std::vector<lu>& aabbs,
+    int vtn,
+    std::vector<std::array<vec3, 4>>& pts,
+    std::vector<std::array<int, 4>>& idx,
+    std::vector<std::array<vec3, 4>>& ees,
+    std::vector<std::array<int, 4>>& eidx,
+    std::vector<std::array<int, 2>>& vidx,
+    std::vector<Eigen::Matrix<double, 2, 12>>& pt_tk,
+    std::vector<Eigen::Matrix<double, 2, 12>>& ee_tk,
+    bool gen_basis)
+{
+    auto start = high_resolution_clock::now();
+    vector<Intersection> ret;
+    intersect_sort(n_cubes, cubes, aabbs, ret, vtn);
+    primitive_brute_force(n_cubes, ret, cubes, vtn,
+        pts,
+        idx,
+        ees,
+        eidx,
+        vidx,
+        pt_tk,
+        ee_tk,
+        gen_basis);
+    auto t = DURATION_TO_DOUBLE(start);
+    spdlog::info("time: iAABB = {:0.6f} ms", t * 1000);
 }

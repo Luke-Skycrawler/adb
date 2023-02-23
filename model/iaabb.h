@@ -1,3 +1,4 @@
+#pragma once
 #include "affine_body.h"
 using lu = std::array<vec3, 2>;
 
@@ -55,4 +56,18 @@ void primitive_brute_force(
     std::vector<std::array<int, 2>>& vidx,
     std::vector<Eigen::Matrix<double, 2, 12>>& pt_tk,
     std::vector<Eigen::Matrix<double, 2, 12>>& ee_tk,
-    bool gen_basis);
+    bool gen_basis = false);
+
+void iaabb_brute_force(
+    int n_cubes,
+    const std::vector<std::unique_ptr<AffineBody>>& cubes,
+    const std::vector<lu> &aabbs,
+    int vtn,
+    std::vector<std::array<vec3, 4>>& pts,
+    std::vector<std::array<int, 4>>& idx,
+    std::vector<std::array<vec3, 4>>& ees,
+    std::vector<std::array<int, 4>>& eidx,
+    std::vector<std::array<int, 2>>& vidx,
+    std::vector<Eigen::Matrix<double, 2, 12>>& pt_tk,
+    std::vector<Eigen::Matrix<double, 2, 12>>& ee_tk,
+    bool gen_basis = false);

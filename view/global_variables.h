@@ -19,6 +19,11 @@ static const unsigned int SCR_HEIGHT = 600;
 #include <omp.h>
 #include <string>
 #include "../model/spatial_hashing.h"
+#define _INCLUDE_IAABB_H_
+#ifdef _INCLUDE_IAABB_H_
+#include "../model/iaabb.h"
+#endif
+
 struct HessBlock {
     int i, j;
     Matrix<double, 12, 1> block;
@@ -58,11 +63,15 @@ struct GlobalVariableMainCPP{
     double alpha, beta;
     double kappa, d_hat, safe_factor, mu, eps_x, backoff;
 
-    bool col_set, upper_bound, line_search, sparse, dense, ee, pt, ground, psd, damp, full_ccd, align_com, log, player;
+    bool col_set, upper_bound, line_search, sparse, dense, ee, pt, ground, psd, damp, full_ccd, align_com, log, player, iaabb;
     vector<omp_lock_t> writelock_cols;
     unique_ptr<spatial_hashing> sh;
     std::string scene, trace_folder;
     std::vector<std::array<unsigned, 2>> edges, points, triangles;
+#ifdef _INCLUDE_IAABB_H_
+    std::vector<lu> aabbs;
+#endif
+
 };
 #ifndef GOOGLE_TEST
 #ifdef _MAIN_CPP
