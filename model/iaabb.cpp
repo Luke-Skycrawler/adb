@@ -58,19 +58,19 @@ lu compute_aabb(const Face& f)
 
 lu affine(const lu& aabb, q4& q)
 {
-    Matrix<double, 3, 8> cull;
+    Matrix<double, 3, 8> cull, _cull;
     vec3 l{ aabb[0] }, u{ aabb[1] };
     for (int i = 0; i < 2; i++)
         for (int j = 0; j < 2; j++)
             for (int k = 0; k < 2; k++) {
                 auto I = (i << 2) | (j << 1) | k;
-                cull(0, I) = i ? u(0) : l(0);
-                cull(1, I) = j ? u(1) : l(1);
-                cull(2, I) = k ? u(2) : l(2);
+                _cull(0, I) = i ? u(0) : l(0);
+                _cull(1, I) = j ? u(1) : l(1);
+                _cull(2, I) = k ? u(2) : l(2);
             }
     mat3 A;
     A << q[1], q[2], q[3];
-    cull = A * cull;
+    cull = A * _cull;
     l = cull.rowwise().minCoeff();
     u = cull.rowwise().maxCoeff();
     return { l + q[0], u + q[0] };
@@ -125,20 +125,31 @@ void intersect_sort(
     std::vector<Intersection>& ret,
     int vtn)
 {
+    static vector<BoundingBox> bounds[3];
+    static vector<Intersection> ilists[3];
+    static vector<lu> affine_bb;
+    static vector<Intersection> tmp;
     ret.resize(0);
-    vector<BoundingBox> bounds[3];
-    vector<Intersection> ilists[3];
-#pragma omp parallel for schedule(static, 1)
+    tmp.resize(0);
+    
+    affine_bb.resize(n_cubes);
+    for (int i = 0; i < n_cubes; i++) {
+        auto t{ affine(aabbs[i], *cubes[i], vtn) };
+        affine_bb[i] = t;
+    }
+    #pragma omp parallel for schedule(static, 1)
     for (int dim = 0; dim < 3; dim++) {
         bounds[dim].resize(n_cubes * 2);
         for (int i = 0; i < n_cubes; i++) {
-            auto t{ affine(aabbs[i], *cubes[i], vtn) };
+            auto& t{ affine_bb[i] };
             auto &l{ t[0] }, &u{ t[1] };
             bounds[dim][i * 2] = { i, l(dim), true };
             bounds[dim][i * 2 + 1] = { i, u(dim), false };
         }
         sort(bounds[dim].begin(), bounds[dim].end(), [](const BoundingBox& a, const BoundingBox& b) { return a.p < b.p; });
         vector<int> active;
+        ilists[dim].resize(0);
+        ilists[dim].reserve(n_cubes * 16);
         for (int i = 0; i < n_cubes * 2; i++) {
             auto& b{ bounds[dim][i] };
             auto body = b.body;
@@ -152,8 +163,8 @@ void intersect_sort(
                     }
                     auto c{ *it };
                     lu cull;
-                    auto bi = affine(aabbs[c], *cubes[c], vtn);
-                    auto bj = affine(aabbs[body], *cubes[body], vtn);
+                    auto& bi = affine_bb[c];
+                    auto& bj = affine_bb[body];
 
                     intersection(bi, bj, cull);
                     // ret.push_back({ min(c, body), max(c, body), cull });
@@ -168,7 +179,8 @@ void intersect_sort(
         };
         sort(ilists[dim].begin(), ilists[dim].end(), les);
     }
-    vector<Intersection> tmp;
+    // tmp.reserve(ilists[0].size());
+    // ret.reserve(ilists[0].size());
     std::set_intersection(ilists[0].begin(), ilists[0].end(), ilists[1].begin(), ilists[1].end(), std::back_inserter(tmp));
     std::set_intersection(tmp.begin(), tmp.end(), ilists[2].begin(), ilists[2].end(), std::back_inserter(ret));
     // TODO: change bounds[3] to static for reuse;
