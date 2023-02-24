@@ -43,19 +43,23 @@ lu compute_aabb(const AffineBody& c)
     u.array() += barrier::d_sqrt;
     return { l, u };
 }
-lu compute_aabb(const Edge& e)
+inline lu compute_aabb(const Edge& e)
 {
     vec3 l, u;
-    l = e.e0.array().min(e.e1.array());
-    u = e.e0.array().max(e.e1.array());
+    auto e0 {e.e0.array()}, e1 {e.e1.array()};
+    l = e0.min(e1);
+    u = e0.max(e1);
     return { l, u };
 }
 
-lu compute_aabb(const Face& f)
+inline lu compute_aabb(const Face& f)
 {
     vec3 l, u;
-    l = f.t0.array().min(f.t1.array()).min(f.t2.array());
-    u = f.t0.array().max(f.t1.array()).max(f.t2.array());
+    auto t0 {f.t0.array()}, 
+        t1 {f.t1.array()}, 
+        t2 {f.t2.array()};
+    l = t0.min(t1).min(t2);
+    u = t0.max(t1).max(t2);
     return { l, u };
 }
 
@@ -79,7 +83,7 @@ lu affine(const lu& aabb, q4& q)
     return { l + q[0], u + q[0] };
 }
 
-bool intersection(const lu& a, const lu& b, lu& ret)
+inline bool intersection(const lu& a, const lu& b, lu& ret)
 {
     vec3 l, u;
     l = a[0].array().max(b[0].array());
@@ -129,11 +133,14 @@ void intersect_sort(
     int vtn)
 {
     static vector<BoundingBox> bounds[3];
-    static vector<Intersection>* ilists[3] = {
-        new vector<Intersection>[n_cubes],
-        new vector<Intersection>[n_cubes],
-        new vector<Intersection>[n_cubes]
-    }, *tmp = new vector<Intersection>[n_cubes];
+    static vector<int>*ilists[3] = {
+        new vector<int>[n_cubes],
+        new vector<int>[n_cubes],
+        new vector<int>[n_cubes]
+    },
+           *tmp = new vector<int>[n_cubes];
+    static vector<Intersection>* ret_tmp = new vector<Intersection>[n_cubes];
+
     static vector<lu> affine_bb;
     // static vector<Intersection> tmp;
     ret.resize(0);
@@ -145,6 +152,7 @@ void intersect_sort(
         auto t{ affine(aabbs[i], *cubes[i], vtn) };
         affine_bb[i] = t;
         tmp[i].resize(0);
+        ret_tmp[i].resize(0);
         for (int dim = 0; dim < 3; dim ++)
         ilists[dim][i].resize(0);
     }
@@ -165,21 +173,11 @@ void intersect_sort(
             if (b.true_for_l_false_for_u)
                 active.push_back(body);
             else {
-                for (auto it = active.begin(); it != active.end();) {
-                    if (*it == body) {
-                        it = active.erase(it);
-                        continue;
-                    }
-                    auto c{ *it };
-                    lu cull;
-                    auto& bi = affine_bb[c];
-                    auto& bj = affine_bb[body];
-
-                    intersection(bi, bj, cull);
-                    // ret.push_back({ min(c, body), max(c, body), cull });
-                    ilists[dim][c].push_back({ c, body, cull, nullptr });
-                    ilists[dim][body].push_back({ body, c, cull, nullptr });
-                    ++it;
+                auto it = find(active.begin(), active.end(), body);
+                active.erase(it);
+                ilists[dim][body].insert(ilists[dim][body].end(), active.begin(), active.end());
+                for (auto c : active) {
+                    ilists[dim][c].push_back(body);
                 }
             }
         }
@@ -190,7 +188,7 @@ void intersect_sort(
 #pragma omp parallel for schedule(guided)
         for (int i = 0; i < n_cubes; i++) {
             auto &l {ilists[dim][i]};
-            sort(l.begin(), l.end(), les);
+            sort(l.begin(), l.end());
             if (dim == 1){
                 auto &l0 {ilists[0][i]};
                 set_intersection(l.begin(), l.end(), l0.begin(), l0.end(), back_inserter(tmp[i]));
@@ -203,9 +201,20 @@ void intersect_sort(
 
         }
     }
+
+    #pragma omp parallel for schedule(guided)
     for (int i = 0; i < n_cubes; i ++) {
         auto &l {ilists[0][i]};
-        ret.insert(ret.end(), l.begin(), l.end());
+        auto& bi = affine_bb[i];
+        for (int j: l) {
+            auto& bj = affine_bb[j];
+            lu cull;
+            intersection(bi, bj, cull);
+            ret_tmp[i].push_back({ i, j, cull, nullptr });
+        }
+    }
+    for (int i = 0; i < n_cubes; i++) {
+        ret.insert(ret.end(), ret_tmp[i].begin(), ret_tmp[i].end());
     }
     // std::set_intersection(ilists[0].begin(), ilists[0].end(), ilists[1].begin(), ilists[1].end(), std::back_inserter(tmp));
     // std::set_intersection(tmp.begin(), tmp.end(), ilists[2].begin(), ilists[2].end(), std::back_inserter(ret));
@@ -303,7 +312,7 @@ void primitive_brute_force(
         for (int v = 0; v < c.n_vertices; v++) {
             auto& p{ c.v_transformed[v] };
             for (int o = starting[I]; o < starting[I + 1]; o++) {
-                lu cull = overlaps[o].cull;
+                lu& cull = overlaps[o].cull;
                 overlaps[o].plist = lists + o;
                 if (filter_if_inside(cull, p)) {
                     auto &t{ overlaps[o] };
@@ -327,7 +336,7 @@ void primitive_brute_force(
             // TODO: always intialize from v_transformed
 
             for (int o = starting[I]; o < starting[I + 1]; o++) {
-                lu cull = overlaps[o].cull;
+                lu& cull = overlaps[o].cull;
 
                 if (filter_if_inside(cull, ei)) {
                     auto &t{ overlaps[o] };
@@ -343,7 +352,7 @@ void primitive_brute_force(
             Face fi{ c, unsigned(f), true, true };
             // TODO: always intialize from v_transformed
             for (int o = starting[I]; o < starting[I + 1]; o++) {
-                lu cull = overlaps[o].cull;
+                lu& cull = overlaps[o].cull;
 
                 if (filter_if_inside(cull, fi)) {
                     auto t{ overlaps[o] };

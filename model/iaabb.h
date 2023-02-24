@@ -25,8 +25,8 @@ struct BoundingBox {
 };
 
 lu compute_aabb(const AffineBody& c);
-lu compute_aabb(const Edge& c);
-lu compute_aabb(const Face& c);
+// lu compute_aabb(const Edge& c);
+// lu compute_aabb(const Face& c);
 lu affine(const lu& aabb, q4& q);
 lu affine(lu aabb, AffineBody& c, int vtn);
 
