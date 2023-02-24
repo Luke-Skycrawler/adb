@@ -35,6 +35,7 @@ void reset(bool init)
     globals.player = data["player"];
     globals.trace_folder = data["trace_folder"];
     globals.iaabb = data["iaabb"];
+    globals.evh = data["evh"];
     if (predefined) {
         int id = data["predefined_case"]["id"];
         if (id == 1) {

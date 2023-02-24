@@ -50,6 +50,7 @@ double E_global(const VectorXd& q_plus_dq, const VectorXd& dq, int n_cubes, int 
         // else
         // c.project_vt1();
         c.project_vt2();
+        // used for pt_vstack. vt1 and vt2 should not use buffer
         e += e_inert;
     }
     if (globals.pt)
@@ -150,7 +151,7 @@ double line_search(const VectorXd& dq, const VectorXd& grad, VectorXd& q0, doubl
         vidx,
         pt_tk,
         ee_tk,
-        cubes, dt, ef0, true);
+        cubes, dt, ef0, false);
     E0 += ef0;
     double qdg = dq.dot(grad);
     VectorXd q1;
@@ -210,7 +211,7 @@ double line_search(const VectorXd& dq, const VectorXd& grad, VectorXd& q0, doubl
             vidx,
             pt_tk,
             ee_tk,
-            cubes, dt, ef1, true);
+            cubes, dt, ef1, false);
         E2 = E_global(q1, dqk, n_cubes, pts_new.size(), ees_new.size(), vidx_new.size(),
             idx_new, eidx_new, vidx_new,
             pt_tk_new,
@@ -381,11 +382,12 @@ void implicit_euler(vector<unique_ptr<AffineBody>>& cubes, double dt)
             auto& c(*cubes[k]);
             c.grad = grad_residue_per_body(c, dt);
             c.hess = hess_inertia_per_body(c, dt);
+            c.project_vt1();
         }
         for (auto _v : vidx) {
             int i = _v[0], v = _v[1];
             auto& c{ *cubes[i] };
-            vec3 p = c.vt1(v);
+            vec3 p = c.v_transformed[v];
             double _d = vg_distance(p);
             double d = _d * _d;
             if (d < barrier::d_hat) {
@@ -420,14 +422,15 @@ void implicit_euler(vector<unique_ptr<AffineBody>>& cubes, double dt)
 
 #pragma omp parallel for schedule(static)
         for (int k = 0; k < n_pt; k++) {
-            auto& pt(pts[k]);
+            // auto& pt(pts[k]);
             auto& ij(idx[k]);
-
             int i = ij[0], j = ij[2];
             auto &ci(*cubes[i]), &cj(*cubes[j]);
+            Face f{ cj, unsigned(ij[3]), false, true };
+            array<vec3, 4> pt{ ci.v_transformed[ij[1]], f.t0, f.t1, f.t2 };
             // auto pt_type = ipc::point_triangle_distance_type(pt[0], pt[1], pt[2], pt[3]);
             ipc::PointTriangleDistanceType pt_type;
-            double d = vf_distance(pt[0], Face{ pt[1], pt[2], pt[3] }, pt_type);
+            double d = vf_distance(pt[0], f, pt_type);
             if (d < barrier::d_hat) {
 #ifdef _FRICTION_
 
@@ -458,10 +461,12 @@ void implicit_euler(vector<unique_ptr<AffineBody>>& cubes, double dt)
         }
 #pragma omp parallel for schedule(static)
         for (int k = 0; k < n_ee; k++) {
-            auto& ee(ees[k]);
+            // auto& ee(ees[k]);
             auto& ij(eidx[k]);
             int i = ij[0], j = ij[2];
             auto &ci(*cubes[i]), &cj(*cubes[j]);
+            Edge ei{ ci, unsigned(ij[1]), false, true }, ej{ cj, unsigned(ij[3]), false, true };
+            array<vec3, 4> ee{ ei.e0, ei.e1, ej.e0, ej.e1 };
             auto ee_type = ipc::edge_edge_distance_type(ee[0], ee[1], ee[2], ee[3]);
             double d = edge_edge_distance(ee[0], ee[1], ee[2], ee[3], ee_type);
             if (d < barrier::d_hat) {
@@ -643,7 +648,7 @@ void implicit_euler(vector<unique_ptr<AffineBody>>& cubes, double dt)
         //                 ees[k] = { ei.e0, ei.e1, ej.e0, ej.e1 };
         //             }
         //         }
-        term_cond = sup_dq < 1e-4 || ++iter >= globals.max_iter;
+        term_cond = sup_dq < 1e-6 || ++iter >= globals.max_iter;
         sup_dq = 0.0;
     } while (!term_cond);
     spdlog::info("\n  converge at iter {}, ts = {} \n", iter, ts++);

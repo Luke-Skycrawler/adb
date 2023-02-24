@@ -61,7 +61,7 @@ struct GlobalVariableMainCPP{
 
     vec3 gravity;
     double alpha, beta;
-    double kappa, d_hat, safe_factor, mu, eps_x, backoff;
+    double kappa, d_hat, safe_factor, mu, eps_x, backoff, evh;
 
     bool col_set, upper_bound, line_search, sparse, dense, ee, pt, ground, psd, damp, full_ccd, align_com, log, player, iaabb;
     vector<omp_lock_t> writelock_cols;
