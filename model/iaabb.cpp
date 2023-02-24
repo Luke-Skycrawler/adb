@@ -182,29 +182,31 @@ void intersect_sort(
             }
         }
     }
-    
 
-    for (int dim = 0; dim < 3; dim++) {
-#pragma omp parallel for schedule(guided)
+#pragma omp parallel
+    {
+        unsigned char *bucket = new unsigned char[n_cubes];
+#pragma omp for schedule(guided)
         for (int i = 0; i < n_cubes; i++) {
-            auto &l {ilists[dim][i]};
-            sort(l.begin(), l.end());
-            if (dim == 1){
-                auto &l0 {ilists[0][i]};
-                set_intersection(l.begin(), l.end(), l0.begin(), l0.end(), back_inserter(tmp[i]));
+            fill(bucket, bucket + n_cubes, 0);
+            for (int dim = 0; dim < 3; dim++) {
+                auto& l{ ilists[dim][i] };
+                for (auto j : l) {
+                    if (dim < 2)
+                        bucket[j] += 1;
+                    else if (bucket[j] == 2) {
+                        tmp[i].push_back(j);
+                    }
+                }
             }
-            else if (dim == 2) {
-                auto &l0 {ilists[0][i]};
-                l0.resize(0);
-                set_intersection(l.begin(), l.end(), tmp[i].begin(), tmp[i].end(), back_inserter(l0));
-            }
-
+            sort(tmp[i].begin(), tmp[i].end());
         }
+        delete[] bucket;
     }
 
-    #pragma omp parallel for schedule(guided)
+#pragma omp parallel for schedule(guided)
     for (int i = 0; i < n_cubes; i ++) {
-        auto &l {ilists[0][i]};
+        auto& l{ tmp[i] };
         auto& bi = affine_bb[i];
         for (int j: l) {
             auto& bj = affine_bb[j];
@@ -216,9 +218,6 @@ void intersect_sort(
     for (int i = 0; i < n_cubes; i++) {
         ret.insert(ret.end(), ret_tmp[i].begin(), ret_tmp[i].end());
     }
-    // std::set_intersection(ilists[0].begin(), ilists[0].end(), ilists[1].begin(), ilists[1].end(), std::back_inserter(tmp));
-    // std::set_intersection(tmp.begin(), tmp.end(), ilists[2].begin(), ilists[2].end(), std::back_inserter(ret));
-    // TODO: change bounds[3] to static for reuse;
     // TODO: O(n) insertion sort
 }
 
