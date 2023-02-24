@@ -14,7 +14,7 @@
 #include <Eigen/PardisoSupport>
 #endif
 #include <ipc/distance/edge_edge_mollifier.hpp>
-#define IAABB_COMPARING
+// #define IAABB_COMPARING
 #ifdef IAABB_COMPARING
 #include <algorithm>
 #endif
@@ -176,6 +176,7 @@ double line_search(const VectorXd& dq, const VectorXd& grad, VectorXd& q0, doubl
 
         if (globals.iaabb)
             iaabb_brute_force(n_cubes, cubes, globals.aabbs, 2,
+        #ifdef IAABB_COMPARING
                 pts_iaab,
                 idx_iaab,
                 ees_iaab,
@@ -183,7 +184,14 @@ double line_search(const VectorXd& dq, const VectorXd& grad, VectorXd& q0, doubl
                 vidx_iaab,
                 pt_tk_iaab,
                 ee_tk_iaab);
-        #ifndef IAABB_COMPARING
+        #else
+                pts_new,
+                idx_new,
+                ees_new,
+                eidx_new,
+                vidx_new,
+                pt_tk_new,
+                ee_tk_new);
         else
         #endif
             gen_collision_set(true, n_cubes, cubes,
@@ -250,7 +258,7 @@ void implicit_euler(vector<unique_ptr<AffineBody>>& cubes, double dt)
 
     vector<Matrix<double, 2, 12>> pt_tk;
     vector<Matrix<double, 2, 12>> ee_tk;
-    
+#ifdef IAABB_COMPARING
     vector<array<vec3, 4>> pts_iaabb;
     vector<array<int, 4>> idx_iaabb;
 
@@ -261,13 +269,14 @@ void implicit_euler(vector<unique_ptr<AffineBody>>& cubes, double dt)
 
     vector<Matrix<double, 2, 12>> pt_tk_iaabb;
     vector<Matrix<double, 2, 12>> ee_tk_iaabb;
+#endif
 
-    double D_friction;
     const int n_cubes = cubes.size(), nsqr = n_cubes * n_cubes, hess_dim = n_cubes * 12;
 
     if (globals.col_set) {
         if (globals.iaabb)
             iaabb_brute_force(n_cubes, cubes, globals.aabbs, 1,
+#ifdef IAABB_COMPARING
                 pts_iaabb,
                 idx_iaabb,
                 ees_iaabb,
@@ -276,10 +285,7 @@ void implicit_euler(vector<unique_ptr<AffineBody>>& cubes, double dt)
                 pt_tk_iaabb,
                 ee_tk_iaabb,
                 true);
-#ifndef IAABB_COMPARING
-        else
-    #endif
-            gen_collision_set(false, n_cubes, cubes,
+#else
                 pts,
                 idx,
                 ees,
@@ -288,6 +294,17 @@ void implicit_euler(vector<unique_ptr<AffineBody>>& cubes, double dt)
                 pt_tk,
                 ee_tk,
                 true);
+        else
+#endif
+        gen_collision_set(false, n_cubes, cubes,
+            pts,
+            idx,
+            ees,
+            eidx,
+            vidx,
+            pt_tk,
+            ee_tk,
+            true);
 
         if (globals.iaabb) {
 
