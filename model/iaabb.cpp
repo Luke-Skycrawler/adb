@@ -23,6 +23,9 @@ using namespace utils;
 using namespace std::chrono;
 using lu = std::array<vec3, 2>;
 #define DURATION_TO_DOUBLE(X) duration_cast<duration<double>>(high_resolution_clock::now() - (X)).count()
+inline bool les(const Intersection& a, const Intersection& b){
+    return a.i < b.i || (a.i == b.i && a.j < b.j);
+};
 lu compute_aabb(const AffineBody& c)
 {
     vec3 l, u;
@@ -126,16 +129,24 @@ void intersect_sort(
     int vtn)
 {
     static vector<BoundingBox> bounds[3];
-    static vector<Intersection> ilists[3];
+    static vector<Intersection>* ilists[3] = {
+        new vector<Intersection>[n_cubes],
+        new vector<Intersection>[n_cubes],
+        new vector<Intersection>[n_cubes]
+    }, *tmp = new vector<Intersection>[n_cubes];
     static vector<lu> affine_bb;
-    static vector<Intersection> tmp;
+    // static vector<Intersection> tmp;
     ret.resize(0);
-    tmp.resize(0);
     
     affine_bb.resize(n_cubes);
+
+    #pragma omp parallel for schedule(static)
     for (int i = 0; i < n_cubes; i++) {
         auto t{ affine(aabbs[i], *cubes[i], vtn) };
         affine_bb[i] = t;
+        tmp[i].resize(0);
+        for (int dim = 0; dim < 3; dim ++)
+        ilists[dim][i].resize(0);
     }
     #pragma omp parallel for schedule(static, 1)
     for (int dim = 0; dim < 3; dim++) {
@@ -148,8 +159,6 @@ void intersect_sort(
         }
         sort(bounds[dim].begin(), bounds[dim].end(), [](const BoundingBox& a, const BoundingBox& b) { return a.p < b.p; });
         vector<int> active;
-        ilists[dim].resize(0);
-        ilists[dim].reserve(n_cubes * 16);
         for (int i = 0; i < n_cubes * 2; i++) {
             auto& b{ bounds[dim][i] };
             auto body = b.body;
@@ -168,21 +177,38 @@ void intersect_sort(
 
                     intersection(bi, bj, cull);
                     // ret.push_back({ min(c, body), max(c, body), cull });
-                    ilists[dim].push_back({ c, body, cull, nullptr });
-                    ilists[dim].push_back({ body, c, cull, nullptr });
+                    ilists[dim][c].push_back({ c, body, cull, nullptr });
+                    ilists[dim][body].push_back({ body, c, cull, nullptr });
                     ++it;
                 }
             }
         }
-        const auto les = [](const Intersection& a, const Intersection& b) -> bool {
-            return a.i < b.i || (a.i == b.i && a.j < b.j);
-        };
-        sort(ilists[dim].begin(), ilists[dim].end(), les);
     }
-    // tmp.reserve(ilists[0].size());
-    // ret.reserve(ilists[0].size());
-    std::set_intersection(ilists[0].begin(), ilists[0].end(), ilists[1].begin(), ilists[1].end(), std::back_inserter(tmp));
-    std::set_intersection(tmp.begin(), tmp.end(), ilists[2].begin(), ilists[2].end(), std::back_inserter(ret));
+    
+
+    for (int dim = 0; dim < 3; dim++) {
+#pragma omp parallel for schedule(guided)
+        for (int i = 0; i < n_cubes; i++) {
+            auto &l {ilists[dim][i]};
+            sort(l.begin(), l.end(), les);
+            if (dim == 1){
+                auto &l0 {ilists[0][i]};
+                set_intersection(l.begin(), l.end(), l0.begin(), l0.end(), back_inserter(tmp[i]));
+            }
+            else if (dim == 2) {
+                auto &l0 {ilists[0][i]};
+                l0.resize(0);
+                set_intersection(l.begin(), l.end(), tmp[i].begin(), tmp[i].end(), back_inserter(l0));
+            }
+
+        }
+    }
+    for (int i = 0; i < n_cubes; i ++) {
+        auto &l {ilists[0][i]};
+        ret.insert(ret.end(), l.begin(), l.end());
+    }
+    // std::set_intersection(ilists[0].begin(), ilists[0].end(), ilists[1].begin(), ilists[1].end(), std::back_inserter(tmp));
+    // std::set_intersection(tmp.begin(), tmp.end(), ilists[2].begin(), ilists[2].end(), std::back_inserter(ret));
     // TODO: change bounds[3] to static for reuse;
     // TODO: O(n) insertion sort
 }
@@ -230,7 +256,21 @@ void primitive_brute_force(
     ee_tk.resize(0);
     int n_overlap = overlaps.size();
 
-    auto lists = new PList[n_overlap];
+    static PList* lists = new PList[n_overlap];
+    static int allocated = n_overlap;
+    if (n_overlap > allocated) {
+        delete []lists;
+        lists = new PList[n_overlap];
+        allocated = n_overlap;
+    }
+    for (int i = 0; i < n_overlap; i++) {
+        lists[i].vi.resize(0);
+        lists[i].vj.resize(0);
+        lists[i].ei.resize(0);
+        lists[i].ej.resize(0);
+        lists[i].fi.resize(0);
+        lists[i].fj.resize(0);
+    }
     vector<int> starting;
     starting.resize(n_cubes + 1);
     for (int i = 0; i <= n_cubes; i++)
