@@ -86,12 +86,22 @@ void friction(
     auto f1 = ipc::f1_SF_over_x(uk, evh);
     Vector<double, 12> F_k = mu * contact_lambda * Tk * f1 * _uk;
     // double D_k = mu * contact_lambda * ipc::f0_SF(uk, evh);
-    double df1_term = ipc::df1_x_minus_f1_over_x3(uk, evh);
-    Matrix2d M2x2 = (df1_term * _uk * _uk.transpose());
-    M2x2 += f1 * Matrix2d::Identity(2, 2);
-    M2x2 = project_to_psd(M2x2);
-    Matrix<double, 12, 12> D_k_hessian = mu * contact_lambda * Tk * M2x2 * Tk.transpose();
+    Matrix<double, 12, 12> D_k_hessian;
 
+    if (uk >= evh) {
+        Vector2d ut{ -_uk[1], _uk[0] };
+        D_k_hessian = mu * contact_lambda * f1 / (uk * uk) * Tk * ut * (ut.transpose() * Tk.transpose());
+    }
+    else if (uk == 0.0) {
+        D_k_hessian = f1 * mu * contact_lambda * Tk * Tk.transpose();
+    }
+    else {
+        double df1_term = ipc::df1_x_minus_f1_over_x3(uk, evh);
+        Matrix2d M2x2 = (df1_term * _uk * _uk.transpose());
+        M2x2 += f1 * Matrix2d::Identity(2, 2);
+        M2x2 = project_to_psd(M2x2);
+        D_k_hessian = mu * contact_lambda * Tk * M2x2 * Tk.transpose();
+    }
     g += F_k * h2;
     H += D_k_hessian * h2;
 }

@@ -648,7 +648,7 @@ void implicit_euler(vector<unique_ptr<AffineBody>>& cubes, double dt)
         //                 ees[k] = { ei.e0, ei.e1, ej.e0, ej.e1 };
         //             }
         //         }
-        term_cond = sup_dq < 1e-6 || ++iter >= globals.max_iter;
+        term_cond = sup_dq < 1e-4 || ++iter >= globals.max_iter;
         sup_dq = 0.0;
     } while (!term_cond);
     spdlog::info("\n  converge at iter {}, ts = {} \n", iter, ts++);
