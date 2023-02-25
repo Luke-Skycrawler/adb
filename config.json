@@ -6,7 +6,7 @@
     "predefined_case" : {
         "enable": false,
         "id" : 2,
-        "custom": "../test_cases/cards.json"
+        "custom": "../test_cases/static_friction.json"
     },
     "solver": "sparse",
     "gravity": true, 
@@ -17,7 +17,7 @@
     "ground": true,
     "safe_factor": 1.0,
     "uppper_bound": true, 
-    "mu": 0.4,
+    "mu": 0.2,
     "log": true,
     "backoff": 0.8,
     "damping": {

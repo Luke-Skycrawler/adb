@@ -44,7 +44,7 @@ void intersect_sort(
     std::vector<Intersection> &ret,
     int vtn);
 
-void primitive_brute_force(
+double primitive_brute_force(
     int n_cubes,
     std::vector<Intersection>& overlaps, // assert sorted
     const std::vector<std::unique_ptr<AffineBody>>& cubes,
@@ -58,7 +58,7 @@ void primitive_brute_force(
     std::vector<Eigen::Matrix<double, 2, 12>>& ee_tk,
     bool gen_basis = false);
 
-void iaabb_brute_force(
+double iaabb_brute_force(
     int n_cubes,
     const std::vector<std::unique_ptr<AffineBody>>& cubes,
     const std::vector<lu> &aabbs,

@@ -62,7 +62,34 @@ inline lu compute_aabb(const Face& f)
     u = t0.max(t1).max(t2);
     return { l, u };
 }
-
+inline lu merge(const lu& a, const lu& b)
+{
+    vec3 l, u;
+    l = a[0].array().max(b[0].array());
+    u = a[1].array().max(b[1].array());
+    return { l, u };
+}
+inline lu compute_aabb(const vec3& p0, const vec3& p1)
+{
+    vec3 l, u;
+    auto e0{ p0.array() }, e1{ p1.array() };
+    l = e0.min(e1);
+    u = e0.max(e1);
+    return { l, u };
+}
+inline lu compute_aabb(const Edge& e1, const Edge& e2)
+{
+    auto e10{ e1.e0.array() }, e11{ e1.e1.array() };
+    auto e20{ e2.e0.array() }, e21{ e2.e1.array() };
+    vec3 l, u;
+    l = e10.min(e11).min(e20).min(e21);
+    u = e10.max(e11).max(e20).max(e21);
+    return { l, u };
+}
+inline lu compute_aabb(const Face& f1, const Face& f2)
+{
+    return merge(compute_aabb(f1), compute_aabb(f2));
+}
 lu affine(const lu& aabb, q4& q)
 {
     Matrix<double, 3, 8> cull, _cull;
@@ -96,8 +123,12 @@ inline bool intersection(const lu& a, const lu& b, lu& ret)
 lu affine(lu aabb, AffineBody& c, int vtn)
 {
     auto qi = vtn == 0 ? c.q0 : c.q;
-    if (vtn == 2)
+    if (vtn >= 2)
         for (int i = 0; i < 4; i++) qi[i] += c.dq.segment<3>(i * 3);
+    if (vtn == 3) {
+        auto bt0{ affine(aabb, c.q) }, bt1{ affine(aabb, qi) };
+        return { merge(bt0, bt1) };
+    }
     return affine(aabb, qi);
 };
 
@@ -132,6 +163,15 @@ void intersect_sort(
     std::vector<Intersection>& ret,
     int vtn)
 {
+
+    /*
+    vtn = {
+        1: A = q,
+        2: A = q + dq,
+        3: trajectory
+    }
+
+    */
     static vector<BoundingBox> bounds[3];
     static vector<int>*ilists[3] = {
         new vector<int>[n_cubes],
@@ -221,27 +261,35 @@ void intersect_sort(
     // TODO: O(n) insertion sort
 }
 
-inline bool filter_if_inside(lu& a, vec3& p)
+inline bool filter_if_inside(lu& a, vec3& p, bool trajectory, AffineBody& c, int pid)
 {
-    vec3 l = a[0], u = a[1];
-    return (l.array() <= p.array()).all() && (u.array() >= p.array()).all();
+    if (!trajectory) {
+        vec3 l = a[0], u = a[1];
+        return (l.array() <= p.array()).all() && (u.array() >= p.array()).all();
+    }
+    auto p1{ c.vt1(pid) }, &p2{ p };
+    lu ret;
+    return intersection(a, compute_aabb(p1, p2), ret);
 }
-inline bool filter_if_inside(lu& a, Edge& e)
+inline bool filter_if_inside(lu& a, Edge& e, bool trajectory, AffineBody& c, int pid)
 {
     lu ret;
-    return intersection(a, compute_aabb(e), ret);
-    // bool b1 = filter_if_inside(a, e.e0),
-    //      b2 = filter_if_inside(a, e.e1);
-    // return b1 || b2;
+    if (!trajectory) {
+        return intersection(a, compute_aabb(e), ret);
+    }
+    Edge e1{ c, unsigned(pid) }, &e2{ e };
+    return intersection(a, compute_aabb(e1, e2), ret);
 }
-inline bool filter_if_inside(lu& a, Face& f)
+inline bool filter_if_inside(lu& a, Face& f, bool trajectory, AffineBody& c, int pid)
 {
     lu ret;
-    return intersection(a, compute_aabb(f), ret);
-    // return filter_if_inside(a, f.t0) || filter_if_inside(a, f.t1) || filter_if_inside(a, f.t2);
+    if (!trajectory)
+        return intersection(a, compute_aabb(f), ret);
+    Face f1{ c, unsigned(pid) }, &f2{ f };
+    return intersection(a, compute_aabb(f1, f2), ret);
 }
 
-void primitive_brute_force(
+double primitive_brute_force(
     int n_cubes,
     std::vector<Intersection>& overlaps, // assert sorted
     const std::vector<std::unique_ptr<AffineBody>>& cubes,
@@ -262,6 +310,7 @@ void primitive_brute_force(
     vidx.resize(0);
     pt_tk.resize(0);
     ee_tk.resize(0);
+    bool cull_trajectory = vtn == 3;
     int n_overlap = overlaps.size();
 
     static PList* lists = new PList[n_overlap];
@@ -313,7 +362,7 @@ void primitive_brute_force(
             for (int o = starting[I]; o < starting[I + 1]; o++) {
                 lu& cull = overlaps[o].cull;
                 overlaps[o].plist = lists + o;
-                if (filter_if_inside(cull, p)) {
+                if (filter_if_inside(cull, p, cull_trajectory, c, v)) {
                     auto &t{ overlaps[o] };
                     assert(t.i == I);
                     if (t.i < t.j)
@@ -337,7 +386,7 @@ void primitive_brute_force(
             for (int o = starting[I]; o < starting[I + 1]; o++) {
                 lu& cull = overlaps[o].cull;
 
-                if (filter_if_inside(cull, ei)) {
+                if (filter_if_inside(cull, ei, cull_trajectory, c, e)) {
                     auto &t{ overlaps[o] };
                     if (t.i < t.j)
                         lists[o].ei.push_back(e);
@@ -353,7 +402,7 @@ void primitive_brute_force(
             for (int o = starting[I]; o < starting[I + 1]; o++) {
                 lu& cull = overlaps[o].cull;
 
-                if (filter_if_inside(cull, fi)) {
+                if (filter_if_inside(cull, fi, cull_trajectory, c, f)) {
                     auto t{ overlaps[o] };
                     if (t.i < t.j)
                         lists[o].fi.push_back(f);
@@ -436,6 +485,37 @@ void primitive_brute_force(
             }
     };
 
+    const auto vf_col_time = [&](vector<int>& vilist, vector<int>& fjlist,
+                                 const std::vector<std::unique_ptr<AffineBody>>& cubes,
+                                 int I, int J) -> double {
+        auto &ci{ *cubes[I] }, &cj{ *cubes[J] };
+        double toi = 1.0;
+        for (int vi : vilist)
+            for (int fj : fjlist) {
+                vec3 v{ ci.v_transformed[vi] };
+                Face f{ cj, unsigned(fj), true, true };
+                double t = pt_collision_time(ci.vt1(vi), Face{ cj, unsigned(fj) }, v, f);
+                toi = min(toi, t);
+            }
+        return toi;
+    };
+
+    const auto ee_col_time = [&](vector<int>& eilist, vector<int>& ejlist,
+                                 const std::vector<std::unique_ptr<AffineBody>>& cubes,
+                                 int I, int J) -> double {
+        auto &ci{ *cubes[I] }, &cj{ *cubes[J] };
+        double toi = 1.0;
+        for (int ei : eilist)
+            for (int ej : ejlist) {
+                Edge ei0(ci, ei), ei1(ci, ei, true, true);
+                Edge ej0(cj, ej), ej1(cj, ej, true, true);
+                double t = ee_collision_time(ei0, ej0, ei1, ej1);
+                toi = min(toi, t);
+            }
+        return toi;
+    };
+    double toi_global = 1.0;
+    if (!cull_trajectory)
 #pragma omp parallel
     {
         vector<array<int, 4>> idx_private, eidx_private;
@@ -492,9 +572,35 @@ void primitive_brute_force(
             ee_tk.insert(ee_tk.end(), ee_tk_private.begin(), ee_tk_private.end());
         }
     }
+    else
+#pragma omp parallel
+    {
+        double toi = 1.0;
+#pragma omp for schedule(guided) nowait
+        for (int _i = 0; _i < n_overlap / 2; _i++) {
+            int i = _i * 2;
+            int I{ overlaps[i].i }, J{ overlaps[i].j };
+            auto& p{ *overlaps[i].plist };
+            auto& vilist{ p.vi };
+            auto& vjlist{ p.vj };
+            auto& eilist{ p.ei };
+            auto& ejlist{ p.ej };
+            auto& filist{ p.fi };
+            auto& fjlist{ p.fj };
+            toi = vf_col_time(vilist, fjlist, cubes, I, J);
+            toi = min(toi, vf_col_time(vjlist, filist, cubes, J, I));
+            toi = min(toi, ee_col_time(eilist, ejlist, cubes, I, J));
+        }
+#pragma omp critical
+        {
+            toi_global = min(toi_global, toi);
+        }
+    }
+    
+    return cull_trajectory? toi_global: 0.0;
 }
 
-void iaabb_brute_force(
+double iaabb_brute_force(
     int n_cubes,
     const std::vector<std::unique_ptr<AffineBody>>& cubes,
     const std::vector<lu>& aabbs,
@@ -511,7 +617,7 @@ void iaabb_brute_force(
     auto start = high_resolution_clock::now();
     vector<Intersection> ret;
     intersect_sort(n_cubes, cubes, aabbs, ret, vtn);
-    primitive_brute_force(n_cubes, ret, cubes, vtn,
+    double toi = primitive_brute_force(n_cubes, ret, cubes, vtn,
         pts,
         idx,
         ees,
@@ -522,4 +628,5 @@ void iaabb_brute_force(
         gen_basis);
     auto t = DURATION_TO_DOUBLE(start);
     spdlog::info("time: iAABB = {:0.6f} ms", t * 1000);
+    return toi;
 }
