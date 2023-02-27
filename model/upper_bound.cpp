@@ -45,6 +45,7 @@ double step_size_upper_bound(VectorXd& dq, vector<unique_ptr<AffineBody>>& cubes
                 toi = min(toi, toi_private);
             }
         }
+        spdlog::info("sh: ground toi = {}", toi);
         if (globals.pt) {
 #ifdef _BODY_LEVEL_
 #pragma omp parallel for schedule(static)
@@ -93,6 +94,7 @@ double step_size_upper_bound(VectorXd& dq, vector<unique_ptr<AffineBody>>& cubes
             }
             globals.sh->remove_all_entries();
 
+            double pt_toi = 1.0;
 #pragma omp parallel
             {
                 double toi_private = 1.0;
@@ -121,10 +123,14 @@ double step_size_upper_bound(VectorXd& dq, vector<unique_ptr<AffineBody>>& cubes
                     }
                 }
 #pragma omp critical
-                toi = min(toi_private, toi);
+                {
+                    toi = min(toi_private, toi);
+                    pt_toi = min(toi_private, pt_toi);
+                }
             }
 #endif
             // globals.sh->remove_all_entries();
+            spdlog::info("sh pt toi = {}", pt_toi);
         }
         if (globals.ee) {
 #ifdef _BODY_LEVEL_
@@ -174,7 +180,7 @@ double step_size_upper_bound(VectorXd& dq, vector<unique_ptr<AffineBody>>& cubes
                 globals.sh->register_edge_trajectory(e0.e0, e0.e1, e1.e0, e1.e1, idx[0], ei);
             }
             globals.sh->remove_all_entries();
-
+            double ee_toi = 1.0;
 #pragma omp parallel
             {
                 double toi_private = 1.0;
@@ -203,11 +209,15 @@ double step_size_upper_bound(VectorXd& dq, vector<unique_ptr<AffineBody>>& cubes
                     }
                 }
 #pragma omp critical
-                toi = min(toi, toi_private);
+                {
+                    toi = min(toi, toi_private);
+                    ee_toi = min(toi_private, ee_toi);
+                }
             }
 
 #endif
             // globals.sh->remove_all_entries();
+            spdlog::info("sh ee toi = {}", ee_toi);
         }
         auto _duration = DURATION_TO_DOUBLE(start);
         spdlog::info("time: step size upper bound = {:0.6f} ms", _duration * 1000);

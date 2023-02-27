@@ -15,7 +15,9 @@
 #endif
 #include <ipc/distance/edge_edge_mollifier.hpp>
 // #define IAABB_COMPARING
+#define IAABB_INTERNSHIP
 #ifdef IAABB_COMPARING
+
 #include <algorithm>
 #endif
 using namespace std;
@@ -586,8 +588,21 @@ void implicit_euler(vector<unique_ptr<AffineBody>>& cubes, double dt)
                 c.dq = dq.segment<12>(k * 12);
             }
 
-            if (globals.upper_bound)
-                toi = step_size_upper_bound(dq, cubes, n_cubes, n_pt, n_ee, n_g, pts, idx, ees, eidx, vidx);
+            if (globals.upper_bound) {
+                double toi_iaabb;
+                if (globals.iaabb)
+                    toi_iaabb = iaabb_brute_force(n_cubes, cubes, globals.aabbs, 3, pts, idx, ees, eidx, vidx, pt_tk, ee_tk, false);
+#ifndef IAABB_INTERNSHIP
+                else
+#endif
+                    toi = step_size_upper_bound(dq, cubes, n_cubes, n_pt, n_ee, n_g, pts, idx, ees, eidx, vidx);
+#ifdef IAABB_INTERNSHIP
+                if (toi != toi_iaabb)
+                    spdlog::error("step size upper bound not match, toi = {}, iaabb = {}", toi, toi_iaabb);
+#else
+                toi = toi_iaabb;
+#endif
+            }
 
             if (toi < 1.0) {
                 spdlog::warn("collision at {}, toi = {}", iter, toi);

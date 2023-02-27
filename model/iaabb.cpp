@@ -310,6 +310,7 @@ double primitive_brute_force(
     vidx.resize(0);
     pt_tk.resize(0);
     ee_tk.resize(0);
+    double toi_global = 1.0;
     bool cull_trajectory = vtn == 3;
     int n_overlap = overlaps.size();
 
@@ -371,11 +372,20 @@ double primitive_brute_force(
                         lists[o].vj.push_back(v);
                 }
             }
-            double d = vg_distance(p);
-            d = d * d;
-            if (d < barrier::d_hat) {
+
+            // handling vertex-ground collision
+            if (!cull_trajectory) {
+                double d = vg_distance(p);
+                d = d * d;
+                if (d < barrier::d_hat) {
+                    #pragma omp critical
+                    vidx.push_back({ I, v });
+                }
+            }
+            else {
+                double t = collision_time(c, v);
                 #pragma omp critical
-                vidx.push_back({ I, v });
+                toi_global = min(toi_global, t);
             }
         }
 
@@ -418,6 +428,7 @@ double primitive_brute_force(
 
         return ad < bd || (ad == bd && am < bm) || (ad == bd && am == bm && a.i < b.i);
     });
+    spdlog::info("ground toi  = {}", toi_global);
 
 #pragma omp parallel for schedule(guided)
     for (int i = 0; i < n_overlap / 2; i++) {
@@ -514,7 +525,9 @@ double primitive_brute_force(
             }
         return toi;
     };
-    double toi_global = 1.0;
+
+
+    double ee_global = 1.0, pt_global = 1.0;
     if (!cull_trajectory)
 #pragma omp parallel
     {
@@ -576,6 +589,8 @@ double primitive_brute_force(
 #pragma omp parallel
     {
         double toi = 1.0;
+        double ee_toi = 1.0;
+        double pt_toi = 1.0;
 #pragma omp for schedule(guided) nowait
         for (int _i = 0; _i < n_overlap / 2; _i++) {
             int i = _i * 2;
@@ -587,17 +602,24 @@ double primitive_brute_force(
             auto& ejlist{ p.ej };
             auto& filist{ p.fi };
             auto& fjlist{ p.fj };
-            toi = vf_col_time(vilist, fjlist, cubes, I, J);
-            toi = min(toi, vf_col_time(vjlist, filist, cubes, J, I));
-            toi = min(toi, ee_col_time(eilist, ejlist, cubes, I, J));
+            double t1 = vf_col_time(vilist, fjlist, cubes, I, J);
+            double t2 = vf_col_time(vjlist, filist, cubes, J, I);
+            double t3 = ee_col_time(eilist, ejlist, cubes, I, J);
+
+            pt_toi = min(toi, min(t1, t2));
+            ee_toi = min(ee_toi, t3);
+            toi = min(toi, min(t1, t2));
+            toi = min(toi, t3);
         }
 #pragma omp critical
         {
             toi_global = min(toi_global, toi);
+            ee_global = min(ee_global, ee_toi);
+            pt_global = min(pt_global, pt_toi);
         }
     }
-    
-    return cull_trajectory? toi_global: 0.0;
+    spdlog::info("pt toi = {}, ee toi = {}", pt_global, ee_global);
+    return cull_trajectory? toi_global: 1.0;
 }
 
 double iaabb_brute_force(
@@ -627,6 +649,6 @@ double iaabb_brute_force(
         ee_tk,
         gen_basis);
     auto t = DURATION_TO_DOUBLE(start);
-    spdlog::info("time: iAABB = {:0.6f} ms", t * 1000);
+    spdlog::info("time: {} = {:0.6f} ms", vtn == 3 ? "iaabb upper bound": "iAABB", t * 1000);
     return toi;
 }
