@@ -36,6 +36,11 @@ void reset(bool init)
     globals.trace_folder = data["trace_folder"];
     globals.iaabb = data["iaabb"];
     globals.evh = data["evh"];
+    {
+        globals.vg_fric = data["vg_friction"];
+        globals.pt_fric = data["pt_friction"];
+        globals.ee_fric = data["ee_friction"];
+    }
     if (predefined) {
         int id = data["predefined_case"]["id"];
         if (id == 1) {

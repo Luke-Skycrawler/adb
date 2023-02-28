@@ -6,7 +6,7 @@
     "predefined_case" : {
         "enable": false,
         "id" : 2,
-        "custom": "../test_cases/friction.json"
+        "custom": "../test_cases/ground_friction.json"
     },
     "solver": "sparse",
     "gravity": true, 
@@ -17,7 +17,7 @@
     "ground": true,
     "safe_factor": 1.0,
     "uppper_bound": true, 
-    "mu": 0.1,
+    "mu": 0.3,
     "log": true,
     "backoff": 0.8,
     "damping": {
@@ -47,5 +47,8 @@
     "align_com": false,
     "trace_folder": "trace",
     "iaabb": true,
-    "evh": 1e-2
+    "evh": 1e-2,
+    "vg_friction": true,
+    "pt_friction": false,
+    "ee_friction": false
 }

@@ -74,7 +74,8 @@ double E_global(const VectorXd& q_plus_dq, const VectorXd& dq, int n_cubes, int 
             auto contact_force = -barrier_derivative_d(d) / (dt * dt) * 2 * sqrt(d);
             auto v_stack = pt_vstack(*cubes[ij[0]], *cubes[ij[2]], ij[1], ij[3]);
             auto uk = (pt_tk[k] * v_stack).norm();
-            ef += D_f0(uk, contact_force);
+            if (globals.pt_fric)
+                ef += D_f0(uk, contact_force);
 #endif
         }
 
@@ -98,7 +99,8 @@ double E_global(const VectorXd& q_plus_dq, const VectorXd& dq, int n_cubes, int 
             auto contact_force = -barrier_derivative_d(d) / (dt * dt) * 2 * sqrt(d);
             auto v_stack = ee_vstack(*cubes[ij[0]], *cubes[ij[2]], ij[1], ij[3]);
             auto uk = (ee_tk[k] * v_stack).norm();
-            ef += D_f0(uk, contact_force);
+            if (globals.ee_fric)
+                ef += D_f0(uk, contact_force);
 #endif
         }
 
@@ -123,7 +125,8 @@ double E_global(const VectorXd& q_plus_dq, const VectorXd& dq, int n_cubes, int 
                 auto contact_force = -barrier_derivative_d(d * d) / (dt * dt) * 2 * d;
                 vec3 _uk = vt2 - vt0;
                 double uk = sqrt(_uk(0) * _uk(0) + _uk(1) * _uk(1));
-                ef += D_f0(uk, contact_force);
+                if (globals.vg_fric)
+                    ef += D_f0(uk, contact_force);
             }
 #endif
         }
@@ -168,10 +171,10 @@ double line_search(const VectorXd& dq, const VectorXd& grad, VectorXd& q0, doubl
     vector<Matrix<double, 2, 12>> pt_tk_new, pt_tk_iaab;
     vector<Matrix<double, 2, 12>> ee_tk_new, ee_tk_iaab;
 
+    auto dq_norm = dq.norm();
     do {
         q1 = q0 + dq * alpha;
         auto dqk = dq * alpha;
-
         for (int i = 0; i < n_cubes; i++) {
             auto& c(*cubes[i]);
             c.dq = dqk.segment<12>(i * 12);
@@ -223,8 +226,13 @@ double line_search(const VectorXd& dq, const VectorXd& grad, VectorXd& q0, doubl
         wolfe = E1 <= E0 + c1 * alpha * qdg;
         // spdlog::info("wanted descend = {}, E1 - E0 = {}, E1 = {}, E0 = {}, alpha = {}", c1 * alpha * qdg, E1 - E0, E1, E0, alpha);
         alpha /= 2;
-        if (alpha < 1e-8) break;
-    } while (!wolfe && grad.norm() > 1e-3);
+        if (!(!wolfe && grad.norm() > 1e-3)) break;
+        if (dq_norm * alpha * 2 < 1e-4) {
+            // smaller than Newton iter convergence condition, clip it
+            alpha = 0.0;
+            break;
+        }
+    } while (true);
     pts = pts_new;
     idx = idx_new;
     ees = ees_new;

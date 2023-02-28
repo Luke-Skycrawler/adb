@@ -120,8 +120,9 @@ void ipc_term_vg(AffineBody& c, int v
     c.hess += barrier::barrier_hessian_q(v_tile, p);
 #ifdef _FRICTION_
     auto J = barrier::x_jacobian_q(v_tile);
-    friction(_uk, contact_lambda,
-        J.transpose() * Tk, c.grad, c.hess);
+    if (globals.vg_fric)
+        friction(_uk, contact_lambda,
+            J.transpose() * Tk, c.grad, c.hess);
 #endif
 };
 
@@ -227,7 +228,8 @@ void ipc_term(
 
     pt_grad *= B_;
 #ifdef _FRICTION_
-    friction(_uk, contact_lambda, Tk, pt_grad, ipc_hess);
+    if (globals.pt_fric)
+        friction(_uk, contact_lambda, Tk, pt_grad, ipc_hess);
 #endif
 
 #ifdef _SM_
@@ -348,7 +350,8 @@ void ipc_term_ee(
         ipc_hess = project_to_psd(ipc_hess);
 
 #ifdef _FRICTION_
-    friction(_uk, contact_lambda, Tk, ee_grad, ipc_hess);
+    if (globals.ee_fric)
+        friction(_uk, contact_lambda, Tk, ee_grad, ipc_hess);
 #endif
 
     int ii = _i, jj = _j;
