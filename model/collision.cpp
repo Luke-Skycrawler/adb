@@ -1,20 +1,24 @@
 #include "collision.h"
 #include "barrier.h"
 #include "geometry.h"
+
+#include <iostream>
+#include <spdlog/spdlog.h>
+#ifdef _TIGHT_INCLUSION_ENABLE_
 #define TIGHT_INCLUSION_DOUBLE
 #include <tight_inclusion/ccd.hpp>
 #include <tight_inclusion/interval_root_finder.hpp>
-#include <iostream>
-#include <spdlog/spdlog.h>
-
+#endif
 using namespace barrier;
 using namespace std;
+#ifdef _TIGHT_INCLUSION_ENABLE_
 
 double vf_collision_detect(vec3& p_t0, vec3& p_t1, const AffineBody& c, int id)
 {
     Face f_t0(c, id, false), f_t1(c, id, true);
     return vf_collision_detect(p_t0, p_t1, f_t0, f_t1);
 }
+
 double vf_collision_detect(vec3& p_t0, vec3& p_t1, const Face& f_t0, const Face& f_t1)
 {
     // Face f_t0(c, id, false), f_t1(c, id, true);
@@ -72,6 +76,7 @@ double ee_collision_detect(
         toi = 1.0;
     return toi;
 }
+#endif
 
 double collision_time(AffineBody& c, int i)
 {

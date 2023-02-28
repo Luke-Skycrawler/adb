@@ -25,8 +25,27 @@ struct BoundingBox {
 };
 
 lu compute_aabb(const AffineBody& c);
-// lu compute_aabb(const Edge& c);
-// lu compute_aabb(const Face& c);
+
+inline lu compute_aabb(const Edge& e)
+{
+    vec3 l, u;
+    auto e0 {e.e0.array()}, e1 {e.e1.array()};
+    l = e0.min(e1);
+    u = e0.max(e1);
+    return { l, u };
+}
+
+inline lu compute_aabb(const Face& f)
+{
+    vec3 l, u;
+    auto t0 {f.t0.array()}, 
+        t1 {f.t1.array()}, 
+        t2 {f.t2.array()};
+    l = t0.min(t1).min(t2);
+    u = t0.max(t1).max(t2);
+    return { l, u };
+}
+
 lu affine(const lu& aabb, q4& q);
 lu affine(lu aabb, AffineBody& c, int vtn);
 

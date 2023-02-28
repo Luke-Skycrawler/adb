@@ -74,6 +74,9 @@ protected:
             double aa, bb, cc;
             double p0, p1, p2;
 
+            double aa_t2, bb_t2, cc_t2;
+            double p0_t2, p1_t2, p2_t2;
+
             if (predefined) {
 #ifdef _FAILED_
                 aa = ags[6 * i];
@@ -93,11 +96,20 @@ protected:
                 p0 = dist(gen) * (space_range[1] - space_range[0]) + space_range[0];
                 p1 = dist(gen) * (space_range[1] - space_range[0]) + space_range[0];
                 p2 = dist(gen) * (space_range[1] - space_range[0]) + space_range[0];
+
+                aa_t2 = dist(gen) * M_PI * 2, bb_t2 = dist(gen) * M_PI * 2, cc_t2 = dist(gen) * M_PI * 2;
+                p0_t2 = dist(gen) * (space_range[1] - space_range[0]) + space_range[0];
+                p1_t2 = dist(gen) * (space_range[1] - space_range[0]) + space_range[0];
+                p2_t2 = dist(gen) * (space_range[1] - space_range[0]) + space_range[0];
             }
             mat3 r = rotation(aa, bb, cc);
+            mat3 r_t2 = rotation(aa_t2, bb_t2, cc_t2);
 
-            for (int i = 0; i < 3; i++) a->q[i + 1] = r.col(i);
-            
+            for (int i = 0; i < 3; i++) {
+                a->q[i + 1] = r.col(i);
+                a -> dq.segment<3>(3 * (i + 1)) = r.col(i);
+            }
+            a->dq.segment<3>(0) = vec3(p0_t2, p1_t2, p2_t2);
             a->q[0] = vec3(p0, p1, p2);
             auto b = compute_aabb(*a);
             aabbs[i] = b;
