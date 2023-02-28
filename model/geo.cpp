@@ -83,17 +83,15 @@ void friction(
     static const double evh = globals.dt * globals.evh, h2 = globals.dt * globals.dt;
     auto uk = _uk.norm();
     if (uk < 1e-10) return;
+
     auto f1 = ipc::f1_SF_over_x(uk, evh);
-    Vector<double, 12> F_k = mu * contact_lambda * Tk * f1 * _uk;
-    // double D_k = mu * contact_lambda * ipc::f0_SF(uk, evh);
+    
+    Vector<double, 12> F_k = mu * contact_lambda * f1 * Tk  * _uk;
     Matrix<double, 12, 12> D_k_hessian;
 
     if (uk >= evh) {
-        Vector2d ut{ -_uk[1], _uk[0] };
+        Vector2d ut{ -_uk(1), _uk(0) };
         D_k_hessian = mu * contact_lambda * f1 / (uk * uk) * Tk * ut * (ut.transpose() * Tk.transpose());
-    }
-    else if (uk == 0.0) {
-        D_k_hessian = f1 * mu * contact_lambda * Tk * Tk.transpose();
     }
     else {
         double df1_term = ipc::df1_x_minus_f1_over_x3(uk, evh);
@@ -175,13 +173,16 @@ void ipc_term(
     mat12 ipc_hess;
     ipc_hess.setZero(12, 12);
     // ipc_hess = PSD_projection(pt_hess  * B_) + pt_grad * pt_grad.transpose() * B__;
+    ipc_hess = pt_hess * B_ + pt_grad * pt_grad.transpose() * B__;
+
+    pt_grad *= B_;
+
     if (globals.psd)
-        ipc_hess = project_to_psd(pt_hess * B_ + pt_grad * pt_grad.transpose() * B__);
-    // ipc_hess = project_to_psd(pt_hess * B_) + pt_grad * pt_grad.transpose() * B__;
-    else
-        ipc_hess = pt_hess * B_ + pt_grad * pt_grad.transpose() * B__;
-    // psd project
-    // ipc_hess = PSD_projection(ipc_hess);
+        ipc_hess = project_to_psd(ipc_hess);
+#ifdef _FRICTION_
+    if (globals.pt_fric)
+        friction(_uk, contact_lambda, Tk, pt_grad, ipc_hess);
+#endif
 
     int ii = _i, jj = _j;
     // mat12 hess_p = Jp.transpose() * ipc_hess.block<3, 3>(0, 0) * Jp;
@@ -203,6 +204,7 @@ void ipc_term(
     Matrix4d blkp = kerp * kerp.transpose();
     mat12 hess_p, hess_t, off_diag;
     // mat12 hess_p, hess_t, hess__off;
+
     for (int i = 0; i < 4; i++)
         for (int j = 0; j < 4; j++) {
             hess_p.block<3, 3>(i * 3, j * 3) = blkp(i, j) * ipc_hess.block<3, 3>(0, 0);
@@ -226,11 +228,6 @@ void ipc_term(
         }
     mat12 off_T = off_diag.transpose();
 
-    pt_grad *= B_;
-#ifdef _FRICTION_
-    if (globals.pt_fric)
-        friction(_uk, contact_lambda, Tk, pt_grad, ipc_hess);
-#endif
 
 #ifdef _SM_
     auto outers = sparse_hess.outerIndexPtr();
@@ -346,6 +343,8 @@ void ipc_term_ee(
 #else
     ee_grad = p * ee_grad * B_ + p_grad * B;
 #endif
+
+
     if (globals.psd)
         ipc_hess = project_to_psd(ipc_hess);
 
