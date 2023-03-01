@@ -282,6 +282,9 @@ double primitive_brute_force(
     vector<array<int, 2>>& vidx,
     vector<Matrix<double, 2, 12>>& pt_tk,
     vector<Matrix<double, 2, 12>>& ee_tk,
+#ifdef TESTING
+    std::vector<double_int>& pt_tois, std::vector<double_int>& ee_tois,
+#endif
     bool gen_basis)
 {
     pts.resize(0);
@@ -364,9 +367,11 @@ double primitive_brute_force(
                 }
             }
             else {
+#ifndef TESTING
                 double t = collision_time(c, v);
                 #pragma omp critical
                 toi_global = min(toi_global, t);
+#endif
             }
         }
 
@@ -487,6 +492,12 @@ double primitive_brute_force(
                 vec3 v{ ci.v_transformed[vi] };
                 Face f{ cj, unsigned(fj), true, true };
                 double t = pt_collision_time(ci.vt1(vi), Face{ cj, unsigned(fj) }, v, f);
+#ifdef TESTING
+                if (t < 1.0) {
+                    idx.push_back({ I, vi, J, fj });
+                    pt_tois.push_back({ t, int(pt_tois.size()) });
+                }
+#endif
                 toi = min(toi, t);
             }
         return toi;
@@ -502,11 +513,16 @@ double primitive_brute_force(
                 Edge ei0(ci, ei), ei1(ci, ei, true, true);
                 Edge ej0(cj, ej), ej1(cj, ej, true, true);
                 double t = ee_collision_time(ei0, ej0, ei1, ej1);
+#ifdef TESTING
+                if (t < 1.0) {
+                    eidx.push_back({ I, ei, J, ej });
+                    ee_tois.push_back({ t, int(ee_tois.size()) });
+                }
+#endif
                 toi = min(toi, t);
             }
         return toi;
     };
-
 
     double ee_global = 1.0, pt_global = 1.0;
     if (!cull_trajectory)
@@ -615,6 +631,10 @@ double iaabb_brute_force(
     std::vector<std::array<int, 2>>& vidx,
     std::vector<Eigen::Matrix<double, 2, 12>>& pt_tk,
     std::vector<Eigen::Matrix<double, 2, 12>>& ee_tk,
+#ifdef TESTING
+    std::vector<double_int>& pt_tois, std::vector<double_int>& ee_tois,
+#endif
+
     bool gen_basis)
 {
     auto start = high_resolution_clock::now();
@@ -628,6 +648,9 @@ double iaabb_brute_force(
         vidx,
         pt_tk,
         ee_tk,
+#ifdef TESTING
+        pt_tois, ee_tois,
+#endif
         gen_basis);
     auto t = DURATION_TO_DOUBLE(start);
     spdlog::info("time: {} = {:0.6f} ms", vtn == 3 ? "iaabb upper bound": "iAABB", t * 1000);

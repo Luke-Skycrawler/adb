@@ -4,11 +4,12 @@
 #include "../model/iaabb.h"
 #include "../model/geometry.h"
 #include "../model/spatial_hashing.h"
+#include "../model/collision.h"
 #include <ipc/distance/point_triangle.hpp>
 #include <ipc/distance/edge_edge.hpp>
 #define _USE_MATH_DEFINES
 //#define _FAILED_
-#define _LOAD_
+//#define _LOAD_
 #include <math.h>
 #include <random>
 
@@ -17,7 +18,7 @@
 #include <filesystem>
 
 inline void Cube::draw(Shader& shader) const {}
-bool predefined = true;
+bool predefined = false;
 unsigned *Cube::_edges = nullptr, *Cube::_indices = nullptr;
 
 
@@ -62,7 +63,7 @@ protected:
         #ifdef _LOAD_
         n_cubes = 3;
         #else
-        n_cubes = predefined ? 6 : 100;
+        n_cubes = predefined ? 6 : 10;
         #endif
 
         Cube::gen_indices();
@@ -210,8 +211,9 @@ TEST_F(iAABBTest, pipelined)
     vector<array<int, 2>> vidx_ref;
     vector<Matrix<double, 2, 12>> pt_tk_ref;
     vector<Matrix<double, 2, 12>> ee_tk_ref;
+    vector<double_int> foo, bar;
     intersect_sort(n_cubes, cubes, aabbs, overlaps_sort, 1);
-    primitive_brute_force(n_cubes, overlaps_sort, cubes, 1, pts, idx, ees, eidx, vidx, pt_tk, ee_tk, false);
+    primitive_brute_force(n_cubes, overlaps_sort, cubes, 1, pts, idx, ees, eidx, vidx, pt_tk, ee_tk, foo, bar, false);
     int nsqr = n_cubes * n_cubes;
     for (int I = 0; I < nsqr; I++) {
         int i = I / n_cubes, j = I % n_cubes;
@@ -278,6 +280,73 @@ TEST_F(iAABBTest, pipelined)
     diff(eidx_ref, eidx);
 }
 
+array<double, 2> brute_force(
+    int n_cubes,
+    const std::vector<std::unique_ptr<AffineBody>>& cubes,
+    std::vector<double_int>& pt_tois, std::vector<double_int>& ee_tois,
+    std::vector<std::array<int, 4>>& idx,
+    std::vector<std::array<int, 4>>& eidx
+    )
+{
+    double toi_pt = 1.0, toi_ee = 1.0;
+    for (int i = 0; i < n_cubes; i++)
+
+        for (int j = 0; j < n_cubes; j++) {
+            if (i == j) continue;
+            auto &ci{ *cubes[i] }, &cj{ *cubes[j] };
+            for (unsigned v = 0; v < ci.n_vertices; v++) {
+                auto p1{ ci.vt1(v) };
+                auto p2{ ci.vt2(v)};
+                for (unsigned f = 0; f < cj.n_vertices; f++) {
+                    Face t1{ cj, f }, t2{ cj, f, true };
+                    double t = pt_collision_time(p1, t1, p2, t2);
+                    if (t < 1.0) {
+                        pt_tois.push_back({t, int(pt_tois.size())});
+                        idx.push_back({i, int(v), j, int(f)});
+                    }
+                    toi_pt = min(toi_pt, t);
+                }
+            }
+        }
+    for (int i = 0; i < n_cubes; i++)
+        for (int j = i + 1; j < n_cubes; j++) {
+            auto &ci{ *cubes[i] }, &cj{ *cubes[j] };
+            for (unsigned ei = 0; ei < ci.n_edges; ei++) {
+                Edge ei1{ ci, ei }, ei2{ ci, ei, true };
+                for (unsigned ej = 0; ej < cj.n_edges; ej++) {
+                    Edge ej1{ cj, ej }, ej2{ cj, ej, true };
+                    double t = ee_collision_time(ei1, ej1, ei2, ej2);
+                    if (t < 1.0) {
+                        ee_tois.push_back({t, int(ee_tois.size())});
+                        eidx.push_back({i, int(ei), j, int(ej)});
+                    }
+                    toi_ee = min(toi_ee, t);
+                }
+            }
+        }
+    return { toi_pt, toi_ee };
+}
+TEST_F(iAABBTest, upper_bound_against_sh)
+{
+    vector<array<vec3, 4>> pts;
+    vector<array<int, 4>> idx, idx_iaabb;
+    vector<array<vec3, 4>> ees;
+    vector<array<int, 4>> eidx, eidx_iaabb;
+    vector<array<int, 2>> vidx;
+    vector<Matrix<double, 2, 12>> pt_tk;
+    vector<Matrix<double, 2, 12>> ee_tk;
+    vector<double_int> pt_tois, ee_tois, pt_toi_iaabb, ee_toi_iaabb;
+    double t = iaabb_brute_force(n_cubes, cubes, aabbs, 3, pts, idx_iaabb, ees, eidx_iaabb, vidx, pt_tk, ee_tk, pt_toi_iaabb, ee_toi_iaabb, false);
+    auto t_ref = brute_force(n_cubes, cubes, pt_tois, ee_tois, idx, eidx);
+    EXPECT_EQ(min(t_ref[0], t_ref[1]), t);
+    sort(idx.begin(), idx.end());
+    sort(eidx.begin(), eidx.end());
+    sort(idx_iaabb.begin(), idx_iaabb.end());
+    sort(eidx_iaabb.begin(), eidx_iaabb.end());
+    
+    diff(idx, idx_iaabb);
+    diff(eidx, eidx_iaabb);
+}
 int main(int argc, char** argv)
 {
     ::testing::InitGoogleTest(&argc, argv);

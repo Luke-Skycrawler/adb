@@ -4,6 +4,8 @@
 #include <chrono>
 #include <spdlog/spdlog.h>
 #include "collision.h"
+#include "spatial_hashing.h"
+
 using namespace std;
 using namespace std::chrono;
 using namespace utils;

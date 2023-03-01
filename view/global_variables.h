@@ -1,4 +1,5 @@
 #pragma once
+#ifndef TESTING
 #include "camera.h"
 // consts
 static const int SHADOW_WIDTH = 800, SHADOW_HEIGHT = 600;
@@ -92,4 +93,5 @@ VARIABLE_LOCATOR GlobalVariableMainCPP globals;
 // lighting
 static glm::vec3 &lightPos(LightPositions[0]);
 
+#endif
 #endif
