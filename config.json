@@ -6,7 +6,7 @@
     "predefined_case" : {
         "enable": false,
         "id" : 2,
-        "custom": "../test_cases/blocks.json"
+        "custom": "../test_cases/case2.json"
     },
     "solver": "sparse",
     "gravity": true, 
@@ -17,7 +17,7 @@
     "ground": true,
     "safe_factor": 1.0,
     "uppper_bound": true, 
-    "mu": 0.5,
+    "mu": 0.0,
     "log": true,
     "backoff": 0.8,
     "damping": {
@@ -48,7 +48,7 @@
     "trace_folder": "trace",
     "iaabb": true,
     "evh": 1e-2,
-    "vg_friction": false,
+    "vg_friction": true,
     "pt_friction": true,
     "ee_friction": true
 }

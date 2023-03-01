@@ -204,9 +204,9 @@ void intersect_sort(
         }
     }
 
-    static unsigned char *bucket = new unsigned char[n_cubes];
 #pragma omp parallel
     {
+        unsigned char* bucket = new unsigned char[n_cubes];
 #pragma omp for schedule(guided)
         for (int i = 0; i < n_cubes; i++) {
             fill(bucket, bucket + n_cubes, 0);
@@ -222,6 +222,7 @@ void intersect_sort(
             }
             sort(tmp[i].begin(), tmp[i].end());
         }
+        delete[] bucket;
     }
 
 #pragma omp parallel for schedule(guided)
@@ -287,16 +288,19 @@ double primitive_brute_force(
 #endif
     bool gen_basis)
 {
-    pts.resize(0);
-    idx.resize(0);
-    ees.resize(0);
-    eidx.resize(0);
-    vidx.resize(0);
-    pt_tk.resize(0);
-    ee_tk.resize(0);
+
     double toi_global = 1.0;
     bool cull_trajectory = vtn == 3;
     int n_overlap = overlaps.size();
+    if (!cull_trajectory) {
+        pts.resize(0);
+        idx.resize(0);
+        ees.resize(0);
+        eidx.resize(0);
+        vidx.resize(0);
+        pt_tk.resize(0);
+        ee_tk.resize(0);
+    }
 
     static PList* lists = new PList[n_overlap];
     static int allocated = n_overlap;
@@ -313,9 +317,10 @@ double primitive_brute_force(
         lists[i].fi.resize(0);
         lists[i].fj.resize(0);
     }
-    static vector<int> starting;
+    vector<int> starting;
     starting.resize(n_cubes + 1);
-    fill(starting.begin(), starting.end(), n_overlap);
+    for (int i = 0; i <= n_cubes; i++)
+        starting[i] = n_overlap;
     starting[0] = 0;
 
     int old_cube_index = 0;
@@ -617,6 +622,7 @@ double primitive_brute_force(
             pt_global = min(pt_global, pt_toi);
         }
     }
+    if (cull_trajectory)
     spdlog::info("pt toi = {}, ee toi = {}", pt_global, ee_global);
     return cull_trajectory? toi_global: 1.0;
 }

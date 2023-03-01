@@ -605,8 +605,10 @@ void implicit_euler(vector<unique_ptr<AffineBody>>& cubes, double dt)
 #endif
                     toi = step_size_upper_bound(dq, cubes, n_cubes, n_pt, n_ee, n_g, pts, idx, ees, eidx, vidx);
 #ifdef IAABB_INTERNSHIP
-                if (toi != toi_iaabb)
+                if (toi != toi_iaabb){
                     spdlog::error("step size upper bound not match, toi = {}, iaabb = {}", toi, toi_iaabb);
+                     exit(1);
+                }
 #else
                 toi = toi_iaabb;
 #endif
