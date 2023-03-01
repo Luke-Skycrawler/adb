@@ -46,7 +46,7 @@ lu compute_aabb(const AffineBody& c)
 inline lu merge(const lu& a, const lu& b)
 {
     vec3 l, u;
-    l = a[0].array().max(b[0].array());
+    l = a[0].array().min(b[0].array());
     u = a[1].array().max(b[1].array());
     return { l, u };
 }
@@ -60,9 +60,9 @@ inline lu compute_aabb(const vec3& p0, const vec3& p1)
 }
 inline lu compute_aabb(const Edge& e1, const Edge& e2)
 {
+    vec3 l, u;
     auto e10{ e1.e0.array() }, e11{ e1.e1.array() };
     auto e20{ e2.e0.array() }, e21{ e2.e1.array() };
-    vec3 l, u;
     l = e10.min(e11).min(e20).min(e21);
     u = e10.max(e11).max(e20).max(e21);
     return { l, u };
@@ -204,9 +204,9 @@ void intersect_sort(
         }
     }
 
+    static unsigned char *bucket = new unsigned char[n_cubes];
 #pragma omp parallel
     {
-        unsigned char *bucket = new unsigned char[n_cubes];
 #pragma omp for schedule(guided)
         for (int i = 0; i < n_cubes; i++) {
             fill(bucket, bucket + n_cubes, 0);
@@ -222,7 +222,6 @@ void intersect_sort(
             }
             sort(tmp[i].begin(), tmp[i].end());
         }
-        delete[] bucket;
     }
 
 #pragma omp parallel for schedule(guided)
@@ -236,6 +235,7 @@ void intersect_sort(
             ret_tmp[i].push_back({ i, j, cull, nullptr });
         }
     }
+
     for (int i = 0; i < n_cubes; i++) {
         ret.insert(ret.end(), ret_tmp[i].begin(), ret_tmp[i].end());
     }
@@ -313,10 +313,9 @@ double primitive_brute_force(
         lists[i].fi.resize(0);
         lists[i].fj.resize(0);
     }
-    vector<int> starting;
+    static vector<int> starting;
     starting.resize(n_cubes + 1);
-    for (int i = 0; i <= n_cubes; i++)
-        starting[i] = n_overlap;
+    fill(starting.begin(), starting.end(), n_overlap);
     starting[0] = 0;
 
     int old_cube_index = 0;
@@ -414,7 +413,7 @@ double primitive_brute_force(
 
         return ad < bd || (ad == bd && am < bm) || (ad == bd && am == bm && a.i < b.i);
     });
-    spdlog::info("ground toi  = {}", toi_global);
+    // spdlog::info("ground toi  = {}", toi_global);
 
 #pragma omp parallel for schedule(guided)
     for (int i = 0; i < n_overlap / 2; i++) {
@@ -515,7 +514,10 @@ double primitive_brute_force(
                 double t = ee_collision_time(ei0, ej0, ei1, ej1);
 #ifdef TESTING
                 if (t < 1.0) {
-                    eidx.push_back({ I, ei, J, ej });
+                    if (I < J)
+                        eidx.push_back({ I, ei, J, ej });
+                    else 
+                        eidx.push_back({ J, ej, I, ei });
                     ee_tois.push_back({ t, int(ee_tois.size()) });
                 }
 #endif

@@ -63,7 +63,7 @@ protected:
         #ifdef _LOAD_
         n_cubes = 3;
         #else
-        n_cubes = predefined ? 6 : 10;
+        n_cubes = predefined ? 6 : 50;
         #endif
 
         Cube::gen_indices();
@@ -297,7 +297,7 @@ array<double, 2> brute_force(
             for (unsigned v = 0; v < ci.n_vertices; v++) {
                 auto p1{ ci.vt1(v) };
                 auto p2{ ci.vt2(v)};
-                for (unsigned f = 0; f < cj.n_vertices; f++) {
+                for (unsigned f = 0; f < cj.n_faces; f++) {
                     Face t1{ cj, f }, t2{ cj, f, true };
                     double t = pt_collision_time(p1, t1, p2, t2);
                     if (t < 1.0) {
