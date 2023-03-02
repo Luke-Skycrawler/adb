@@ -246,8 +246,6 @@ double line_search(const VectorXd& dq, const VectorXd& grad, VectorXd& q0, doubl
 
 void implicit_euler(vector<unique_ptr<AffineBody>>& cubes, double dt)
 {
-    if (!globals.log)
-        spdlog::set_level(spdlog::level::err);
     bool term_cond;
     int& ts = globals.ts;
     int iter = 0;

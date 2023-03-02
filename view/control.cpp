@@ -8,6 +8,8 @@
 #include <spdlog/spdlog.h>
 #include <chrono>
 #include "../model/time_integrator.h"
+#include "spdlog/sinks/basic_file_sink.h"
+
 #define DURATION_TO_DOUBLE(X) duration_cast<duration<double>>((X)).count()
 using json = nlohmann::json;
 void reset(bool init)
@@ -89,6 +91,11 @@ void reset(bool init)
         globals.aabbs[i] = compute_aabb(*globals.cubes[i]);
     }
     #endif
+    auto logger = spdlog::basic_logger_mt("basic_logger", "logs/log.txt");
+    if (!globals.log)
+        spdlog::set_level(spdlog::level::err);        
+    spdlog::flush_every(std::chrono::seconds(3));
+    spdlog::set_default_logger(logger);
 }
 // process all input: query GLFW whether relevant keys are pressed/released this frame and react accordingly
 // ---------------------------------------------------------------------------------------------------------
