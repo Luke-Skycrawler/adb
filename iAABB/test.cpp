@@ -24,7 +24,28 @@ unsigned *Cube::_edges = nullptr, *Cube::_indices = nullptr;
 
 using namespace std;
 using namespace Eigen;
+void failure_load(
+    const std::vector<std::unique_ptr<AffineBody>>& cubes)
+{
+    string filename = "../view/trace/ub_failure";
+    ifstream in(filename, ios::in | ios::binary);
+    int n_cubes = cubes.size();
 
+    for (int i = 0; i < n_cubes; i++) {
+        auto& c{ *cubes[i] };
+        for (int j = 0; j < 4; j++)
+            in.read((char*)c.q[j].data(), 3 * sizeof(double));
+        for (int j = 0; j < 4; j++){
+            vec3 tmp;
+            in.read((char*)tmp.data(), 3 * sizeof(double));
+            c.dq.segment<3>(3 * j) = tmp;
+        }
+        c.p = c.q[0];
+        c.A << c.q[1], c.q[2], c.q[3];
+    }
+    in.close();
+
+}
 void player_load(
     int timestep,
     const std::vector<std::unique_ptr<AffineBody>>& cubes)
@@ -117,7 +138,12 @@ protected:
             cubes.push_back(move(a));
             args.push_back({aa, bb, cc, p0, p1, p2});
         }
+        #ifdef _FAILED_
         player_load(40, cubes);
+        #endif
+        #ifdef _LOAD_
+        failure_load(cubes);
+        #endif
     }
 };
 uniform_real_distribution<double> iAABBTest ::dist(0.0, 1.0);

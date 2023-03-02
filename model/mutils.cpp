@@ -415,6 +415,21 @@ void player_load(
     in.close();
 }
 
+void dump_states(
+    const std::vector<std::unique_ptr<AffineBody>>& cubes
+){
+    string filename = "trace/ub_failure"
+    ofstream out(filename, ios::out | ios::binary | ios::trunc);
+    int n_cubes = cubes.size();
+    for (int i = 0; i < n_cubes; i++) {
+        auto& c{ *cubes[i] };
+        for (int j = 0; j < 4; j++)
+            out.write((char*)c.q[j].data(), 3 * sizeof(double));
+        for (int j = 0; j < 4; j++)
+            out.write((char*)c.dq.segment<3>(j * 3).data(), 3 * sizeof(double));
+    }
+    out.close();
+}
 void player_save(
     std::string& path,
     int timestep,
