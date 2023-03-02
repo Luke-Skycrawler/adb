@@ -1,3 +1,4 @@
+#pragma once
 #include "cube.h"
 #include "othogonal_energy.h"
 #include <vector>

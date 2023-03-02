@@ -418,7 +418,7 @@ void player_load(
 void dump_states(
     const std::vector<std::unique_ptr<AffineBody>>& cubes
 ){
-    string filename = "trace/ub_failure"
+    string filename = "trace/ub_failure";
     ofstream out(filename, ios::out | ios::binary | ios::trunc);
     int n_cubes = cubes.size();
     for (int i = 0; i < n_cubes; i++) {

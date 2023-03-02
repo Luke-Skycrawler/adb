@@ -118,6 +118,7 @@ void spatial_hashing::query_interval(const vec3i& l, const vec3i& u, element_typ
 void spatial_hashing::remove_all_entries()
 {
     count_overflow = 0;
+    fill(count_non_atomic, count_non_atomic + n_entries, 0);
     for (int i = 0; i < n_l1_bitmap; i++)
         if (bitmap_l1[i]) {
             bitmap_l1[i] = false;

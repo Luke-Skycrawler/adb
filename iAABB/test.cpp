@@ -9,7 +9,7 @@
 #include <ipc/distance/edge_edge.hpp>
 #define _USE_MATH_DEFINES
 //#define _FAILED_
-//#define _LOAD_
+#define _LOAD_
 #include <math.h>
 #include <random>
 
