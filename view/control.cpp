@@ -79,6 +79,19 @@ void reset(bool init)
     if (init) {
         auto sh_args = data["spatial hashing"];
         globals.sh = make_unique<spatial_hashing>(sh_args["xyz_bits"], sh_args["n_buffer"], sh_args["min_xyz"], sh_args["max_xyz"], sh_args["dx"], sh_args["set_size"]);
+        if (globals.log > 4) {
+            auto logger = spdlog::basic_logger_mt("basic_logger", "logs/log.txt");
+            spdlog::set_default_logger(logger);
+        }
+        switch (globals.log % 4) {
+        case 0:
+            spdlog::set_level(spdlog::level::err);
+            break;
+        case 1:
+            spdlog::set_level(spdlog::level::warn);
+            break;
+        }
+        spdlog::flush_every(std::chrono::seconds(3));
     }
     int st = data["starting_ts"];
     if (st >= 0) {
@@ -90,12 +103,7 @@ void reset(bool init)
     for (int i = 0; i < n_cubes; i ++ ){
         globals.aabbs[i] = compute_aabb(*globals.cubes[i]);
     }
-    #endif
-    auto logger = spdlog::basic_logger_mt("basic_logger", "logs/log.txt");
-    if (!globals.log)
-        spdlog::set_level(spdlog::level::err);        
-    spdlog::flush_every(std::chrono::seconds(3));
-    spdlog::set_default_logger(logger);
+#endif
 }
 // process all input: query GLFW whether relevant keys are pressed/released this frame and react accordingly
 // ---------------------------------------------------------------------------------------------------------

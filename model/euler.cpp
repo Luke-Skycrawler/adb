@@ -5,11 +5,11 @@
 #include "../view/global_variables.h"
 #include <assert.h>
 #include <array>
+#include "timer.h"
 // #include <ipc/distance/point_triangle.hpp>
 // #include <ipc/distance/edge_edge.hpp>
 #include <ipc/friction/closest_point.hpp>
 #include <ipc/friction/tangent_basis.hpp>
-#include <chrono>
 #ifdef EIGEN_USE_MKL_ALL
 #include <Eigen/PardisoSupport>
 #endif
@@ -23,9 +23,13 @@
 using namespace std;
 using namespace barrier;
 using namespace Eigen;
-using namespace std::chrono;
 using namespace utils;
-#define DURATION_TO_DOUBLE(X) duration_cast<duration<double>>((X)).count()
+
+#define __IPC__ 0
+#define __SOLVER__ 1
+#define __CCD__ 2
+#define __LINE_SEARCH__ 3
+
 double E_global(const VectorXd& q_plus_dq, const VectorXd& dq, int n_cubes, int n_pt, int n_ee, int n_g,
     const vector<array<int, 4>>& idx,
     const vector<array<int, 4>>& eidx,
@@ -182,7 +186,7 @@ double line_search(const VectorXd& dq, const VectorXd& grad, VectorXd& q0, doubl
 
         if (globals.iaabb)
             iaabb_brute_force(n_cubes, cubes, globals.aabbs, 2,
-        #ifdef IAABB_COMPARING
+#ifdef IAABB_COMPARING
                 pts_iaab,
                 idx_iaab,
                 ees_iaab,
@@ -190,7 +194,7 @@ double line_search(const VectorXd& dq, const VectorXd& grad, VectorXd& q0, doubl
                 vidx_iaab,
                 pt_tk_iaab,
                 ee_tk_iaab);
-        #else
+#else
                 pts_new,
                 idx_new,
                 ees_new,
@@ -199,15 +203,15 @@ double line_search(const VectorXd& dq, const VectorXd& grad, VectorXd& q0, doubl
                 pt_tk_new,
                 ee_tk_new);
         else
-        #endif
-            gen_collision_set(true, n_cubes, cubes,
-                pts_new,
-                idx_new,
-                ees_new,
-                eidx_new,
-                vidx_new,
-                pt_tk_new,
-                ee_tk_new);
+#endif
+        gen_collision_set(true, n_cubes, cubes,
+            pts_new,
+            idx_new,
+            ees_new,
+            eidx_new,
+            vidx_new,
+            pt_tk_new,
+            ee_tk_new);
         double ef1 = 0.0, E2 = 0.0, ef2 = 0.0;
         E1 = E_global(q1, dqk,
             n_cubes, n_pt, n_ee, n_g,
@@ -267,6 +271,9 @@ void implicit_euler(vector<unique_ptr<AffineBody>>& cubes, double dt)
 
     vector<Matrix<double, 2, 12>> pt_tk;
     vector<Matrix<double, 2, 12>> ee_tk;
+    static double times[4];
+    fill(times, times + 4, 0.0);
+    auto frame_start = high_resolution_clock::now();
 #ifdef IAABB_COMPARING
     vector<array<vec3, 4>> pts_iaabb;
     vector<array<int, 4>> idx_iaabb;
@@ -351,17 +358,17 @@ void implicit_euler(vector<unique_ptr<AffineBody>>& cubes, double dt)
             };
             spdlog::info("PT");
             bool pt_success = compare_collision(
-                idx, idx_iaabb
-            );
+                idx, idx_iaabb);
 
             spdlog::info("EE");
             bool ee_success = compare_collision(
-                eidx, eidx_iaabb
-            );
+                eidx, eidx_iaabb);
             if (!pt_success) spdlog::error("pt fails, exiting");
             if (!ee_success) spdlog::error("ee fails, exiting");
-            if (!(pt_success && ee_success)) exit(1);
-            else spdlog::info("pt and ee set matched");
+            if (!(pt_success && ee_success))
+                exit(1);
+            else
+                spdlog::info("pt and ee set matched");
 
 #endif
         }
@@ -379,7 +386,6 @@ void implicit_euler(vector<unique_ptr<AffineBody>>& cubes, double dt)
 
     int n_pt = idx.size(), n_ee = eidx.size(), n_g = vidx.size();
     spdlog::info("constraint size = {}, {}", n_pt, n_ee);
-
     do {
 #ifdef _TRIPLETS_
         globals.hess_triplets.clear();
@@ -508,8 +514,8 @@ void implicit_euler(vector<unique_ptr<AffineBody>>& cubes, double dt)
             }
         }
 
-        auto ipc_duration = DURATION_TO_DOUBLE(high_resolution_clock::now() - ipc_start);
-
+        auto ipc_duration = DURATION_TO_DOUBLE(ipc_start);
+        times[__IPC__] += ipc_duration;
         double toi = 1.0, factor = 1.0, alpha = 1.0;
 
         {
@@ -575,9 +581,13 @@ void implicit_euler(vector<unique_ptr<AffineBody>>& cubes, double dt)
                 }
 #endif
             }
-            auto solver_duration = DURATION_TO_DOUBLE(high_resolution_clock::now() - solver_start);
+            auto solver_duration = DURATION_TO_DOUBLE(solver_start);
+            times[__SOLVER__] += solver_duration;
             spdlog::info("solver time = {:0.6f} ms", solver_duration);
-
+            if (isnan(dq.norm())) {
+                spdlog::error("solver nan");
+                exit(1);
+            }
             spdlog::info("norms: dq = {}, grad = {}, big_hess = {}", dq.norm(), r.norm(), globals.sparse ? sparse_hess.norm() : big_hess.norm());
             // spdlog::warn("dense norms: dq = {}, grad = {}, big_hess = {}, difference = {}", dq.norm(), r.norm(), big_hess.norm(), dif);
             spdlog::info("dq dot grad = {}, cos = {}", dq.dot(r), dq.dot(r) / (dq.norm() * r.norm()));
@@ -593,7 +603,7 @@ void implicit_euler(vector<unique_ptr<AffineBody>>& cubes, double dt)
                 auto& c(*cubes[k]);
                 c.dq = dq.segment<12>(k * 12);
             }
-
+            auto ccd_start = high_resolution_clock::now();
             if (globals.upper_bound) {
                 double toi_iaabb;
                 if (globals.iaabb)
@@ -603,7 +613,7 @@ void implicit_euler(vector<unique_ptr<AffineBody>>& cubes, double dt)
 #endif
                     toi = step_size_upper_bound(dq, cubes, n_cubes, n_pt, n_ee, n_g, pts, idx, ees, eidx, vidx);
 #ifdef IAABB_INTERNSHIP
-                if (toi != toi_iaabb){
+                if (toi != toi_iaabb) {
                     spdlog::error("step size upper bound not match, toi = {}, iaabb = {}", toi, toi_iaabb);
                     dump_states(cubes);
                     exit(1);
@@ -612,7 +622,8 @@ void implicit_euler(vector<unique_ptr<AffineBody>>& cubes, double dt)
                 toi = toi_iaabb;
 #endif
             }
-
+            double ccd_duration = DURATION_TO_DOUBLE(ccd_start);
+            times[__CCD__] += ccd_duration;
             if (toi < 1.0) {
                 spdlog::warn("collision at {}, toi = {}", iter, toi);
                 factor = globals.backoff;
@@ -622,6 +633,7 @@ void implicit_euler(vector<unique_ptr<AffineBody>>& cubes, double dt)
 
             alpha = 1.0;
             double E0 = 0.0, E1 = 0.0;
+            auto line_search_start = high_resolution_clock::now();
             if (globals.line_search)
                 alpha = line_search(dq, r, q0_cat, E0, E1,
                     n_cubes, n_pt, n_ee, n_g,
@@ -638,6 +650,8 @@ void implicit_euler(vector<unique_ptr<AffineBody>>& cubes, double dt)
             if (alpha < 2e-8) {
                 spdlog::error("iter, ts ({}, {}), alpha = {}, E0 = {}, E1 = {}", iter, ts, alpha, E0, E1);
             }
+            auto line_search_duration = DURATION_TO_DOUBLE(line_search_start);
+            times[__LINE_SEARCH__] += line_search_duration;
             double norm_dq = dq.norm();
             sup_dq = norm_dq;
 #pragma omp parallel for schedule(static)
@@ -645,10 +659,11 @@ void implicit_euler(vector<unique_ptr<AffineBody>>& cubes, double dt)
                 for (int j = 0; j < 4; j++)
                     cubes[i]->q[j] += dq.segment<3>(i * 12 + j * 3);
             }
-            spdlog ::info("step size upper = {}, alpha = {}", toi, alpha);
+            spdlog::info("step size upper = {}, alpha = {}", toi, alpha);
 
-            auto iter_duration = DURATION_TO_DOUBLE(high_resolution_clock::now() - newton_iter_start);
-            spdlog::info("iter {}, time = {} ms, IPC term time = {} \n e0 = {}, e1 = {}, norm_dq = {}\n", iter, iter_duration * 1000, ipc_duration * 1000, E0, E1, norm_dq);
+            auto iter_duration = DURATION_TO_DOUBLE(newton_iter_start);
+            // spdlog::warn("iter {}, time = {} ms, IPC term time = {} \n e0 = {}, e1 = {}, norm_dq = {}\n", iter, iter_duration, ipc_duration, E0, E1, norm_dq);
+            spdlog::warn("Newton iter #{}, time = {} ms, upper bound = {}, line search = {}", iter + 1, iter_duration, toi, alpha);
         }
         //         {
         //             // updating collision set
@@ -675,7 +690,20 @@ void implicit_euler(vector<unique_ptr<AffineBody>>& cubes, double dt)
         term_cond = sup_dq < 1e-4 || ++iter >= globals.max_iter;
         sup_dq = 0.0;
     } while (!term_cond);
-    spdlog::info("\n  converge at iter {}, ts = {} \n", iter, ts++);
+
+    double frame_duration = DURATION_TO_DOUBLE(frame_start) / 100.0;
+    spdlog::warn("converge #iter {}, ts = {}, time = {} ms---------------------------\n\\
+    time breakdown :\n\\
+    \tipc: {} ms, percentage = {}% \n\\
+    \tsolver: {}, percentage = {}%\n\\
+    \tccd: {}, percentage = {}%\n\\
+    \tline search: {}, percentage = {}%\n\n\n",
+        iter, ts++, frame_duration * 100.0,
+        times[__IPC__],
+        times[__IPC__] / frame_duration,
+        times[__SOLVER__], times[__SOLVER__] / frame_duration,
+        times[__CCD__], times[__CCD__] / frame_duration,
+        times[__LINE_SEARCH__], times[__LINE_SEARCH__] / frame_duration);
     globals.tot_iter += iter;
 #pragma omp parallel for schedule(static)
     for (int k = 0; k < n_cubes; k++) {

@@ -18,7 +18,7 @@
     "safe_factor": 1.0,
     "uppper_bound": true, 
     "mu": 0.0,
-    "log": true,
+    "log": 1,
     "backoff": 0.8,
     "damping": {
         "enable": false,
