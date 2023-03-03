@@ -613,13 +613,14 @@ void implicit_euler(vector<unique_ptr<AffineBody>>& cubes, double dt)
 #endif
                     toi = step_size_upper_bound(dq, cubes, n_cubes, n_pt, n_ee, n_g, pts, idx, ees, eidx, vidx);
 #ifdef IAABB_INTERNSHIP
-                if (toi != toi_iaabb) {
+                if (globals.iaabb && toi != toi_iaabb) {
                     spdlog::error("step size upper bound not match, toi = {}, iaabb = {}", toi, toi_iaabb);
                     dump_states(cubes);
                     exit(1);
                 }
 #else
-                toi = toi_iaabb;
+                if (globals.iaabb)
+                    toi = toi_iaabb;
 #endif
             }
             double ccd_duration = DURATION_TO_DOUBLE(ccd_start);
@@ -692,13 +693,13 @@ void implicit_euler(vector<unique_ptr<AffineBody>>& cubes, double dt)
     } while (!term_cond);
 
     double frame_duration = DURATION_TO_DOUBLE(frame_start) / 100.0;
-    spdlog::warn("converge #iter {}, ts = {}, time = {} ms---------------------------\n\\
+    spdlog::warn("converge #iter {}, ts = {}, time = {} ms\n\\
     time breakdown :\n\\
-    \tipc: {} ms, percentage = {}% \n\\
-    \tsolver: {}, percentage = {}%\n\\
-    \tccd: {}, percentage = {}%\n\\
-    \tline search: {}, percentage = {}%\n\n\n",
-        iter, ts++, frame_duration * 100.0,
+    \tipc: {:.3f} ms, percentage = {:.3f}% \n\\
+    \tsolver: {:.3f}, percentage = {:.3f}%\n\\
+    \tccd: {:.3f}, percentage = {:.3f}%\n\\
+    \tline search: {:.3f}, percentage = {:.3f}%\n\n\n",
+        ++iter, ts++, frame_duration * 100.0,
         times[__IPC__],
         times[__IPC__] / frame_duration,
         times[__SOLVER__], times[__SOLVER__] / frame_duration,

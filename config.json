@@ -6,7 +6,7 @@
     "predefined_case" : {
         "enable": false,
         "id" : 2,
-        "custom": "../test_cases/case2.json"
+        "custom": "../test_cases/bolt.json"
     },
     "solver": "sparse",
     "gravity": true, 
@@ -17,7 +17,7 @@
     "ground": true,
     "safe_factor": 1.0,
     "uppper_bound": true, 
-    "mu": 0.0,
+    "mu": 1e-3,
     "log": 1,
     "backoff": 0.8,
     "damping": {
@@ -39,7 +39,7 @@
         "min_xyz": -10.0,
         "max_xyz": 10.0,
         "dx": 0.8,
-        "n_buffer": 256,
+        "n_buffer": 512,
         "xyz_bits": 6,
         "set_size": 1
     },

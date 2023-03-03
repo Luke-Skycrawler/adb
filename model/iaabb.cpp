@@ -9,6 +9,7 @@
 #include <ipc/distance/edge_edge.hpp>
 #include "barrier.h"
 #include "time_integrator.h"
+#include <omp.h>
 #ifndef TESTING
 #include "../view/global_variables.h"
 #define DT globals.dt
@@ -343,7 +344,29 @@ double primitive_brute_force(
         default: c.project_vt2();
         }
     }
-
+#pragma omp parallel for schedule(guided)
+    for (int I = 0; I < n_cubes; I++) {
+        auto& c{ *cubes[I] };
+        for (int v = 0; v < c.n_vertices; v++) {
+            auto& p{ c.v_transformed[v] };
+            // handling vertex-ground collision
+            if (!cull_trajectory) {
+                double d = vg_distance(p);
+                d = d * d;
+                if (d < barrier::d_hat) {
+#pragma omp critical
+                    vidx.push_back({ I, v });
+                }
+            }
+            else {
+#ifndef TESTING
+                double t = collision_time(c, v);
+#pragma omp critical
+                toi_global = min(toi_global, t);
+#endif
+            }
+        }
+    }
 #ifdef _BODY_WISE_
 #pragma omp parallel for schedule(guided)
     for (int I = 0; I < n_cubes; I++) {
@@ -351,33 +374,16 @@ double primitive_brute_force(
         for (int v = 0; v < c.n_vertices; v++) {
             auto& p{ c.v_transformed[v] };
             for (int o = starting[I]; o < starting[I + 1]; o++) {
-                lu& cull = overlaps[o].cull;
-                overlaps[o].plist = lists + o;
-                if (filter_if_inside(cull, p, cull_trajectory, c, v)) {
-                    auto &t{ overlaps[o] };
+            lu& cull = overlaps[o].cull;
+            overlaps[o].plist = lists + o;
+            if (filter_if_inside(cull, p, cull_trajectory, c, v)) {
+                    auto& t{ overlaps[o] };
                     assert(t.i == I);
                     if (t.i < t.j)
                         lists[o].vi.push_back(v);
                     else
                         lists[o].vj.push_back(v);
-                }
             }
-
-            // handling vertex-ground collision
-            if (!cull_trajectory) {
-                double d = vg_distance(p);
-                d = d * d;
-                if (d < barrier::d_hat) {
-                    #pragma omp critical
-                    vidx.push_back({ I, v });
-                }
-            }
-            else {
-#ifndef TESTING
-                double t = collision_time(c, v);
-                #pragma omp critical
-                toi_global = min(toi_global, t);
-#endif
             }
         }
 
@@ -420,54 +426,52 @@ double primitive_brute_force(
 
     // FIXME: n_overlap = 0 ?
     static omp_lock_t* locks = new omp_lock_t[max(n_overlap, 1)];
-    static int allocated = n_overlap;
+    static int allocated_locks = n_overlap;
     static bool init = true;
-    if (n_overlap > allocated) {
-        for (int i = 0; i < allocated; i++)
+    if (n_overlap > allocated_locks) {
+        for (int i = 0; i < allocated_locks; i++)
             omp_destroy_lock(locks + i);
         delete[] locks;
         locks = new omp_lock_t[n_overlap];
-        allocated = n_overlap;
+        allocated_locks = n_overlap;
     }
-    if (n_overlap > allocated || init)
+    if (n_overlap > allocated_locks || init)
         for (int i = 0; i < n_overlap; i++)
             omp_init_lock(locks + i);
     init = false;
-    if (n_overlap)
+    for (int i = 0; i < n_overlap; i ++) overlaps[i].plist = lists + i;
 #pragma omp parallel for schedule(guided)
-        for (int i = 0; i < n_points; i++) {
-            auto& idx{ globals.points[i] };
-            auto I{ idx[0] };
-            auto v{ idx[1] };
-            auto& c{ *cubes[I] };
-            vec3 p{ c.v_transformed[v] };
-            for (int o = starting[I]; o < starting[I + 1]; o++) {
-                lu& cull = overlaps[o].cull;
-                overlaps[o].plist = lists + o;
-                if (filter_if_inside(cull, p, cull_trajectory, c, v)) {
-                    auto& t{ overlaps[o] };
-                    assert(t.i == I);
-                    omp_set_lock(locks + o);
-                    if (t.i < t.j)
-                        lists[o].vi.push_back(v);
-                    else
-                        lists[o].vj.push_back(v);
-                    omp_unset_lock(locks + o);
-                }
+    for (int i = 0; i < n_points; i++) {
+        auto idx{ globals.points[i] };
+        auto I{ idx[0] };
+        auto v{ idx[1] };
+        auto& c{ *cubes[I] };
+        vec3 p{ c.v_transformed[v] };
+        for (int o = starting[I]; o < starting[I + 1]; o++) {
+            lu cull = overlaps[o].cull;
+            if (filter_if_inside(cull, p, cull_trajectory, c, v)) {
+                auto& t{ overlaps[o] };
+                assert(t.i == I);
+                omp_set_lock(locks + o);
+                if (t.i < t.j)
+                    lists[o].vi.push_back(v);
+                else
+                    lists[o].vj.push_back(v);
+                omp_unset_lock(locks + o);
             }
         }
+    }
 
 #pragma omp parallel for schedule(guided)
     for (int i = 0; i < n_edges; i++) {
-        auto& idx{ globals.edges[i] };
+        auto idx{ globals.edges[i] };
         auto I{ idx[0] };
         auto ei{ idx[1] };
         auto& c{ *cubes[I] };
         Edge e{ c, ei, true, true };
 
         for (int o = starting[I]; o < starting[I + 1]; o++) {
-            lu& cull = overlaps[o].cull;
-            overlaps[o].plist = lists + o;
+            lu cull = overlaps[o].cull;
             if (filter_if_inside(cull, e, cull_trajectory, c, ei)) {
                 auto& t{ overlaps[o] };
                 omp_set_lock(locks + o);
@@ -482,15 +486,14 @@ double primitive_brute_force(
 
 #pragma omp parallel for schedule(guided)
     for (int i = 0; i < n_triangles; i++) {
-        auto& idx{ globals.triangles[i] };
+        auto idx{ globals.triangles[i] };
         auto I{ idx[0] };
         auto fi{ idx[1] };
         auto& c{ *cubes[I] };
         Face f{ c, fi, true, true };
 
         for (int o = starting[I]; o < starting[I + 1]; o++) {
-            lu& cull = overlaps[o].cull;
-            overlaps[o].plist = lists + o;
+            lu cull = overlaps[o].cull;
             if (filter_if_inside(cull, f, cull_trajectory, c, fi)) {
                 auto& t{ overlaps[o] };
                 omp_set_lock(locks + o);
