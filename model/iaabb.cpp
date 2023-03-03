@@ -343,6 +343,8 @@ double primitive_brute_force(
         default: c.project_vt2();
         }
     }
+
+#ifdef _BODY_WISE_
 #pragma omp parallel for schedule(guided)
     for (int I = 0; I < n_cubes; I++) {
         auto& c{ *cubes[I] };
@@ -412,6 +414,95 @@ double primitive_brute_force(
             }
         }
     }
+
+#else
+    int n_points = globals.points.size(), n_triangles = globals.triangles.size(), n_edges = globals.edges.size();
+
+    // FIXME: n_overlap = 0 ?
+    static omp_lock_t* locks = new omp_lock_t[max(n_overlap, 1)];
+    static int allocated = n_overlap;
+    static bool init = true;
+    if (n_overlap > allocated) {
+        for (int i = 0; i < allocated; i++)
+            omp_destroy_lock(locks + i);
+        delete[] locks;
+        locks = new omp_lock_t[n_overlap];
+        allocated = n_overlap;
+    }
+    if (n_overlap > allocated || init)
+        for (int i = 0; i < n_overlap; i++)
+            omp_init_lock(locks + i);
+    init = false;
+    if (n_overlap)
+#pragma omp parallel for schedule(guided)
+        for (int i = 0; i < n_points; i++) {
+            auto& idx{ globals.points[i] };
+            auto I{ idx[0] };
+            auto v{ idx[1] };
+            auto& c{ *cubes[I] };
+            vec3 p{ c.v_transformed[v] };
+            for (int o = starting[I]; o < starting[I + 1]; o++) {
+                lu& cull = overlaps[o].cull;
+                overlaps[o].plist = lists + o;
+                if (filter_if_inside(cull, p, cull_trajectory, c, v)) {
+                    auto& t{ overlaps[o] };
+                    assert(t.i == I);
+                    omp_set_lock(locks + o);
+                    if (t.i < t.j)
+                        lists[o].vi.push_back(v);
+                    else
+                        lists[o].vj.push_back(v);
+                    omp_unset_lock(locks + o);
+                }
+            }
+        }
+
+#pragma omp parallel for schedule(guided)
+    for (int i = 0; i < n_edges; i++) {
+        auto& idx{ globals.edges[i] };
+        auto I{ idx[0] };
+        auto ei{ idx[1] };
+        auto& c{ *cubes[I] };
+        Edge e{ c, ei, true, true };
+
+        for (int o = starting[I]; o < starting[I + 1]; o++) {
+            lu& cull = overlaps[o].cull;
+            overlaps[o].plist = lists + o;
+            if (filter_if_inside(cull, e, cull_trajectory, c, ei)) {
+                auto& t{ overlaps[o] };
+                omp_set_lock(locks + o);
+                if (t.i < t.j)
+                    lists[o].ei.push_back(ei);
+                else
+                    lists[o].ej.push_back(ei);
+                omp_unset_lock(locks + o);
+            }
+        }
+    }
+
+#pragma omp parallel for schedule(guided)
+    for (int i = 0; i < n_triangles; i++) {
+        auto& idx{ globals.triangles[i] };
+        auto I{ idx[0] };
+        auto fi{ idx[1] };
+        auto& c{ *cubes[I] };
+        Face f{ c, fi, true, true };
+
+        for (int o = starting[I]; o < starting[I + 1]; o++) {
+            lu& cull = overlaps[o].cull;
+            overlaps[o].plist = lists + o;
+            if (filter_if_inside(cull, f, cull_trajectory, c, fi)) {
+                auto& t{ overlaps[o] };
+                omp_set_lock(locks + o);
+                if (t.i < t.j)
+                    lists[o].ei.push_back(fi);
+                else
+                    lists[o].ej.push_back(fi);
+                omp_unset_lock(locks + o);
+            }
+        }
+    }
+#endif
     sort(overlaps.begin(), overlaps.end(), [](const Intersection& a, const Intersection& b) -> bool{
         auto ad = a.i + a.j, am = abs(a.i - a.j);
         auto bd = b.i + b.j, bm = abs(b.i - b.j);
