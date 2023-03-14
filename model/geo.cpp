@@ -81,8 +81,8 @@ void friction(
 {
     static double mu = globals.mu;
     static const double evh = globals.dt * globals.evh, h2 = globals.dt * globals.dt;
-    auto uk = _uk.norm();
-    if (uk < 1e-10) return;
+    double uk = sqrt(_uk(0) * _uk(0) + _uk(1) * _uk(1));
+    //if (uk < 1e-10) return;
 
     auto f1 = ipc::f1_SF_over_x(uk, evh);
     
@@ -92,6 +92,9 @@ void friction(
     if (uk >= evh) {
         Vector2d ut{ -_uk(1), _uk(0) };
         D_k_hessian = mu * contact_lambda * f1 / (uk * uk) * Tk * ut * (ut.transpose() * Tk.transpose());
+    }
+    else if (uk <= 1e-10) {
+        D_k_hessian = mu * contact_lambda * f1 * Tk * Tk.transpose();
     }
     else {
         double df1_term = ipc::df1_x_minus_f1_over_x3(uk, evh);

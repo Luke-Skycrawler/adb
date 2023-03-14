@@ -6,7 +6,7 @@
     "predefined_case" : {
         "enable": false,
         "id" : 2,
-        "custom": "../test_cases/bolt.json"
+        "custom": "../test_cases/cards.json"
     },
     "solver": "sparse",
     "gravity": true, 
@@ -17,12 +17,12 @@
     "ground": true,
     "safe_factor": 1.0,
     "uppper_bound": true, 
-    "mu": 1e-3,
+    "mu": 0.3,
     "log": 1,
-    "backoff": 0.8,
+    "backoff": 0.95,
     "damping": {
         "enable": false,
-        "alpha": 2.3e-2,
+        "alpha": 5e-2,
         "beta": 2.5e-2
     },
     "eps_x": 1e-3,
@@ -46,7 +46,7 @@
     "full_ccd": true,
     "align_com": false,
     "trace_folder": "trace",
-    "iaabb": true,
+    "iaabb": false,
     "evh": 1e-2,
     "vg_friction": true,
     "pt_friction": true,

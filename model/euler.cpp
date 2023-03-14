@@ -398,27 +398,7 @@ void implicit_euler(vector<unique_ptr<AffineBody>>& cubes, double dt)
             c.hess = hess_inertia_per_body(c, dt);
             c.project_vt1();
         }
-        for (auto _v : vidx) {
-            int i = _v[0], v = _v[1];
-            auto& c{ *cubes[i] };
-            vec3 p = c.v_transformed[v];
-            double _d = vg_distance(p);
-            double d = _d * _d;
-            if (d < barrier::d_hat) {
-#ifdef _FRICTION_
-                Matrix<double, 3, 2> Pk;
-                Pk.col(0) = vec3(1.0, 0.0, 0.0);
-                Pk.col(1) = vec3(0.0, 0.0, 1.0);
-
-                Vector2d uk = Pk.transpose() * (p - c.vt0(v));
-                auto contact_force = -barrier_derivative_d(d) / (dt * dt) * 2 * _d;
-
-                ipc_term_vg(c, v, uk, contact_force, Pk);
-#else
-                ipc_term_vg(c, v);
-#endif
-            }
-        }
+   
 
 #ifdef _SM_
         if (iter) {
@@ -513,7 +493,27 @@ void implicit_euler(vector<unique_ptr<AffineBody>>& cubes, double dt)
 #endif
             }
         }
+        for (auto _v : vidx) {
+            int i = _v[0], v = _v[1];
+            auto& c{ *cubes[i] };
+            vec3 p = c.v_transformed[v];
+            double _d = vg_distance(p);
+            double d = _d * _d;
+            if (d < barrier::d_hat) {
+#ifdef _FRICTION_
+                Matrix<double, 3, 2> Pk;
+                Pk.col(0) = vec3(1.0, 0.0, 0.0);
+                Pk.col(1) = vec3(0.0, 0.0, 1.0);
 
+                Vector2d uk = Pk.transpose() * (p - c.vt0(v));
+                auto contact_force = -barrier_derivative_d(d) / (dt * dt) * 2 * _d;
+
+                ipc_term_vg(c, v, uk, contact_force, Pk);
+#else
+                ipc_term_vg(c, v);
+#endif
+            }
+        }
         auto ipc_duration = DURATION_TO_DOUBLE(ipc_start);
         times[__IPC__] += ipc_duration;
         double toi = 1.0, factor = 1.0, alpha = 1.0;
