@@ -503,9 +503,9 @@ double primitive_brute_force(
                 auto& t{ overlaps[o] };
                 omp_set_lock(locks + o);
                 if (t.i < t.j)
-                    lists[o].ei.push_back(fi);
+                    lists[o].fi.push_back(fi);
                 else
-                    lists[o].ej.push_back(fi);
+                    lists[o].fj.push_back(fi);
                 omp_unset_lock(locks + o);
             }
         }

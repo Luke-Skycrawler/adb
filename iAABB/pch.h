@@ -10,4 +10,4 @@
 struct Globals {
     std::vector<std::array<unsigned, 2>> points, edges, triangles;
 };
-#define _BODY_WISE_
+//#define _BODY_WISE_
