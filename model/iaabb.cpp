@@ -14,6 +14,7 @@
 #include "../view/global_variables.h"
 #define DT globals.dt
 #else
+#include "../iAABB/pch.h"
 #define DT 1e-2
 #endif
 #include <chrono>
@@ -286,6 +287,9 @@ double primitive_brute_force(
     vector<Matrix<double, 2, 12>>& ee_tk,
 #ifdef TESTING
     std::vector<double_int>& pt_tois, std::vector<double_int>& ee_tois,
+#ifndef _BODY_WISE_
+    Globals &globals,
+#endif
 #endif
     bool gen_basis)
 {
@@ -736,6 +740,9 @@ double iaabb_brute_force(
     std::vector<Eigen::Matrix<double, 2, 12>>& ee_tk,
 #ifdef TESTING
     std::vector<double_int>& pt_tois, std::vector<double_int>& ee_tois,
+    #ifndef _BODY_WISE_
+    Globals &globals,
+    #endif
 #endif
 
     bool gen_basis)
@@ -753,6 +760,10 @@ double iaabb_brute_force(
         ee_tk,
 #ifdef TESTING
         pt_tois, ee_tois,
+
+        #ifndef _BODY_WISE_
+        globals,
+        #endif
 #endif
         gen_basis);
     auto t = DURATION_TO_DOUBLE(start);

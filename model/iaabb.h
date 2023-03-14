@@ -1,5 +1,9 @@
 #pragma once
 #include "affine_body.h"
+#ifdef TESTING
+#include "../iAABB/pch.h"
+
+#endif
 using lu = std::array<vec3, 2>;
 
 struct PList {
@@ -82,6 +86,9 @@ double primitive_brute_force(
     std::vector<Eigen::Matrix<double, 2, 12>>& ee_tk,
 #ifdef TESTING
     std::vector<double_int>& pt_tois, std::vector<double_int>& ee_tois,
+#ifndef _BODY_WISE_
+    Globals &globals,
+#endif
 #endif
     bool gen_basis = false);
 
@@ -99,6 +106,9 @@ double iaabb_brute_force(
     std::vector<Eigen::Matrix<double, 2, 12>>& ee_tk,
 #ifdef TESTING
     std::vector<double_int>& pt_tois, std::vector<double_int>& ee_tois,
+#ifndef _BODY_WISE_
+    Globals &globals,
+#endif
 #endif
 
     bool gen_basis = false);

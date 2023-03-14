@@ -9,7 +9,7 @@
 #include <ipc/distance/edge_edge.hpp>
 #define _USE_MATH_DEFINES
 //#define _FAILED_
-#define _LOAD_
+//#define _LOAD_
 #include <math.h>
 #include <random>
 
@@ -72,6 +72,7 @@ public:
     static const double space_range[2];
     vector<lu> aabbs;
     int n_cubes;
+    Globals globals;
     default_random_engine gen;
     static uniform_real_distribution<double> dist;
     vector<array<double, 6>> args;
@@ -144,10 +145,21 @@ protected:
         #ifdef _LOAD_
         failure_load(cubes);
         #endif
+        for (unsigned I = 0; I < n_cubes; I++) {
+            auto& c{ *cubes[I] };
+
+            for (unsigned i = 0; i < c.n_vertices; i++)
+                globals.points.push_back({ I, i });
+            for (unsigned i = 0; i < c.n_edges; i++)
+                globals.edges.push_back({ I, i });
+            for (unsigned i = 0; i < c.n_faces; i++)
+                globals.triangles.push_back({ I, i });
+        }
     }
 };
 uniform_real_distribution<double> iAABBTest ::dist(0.0, 1.0);
 const double iAABBTest::space_range[2]{ -3.0, 3.0 };
+#ifdef _BODY_WISE_
 TEST_F(iAABBTest, sort_against_bf)
 {
     vector<Intersection> overlaps_bf, overlaps_sort;
@@ -161,7 +173,7 @@ TEST_F(iAABBTest, sort_against_bf)
     cout << "size: bf = " << overlaps_bf.size() << " sort = " << overlaps_sort.size() << "\n";
     diff(overlaps_bf, overlaps_sort);
 }
-
+#endif  
 
 void iAABBTest::diff(vector<array<int, 4>>& a, vector<array<int, 4>>& b)
 {
@@ -219,6 +231,8 @@ void iAABBTest::diff(vector<Intersection>& a, vector<Intersection>& b)
         }
 
 }
+#ifdef _BODY_WISE_
+
 TEST_F(iAABBTest, pipelined)
 {
     vector<Intersection> overlaps_sort;
@@ -305,6 +319,7 @@ TEST_F(iAABBTest, pipelined)
     diff(idx_ref, idx); 
     diff(eidx_ref, eidx);
 }
+#endif
 
 array<double, 2> brute_force(
     int n_cubes,
@@ -362,7 +377,11 @@ TEST_F(iAABBTest, upper_bound_against_sh)
     vector<Matrix<double, 2, 12>> pt_tk;
     vector<Matrix<double, 2, 12>> ee_tk;
     vector<double_int> pt_tois, ee_tois, pt_toi_iaabb, ee_toi_iaabb;
-    double t = iaabb_brute_force(n_cubes, cubes, aabbs, 3, pts, idx_iaabb, ees, eidx_iaabb, vidx, pt_tk, ee_tk, pt_toi_iaabb, ee_toi_iaabb, false);
+    double t = iaabb_brute_force(n_cubes, cubes, aabbs, 3, pts, idx_iaabb, ees, eidx_iaabb, vidx, pt_tk, ee_tk, pt_toi_iaabb, ee_toi_iaabb,
+#ifndef _BODY_WISE_
+        globals,
+#endif
+        false);
     auto t_ref = brute_force(n_cubes, cubes, pt_tois, ee_tois, idx, eidx);
     EXPECT_EQ(min(t_ref[0], t_ref[1]), t);
     sort(idx.begin(), idx.end());
