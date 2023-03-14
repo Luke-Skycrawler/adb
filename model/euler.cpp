@@ -184,7 +184,7 @@ double line_search(const VectorXd& dq, const VectorXd& grad, VectorXd& q0, doubl
             c.dq = dqk.segment<12>(i * 12);
         }
 
-        if (globals.iaabb)
+        if (globals.iaabb % 2)
             iaabb_brute_force(n_cubes, cubes, globals.aabbs, 2,
 #ifdef IAABB_COMPARING
                 pts_iaab,
@@ -290,7 +290,7 @@ void implicit_euler(vector<unique_ptr<AffineBody>>& cubes, double dt)
     const int n_cubes = cubes.size(), nsqr = n_cubes * n_cubes, hess_dim = n_cubes * 12;
 
     if (globals.col_set) {
-        if (globals.iaabb)
+        if (globals.iaabb % 2)
             iaabb_brute_force(n_cubes, cubes, globals.aabbs, 1,
 #ifdef IAABB_COMPARING
                 pts_iaabb,
@@ -606,20 +606,20 @@ void implicit_euler(vector<unique_ptr<AffineBody>>& cubes, double dt)
             auto ccd_start = high_resolution_clock::now();
             if (globals.upper_bound) {
                 double toi_iaabb;
-                if (globals.iaabb)
+                if (globals.iaabb > 1)
                     toi_iaabb = iaabb_brute_force(n_cubes, cubes, globals.aabbs, 3, pts, idx, ees, eidx, vidx, pt_tk, ee_tk, false);
 #ifndef IAABB_INTERNSHIP
                 else
 #endif
                     toi = step_size_upper_bound(dq, cubes, n_cubes, n_pt, n_ee, n_g, pts, idx, ees, eidx, vidx);
 #ifdef IAABB_INTERNSHIP
-                if (globals.iaabb && toi != toi_iaabb) {
+                if (globals.iaabb > 1 && toi != toi_iaabb) {
                     spdlog::error("step size upper bound not match, toi = {}, iaabb = {}", toi, toi_iaabb);
                     dump_states(cubes);
                     exit(1);
                 }
 #else
-                if (globals.iaabb)
+                if (globals.iaabb > 1)
                     toi = toi_iaabb;
 #endif
             }

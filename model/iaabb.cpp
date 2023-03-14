@@ -424,22 +424,23 @@ double primitive_brute_force(
 #else
     int n_points = globals.points.size(), n_triangles = globals.triangles.size(), n_edges = globals.edges.size();
 
-    // FIXME: n_overlap = 0 ?
-    static omp_lock_t* locks = new omp_lock_t[max(n_overlap, 1)];
-    static int allocated_locks = n_overlap;
+    static omp_lock_t* locks = nullptr;
+    static int allocated_locks = 0;
     static bool init = true;
     if (n_overlap > allocated_locks) {
-        for (int i = 0; i < allocated_locks; i++)
-            omp_destroy_lock(locks + i);
-        delete[] locks;
+        if (!init) {
+            for (int i = 0; i < allocated_locks; i++)
+                omp_destroy_lock(locks + i);
+            delete[] locks;
+        }
         locks = new omp_lock_t[n_overlap];
         allocated_locks = n_overlap;
-    }
-    if (n_overlap > allocated_locks || init)
         for (int i = 0; i < n_overlap; i++)
             omp_init_lock(locks + i);
-    init = false;
+    }
+
     for (int i = 0; i < n_overlap; i ++) overlaps[i].plist = lists + i;
+
 #pragma omp parallel for schedule(guided)
     for (int i = 0; i < n_points; i++) {
         auto idx{ globals.points[i] };
