@@ -351,6 +351,7 @@ double primitive_brute_force(
 #pragma omp parallel
     {
         double toi_thread_local = 1.0;
+        vector<array<int, 2>> vidx_thread_local;
 #pragma omp for schedule(guided)
         for (int I = 0; I < n_cubes; I++) {
             auto& c{ *cubes[I] };
@@ -361,20 +362,23 @@ double primitive_brute_force(
                     double d = vg_distance(p);
                     d = d * d;
                     if (d < barrier::d_hat) {
-#pragma omp critical
-                        vidx.push_back({ I, v });
+                        vidx_thread_local.push_back({ I, v });
                     }
                 }
                 else {
-#ifndef TESTING
                     double t = collision_time(c, v);
                     toi_thread_local = min(toi_thread_local, t);
                 }
             }
         }
+        if (cull_trajectory) {
 #pragma omp critical
-        toi_global = min(toi_global, toi_thread_local);
-#endif
+            toi_global = min(toi_global, toi_thread_local);
+        }
+        else {
+#pragma omp critical
+            vidx.insert(vidx.end(), vidx_thread_local.begin(), vidx_thread_local.end());
+        }
     }
 #ifdef _BODY_WISE_
 #pragma omp parallel for schedule(guided)
@@ -524,7 +528,7 @@ double primitive_brute_force(
     });
     // spdlog::info("ground toi  = {}", toi_global);
 
-#pragma omp parallel for schedule(guided)
+#pragma omp parallel for schedule(static)
     for (int i = 0; i < n_overlap / 2; i++) {
         int i0 = overlaps[i * 2].i, j0 = overlaps[i * 2].j;
         int i1 = overlaps[i * 2 + 1].i, j1 = overlaps[i * 2 + 1].j;

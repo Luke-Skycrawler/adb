@@ -46,7 +46,7 @@
     "full_ccd": true,
     "align_com": false,
     "trace_folder": "trace",
-    "iaabb": 2,
+    "iaabb": 3,
     "evh": 1e-2,
     "vg_friction": true,
     "pt_friction": true,

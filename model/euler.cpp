@@ -14,7 +14,7 @@
 #include <Eigen/PardisoSupport>
 #endif
 #include <ipc/distance/edge_edge_mollifier.hpp>
-// #define IAABB_COMPARING
+//#define IAABB_COMPARING
 // #define IAABB_INTERNSHIP
 #ifdef IAABB_COMPARING
 
@@ -164,16 +164,16 @@ double line_search(const VectorXd& dq, const VectorXd& grad, VectorXd& q0, doubl
     E0 += ef0;
     double qdg = dq.dot(grad);
     VectorXd q1;
-    vector<array<vec3, 4>> pts_new, pts_iaab;
-    vector<array<int, 4>> idx_new, idx_iaab;
+    static vector<array<vec3, 4>> pts_new, pts_iaab;
+    static vector<array<int, 4>> idx_new, idx_iaab;
 
-    vector<array<vec3, 4>> ees_new, ees_iaab;
-    vector<array<int, 4>> eidx_new, eidx_iaab;
+    static vector<array<vec3, 4>> ees_new, ees_iaab;
+    static vector<array<int, 4>> eidx_new, eidx_iaab;
 
-    vector<array<int, 2>> vidx_new, vidx_iaab;
+    static vector<array<int, 2>> vidx_new, vidx_iaab;
 
-    vector<Matrix<double, 2, 12>> pt_tk_new, pt_tk_iaab;
-    vector<Matrix<double, 2, 12>> ee_tk_new, ee_tk_iaab;
+    static vector<Matrix<double, 2, 12>> pt_tk_new, pt_tk_iaab;
+    static vector<Matrix<double, 2, 12>> ee_tk_new, ee_tk_iaab;
 
     auto dq_norm = dq.norm();
     do {
@@ -261,16 +261,16 @@ void implicit_euler(vector<unique_ptr<AffineBody>>& cubes, double dt)
         }
     }
 
-    vector<array<vec3, 4>> pts;
-    vector<array<int, 4>> idx;
+    static vector<array<vec3, 4>> pts;
+    static vector<array<int, 4>> idx;
 
-    vector<array<vec3, 4>> ees;
-    vector<array<int, 4>> eidx;
+    static vector<array<vec3, 4>> ees;
+    static vector<array<int, 4>> eidx;
 
-    vector<array<int, 2>> vidx;
+    static vector<array<int, 2>> vidx;
 
-    vector<Matrix<double, 2, 12>> pt_tk;
-    vector<Matrix<double, 2, 12>> ee_tk;
+    static vector<Matrix<double, 2, 12>> pt_tk;
+    static vector<Matrix<double, 2, 12>> ee_tk;
     static double times[4];
     fill(times, times + 4, 0.0);
     auto frame_start = high_resolution_clock::now();
@@ -322,7 +322,7 @@ void implicit_euler(vector<unique_ptr<AffineBody>>& cubes, double dt)
             ee_tk,
             true);
 
-        if (globals.iaabb) {
+        if (globals.iaabb % 2) {
 
 #ifdef IAABB_COMPARING
             const auto compare_collision = [](
