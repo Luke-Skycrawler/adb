@@ -338,7 +338,7 @@ double primitive_brute_force(
             old_cube_index = o.i;
         }
     }
-#pragma omp parallel for schedule(guided)
+#pragma omp parallel for schedule(static)
     for (int I = 0; I < n_cubes; I++) {
         // construct the vertex, edge, and triangle list inside each overlap
         auto& c{ *cubes[I] };
@@ -348,11 +348,15 @@ double primitive_brute_force(
         default: c.project_vt2();
         }
     }
-#pragma omp parallel
+
+    static vector<array<int, 2>>* vidx_thread_local = new vector<array<int, 2>>[omp_get_max_threads()];
+
+// #pragma omp parallel
     {
         double toi_thread_local = 1.0;
-        vector<array<int, 2>> vidx_thread_local;
-#pragma omp for schedule(guided)
+        auto tid = omp_get_thread_num();
+        vidx_thread_local[tid].resize(0);
+// #pragma omp for schedule(static)
         for (int I = 0; I < n_cubes; I++) {
             auto& c{ *cubes[I] };
             for (int v = 0; v < c.n_vertices; v++) {
@@ -362,7 +366,7 @@ double primitive_brute_force(
                     double d = vg_distance(p);
                     d = d * d;
                     if (d < barrier::d_hat) {
-                        vidx_thread_local.push_back({ I, v });
+                        vidx_thread_local[tid].push_back({ I, v });
                     }
                 }
                 else {
@@ -377,7 +381,7 @@ double primitive_brute_force(
         }
         else {
 #pragma omp critical
-            vidx.insert(vidx.end(), vidx_thread_local.begin(), vidx_thread_local.end());
+            vidx.insert(vidx.end(), vidx_thread_local[tid].begin(), vidx_thread_local[tid].end());
         }
     }
 #ifdef _BODY_WISE_
@@ -649,12 +653,20 @@ double primitive_brute_force(
     };
 
     double ee_global = 1.0, pt_global = 1.0;
+    static vector<array<int, 4>>*idx_private = new vector<array<int, 4>>[omp_get_max_threads()],
+                             *eidx_private = new vector<array<int, 4>>[omp_get_max_threads()];
+    static vector<array<vec3, 4>>*pts_private = new vector<array<vec3, 4>>[omp_get_max_threads()], *ees_private = new vector<array<vec3, 4>>[omp_get_max_threads()];
+    static vector<Matrix<double, 2, 12>>*pt_tk_private = new vector<Matrix<double, 2, 12>>[omp_get_max_threads()], *ee_tk_private = new vector<Matrix<double, 2, 12>>[omp_get_max_threads()];
     if (!cull_trajectory)
 #pragma omp parallel
     {
-        vector<array<int, 4>> idx_private, eidx_private;
-        vector<array<vec3, 4>> pts_private, ees_private;
-        vector<Matrix<double, 2, 12>> pt_tk_private, ee_tk_private;
+        auto tid = omp_get_thread_num();
+        idx_private[tid].resize(0);
+        eidx_private[tid].resize(0);
+        pts_private[tid].resize(0);
+        ees_private[tid].resize(0);
+        pt_tk_private[tid].resize(0);
+        ee_tk_private[tid].resize(0);
 #pragma omp for schedule(guided) nowait
         for (int _i = 0; _i < n_overlap / 2; _i++) {
             int i = _i * 2;
@@ -685,25 +697,25 @@ double primitive_brute_force(
                             ee_uktk(*cubes[I], cj, ee, ij, ee_type, Tk_T, uk, d, DT);
 #endif
                         {
-                            ees_private.push_back(ee);
-                            eidx_private.push_back(ij);
+                            ees_private[tid].push_back(ee);
+                            eidx_private[tid].push_back(ij);
 #ifdef _FRICTION_
-                            ee_tk_private.push_back(Tk_T);
+                            ee_tk_private[tid].push_back(Tk_T);
 #endif
                         }
                     }
                 }
-            vf_col_set(vilist, fjlist, cubes, I, J, pts_private, idx_private, pt_tk_private);
-            vf_col_set(vjlist, filist, cubes, J, I, pts_private, idx_private, pt_tk_private);
+            vf_col_set(vilist, fjlist, cubes, I, J, pts_private[tid], idx_private[tid], pt_tk_private[tid]);
+            vf_col_set(vjlist, filist, cubes, J, I, pts_private[tid], idx_private[tid], pt_tk_private[tid]);
         }
 #pragma omp critical
         {
-            pts.insert(pts.end(), pts_private.begin(), pts_private.end());
-            idx.insert(idx.end(), idx_private.begin(), idx_private.end());
-            pt_tk.insert(pt_tk.end(), pt_tk_private.begin(), pt_tk_private.end());
-            ees.insert(ees.end(), ees_private.begin(), ees_private.end());
-            eidx.insert(eidx.end(), eidx_private.begin(), eidx_private.end());
-            ee_tk.insert(ee_tk.end(), ee_tk_private.begin(), ee_tk_private.end());
+            pts.insert(pts.end(), pts_private[tid].begin(), pts_private[tid].end());
+            idx.insert(idx.end(), idx_private[tid].begin(), idx_private[tid].end());
+            pt_tk.insert(pt_tk.end(), pt_tk_private[tid].begin(), pt_tk_private[tid].end());
+            ees.insert(ees.end(), ees_private[tid].begin(), ees_private[tid].end());
+            eidx.insert(eidx.end(), eidx_private[tid].begin(), eidx_private[tid].end());
+            ee_tk.insert(ee_tk.end(), ee_tk_private[tid].begin(), ee_tk_private[tid].end());
         }
     }
     else
