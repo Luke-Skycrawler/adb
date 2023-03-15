@@ -10,6 +10,7 @@
 #include "barrier.h"
 #include "time_integrator.h"
 #include <omp.h>
+#include <tbb/parallel_sort.h>
 #ifndef TESTING
 #include "../view/global_variables.h"
 #define DT globals.dt
@@ -524,7 +525,7 @@ double primitive_brute_force(
         }
     }
 #endif
-    sort(overlaps.begin(), overlaps.end(), [](const Intersection& a, const Intersection& b) -> bool{
+    tbb::parallel_sort(overlaps.begin(), overlaps.end(), [](const Intersection& a, const Intersection& b) -> bool{
         auto ad = a.i + a.j, am = abs(a.i - a.j);
         auto bd = b.i + b.j, bm = abs(b.i - b.j);
 
