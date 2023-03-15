@@ -14,8 +14,11 @@ Edge::Edge(const AffineBody& c, unsigned id, bool b, bool batch)
         e1 = c.vt2(_1);
     }
     else {
-        e0 = c.vt1(_0);
-        e1 = c.vt1(_1);
+        mat3 a;
+        vec3 b = c.q[0];
+        a << c.q[1] , c.q[2], c.q[3];
+        e0 = a * c.vertices(_0) + b;
+        e1 = a * c.vertices(_1) + b;
     }
 }
 
@@ -48,9 +51,12 @@ Face::Face(const AffineBody& c, unsigned id, bool b, bool batch)
         t2 = c.vt2(_c);
     }
     else {
-        t0 = c.vt1(_a);
-        t1 = c.vt1(_b);
-        t2 = c.vt1(_c);
+        mat3 a;
+        vec3 b = c.q[0];
+        a << c.q[1] , c.q[2], c.q[3];
+        t0 = a * c.vertices(_a) + b;
+        t1 = a * c.vertices(_b) + b;
+        t2 = a * c.vertices(_c) + b;
     }
 }
 
