@@ -348,28 +348,33 @@ double primitive_brute_force(
         default: c.project_vt2();
         }
     }
-#pragma omp parallel for schedule(guided)
-    for (int I = 0; I < n_cubes; I++) {
-        auto& c{ *cubes[I] };
-        for (int v = 0; v < c.n_vertices; v++) {
-            auto& p{ c.v_transformed[v] };
-            // handling vertex-ground collision
-            if (!cull_trajectory) {
-                double d = vg_distance(p);
-                d = d * d;
-                if (d < barrier::d_hat) {
+#pragma omp parallel
+    {
+        double toi_thread_local = 1.0;
+#pragma omp for schedule(guided)
+        for (int I = 0; I < n_cubes; I++) {
+            auto& c{ *cubes[I] };
+            for (int v = 0; v < c.n_vertices; v++) {
+                auto& p{ c.v_transformed[v] };
+                // handling vertex-ground collision
+                if (!cull_trajectory) {
+                    double d = vg_distance(p);
+                    d = d * d;
+                    if (d < barrier::d_hat) {
 #pragma omp critical
-                    vidx.push_back({ I, v });
+                        vidx.push_back({ I, v });
+                    }
+                }
+                else {
+#ifndef TESTING
+                    double t = collision_time(c, v);
+                    toi_thread_local = min(toi_thread_local, t);
                 }
             }
-            else {
-#ifndef TESTING
-                double t = collision_time(c, v);
-#pragma omp critical
-                toi_global = min(toi_global, t);
-#endif
-            }
         }
+#pragma omp critical
+        toi_global = min(toi_global, toi_thread_local);
+#endif
     }
 #ifdef _BODY_WISE_
 #pragma omp parallel for schedule(guided)
@@ -445,7 +450,7 @@ double primitive_brute_force(
 
     for (int i = 0; i < n_overlap; i ++) overlaps[i].plist = lists + i;
 
-#pragma omp parallel for schedule(guided)
+#pragma omp parallel for schedule(static)
     for (int i = 0; i < n_points; i++) {
         auto idx{ globals.points[i] };
         auto I{ idx[0] };
@@ -467,7 +472,7 @@ double primitive_brute_force(
         }
     }
 
-#pragma omp parallel for schedule(guided)
+#pragma omp parallel for schedule(static)
     for (int i = 0; i < n_edges; i++) {
         auto idx{ globals.edges[i] };
         auto I{ idx[0] };
@@ -489,7 +494,7 @@ double primitive_brute_force(
         }
     }
 
-#pragma omp parallel for schedule(guided)
+#pragma omp parallel for schedule(static)
     for (int i = 0; i < n_triangles; i++) {
         auto idx{ globals.triangles[i] };
         auto I{ idx[0] };
@@ -594,14 +599,20 @@ double primitive_brute_force(
             for (int fj : fjlist) {
                 vec3 v{ ci.v_transformed[vi] };
                 Face f{ cj, unsigned(fj), true, true };
-                double t = pt_collision_time(ci.vt1(vi), Face{ cj, unsigned(fj) }, v, f);
+
+                vec3 v0{ ci.vt1(vi) };
+                Face f0{ cj, unsigned(fj) };
+                lu ret;
+                if (intersection(compute_aabb(v0, v), compute_aabb(f0, f), ret)) {
+                    double t = pt_collision_time(v0, f0, v, f);
 #ifdef TESTING
-                if (t < 1.0) {
-                    idx.push_back({ I, vi, J, fj });
-                    pt_tois.push_back({ t, int(pt_tois.size()) });
-                }
+                    if (t < 1.0) {
+                        idx.push_back({ I, vi, J, fj });
+                        pt_tois.push_back({ t, int(pt_tois.size()) });
+                    }
 #endif
-                toi = min(toi, t);
+                    toi = min(toi, t);
+                }
             }
         return toi;
     };
@@ -615,17 +626,20 @@ double primitive_brute_force(
             for (int ej : ejlist) {
                 Edge ei0(ci, ei), ei1(ci, ei, true, true);
                 Edge ej0(cj, ej), ej1(cj, ej, true, true);
-                double t = ee_collision_time(ei0, ej0, ei1, ej1);
+                lu ret;
+                if (intersection(compute_aabb(ei0, ei1), compute_aabb(ej0, ej1), ret)) {
+                    double t = ee_collision_time(ei0, ej0, ei1, ej1);
 #ifdef TESTING
-                if (t < 1.0) {
-                    if (I < J)
-                        eidx.push_back({ I, ei, J, ej });
-                    else 
-                        eidx.push_back({ J, ej, I, ei });
-                    ee_tois.push_back({ t, int(ee_tois.size()) });
-                }
+                    if (t < 1.0) {
+                        if (I < J)
+                            eidx.push_back({ I, ei, J, ej });
+                        else
+                            eidx.push_back({ J, ej, I, ei });
+                        ee_tois.push_back({ t, int(ee_tois.size()) });
+                    }
 #endif
-                toi = min(toi, t);
+                    toi = min(toi, t);
+                }
             }
         return toi;
     };

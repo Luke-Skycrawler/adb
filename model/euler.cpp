@@ -15,7 +15,7 @@
 #endif
 #include <ipc/distance/edge_edge_mollifier.hpp>
 // #define IAABB_COMPARING
-#define IAABB_INTERNSHIP
+// #define IAABB_INTERNSHIP
 #ifdef IAABB_COMPARING
 
 #include <algorithm>
