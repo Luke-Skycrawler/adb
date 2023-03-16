@@ -25,6 +25,7 @@ google_test.*
 *.jpg
 *.png
 test/
+view/logs/
 view/trace*
 *.recipe
 *.CopyComplete

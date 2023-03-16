@@ -55,7 +55,7 @@ struct GlobalVariableMainCPP{
     }
     #endif
     double dt;
-    int max_iter, tot_iter, ts, set_size;
+    int max_iter, tot_iter, ts, set_size, starting_ts, ending_ts;
     std::vector<HessBlock> hess_triplets;
     std::vector<unique_ptr<AffineBody>> cubes;
         std::map<std::string, unique_ptr<Model>> loaded_models;
@@ -63,8 +63,15 @@ struct GlobalVariableMainCPP{
     vec3 gravity;
     double alpha, beta;
     double kappa, d_hat, safe_factor, mu, eps_x, backoff, evh;
+    Vector4d aggregate_time;
     bool vg_fric, pt_fric, ee_fric;
     bool col_set, upper_bound, line_search, sparse, dense, ee, pt, ground, psd, damp, full_ccd, align_com, player;
+
+    // bundle the rest parameters in here
+    // no intellecense but speed up compiling
+    map<string, double> params_double;
+    map<string, int> params_int;
+    
     int log, iaabb;
     vector<omp_lock_t> writelock_cols;
     unique_ptr<spatial_hashing> sh;

@@ -271,8 +271,8 @@ void implicit_euler(vector<unique_ptr<AffineBody>>& cubes, double dt)
 
     static vector<Matrix<double, 2, 12>> pt_tk;
     static vector<Matrix<double, 2, 12>> ee_tk;
-    static double times[4];
-    fill(times, times + 4, 0.0);
+    static Vector4d times;
+    times.setZero(4);
     auto frame_start = high_resolution_clock::now();
 #ifdef IAABB_COMPARING
     vector<array<vec3, 4>> pts_iaabb;
@@ -706,6 +706,7 @@ void implicit_euler(vector<unique_ptr<AffineBody>>& cubes, double dt)
         times[__CCD__], times[__CCD__] / frame_duration,
         times[__LINE_SEARCH__], times[__LINE_SEARCH__] / frame_duration);
     globals.tot_iter += iter;
+    globals.aggregate_time += times;
 #pragma omp parallel for schedule(static)
     for (int k = 0; k < n_cubes; k++) {
         auto& c(*cubes[k]);

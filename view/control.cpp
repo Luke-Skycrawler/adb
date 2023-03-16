@@ -10,6 +10,11 @@
 #include "../model/time_integrator.h"
 #include "spdlog/sinks/basic_file_sink.h"
 
+#define __IPC__ 0
+#define __SOLVER__ 1
+#define __CCD__ 2
+#define __LINE_SEARCH__ 3
+
 #define DURATION_TO_DOUBLE(X) duration_cast<duration<double>>((X)).count()
 using json = nlohmann::json;
 void reset(bool init)
@@ -93,9 +98,12 @@ void reset(bool init)
         }
         spdlog::flush_every(std::chrono::seconds(3));
     }
+    globals.aggregate_time.setZero(4);
     int st = data["starting_ts"];
+    globals.ending_ts = data["ending_ts"];
     if (st >= 0) {
         globals.ts = st;
+        globals.starting_ts = st;
         player_load(globals.trace_folder, st, globals.cubes);
     }
     #ifdef _INCLUDE_IAABB_H_
@@ -133,8 +141,25 @@ void processInput(GLFWwindow *window)
     }
     if (glfwGetKey(window, GLFW_KEY_ESCAPE) == GLFW_PRESS){
         double t = glfwGetTime();
+        spdlog::default_logger()->flush();
         spdlog::error("running time = {}, ts = {}, #iters = {}, fps = {}", t, globals.ts, globals.tot_iter, globals.ts / t);
+        auto &times {globals.aggregate_time};
+        double frame_duration = 0.0;
+        times /= globals.ts;
+        frame_duration = times.sum() /100.0;
+        spdlog::error("average per-frame time breakdown ------------\n\\
+    \tipc: {:.3f} ms, percentage = {:.3f}% \n\\
+    \tsolver: {:.3f}, percentage = {:.3f}%\n\\
+    \tccd: {:.3f}, percentage = {:.3f}%\n\\
+    \tline search: {:.3f}, percentage = {:.3f}%\n\n\n",
+
+            times[__IPC__],
+            times[__IPC__] / frame_duration,
+            times[__SOLVER__], times[__SOLVER__] / frame_duration,
+            times[__CCD__], times[__CCD__] / frame_duration,
+            times[__LINE_SEARCH__], times[__LINE_SEARCH__] / frame_duration);
         glfwSetWindowShouldClose(window, true);
+        exit(0);
     }
 
     // if (glfwGetKey(window, GLFW_KEY_R) == GLFW_PRESS)

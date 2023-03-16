@@ -1,6 +1,7 @@
 {
     "player": false,
     "starting_ts": -1,
+    "ending_ts": -1,
     "dt": 1e-2,
     "max_iter": 100,
     "predefined_case" : {
@@ -18,7 +19,7 @@
     "safe_factor": 1.0,
     "uppper_bound": true, 
     "mu": 0.2,
-    "log": 1,
+    "log": 5,
     "backoff": 0.95,
     "damping": {
         "enable": false,

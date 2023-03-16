@@ -280,6 +280,7 @@ int main()
             for (int i = 0; i < 1; i++)
                 implicit_euler(globals.cubes, globals.dt);
             player_save(trace_folder, globals.ts, globals.cubes, init);
+            if (globals.ending_ts > 0 && globals.ts >= globals.ending_ts) glfwSetWindowShouldClose(window, true);
         }
         else{
             spdlog::info("timestep = {}", globals.ts);
