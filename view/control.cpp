@@ -2,8 +2,7 @@
 #include "global_variables.h"
 #include "../test_cases/tests.h"
 
-
-#include <fstream> 
+#include <fstream>
 #include <nlohmann/json.hpp>
 #include <spdlog/spdlog.h>
 #include <chrono>
@@ -24,7 +23,7 @@ void reset(bool init)
     double dt = data["dt"];
     auto predefined = data["predefined_case"]["enable"];
     auto g = data["gravity"];
-    globals.gravity = vec3(0.0, g? -9.8 : 0.0 , 0.0);
+    globals.gravity = vec3(0.0, g ? -9.8 : 0.0, 0.0);
     globals.col_set = data["col_set"];
     globals.line_search = data["line_search"];
     globals.upper_bound = data["uppper_bound"];
@@ -66,7 +65,7 @@ void reset(bool init)
     int n_cubes = globals.cubes.size();
     globals.writelock_cols.resize(n_cubes);
     auto ptr = globals.writelock_cols.data();
-    for(int i = 0; i < n_cubes; i++){
+    for (int i = 0; i < n_cubes; i++) {
         omp_init_lock(ptr + i);
     }
     globals.tot_iter = 0;
@@ -106,19 +105,28 @@ void reset(bool init)
         globals.starting_ts = st;
         player_load(globals.trace_folder, st, globals.cubes);
     }
-    #ifdef _INCLUDE_IAABB_H_
+#ifdef _INCLUDE_IAABB_H_
     globals.aabbs.resize(n_cubes);
-    for (int i = 0; i < n_cubes; i ++ ){
+    for (int i = 0; i < n_cubes; i++) {
         globals.aabbs[i] = compute_aabb(*globals.cubes[i]);
     }
 #endif
+
+    auto &params_double {data["params_double"]};
+    for (auto p: params_double.items()) {
+        globals.params_double[p.key()] = p.value();
+    }
+
+    auto &params_int {data["params_int"]};
+    for (auto p: params_int.items()) {
+        globals.params_int[p.key()] = p.value();
+    }
 }
 // process all input: query GLFW whether relevant keys are pressed/released this frame and react accordingly
 // ---------------------------------------------------------------------------------------------------------
-void processInput(GLFWwindow *window)
+void processInput(GLFWwindow* window)
 {
-    if (globals.motion)
-    {
+    if (globals.motion) {
         if (glfwGetKey(window, GLFW_KEY_W) == GLFW_PRESS)
             lightPos += 2.5f * globals.deltaTime * globals.camera.Front;
         if (glfwGetKey(window, GLFW_KEY_S) == GLFW_PRESS)
@@ -128,8 +136,7 @@ void processInput(GLFWwindow *window)
         if (glfwGetKey(window, GLFW_KEY_D) == GLFW_PRESS)
             lightPos += 2.5f * globals.deltaTime * globals.camera.Right;
     }
-    else
-    {
+    else {
         if (glfwGetKey(window, GLFW_KEY_W) == GLFW_PRESS)
             globals.camera.ProcessKeyboard(FORWARD, globals.deltaTime);
         if (glfwGetKey(window, GLFW_KEY_S) == GLFW_PRESS)
@@ -139,14 +146,14 @@ void processInput(GLFWwindow *window)
         if (glfwGetKey(window, GLFW_KEY_D) == GLFW_PRESS)
             globals.camera.ProcessKeyboard(RIGHT, globals.deltaTime);
     }
-    if (glfwGetKey(window, GLFW_KEY_ESCAPE) == GLFW_PRESS){
+    if (glfwGetKey(window, GLFW_KEY_ESCAPE) == GLFW_PRESS) {
         double t = glfwGetTime();
         spdlog::default_logger()->flush();
         spdlog::error("running time = {}, ts = {}, #iters = {}, fps = {}", t, globals.ts, globals.tot_iter, globals.ts / t);
-        auto &times {globals.aggregate_time};
+        auto& times{ globals.aggregate_time };
         double frame_duration = 0.0;
         times /= globals.ts;
-        frame_duration = times.sum() /100.0;
+        frame_duration = times.sum() / 100.0;
         spdlog::error("average per-frame time breakdown ------------\n\\
     \tipc: {:.3f} ms, percentage = {:.3f}% \n\\
     \tsolver: {:.3f}, percentage = {:.3f}%\n\\
@@ -172,46 +179,50 @@ void processInput(GLFWwindow *window)
     //     globals.model_draw = !globals.model_draw;
 }
 
-void text_callback(GLFWwindow *window, unsigned int c){
+void text_callback(GLFWwindow* window, unsigned int c)
+{
     Cube* p;
     switch (c) {
-        case 'c': case 'C':
-            globals.display_corner = !globals.display_corner;
-            break;
-        case 'l': case 'L':
-            globals.motion = !globals.motion;
-            break;
-        case 'r': case 'R':
-            //p = &(globals.cubes[0]);
-            //globals.cubes.clear();
-            //globals.cubes.push_back(*spinning_cube());
-            //delete p;
-            // globals.cubes = cube_blocks(2);
-            reset();
-            break;
-        case 'q': case 'Q':
-            if (globals.cursor_hidden)
-            {
-                glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_NORMAL);
-                globals.firstMouse = true;
-                glfwSetCursorPos(window, SCR_WIDTH / 2, SCR_HEIGHT / 2);
-            }
-            else
-                glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
-            globals.cursor_hidden = !globals.cursor_hidden;
-            break;
+    case 'c':
+    case 'C':
+        globals.display_corner = !globals.display_corner;
+        break;
+    case 'l':
+    case 'L':
+        globals.motion = !globals.motion;
+        break;
+    case 'r':
+    case 'R':
+        // p = &(globals.cubes[0]);
+        // globals.cubes.clear();
+        // globals.cubes.push_back(*spinning_cube());
+        // delete p;
+        //  globals.cubes = cube_blocks(2);
+        reset();
+        break;
+    case 'q':
+    case 'Q':
+        if (globals.cursor_hidden) {
+            glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_NORMAL);
+            globals.firstMouse = true;
+            glfwSetCursorPos(window, SCR_WIDTH / 2, SCR_HEIGHT / 2);
+        }
+        else
+            glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
+        globals.cursor_hidden = !globals.cursor_hidden;
+        break;
     }
 }
 // glfw: whenever the window size changed (by OS or user resize) this callback function executes
 // ---------------------------------------------------------------------------------------------
-void framebuffer_size_callback(GLFWwindow *window, int width, int height)
+void framebuffer_size_callback(GLFWwindow* window, int width, int height)
 {
     // make sure the viewport matches the new window dimensions; note that width and
     // height will be significantly larger than specified on retina displays.
     glViewport(0, 0, width, height);
 }
 
-void click_callback(GLFWwindow *window, int button, int action, int mods)
+void click_callback(GLFWwindow* window, int button, int action, int mods)
 {
     if (globals.cursor_hidden)
         return;
@@ -223,10 +234,9 @@ void click_callback(GLFWwindow *window, int button, int action, int mods)
 
 // glfw: whenever the mouse moves, this callback is called
 // -------------------------------------------------------
-void mouse_callback(GLFWwindow *window, double xpos, double ypos)
+void mouse_callback(GLFWwindow* window, double xpos, double ypos)
 {
-    if (globals.firstMouse)
-    {
+    if (globals.firstMouse) {
         globals.lastX = xpos;
         globals.lastY = ypos;
         globals.firstMouse = false;
@@ -244,12 +254,11 @@ void mouse_callback(GLFWwindow *window, double xpos, double ypos)
 
 // glfw: whenever the mouse scroll wheel scrolls, this callback is called
 // ----------------------------------------------------------------------
-void scroll_callback(GLFWwindow *window, double xoffset, double yoffset)
+void scroll_callback(GLFWwindow* window, double xoffset, double yoffset)
 {
     if (globals.cursor_hidden)
         globals.camera.ProcessMouseScroll(yoffset);
-    else
-    {
+    else {
         if (yoffset > 0)
             globals.objectType += yoffset;
         else

@@ -149,6 +149,10 @@ double line_search(const VectorXd& dq, const VectorXd& grad, VectorXd& q0, doubl
     const vector<unique_ptr<AffineBody>>& cubes,
     double dt)
 {
+    static double tol
+    {
+        globals.params_double["tol"]
+    };
     const double c1 = 1e-4;
     double alpha = 1.0;
     bool wolfe = false;
@@ -231,7 +235,7 @@ double line_search(const VectorXd& dq, const VectorXd& grad, VectorXd& q0, doubl
         // spdlog::info("wanted descend = {}, E1 - E0 = {}, E1 = {}, E0 = {}, alpha = {}", c1 * alpha * qdg, E1 - E0, E1, E0, alpha);
         alpha /= 2;
         if (!(!wolfe && grad.norm() > 1e-3)) break;
-        if (dq_norm * alpha * 2 < 1e-4) {
+        if (dq_norm * alpha * 2 < tol) {
             // smaller than Newton iter convergence condition, clip it
             alpha = 0.0;
             break;
@@ -252,6 +256,8 @@ void implicit_euler(vector<unique_ptr<AffineBody>>& cubes, double dt)
 {
     bool term_cond;
     int& ts = globals.ts;
+    static double tol = globals.params_double["tol"];
+    
     int iter = 0;
     double sup_dq = 0.0;
     for (int k = 0; k < cubes.size(); k++) {
@@ -688,7 +694,7 @@ void implicit_euler(vector<unique_ptr<AffineBody>>& cubes, double dt)
         //                 ees[k] = { ei.e0, ei.e1, ej.e0, ej.e1 };
         //             }
         //         }
-        term_cond = sup_dq < 1e-4 || ++iter >= globals.max_iter;
+        term_cond = sup_dq < tol || ++iter >= globals.max_iter;
         sup_dq = 0.0;
     } while (!term_cond);
 

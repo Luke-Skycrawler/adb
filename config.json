@@ -1,7 +1,7 @@
 {
     "player": false,
     "starting_ts": -1,
-    "ending_ts": -1,
+    "ending_ts": 5000,
     "dt": 1e-2,
     "max_iter": 100,
     "predefined_case" : {
@@ -18,7 +18,7 @@
     "ground": true,
     "safe_factor": 1.0,
     "uppper_bound": true, 
-    "mu": 0.2,
+    "mu": 0.0,
     "log": 5,
     "backoff": 0.95,
     "damping": {
@@ -51,5 +51,14 @@
     "evh": 1e-2,
     "vg_friction": true,
     "pt_friction": true,
-    "ee_friction": true
+    "ee_friction": true,
+
+    "params_double": {
+        "tol": 1e-3,
+        "dhat_sqr": 1e-2,
+        "kappa": 1e1
+    },
+    "params_int": {
+        
+    }
 }

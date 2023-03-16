@@ -69,8 +69,8 @@ struct GlobalVariableMainCPP{
 
     // bundle the rest parameters in here
     // no intellecense but speed up compiling
-    map<string, double> params_double;
-    map<string, int> params_int;
+    std::map<std::string, double> params_double;
+    std::map<std::string, int> params_int;
     
     int log, iaabb;
     vector<omp_lock_t> writelock_cols;
