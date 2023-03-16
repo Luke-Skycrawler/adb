@@ -3,11 +3,11 @@
     "starting_ts": -1,
     "ending_ts": 5000,
     "dt": 1e-2,
-    "max_iter": 100,
+    "max_iter": 1000,
     "predefined_case" : {
         "enable": false,
         "id" : 2,
-        "custom": "../test_cases/cards.json"
+        "custom": "../test_cases/links.json"
     },
     "solver": "sparse",
     "gravity": true, 
@@ -19,7 +19,7 @@
     "safe_factor": 1.0,
     "uppper_bound": true, 
     "mu": 0.0,
-    "log": 5,
+    "log": 1,
     "backoff": 0.95,
     "damping": {
         "enable": false,
@@ -56,9 +56,10 @@
     "params_double": {
         "tol": 1e-3,
         "dhat_sqr": 1e-2,
-        "kappa": 1e1
+        "kappa": 1e1,
+        "c1": 1e-4
     },
     "params_int": {
-        
+        "clip": 0
     }
 }

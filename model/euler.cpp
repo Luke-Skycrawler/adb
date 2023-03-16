@@ -153,7 +153,7 @@ double line_search(const VectorXd& dq, const VectorXd& grad, VectorXd& q0, doubl
     {
         globals.params_double["tol"]
     };
-    const double c1 = 1e-4;
+    static const double c1 = globals.params_double["c1"];
     double alpha = 1.0;
     bool wolfe = false;
     double ef0 = 0.0;
@@ -237,8 +237,13 @@ double line_search(const VectorXd& dq, const VectorXd& grad, VectorXd& q0, doubl
         if (!(!wolfe && grad.norm() > 1e-3)) break;
         if (dq_norm * alpha * 2 < tol) {
             // smaller than Newton iter convergence condition, clip it
-            alpha = 0.0;
-            break;
+            if (globals.params_int["clip"]) {
+                alpha = 0.0;
+                break;
+            }
+            else {
+                // continue to loop until & line search
+            }
         }
     } while (true);
     pts = pts_new;
@@ -602,7 +607,7 @@ void implicit_euler(vector<unique_ptr<AffineBody>>& cubes, double dt)
                 cout << big_hess << "\n\n"
                      << sparse_hess;
             }
-
+            sup_dq = dq.norm();
             toi = 1.0;
 #pragma omp parallel for schedule(static)
             for (int k = 0; k < n_cubes; k++) {
@@ -660,7 +665,6 @@ void implicit_euler(vector<unique_ptr<AffineBody>>& cubes, double dt)
             auto line_search_duration = DURATION_TO_DOUBLE(line_search_start);
             times[__LINE_SEARCH__] += line_search_duration;
             double norm_dq = dq.norm();
-            sup_dq = norm_dq;
 #pragma omp parallel for schedule(static)
             for (int i = 0; i < n_cubes; i++) {
                 for (int j = 0; j < 4; j++)
