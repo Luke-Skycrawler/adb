@@ -11,6 +11,8 @@
 #include "time_integrator.h"
 #include <omp.h>
 #include <tbb/parallel_sort.h>
+// #define _FULL_PARALLEL_
+
 #ifndef TESTING
 #include "../view/global_variables.h"
 #define DT globals.dt
@@ -352,7 +354,8 @@ double primitive_brute_force(
 
     static vector<array<int, 2>>* vidx_thread_local = new vector<array<int, 2>>[omp_get_max_threads()];
 
-// #pragma omp parallel
+    if (globals.ground)
+    // #pragma omp parallel
     {
         double toi_thread_local = 1.0;
         auto tid = omp_get_thread_num();
@@ -565,6 +568,63 @@ double primitive_brute_force(
         fj0.insert(fj0.end(), fj1.begin(), fj1.end());
     }
 
+    const auto pt_col_set_task = [](
+                                     int vi, int fj, int I, int J,
+                                     const AffineBody& ci, const AffineBody& cj,
+                                     vector<array<vec3, 4>>& pts,
+                                     vector<array<int, 4>>& idx,
+                                     vector<Matrix<double, 2, 12>>& pt_tk) {
+        vec3 v{ ci.v_transformed[vi] };
+        Face f{ cj, unsigned(fj), true, true };
+        lu cull;
+        bool pt_intersects = intersection({v.array() - barrier::d_sqrt, v.array() + barrier::d_sqrt}, compute_aabb(f), cull);
+        if (!pt_intersects) return;
+        ipc::PointTriangleDistanceType pt_type;
+        double d = vf_distance(v, f, pt_type);
+        if (d < barrier::d_hat) {
+            array<vec3, 4> pt = { v, f.t0, f.t1, f.t2 };
+            array<int, 4> ij = { I, vi, J, fj };
+            Matrix<double, 2, 12> Tk_T;
+            Tk_T.setZero(2, 12);
+            // Vector2d uk;
+            {
+                pts.push_back(pt);
+                idx.push_back(ij);
+#ifdef _FRICTION_
+                pt_tk.push_back(Tk_T);
+#endif
+            }
+        }
+    };
+    const auto ee_col_set_task = [](
+                                     int ei, int ej, int I, int J,
+                                     const AffineBody& ci, const AffineBody& cj,
+                                     vector<array<vec3, 4>>& ees,
+                                     vector<array<int, 4>>& eidx,
+                                     vector<Matrix<double, 2, 12>>& ee_tk) {
+        Edge eii{ ci, unsigned(ei), true, true };
+        Edge ejj{ cj, unsigned(ej), true, true };
+        lu cull;
+        bool ee_intersects = intersection(compute_aabb(eii, barrier::d_sqrt), compute_aabb(ejj), cull);
+        if (!ee_intersects) return;
+        auto ee_type = ipc::edge_edge_distance_type(eii.e0, eii.e1, ejj.e0, ejj.e1);
+        double d = ipc::edge_edge_distance(eii.e0, eii.e1, ejj.e0, ejj.e1, ee_type);
+        if (d < barrier::d_hat) {
+            array<vec3, 4> ee = { eii.e0, eii.e1, ejj.e0, ejj.e1 };
+            array<int, 4> ij = { I, ei, J, ej };
+            Matrix<double, 2, 12> Tk_T;
+            Tk_T.setZero(2, 12);
+            Vector2d uk;
+
+            {
+                ees.push_back(ee);
+                eidx.push_back(ij);
+#ifdef _FRICTION_
+                ee_tk.push_back(Tk_T);
+#endif
+            }
+        }
+    };
     const auto vf_col_set = [&](vector<int>& vilist, vector<int>& fjlist,
                                 const std::vector<std::unique_ptr<AffineBody>>& cubes,
                                 int I, int J,
@@ -574,28 +634,7 @@ double primitive_brute_force(
         auto &ci{ *cubes[I] }, &cj{ *cubes[J] };
         for (int vi : vilist)
             for (int fj : fjlist) {
-                vec3 v{ ci.v_transformed[vi] };
-                Face f{ cj, unsigned(fj), true, true };
-                ipc::PointTriangleDistanceType pt_type;
-                double d = vf_distance(v, f, pt_type);
-                if (d < barrier::d_hat) {
-                    array<vec3, 4> pt = { v, f.t0, f.t1, f.t2 };
-                    array<int, 4> ij = { I, vi, J, fj };
-                    Matrix<double, 2, 12> Tk_T;
-                    Tk_T.setZero(2, 12);
-                    Vector2d uk;
-#ifndef TESTING
-                    if (gen_basis)
-                        pt_uktk(*cubes[I], cj, pt, ij, pt_type, Tk_T, uk, d, DT);
-#endif
-                    {
-                        pts.push_back(pt);
-                        idx.push_back(ij);
-#ifdef _FRICTION_
-                        pt_tk.push_back(Tk_T);
-#endif
-                    }
-                }
+                pt_col_set_task(vi, fj, I, J, ci, cj, pts, idx, pt_tk);
             }
     };
 
@@ -658,6 +697,160 @@ double primitive_brute_force(
                              *eidx_private = new vector<array<int, 4>>[omp_get_max_threads()];
     static vector<array<vec3, 4>>*pts_private = new vector<array<vec3, 4>>[omp_get_max_threads()], *ees_private = new vector<array<vec3, 4>>[omp_get_max_threads()];
     static vector<Matrix<double, 2, 12>>*pt_tk_private = new vector<Matrix<double, 2, 12>>[omp_get_max_threads()], *ee_tk_private = new vector<Matrix<double, 2, 12>>[omp_get_max_threads()];
+
+    #ifdef _FULL_PARALLEL_
+    static vector<int> inner_presum;
+    auto n_lists = n_overlap / 2;
+    inner_presum.resize(n_lists + 1);
+
+    const auto compute_thread_starting = [&](int pt_ee_tp, vector<array<int, 2>>& ret) -> int {
+        int inner, outer;
+        int n_threads = omp_get_num_procs();
+        ret.resize(n_threads);
+        inner_presum[0] = 0;
+        for (int _i = 0; _i < n_lists; _i++) {
+            int i = _i * 2;
+            auto& p{ *overlaps[i].plist };
+            auto& pi{
+                pt_ee_tp == 0 ? p.vi : pt_ee_tp == 1 ? p.ei
+                                                     : p.fi
+            };
+            auto& pj{
+                pt_ee_tp == 0 ? p.fj : pt_ee_tp == 1 ? p.ej
+                                                     : p.vj
+            };
+            auto ni = pi.size(), nj = pj.size();
+            inner_presum[_i + 1] = inner_presum[_i] + ni * nj;
+            // presum
+        }
+        int n_task = inner_presum[n_lists];
+        int k_threads = (n_task + n_threads - 1) / n_threads;
+        for (int j = 0; j < n_threads; j++) {
+            int kj = j * k_threads;
+            int i0 = lower_bound(inner_presum.begin(), inner_presum.end(), kj, [](int a, int b) -> bool {
+                return a <= b;
+            }) - inner_presum.begin() - 1;
+
+            ret[j] = { i0 * 2, kj - inner_presum[i0] };
+        }
+        return k_threads;
+    };
+
+    static vector<array<int, 2>> thread_starting_index;
+    if (!cull_trajectory) {
+        // point-triangle
+        int k_threads = compute_thread_starting(0, thread_starting_index);
+#pragma omp parallel
+        {
+            int k_tasks_done = 0;
+            auto tid = omp_get_thread_num();
+            idx_private[tid].resize(0);
+            pts_private[tid].resize(0);
+            pt_tk_private[tid].resize(0);
+
+            auto& a = thread_starting_index[tid];
+            int outer = a[0], inner = a[1];
+            do {
+                int I{ overlaps[outer].i }, J{ overlaps[outer].j };
+                auto &ci{ *cubes[I] }, &cj{ *cubes[J] };
+                auto& p{ *overlaps[outer].plist };
+                auto& vilist{ p.vi };
+                auto& fjlist{ p.fj };
+                int nv = vilist.size(), nf = fjlist.size();
+                int n_pt = nv * nf;
+                for (int i = inner; i < n_pt; i++) {
+                    int vi{ i / nf }, fj{ i % nf };
+                    pt_col_set_task(vi, fj, I, J, ci, cj, pts_private[tid], idx_private[tid], pt_tk_private[tid]);
+                    k_tasks_done++;
+                    if (k_tasks_done >= k_threads) break;
+                }
+                if (outer >= n_overlap || k_tasks_done >= k_threads) break;
+                outer += 2;
+                inner = 0;
+            } while (1);
+#pragma omp critical
+            {
+                pts.insert(pts.end(), pts_private[tid].begin(), pts_private[tid].end());
+                idx.insert(idx.end(), idx_private[tid].begin(), idx_private[tid].end());
+                pt_tk.insert(pt_tk.end(), pt_tk_private[tid].begin(), pt_tk_private[tid].end());
+            }
+        }
+        // triangle-point
+        k_threads = compute_thread_starting(2, thread_starting_index);
+#pragma omp parallel
+        {
+            int k_tasks_done = 0;
+            auto tid = omp_get_thread_num();
+            idx_private[tid].resize(0);
+            pts_private[tid].resize(0);
+            pt_tk_private[tid].resize(0);
+
+            auto& a = thread_starting_index[tid];
+            int outer = a[0], inner = a[1];
+            do {
+                int I{ overlaps[outer].i }, J{ overlaps[outer].j };
+                auto &ci{ *cubes[I] }, &cj{ *cubes[J] };
+                auto& p{ *overlaps[outer].plist };
+                auto& vjlist{ p.vj };
+                auto& filist{ p.fi };
+                int nv = vjlist.size(), nf = filist.size();
+                int n_pt = nv * nf;
+                for (int i = inner; i < n_pt; i++) {
+                    int vj{ i / nf }, fi{ i % nf };
+                    pt_col_set_task(vj, fi, I, J, ci, cj, pts_private[tid], idx_private[tid], pt_tk_private[tid]);
+                    k_tasks_done++;
+                    if (k_tasks_done >= k_threads) break;
+                }
+                if (outer >= n_overlap || k_tasks_done >= k_threads) break;
+                outer += 2;
+                inner = 0;
+            } while (1);
+#pragma omp critical
+            {
+                pts.insert(pts.end(), pts_private[tid].begin(), pts_private[tid].end());
+                idx.insert(idx.end(), idx_private[tid].begin(), idx_private[tid].end());
+                pt_tk.insert(pt_tk.end(), pt_tk_private[tid].begin(), pt_tk_private[tid].end());
+            }
+        }
+        // edge-edge
+        k_threads = compute_thread_starting(1, thread_starting_index);
+#pragma omp parallel
+        {
+            int k_tasks_done = 0;
+            auto tid = omp_get_thread_num();
+            ees_private[tid].resize(0);
+            eidx_private[tid].resize(0);
+            ee_tk_private[tid].resize(0);
+
+            auto& a = thread_starting_index[tid];
+            int outer = a[0], inner = a[1];
+            do {
+                int I{ overlaps[outer].i }, J{ overlaps[outer].j };
+                auto &ci{ *cubes[I] }, &cj{ *cubes[J] };
+                auto& p{ *overlaps[outer].plist };
+                auto& eilist{ p.ei };
+                auto& ejlist{ p.ej };
+                int nei = eilist.size(), nej = ejlist.size();
+                int n_ee = nei * nej;
+                for (int i = inner; i < n_ee; i++) {
+                    int ei{ i / nej }, ej{ i % nej };
+                    ee_col_set_task(ei, ej, I, J, ci, cj,  ees_private[tid], eidx_private[tid], ee_tk_private[tid]);
+                    k_tasks_done++;
+                    if (k_tasks_done >= k_threads) break;
+                }
+                if (outer >= n_overlap || k_tasks_done >= k_threads) break;
+                outer += 2;
+                inner = 0;
+            } while (1);
+#pragma omp critical
+            {
+                ees.insert(ees.end(), ees_private[tid].begin(), ees_private[tid].end());
+                eidx.insert(eidx.end(), eidx_private[tid].begin(), eidx_private[tid].end());
+                ee_tk.insert(ee_tk.end(), ee_tk_private[tid].begin(), ee_tk_private[tid].end());
+            }
+        }
+    }
+    #else
     if (!cull_trajectory)
 #pragma omp parallel
     {
@@ -682,29 +875,7 @@ double primitive_brute_force(
             auto& fjlist{ p.fj };
             for (auto ei : eilist)
                 for (auto ej : ejlist) {
-                    Edge eii{ ci, unsigned(ei), true, true };
-                    Edge ejj{ cj, unsigned(ej), true, true };
-
-                    auto ee_type = ipc::edge_edge_distance_type(eii.e0, eii.e1, ejj.e0, ejj.e1);
-                    double d = ipc::edge_edge_distance(eii.e0, eii.e1, ejj.e0, ejj.e1, ee_type);
-                    if (d < barrier::d_hat) {
-                        array<vec3, 4> ee = { eii.e0, eii.e1, ejj.e0, ejj.e1 };
-                        array<int, 4> ij = { I, ei, J, ej };
-                        Matrix<double, 2, 12> Tk_T;
-                        Tk_T.setZero(2, 12);
-                        Vector2d uk;
-#ifndef TESTING
-                        if (gen_basis)
-                            ee_uktk(*cubes[I], cj, ee, ij, ee_type, Tk_T, uk, d, DT);
-#endif
-                        {
-                            ees_private[tid].push_back(ee);
-                            eidx_private[tid].push_back(ij);
-#ifdef _FRICTION_
-                            ee_tk_private[tid].push_back(Tk_T);
-#endif
-                        }
-                    }
+                    ee_col_set_task(ei, ej, I, J, ci, cj, ees_private[tid], eidx_private[tid], ee_tk_private[tid]);
                 }
             vf_col_set(vilist, fjlist, cubes, I, J, pts_private[tid], idx_private[tid], pt_tk_private[tid]);
             vf_col_set(vjlist, filist, cubes, J, I, pts_private[tid], idx_private[tid], pt_tk_private[tid]);
@@ -719,6 +890,7 @@ double primitive_brute_force(
             ee_tk.insert(ee_tk.end(), ee_tk_private[tid].begin(), ee_tk_private[tid].end());
         }
     }
+    #endif
     else
 #pragma omp parallel
     {

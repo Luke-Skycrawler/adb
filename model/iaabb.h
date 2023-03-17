@@ -39,6 +39,16 @@ inline lu compute_aabb(const Edge& e)
     return { l, u };
 }
 
+
+inline lu compute_aabb(const Edge& e, double d_hat_sqrt)
+{
+    vec3 l, u;
+    auto e0 {e.e0.array()}, e1 {e.e1.array()};
+    l = e0.min(e1);
+    u = e0.max(e1);
+    return { l.array() - d_hat_sqrt, u.array() + d_hat_sqrt };
+}
+
 inline lu compute_aabb(const Face& f)
 {
     vec3 l, u;
