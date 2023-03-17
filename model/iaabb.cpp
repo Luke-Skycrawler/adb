@@ -568,6 +568,32 @@ double primitive_brute_force(
         fj0.insert(fj0.end(), fj1.begin(), fj1.end());
     }
 
+    static vector<vec3> vt1_buffer;
+    static vector<int> vertex_starting_index;
+
+    if (vertex_starting_index.size() == 0) {
+        // initialization
+        vertex_starting_index.resize(n_cubes);
+        vt1_buffer.resize(globals.points.size());
+        vertex_starting_index[0] = 0;
+
+        for (int i = 0; i < n_cubes - 1; i++) {
+            auto& c{ *cubes[i] };
+            vertex_starting_index[i + 1] = vertex_starting_index[i] + c.n_vertices;
+        }
+    }
+
+#pragma omp parallel for
+    for (int i = 0; i < n_cubes; i++) {
+        auto& c{ *cubes[i] };
+        auto offset = vertex_starting_index[i];
+        mat3 a;
+        vec3 b = c.q[0];
+        a << c.q[1], c.q[2], c.q[3];
+        for (int j = 0; j < c.n_vertices; j++) {
+            vt1_buffer[j + offset] = a * c.vertices(j) + b;
+        }
+    }
     const auto pt_col_set_task = [](
                                      int vi, int fj, int I, int J,
                                      const AffineBody& ci, const AffineBody& cj,
@@ -642,14 +668,21 @@ double primitive_brute_force(
                                  const std::vector<std::unique_ptr<AffineBody>>& cubes,
                                  int I, int J) -> double {
         auto &ci{ *cubes[I] }, &cj{ *cubes[J] };
+        int offi{ vertex_starting_index[I] }, offj{ vertex_starting_index[J] };
         double toi = 1.0;
         for (int vi : vilist)
             for (int fj : fjlist) {
                 vec3 v{ ci.v_transformed[vi] };
                 Face f{ cj, unsigned(fj), true, true };
 
-                vec3 v0{ ci.vt1(vi) };
-                Face f0{ cj, unsigned(fj) };
+                // vec3 v0{ ci.vt1(vi) };
+                // Face f0{ cj, unsigned(fj) };
+                int _a, _b, _c;
+                _a = cj.indices[fj * 3 + 0],
+                _b = cj.indices[fj * 3 + 1],
+                _c = cj.indices[fj * 3 + 2];
+                vec3 v0{ vt1_buffer[offi + vi] };
+                Face f0{ vt1_buffer[offj + _a], vt1_buffer[offj + _b], vt1_buffer[offj + _c] };
                 lu ret;
                 if (intersection(compute_aabb(v0, v), compute_aabb(f0, f), ret)) {
                     double t = pt_collision_time(v0, f0, v, f);
@@ -669,11 +702,23 @@ double primitive_brute_force(
                                  const std::vector<std::unique_ptr<AffineBody>>& cubes,
                                  int I, int J) -> double {
         auto &ci{ *cubes[I] }, &cj{ *cubes[J] };
+        int offi{ vertex_starting_index[I] }, offj{ vertex_starting_index[J] };
+
         double toi = 1.0;
         for (int ei : eilist)
             for (int ej : ejlist) {
-                Edge ei0(ci, ei), ei1(ci, ei, true, true);
-                Edge ej0(cj, ej), ej1(cj, ej, true, true);
+                // Edge ei0(ci, ei), ei1(ci, ei, true, true);
+                // Edge ej0(cj, ej), ej1(cj, ej, true, true);
+                Edge ei1(ci, ei, true, true);
+                Edge ej1(cj, ej, true, true);
+                int i0, i1, j0, j1;
+                i0 = ci.edges[ei * 2];
+                i1 = ci.edges[ei * 2 + 1];
+                j0 = cj.edges[ej * 2];
+                j1 = cj.edges[ej * 2 + 1];
+
+                Edge ei0 {vt1_buffer[offi + i0], vt1_buffer[offi + i1]};
+                Edge ej0 {vt1_buffer[offj + j0], vt1_buffer[offj + j1]};
                 lu ret;
                 if (intersection(compute_aabb(ei0, ei1), compute_aabb(ej0, ej1), ret)) {
                     double t = ee_collision_time(ei0, ej0, ei1, ej1);
