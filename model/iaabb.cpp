@@ -276,6 +276,68 @@ inline bool filter_if_inside(lu& a, Face& f, bool trajectory, AffineBody& c, int
     return intersection(a, compute_aabb(f1, f2), ret);
 }
 
+void pt_col_set_task(
+    int vi, int fj, int I, int J,
+    // const AffineBody& ci, const AffineBody& cj,
+    const vec3&v, const Face& f,
+    const lu& aabb_i, const lu& aabb_j,
+    vector<array<vec3, 4>>& pts,
+    vector<array<int, 4>>& idx,
+    vector<Matrix<double, 2, 12>>& pt_tk)
+{
+    lu cull;
+    bool pt_intersects = intersection({ v.array() - barrier::d_sqrt, v.array() + barrier::d_sqrt }, compute_aabb(f), cull);
+    if (!pt_intersects) return;
+    ipc::PointTriangleDistanceType pt_type;
+    double d = vf_distance(v, f, pt_type);
+    if (d < barrier::d_hat) {
+        array<vec3, 4> pt = { v, f.t0, f.t1, f.t2 };
+        array<int, 4> ij = { I, vi, J, fj };
+        Matrix<double, 2, 12> Tk_T;
+        Tk_T.setZero(2, 12);
+        // Vector2d uk;
+        {
+            pts.push_back(pt);
+            idx.push_back(ij);
+#ifdef _FRICTION_
+            pt_tk.push_back(Tk_T);
+#endif
+        }
+    }
+};
+void ee_col_set_task(
+     int ei, int ej, int I, int J,
+    // const AffineBody& ci, const AffineBody& cj,
+    const Edge& eii, const Edge& ejj,
+    const lu& aabb_i, const lu& aabb_j, vector<array<vec3, 4>>& ees,
+    vector<array<int, 4>>& eidx,
+    vector<Matrix<double, 2, 12>>& ee_tk)
+{
+    // Edge eii{ ci, unsigned(ei), true, true };
+    // Edge ejj{ cj, unsigned(ej), true, true };
+    lu cull;
+    // bool ee_intersects = intersection(compute_aabb(eii, barrier::d_sqrt), compute_aabb(ejj), cull);
+    bool ee_intersects = intersection(aabb_i, aabb_j, cull);
+    if (!ee_intersects) return;
+    auto ee_type = ipc::edge_edge_distance_type(eii.e0, eii.e1, ejj.e0, ejj.e1);
+    double d = ipc::edge_edge_distance(eii.e0, eii.e1, ejj.e0, ejj.e1, ee_type);
+    if (d < barrier::d_hat) {
+        array<vec3, 4> ee = { eii.e0, eii.e1, ejj.e0, ejj.e1 };
+        array<int, 4> ij = { I, ei, J, ej };
+        Matrix<double, 2, 12> Tk_T;
+        Tk_T.setZero(2, 12);
+        Vector2d uk;
+
+        {
+            ees.push_back(ee);
+            eidx.push_back(ij);
+#ifdef _FRICTION_
+            ee_tk.push_back(Tk_T);
+#endif
+        }
+    }
+};
+
 double primitive_brute_force(
     int n_cubes,
     std::vector<Intersection>& overlaps, // assert sorted
@@ -594,63 +656,7 @@ double primitive_brute_force(
             vt1_buffer[j + offset] = a * c.vertices(j) + b;
         }
     }
-    const auto pt_col_set_task = [](
-                                     int vi, int fj, int I, int J,
-                                     const AffineBody& ci, const AffineBody& cj,
-                                     vector<array<vec3, 4>>& pts,
-                                     vector<array<int, 4>>& idx,
-                                     vector<Matrix<double, 2, 12>>& pt_tk) {
-        vec3 v{ ci.v_transformed[vi] };
-        Face f{ cj, unsigned(fj), true, true };
-        lu cull;
-        bool pt_intersects = intersection({v.array() - barrier::d_sqrt, v.array() + barrier::d_sqrt}, compute_aabb(f), cull);
-        if (!pt_intersects) return;
-        ipc::PointTriangleDistanceType pt_type;
-        double d = vf_distance(v, f, pt_type);
-        if (d < barrier::d_hat) {
-            array<vec3, 4> pt = { v, f.t0, f.t1, f.t2 };
-            array<int, 4> ij = { I, vi, J, fj };
-            Matrix<double, 2, 12> Tk_T;
-            Tk_T.setZero(2, 12);
-            // Vector2d uk;
-            {
-                pts.push_back(pt);
-                idx.push_back(ij);
-#ifdef _FRICTION_
-                pt_tk.push_back(Tk_T);
-#endif
-            }
-        }
-    };
-    const auto ee_col_set_task = [](
-                                     int ei, int ej, int I, int J,
-                                     const AffineBody& ci, const AffineBody& cj,
-                                     vector<array<vec3, 4>>& ees,
-                                     vector<array<int, 4>>& eidx,
-                                     vector<Matrix<double, 2, 12>>& ee_tk) {
-        Edge eii{ ci, unsigned(ei), true, true };
-        Edge ejj{ cj, unsigned(ej), true, true };
-        lu cull;
-        bool ee_intersects = intersection(compute_aabb(eii, barrier::d_sqrt), compute_aabb(ejj), cull);
-        if (!ee_intersects) return;
-        auto ee_type = ipc::edge_edge_distance_type(eii.e0, eii.e1, ejj.e0, ejj.e1);
-        double d = ipc::edge_edge_distance(eii.e0, eii.e1, ejj.e0, ejj.e1, ee_type);
-        if (d < barrier::d_hat) {
-            array<vec3, 4> ee = { eii.e0, eii.e1, ejj.e0, ejj.e1 };
-            array<int, 4> ij = { I, ei, J, ej };
-            Matrix<double, 2, 12> Tk_T;
-            Tk_T.setZero(2, 12);
-            Vector2d uk;
 
-            {
-                ees.push_back(ee);
-                eidx.push_back(ij);
-#ifdef _FRICTION_
-                ee_tk.push_back(Tk_T);
-#endif
-            }
-        }
-    };
     const auto vf_col_set = [&](vector<int>& vilist, vector<int>& fjlist,
                                 const std::vector<std::unique_ptr<AffineBody>>& cubes,
                                 int I, int J,
@@ -658,12 +664,50 @@ double primitive_brute_force(
                                 vector<array<int, 4>>& idx,
                                 vector<Matrix<double, 2, 12>>& pt_tk) {
         auto &ci{ *cubes[I] }, &cj{ *cubes[J] };
-        for (int vi : vilist)
-            for (int fj : fjlist) {
-                pt_col_set_task(vi, fj, I, J, ci, cj, pts, idx, pt_tk);
+        vector<lu> viaabbs, fjaabbs;
+        vector<vec3> vis;
+        vector<Face> fjs;
+        for (auto& vi : vilist) {
+            vec3 v{ ci.v_transformed[vi] };
+            vis.push_back(v);
+            viaabbs.push_back({ v.array() - barrier::d_sqrt, v.array() + barrier::d_sqrt });
+        }
+        for (auto& fj : fjlist) {
+            Face f{ cj, unsigned(fj), true, true };
+            fjs.push_back(f);
+            fjaabbs.push_back(compute_aabb(f));
+        }
+        for (int i = 0; i < vilist.size(); i ++)
+            for (int j = 0; j < fjlist.size(); j ++){
+                int vi = vilist[i], fj = fjlist[j];
+                pt_col_set_task(vi, fj, I, J, vis[i], fjs[j], viaabbs[i], fjaabbs[j], pts, idx, pt_tk);
             }
     };
 
+    const auto ee_col_set = [&](vector<int>& eilist, vector<int>& ejlist,
+                                const std::vector<std::unique_ptr<AffineBody>>& cubes,
+                                int I, int J,
+                                vector<array<vec3, 4>>& ees,
+                                vector<array<int, 4>>& eidx,
+                                vector<Matrix<double, 2, 12>>& ee_tk) {
+        auto &ci{ *cubes[I] }, &cj{ *cubes[J] };
+        vector<lu> eiaabbs, ejaabbs;
+        vector<Edge> eis, ejs;
+        for (auto& ei : eilist) {
+            Edge eii{ ci, unsigned(ei), true, true };
+            eis.push_back(eii);
+            eiaabbs.push_back(compute_aabb(eii, barrier::d_sqrt));
+        }
+        for (auto& ej : ejlist) {
+            Edge ejj{ cj, unsigned(ej), true, true };
+            ejs.push_back(ejj);
+            ejaabbs.push_back(compute_aabb(ejj));
+        }
+        for (int i = 0; i < eilist.size(); i++)
+            for (int j = 0; j < ejlist.size(); j++) {
+                ee_col_set_task(eilist[i], ejlist[j], I, J, eis[i], ejs[j], eiaabbs[i], ejaabbs[j], ees, eidx, ee_tk);
+            }
+    };
     const auto vf_col_time = [&](vector<int>& vilist, vector<int>& fjlist,
                                  const std::vector<std::unique_ptr<AffineBody>>& cubes,
                                  int I, int J) -> double {
@@ -707,8 +751,6 @@ double primitive_brute_force(
         double toi = 1.0;
         for (int ei : eilist)
             for (int ej : ejlist) {
-                // Edge ei0(ci, ei), ei1(ci, ei, true, true);
-                // Edge ej0(cj, ej), ej1(cj, ej, true, true);
                 Edge ei1(ci, ei, true, true);
                 Edge ej1(cj, ej, true, true);
                 int i0, i1, j0, j1;
@@ -918,10 +960,8 @@ double primitive_brute_force(
             auto& ejlist{ p.ej };
             auto& filist{ p.fi };
             auto& fjlist{ p.fj };
-            for (auto ei : eilist)
-                for (auto ej : ejlist) {
-                    ee_col_set_task(ei, ej, I, J, ci, cj, ees_private[tid], eidx_private[tid], ee_tk_private[tid]);
-                }
+
+            ee_col_set(eilist, ejlist, cubes, I, J, ees_private[tid], eidx_private[tid], ee_tk_private[tid]);
             vf_col_set(vilist, fjlist, cubes, I, J, pts_private[tid], idx_private[tid], pt_tk_private[tid]);
             vf_col_set(vjlist, filist, cubes, J, I, pts_private[tid], idx_private[tid], pt_tk_private[tid]);
         }
