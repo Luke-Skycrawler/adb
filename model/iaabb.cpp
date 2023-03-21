@@ -106,6 +106,14 @@ inline bool intersection(const lu& a, const lu& b, lu& ret)
     return intersects;
 }
 
+inline bool intersects(const lu& a, const lu& b)
+{
+    const auto overlaps = [&](int i) -> bool {
+        return a[0][i] <= b[1][i] && a[1][i] >= b[0][i];
+    };
+    return overlaps(0) && overlaps(1) && overlaps(2);
+}
+
 lu affine(lu aabb, AffineBody& c, int vtn)
 {
     auto qi = vtn == 0 ? c.q0 : c.q;
@@ -248,35 +256,8 @@ void intersect_sort(
     // TODO: O(n) insertion sort
 }
 
-inline bool filter_if_inside(lu& a, vec3& p, bool trajectory, AffineBody& c, int pid)
-{
-    if (!trajectory) {
-        vec3 l = a[0], u = a[1];
-        return (l.array() <= p.array()).all() && (u.array() >= p.array()).all();
-    }
-    auto p1{ c.vt1(pid) }, &p2{ p };
-    lu ret;
-    return intersection(a, compute_aabb(p1, p2), ret);
-}
-inline bool filter_if_inside(lu& a, Edge& e, bool trajectory, AffineBody& c, int pid)
-{
-    lu ret;
-    if (!trajectory) {
-        return intersection(a, compute_aabb(e), ret);
-    }
-    Edge e1{ c, unsigned(pid) }, &e2{ e };
-    return intersection(a, compute_aabb(e1, e2), ret);
-}
-inline bool filter_if_inside(lu& a, Face& f, bool trajectory, AffineBody& c, int pid)
-{
-    lu ret;
-    if (!trajectory)
-        return intersection(a, compute_aabb(f), ret);
-    Face f1{ c, unsigned(pid) }, &f2{ f };
-    return intersection(a, compute_aabb(f1, f2), ret);
-}
 
-void pt_col_set_task(
+inline void pt_col_set_task(
     int vi, int fj, int I, int J,
     // const AffineBody& ci, const AffineBody& cj,
     const vec3&v, const Face& f,
@@ -285,8 +266,7 @@ void pt_col_set_task(
     vector<array<int, 4>>& idx,
     vector<Matrix<double, 2, 12>>& pt_tk)
 {
-    lu cull;
-    bool pt_intersects = intersection({ v.array() - barrier::d_sqrt, v.array() + barrier::d_sqrt }, compute_aabb(f), cull);
+    bool pt_intersects = intersects(aabb_i, aabb_j);
     if (!pt_intersects) return;
     ipc::PointTriangleDistanceType pt_type;
     double d = vf_distance(v, f, pt_type);
@@ -305,19 +285,15 @@ void pt_col_set_task(
         }
     }
 };
-void ee_col_set_task(
-     int ei, int ej, int I, int J,
+inline void ee_col_set_task(
+    int ei, int ej, int I, int J,
     // const AffineBody& ci, const AffineBody& cj,
     const Edge& eii, const Edge& ejj,
     const lu& aabb_i, const lu& aabb_j, vector<array<vec3, 4>>& ees,
     vector<array<int, 4>>& eidx,
     vector<Matrix<double, 2, 12>>& ee_tk)
 {
-    // Edge eii{ ci, unsigned(ei), true, true };
-    // Edge ejj{ cj, unsigned(ej), true, true };
-    lu cull;
-    // bool ee_intersects = intersection(compute_aabb(eii, barrier::d_sqrt), compute_aabb(ejj), cull);
-    bool ee_intersects = intersection(aabb_i, aabb_j, cull);
+    bool ee_intersects = intersects(aabb_i, aabb_j);
     if (!ee_intersects) return;
     auto ee_type = ipc::edge_edge_distance_type(eii.e0, eii.e1, ejj.e0, ejj.e1);
     double d = ipc::edge_edge_distance(eii.e0, eii.e1, ejj.e0, ejj.e1, ee_type);
@@ -531,9 +507,12 @@ double primitive_brute_force(
         auto v{ idx[1] };
         auto& c{ *cubes[I] };
         vec3 p{ c.v_transformed[v] };
+        vec3 p0{ c.vt1(v) };
+
+        lu aabb = cull_trajectory ? compute_aabb(p, p0) : lu{p, p};
         for (int o = starting[I]; o < starting[I + 1]; o++) {
             lu cull = overlaps[o].cull;
-            if (filter_if_inside(cull, p, cull_trajectory, c, v)) {
+            if (intersects(cull, aabb)) {
                 auto& t{ overlaps[o] };
                 assert(t.i == I);
                 omp_set_lock(locks + o);
@@ -553,10 +532,12 @@ double primitive_brute_force(
         auto ei{ idx[1] };
         auto& c{ *cubes[I] };
         Edge e{ c, ei, true, true };
+        Edge e0{ c, ei };
 
+        lu aabb = cull_trajectory ? compute_aabb(e, e0) : compute_aabb(e);
         for (int o = starting[I]; o < starting[I + 1]; o++) {
             lu cull = overlaps[o].cull;
-            if (filter_if_inside(cull, e, cull_trajectory, c, ei)) {
+            if (intersects(cull, aabb)) {
                 auto& t{ overlaps[o] };
                 omp_set_lock(locks + o);
                 if (t.i < t.j)
@@ -575,10 +556,12 @@ double primitive_brute_force(
         auto fi{ idx[1] };
         auto& c{ *cubes[I] };
         Face f{ c, fi, true, true };
+        Face f0 {c, fi};
 
+        lu aabb= cull_trajectory ? compute_aabb(f, f0): compute_aabb(f);
         for (int o = starting[I]; o < starting[I + 1]; o++) {
             lu cull = overlaps[o].cull;
-            if (filter_if_inside(cull, f, cull_trajectory, c, fi)) {
+            if (intersects(aabb, cull)){
                 auto& t{ overlaps[o] };
                 omp_set_lock(locks + o);
                 if (t.i < t.j)
@@ -714,21 +697,36 @@ double primitive_brute_force(
         auto &ci{ *cubes[I] }, &cj{ *cubes[J] };
         int offi{ vertex_starting_index[I] }, offj{ vertex_starting_index[J] };
         double toi = 1.0;
-        for (int vi : vilist)
-            for (int fj : fjlist) {
-                vec3 v{ ci.v_transformed[vi] };
-                Face f{ cj, unsigned(fj), true, true };
 
-                // vec3 v0{ ci.vt1(vi) };
-                // Face f0{ cj, unsigned(fj) };
-                int _a, _b, _c;
-                _a = cj.indices[fj * 3 + 0],
-                _b = cj.indices[fj * 3 + 1],
-                _c = cj.indices[fj * 3 + 2];
-                vec3 v0{ vt1_buffer[offi + vi] };
-                Face f0{ vt1_buffer[offj + _a], vt1_buffer[offj + _b], vt1_buffer[offj + _c] };
-                lu ret;
-                if (intersection(compute_aabb(v0, v), compute_aabb(f0, f), ret)) {
+        vector<lu> viaabbs, fjaabbs;
+        vector<vec3> v0s, v1s;
+        vector<Face> f0s, f1s;
+        for (auto& vi : vilist) {
+            vec3 v1{ ci.v_transformed[vi] };
+            vec3 v0{ vt1_buffer[offi + vi] };
+            v0s.push_back(v0);
+            v1s.push_back(v1);
+            viaabbs.push_back(compute_aabb(v0, v1));
+        }
+        for (auto& fj : fjlist) {
+            Face f{ cj, unsigned(fj), true, true };
+            int _a, _b, _c;
+            _a = cj.indices[fj * 3 + 0],
+            _b = cj.indices[fj * 3 + 1],
+            _c = cj.indices[fj * 3 + 2];
+
+            Face f0{ vt1_buffer[offj + _a], vt1_buffer[offj + _b], vt1_buffer[offj + _c] };
+
+            f0s.push_back(f0);
+            f1s.push_back(f);
+            fjaabbs.push_back(compute_aabb(f0, f));
+        }
+        for (int i = 0; i < vilist.size(); i++)
+            for (int j = 0; j < fjlist.size(); j++) {
+                int vi = vilist[i], fj = fjlist[j];
+                auto &v0{ v0s[i] }, &v{ v1s[i] };
+                auto &f0{ f0s[j] }, &f{ f1s[j] };
+                if (intersects(viaabbs[i], fjaabbs[j])) {
                     double t = pt_collision_time(v0, f0, v, f);
 #ifdef TESTING
                     if (t < 1.0) {
@@ -749,20 +747,33 @@ double primitive_brute_force(
         int offi{ vertex_starting_index[I] }, offj{ vertex_starting_index[J] };
 
         double toi = 1.0;
-        for (int ei : eilist)
-            for (int ej : ejlist) {
-                Edge ei1(ci, ei, true, true);
-                Edge ej1(cj, ej, true, true);
-                int i0, i1, j0, j1;
-                i0 = ci.edges[ei * 2];
-                i1 = ci.edges[ei * 2 + 1];
-                j0 = cj.edges[ej * 2];
-                j1 = cj.edges[ej * 2 + 1];
-
-                Edge ei0 {vt1_buffer[offi + i0], vt1_buffer[offi + i1]};
-                Edge ej0 {vt1_buffer[offj + j0], vt1_buffer[offj + j1]};
-                lu ret;
-                if (intersection(compute_aabb(ei0, ei1), compute_aabb(ej0, ej1), ret)) {
+        vector<lu> eiaabbs, ejaabbs;
+        vector<Edge> ei0s, ej0s, ei1s, ej1s;
+        for (auto& ei : eilist) {
+            Edge ei1(ci, ei, true, true);
+            int i0, i1;
+            i0 = ci.edges[ei * 2];
+            i1 = ci.edges[ei * 2 + 1];
+            Edge ei0{ vt1_buffer[offi + i0], vt1_buffer[offi + i1] };
+            ei0s.push_back(ei0);
+            ei1s.push_back(ei1);
+            eiaabbs.push_back(compute_aabb(ei0, ei1));
+        }
+        for (auto& ej : ejlist) {
+            Edge ej1(cj, ej, true, true);
+            int j0, j1;
+            j0 = cj.edges[ej * 2];
+            j1 = cj.edges[ej * 2 + 1];
+            Edge ej0{ vt1_buffer[offj + j0], vt1_buffer[offj + j1] };
+            ej0s.push_back(ej0);
+            ej1s.push_back(ej1);
+            ejaabbs.push_back(compute_aabb(ej0, ej1));
+        }
+        for (int i = 0; i < eilist.size(); i++)
+            for (int j = 0; j < ejlist.size(); j++) {
+                if (intersects(eiaabbs[i], ejaabbs[j])) {
+                    auto &ei0{ ei0s[i] }, &ei1{ ei1s[i] }, &ej0{ ej0s[j] }, &ej1{ ej1s[j] };
+                    int ei = eilist[i], ej = ejlist[j];
                     double t = ee_collision_time(ei0, ej0, ei1, ej1);
 #ifdef TESTING
                     if (t < 1.0) {
@@ -952,7 +963,6 @@ double primitive_brute_force(
         for (int _i = 0; _i < n_overlap / 2; _i++) {
             int i = _i * 2;
             int I{ overlaps[i].i }, J{ overlaps[i].j };
-            auto &ci{ *cubes[I] }, &cj{ *cubes[J] };
             auto& p{ *overlaps[i].plist };
             auto& vilist{ p.vi };
             auto& vjlist{ p.vj };
@@ -980,8 +990,6 @@ double primitive_brute_force(
 #pragma omp parallel
     {
         double toi = 1.0;
-        double ee_toi = 1.0;
-        double pt_toi = 1.0;
 #pragma omp for schedule(guided) nowait
         for (int _i = 0; _i < n_overlap / 2; _i++) {
             int i = _i * 2;
@@ -997,20 +1005,13 @@ double primitive_brute_force(
             double t2 = vf_col_time(vjlist, filist, cubes, J, I);
             double t3 = ee_col_time(eilist, ejlist, cubes, I, J);
 
-            pt_toi = min(toi, min(t1, t2));
-            ee_toi = min(ee_toi, t3);
-            toi = min(toi, min(t1, t2));
-            toi = min(toi, t3);
+            toi = min(toi, min({t1, t2, t3}));
         }
 #pragma omp critical
         {
             toi_global = min(toi_global, toi);
-            ee_global = min(ee_global, ee_toi);
-            pt_global = min(pt_global, pt_toi);
         }
     }
-    if (cull_trajectory)
-    spdlog::info("pt toi = {}, ee toi = {}", pt_global, ee_global);
     return cull_trajectory? toi_global: 1.0;
 }
 
