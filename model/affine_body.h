@@ -2,9 +2,9 @@
 #include <vector>
 #include <array>
 
-// #ifndef TESTING 
-// #define EIGEN_USE_MKL_ALL
-// #endif
+#ifndef TESTING 
+#define EIGEN_USE_MKL_ALL
+#endif
  
 #include <Eigen/Eigen>
 #include "../view/shader.h"

@@ -87,38 +87,37 @@ double primitive_brute_force(
     std::vector<Intersection>& overlaps, // assert sorted
     const std::vector<std::unique_ptr<AffineBody>>& cubes,
     int vtn,
-    std::vector<std::array<vec3, 4>>& pts,
-    std::vector<std::array<int, 4>>& idx,
-    std::vector<std::array<vec3, 4>>& ees,
-    std::vector<std::array<int, 4>>& eidx,
-    std::vector<std::array<int, 2>>& vidx,
-    std::vector<Eigen::Matrix<double, 2, 12>>& pt_tk,
-    std::vector<Eigen::Matrix<double, 2, 12>>& ee_tk,
+
 #ifdef TESTING
     std::vector<double_int>& pt_tois, std::vector<double_int>& ee_tois,
 #ifndef _BODY_WISE_
     Globals &globals,
 #endif
 #endif
-    bool gen_basis = false);
+    ///////////////////////////return values////////////////////// 
+    // if vtn == 3 returns ccd toi 
+    // if vtn == 2 ccd returns collision set by following params
+    std::vector<std::array<vec3, 4>>& pts,
+    std::vector<std::array<int, 4>>& idx,
+    std::vector<std::array<vec3, 4>>& ees,
+    std::vector<std::array<int, 4>>& eidx,
+    std::vector<std::array<int, 2>>& vidx
+);
 
 double iaabb_brute_force(
     int n_cubes,
     const std::vector<std::unique_ptr<AffineBody>>& cubes,
     const std::vector<lu>& aabbs,
     int vtn,
-    std::vector<std::array<vec3, 4>>& pts,
-    std::vector<std::array<int, 4>>& idx,
-    std::vector<std::array<vec3, 4>>& ees,
-    std::vector<std::array<int, 4>>& eidx,
-    std::vector<std::array<int, 2>>& vidx,
-    std::vector<Eigen::Matrix<double, 2, 12>>& pt_tk,
-    std::vector<Eigen::Matrix<double, 2, 12>>& ee_tk,
 #ifdef TESTING
     std::vector<double_int>& pt_tois, std::vector<double_int>& ee_tois,
 #ifndef _BODY_WISE_
     Globals &globals,
 #endif
 #endif
-
-    bool gen_basis = false);
+    std::vector<std::array<vec3, 4>>& pts,
+    std::vector<std::array<int, 4>>& idx,
+    std::vector<std::array<vec3, 4>>& ees,
+    std::vector<std::array<int, 4>>& eidx,
+    std::vector<std::array<int, 2>>& vidx
+);

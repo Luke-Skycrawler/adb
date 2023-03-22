@@ -54,7 +54,7 @@
     "ee_friction": true,
 
     "params_double": {
-        "tol": 1e-3,
+        "tol": 1e-2,
         "dhat_sqr": 1e-2,
         "kappa": 1e1,
         "c1": 1e-4

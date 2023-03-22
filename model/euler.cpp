@@ -77,7 +77,7 @@ double E_global(const VectorXd& q_plus_dq, const VectorXd& dq, int n_cubes, int 
 #ifdef _FRICTION_
             auto contact_force = -barrier_derivative_d(d) / (dt * dt) * 2 * sqrt(d);
             auto v_stack = pt_vstack(*cubes[ij[0]], *cubes[ij[2]], ij[1], ij[3]);
-            auto uk = (pt_tk[k] * v_stack).norm();
+            auto uk = _vt2 ? 0.0 : (pt_tk[k] * v_stack).norm();
             if (globals.pt_fric)
                 ef += D_f0(uk, contact_force);
 #endif
@@ -102,7 +102,7 @@ double E_global(const VectorXd& q_plus_dq, const VectorXd& dq, int n_cubes, int 
 #ifdef _FRICTION_
             auto contact_force = -barrier_derivative_d(d) / (dt * dt) * 2 * sqrt(d);
             auto v_stack = ee_vstack(*cubes[ij[0]], *cubes[ij[2]], ij[1], ij[3]);
-            auto uk = (ee_tk[k] * v_stack).norm();
+            auto uk = _vt2 ? 0.0 : (ee_tk[k] * v_stack).norm();
             if (globals.ee_fric)
                 ef += D_f0(uk, contact_force);
 #endif
@@ -176,9 +176,6 @@ double line_search(const VectorXd& dq, const VectorXd& grad, VectorXd& q0, doubl
 
     static vector<array<int, 2>> vidx_new, vidx_iaab;
 
-    static vector<Matrix<double, 2, 12>> pt_tk_new, pt_tk_iaab;
-    static vector<Matrix<double, 2, 12>> ee_tk_new, ee_tk_iaab;
-
     auto dq_norm = dq.norm();
     do {
         q1 = q0 + dq * alpha;
@@ -195,17 +192,13 @@ double line_search(const VectorXd& dq, const VectorXd& grad, VectorXd& q0, doubl
                 idx_iaab,
                 ees_iaab,
                 eidx_iaab,
-                vidx_iaab,
-                pt_tk_iaab,
-                ee_tk_iaab);
+                vidx_iaab);
 #else
                 pts_new,
                 idx_new,
                 ees_new,
                 eidx_new,
-                vidx_new,
-                pt_tk_new,
-                ee_tk_new);
+                vidx_new);
         else
 #endif
         gen_collision_set(true, n_cubes, cubes,
@@ -213,9 +206,7 @@ double line_search(const VectorXd& dq, const VectorXd& grad, VectorXd& q0, doubl
             idx_new,
             ees_new,
             eidx_new,
-            vidx_new,
-            pt_tk_new,
-            ee_tk_new);
+            vidx_new);
         double ef1 = 0.0, E2 = 0.0, ef2 = 0.0;
         E1 = E_global(q1, dqk,
             n_cubes, n_pt, n_ee, n_g,
@@ -227,8 +218,8 @@ double line_search(const VectorXd& dq, const VectorXd& grad, VectorXd& q0, doubl
             cubes, dt, ef1, false);
         E2 = E_global(q1, dqk, n_cubes, pts_new.size(), ees_new.size(), vidx_new.size(),
             idx_new, eidx_new, vidx_new,
-            pt_tk_new,
-            ee_tk_new,
+            pt_tk,
+            ee_tk,
             cubes, dt, ef2, true);
         E1 = E2 + ef1;
         wolfe = E1 <= E0 + c1 * alpha * qdg;
@@ -251,8 +242,6 @@ double line_search(const VectorXd& dq, const VectorXd& grad, VectorXd& q0, doubl
     ees = ees_new;
     eidx = eidx_new;
     vidx = vidx_new;
-    pt_tk = pt_tk_new;
-    ee_tk = ee_tk_new;
 
     return alpha * 2;
 }
@@ -283,6 +272,8 @@ void implicit_euler(vector<unique_ptr<AffineBody>>& cubes, double dt)
     static vector<Matrix<double, 2, 12>> pt_tk;
     static vector<Matrix<double, 2, 12>> ee_tk;
     static Vector4d times;
+    static int n_pt, n_ee, n_g;
+    static vector<double> pt_contact_forces, ee_contact_forces;
     times.setZero(4);
     auto frame_start = high_resolution_clock::now();
 #ifdef IAABB_COMPARING
@@ -298,7 +289,7 @@ void implicit_euler(vector<unique_ptr<AffineBody>>& cubes, double dt)
     vector<Matrix<double, 2, 12>> ee_tk_iaabb;
 #endif
 
-    const int n_cubes = cubes.size(), nsqr = n_cubes * n_cubes, hess_dim = n_cubes * 12;
+    const int n_cubes = cubes.size(), hess_dim = n_cubes * 12;
 
     if (globals.col_set) {
         if (globals.iaabb % 2)
@@ -308,19 +299,13 @@ void implicit_euler(vector<unique_ptr<AffineBody>>& cubes, double dt)
                 idx_iaabb,
                 ees_iaabb,
                 eidx_iaabb,
-                vidx_iaabb,
-                pt_tk_iaabb,
-                ee_tk_iaabb,
-                true);
+                vidx_iaabb);
 #else
                 pts,
                 idx,
                 ees,
                 eidx,
-                vidx,
-                pt_tk,
-                ee_tk,
-                true);
+                vidx);
         else
 #endif
         gen_collision_set(false, n_cubes, cubes,
@@ -328,10 +313,7 @@ void implicit_euler(vector<unique_ptr<AffineBody>>& cubes, double dt)
             idx,
             ees,
             eidx,
-            vidx,
-            pt_tk,
-            ee_tk,
-            true);
+            vidx);
 
         if (globals.iaabb % 2) {
 
@@ -389,14 +371,13 @@ void implicit_euler(vector<unique_ptr<AffineBody>>& cubes, double dt)
     map<array<int, 2>, int> lut;
     // look-up table
     SparseMatrix<double> sparse_hess(hess_dim, hess_dim);
-    gen_empty_sm(n_cubes, idx, eidx, sparse_hess, lut);
+    // gen_empty_sm(n_cubes, idx, eidx, sparse_hess, lut);
 #endif
 #ifdef _TRIPLETS_
     globals.hess_triplets.reserve(((n_pt + n_ee) * 2 + n_cubes) * 12);
 #endif
 
-    int n_pt = idx.size(), n_ee = eidx.size(), n_g = vidx.size();
-    spdlog::info("constraint size = {}, {}", n_pt, n_ee);
+    ///////////////////////// MAIN LOOP /////////////////////
     do {
 #ifdef _TRIPLETS_
         globals.hess_triplets.clear();
@@ -409,16 +390,20 @@ void implicit_euler(vector<unique_ptr<AffineBody>>& cubes, double dt)
             c.hess = hess_inertia_per_body(c, dt);
             c.project_vt1();
         }
-   
 
 #ifdef _SM_
-        if (iter) {
+        {
             lut.clear();
             sparse_hess.setZero();
             gen_empty_sm(n_cubes, idx, eidx, sparse_hess, lut);
             n_pt = idx.size();
             n_ee = eidx.size();
             n_g = vidx.size();
+            pt_tk.resize(n_pt);
+            pt_contact_forces.resize(n_pt);
+            ee_tk.resize(n_ee);
+            ee_contact_forces.resize(n_ee);
+            spdlog::info("constraint size = {}, {}", n_pt, n_ee);
         }
         // clear(sparse_hess);
 #endif
@@ -437,11 +422,6 @@ void implicit_euler(vector<unique_ptr<AffineBody>>& cubes, double dt)
             ipc::PointTriangleDistanceType pt_type;
             double d = vf_distance(pt[0], f, pt_type);
             if (d < barrier::d_hat) {
-#ifdef _FRICTION_
-
-                Vector2d uk;
-                double contact_force = pt_uktk(ci, cj, pt, ij, pt_type, pt_tk[k], uk, d, dt);
-
                 ipc_term(
                     pt, ij, pt_type, d,
 #ifdef _SM_
@@ -450,18 +430,12 @@ void implicit_euler(vector<unique_ptr<AffineBody>>& cubes, double dt)
 #ifdef _TRIPLETS_
                     globals.hess_triplets,
 #endif
-                    ci.grad, cj.grad,
-                    uk, contact_force, pt_tk[k].transpose());
-#else
-                ipc_term(pt, ij, pt_type, d,
-#ifdef _SM_
-                    lut, sparse_hess,
+                    ci.grad, cj.grad
+#ifdef _FRICTION_
+                    ,
+                    pt_contact_forces[k], pt_tk[k]
 #endif
-#ifdef _TRIPLETS_
-                    globals.hess_triplets,
-#endif
-                    ci.grad, cj.grad);
-#endif
+                );
             }
         }
 #pragma omp parallel for schedule(static)
@@ -475,11 +449,6 @@ void implicit_euler(vector<unique_ptr<AffineBody>>& cubes, double dt)
             auto ee_type = ipc::edge_edge_distance_type(ee[0], ee[1], ee[2], ee[3]);
             double d = edge_edge_distance(ee[0], ee[1], ee[2], ee[3], ee_type);
             if (d < barrier::d_hat) {
-
-#ifdef _FRICTION_
-                Vector2d uk;
-                double contact_force = ee_uktk(ci, cj, ee, ij, ee_type, ee_tk[k], uk, d, dt);
-
                 ipc_term_ee(
                     ee, ij, ee_type, d,
 #ifdef _SM_
@@ -488,20 +457,12 @@ void implicit_euler(vector<unique_ptr<AffineBody>>& cubes, double dt)
 #ifdef _TRIPLETS_
                     globals.hess_triplets,
 #endif
-                    ci.grad, cj.grad,
-                    uk, contact_force, ee_tk[k].transpose());
-
-#else
-                ipc_term_ee(ee, ij, ee_type, d,
-#ifdef _SM_
-                    lut,
-                    sparse_hess,
+                    ci.grad, cj.grad
+#ifdef _FRICTION_
+                    ,
+                    ee_contact_forces[k], ee_tk[k]
 #endif
-#ifdef _TRIPLETS_
-                    globals.hess_triplets,
-#endif
-                    ci.grad, cj.grad);
-#endif
+                );
             }
         }
         for (auto _v : vidx) {
@@ -618,7 +579,7 @@ void implicit_euler(vector<unique_ptr<AffineBody>>& cubes, double dt)
             if (globals.upper_bound) {
                 double toi_iaabb;
                 if (globals.iaabb > 1)
-                    toi_iaabb = iaabb_brute_force(n_cubes, cubes, globals.aabbs, 3, pts, idx, ees, eidx, vidx, pt_tk, ee_tk, false);
+                    toi_iaabb = iaabb_brute_force(n_cubes, cubes, globals.aabbs, 3, pts, idx, ees, eidx, vidx);
 #ifndef IAABB_INTERNSHIP
                 else
 #endif

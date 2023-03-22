@@ -55,11 +55,8 @@ void ipc_term(
     vec12& grad_p, vec12& grad_t
 
 #ifdef _FRICTION_
-    ,
-    const Eigen::Vector2d& _uk, double contact_lambda, const Eigen::Matrix<double, 12, 2>& Tk
+    , double &contact_lambda, Eigen::Matrix<double, 2, 12>& Tk
 #endif
-    // , Matrix<double, 12 , 12> &off_diag
-    // , vector<Cube> &cubes
 );
 void ipc_term_ee(
     std::array<vec3, 4> ee, std::array<int, 4> ij, ipc::EdgeEdgeDistanceType ee_type, double dist, 
@@ -75,6 +72,6 @@ void ipc_term_ee(
 
 #ifdef _FRICTION_
     ,
-    const Eigen::Vector2d& _uk, double contact_lambda, const Eigen::Matrix<double, 12, 2>& Tk
+    double& contact_lambda, Eigen::Matrix<double, 2, 12>& Tk
 #endif
 );

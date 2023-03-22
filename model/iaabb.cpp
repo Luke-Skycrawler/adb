@@ -256,15 +256,13 @@ void intersect_sort(
     // TODO: O(n) insertion sort
 }
 
-
 inline void pt_col_set_task(
     int vi, int fj, int I, int J,
     // const AffineBody& ci, const AffineBody& cj,
-    const vec3&v, const Face& f,
+    const vec3& v, const Face& f,
     const lu& aabb_i, const lu& aabb_j,
     vector<array<vec3, 4>>& pts,
-    vector<array<int, 4>>& idx,
-    vector<Matrix<double, 2, 12>>& pt_tk)
+    vector<array<int, 4>>& idx)
 {
     bool pt_intersects = intersects(aabb_i, aabb_j);
     if (!pt_intersects) return;
@@ -273,15 +271,9 @@ inline void pt_col_set_task(
     if (d < barrier::d_hat) {
         array<vec3, 4> pt = { v, f.t0, f.t1, f.t2 };
         array<int, 4> ij = { I, vi, J, fj };
-        Matrix<double, 2, 12> Tk_T;
-        Tk_T.setZero(2, 12);
-        // Vector2d uk;
         {
             pts.push_back(pt);
             idx.push_back(ij);
-#ifdef _FRICTION_
-            pt_tk.push_back(Tk_T);
-#endif
         }
     }
 };
@@ -290,8 +282,7 @@ inline void ee_col_set_task(
     // const AffineBody& ci, const AffineBody& cj,
     const Edge& eii, const Edge& ejj,
     const lu& aabb_i, const lu& aabb_j, vector<array<vec3, 4>>& ees,
-    vector<array<int, 4>>& eidx,
-    vector<Matrix<double, 2, 12>>& ee_tk)
+    vector<array<int, 4>>& eidx)
 {
     bool ee_intersects = intersects(aabb_i, aabb_j);
     if (!ee_intersects) return;
@@ -300,16 +291,10 @@ inline void ee_col_set_task(
     if (d < barrier::d_hat) {
         array<vec3, 4> ee = { eii.e0, eii.e1, ejj.e0, ejj.e1 };
         array<int, 4> ij = { I, ei, J, ej };
-        Matrix<double, 2, 12> Tk_T;
-        Tk_T.setZero(2, 12);
-        Vector2d uk;
 
         {
             ees.push_back(ee);
             eidx.push_back(ij);
-#ifdef _FRICTION_
-            ee_tk.push_back(Tk_T);
-#endif
         }
     }
 };
@@ -319,20 +304,17 @@ double primitive_brute_force(
     std::vector<Intersection>& overlaps, // assert sorted
     const std::vector<std::unique_ptr<AffineBody>>& cubes,
     int vtn,
+#ifdef TESTING
+    std::vector<double_int>& pt_tois, std::vector<double_int>& ee_tois,
+#ifndef _BODY_WISE_
+    Globals& globals,
+#endif
+#endif
     vector<array<vec3, 4>>& pts,
     vector<array<int, 4>>& idx,
     vector<array<vec3, 4>>& ees,
     vector<array<int, 4>>& eidx,
-    vector<array<int, 2>>& vidx,
-    vector<Matrix<double, 2, 12>>& pt_tk,
-    vector<Matrix<double, 2, 12>>& ee_tk,
-#ifdef TESTING
-    std::vector<double_int>& pt_tois, std::vector<double_int>& ee_tois,
-#ifndef _BODY_WISE_
-    Globals &globals,
-#endif
-#endif
-    bool gen_basis)
+    vector<array<int, 2>>& vidx)
 {
 
     double toi_global = 1.0;
@@ -344,8 +326,6 @@ double primitive_brute_force(
         ees.resize(0);
         eidx.resize(0);
         vidx.resize(0);
-        pt_tk.resize(0);
-        ee_tk.resize(0);
     }
 
     static PList* lists = new PList[n_overlap];
@@ -644,8 +624,7 @@ double primitive_brute_force(
                                 const std::vector<std::unique_ptr<AffineBody>>& cubes,
                                 int I, int J,
                                 vector<array<vec3, 4>>& pts,
-                                vector<array<int, 4>>& idx,
-                                vector<Matrix<double, 2, 12>>& pt_tk) {
+                                vector<array<int, 4>>& idx) {
         auto &ci{ *cubes[I] }, &cj{ *cubes[J] };
         vector<lu> viaabbs, fjaabbs;
         vector<vec3> vis;
@@ -672,15 +651,9 @@ double primitive_brute_force(
                 if (d < barrier::d_hat) {
                     array<vec3, 4> pt = { v, f.t0, f.t1, f.t2 };
                     array<int, 4> ij = { I, vi, J, fj };
-                    Matrix<double, 2, 12> Tk_T;
-                    Tk_T.setZero(2, 12);
-                    // Vector2d uk;
                     {
                         pts.push_back(pt);
                         idx.push_back(ij);
-#ifdef _FRICTION_
-                        pt_tk.push_back(Tk_T);
-#endif
                     }
                 }
             }
@@ -690,8 +663,7 @@ double primitive_brute_force(
                                 const std::vector<std::unique_ptr<AffineBody>>& cubes,
                                 int I, int J,
                                 vector<array<vec3, 4>>& ees,
-                                vector<array<int, 4>>& eidx,
-                                vector<Matrix<double, 2, 12>>& ee_tk) {
+                                vector<array<int, 4>>& eidx) {
         auto &ci{ *cubes[I] }, &cj{ *cubes[J] };
         vector<lu> eiaabbs, ejaabbs;
         vector<Edge> eis, ejs;
@@ -717,16 +689,9 @@ double primitive_brute_force(
                 if (d < barrier::d_hat) {
                     array<vec3, 4> ee = { eii.e0, eii.e1, ejj.e0, ejj.e1 };
                     array<int, 4> ij = { I, ei, J, ej };
-                    Matrix<double, 2, 12> Tk_T;
-                    Tk_T.setZero(2, 12);
-                    Vector2d uk;
-
                     {
                         ees.push_back(ee);
                         eidx.push_back(ij);
-#ifdef _FRICTION_
-                        ee_tk.push_back(Tk_T);
-#endif
                     }
                 }
             }
@@ -834,9 +799,8 @@ double primitive_brute_force(
     static vector<array<int, 4>>*idx_private = new vector<array<int, 4>>[omp_get_max_threads()],
                              *eidx_private = new vector<array<int, 4>>[omp_get_max_threads()];
     static vector<array<vec3, 4>>*pts_private = new vector<array<vec3, 4>>[omp_get_max_threads()], *ees_private = new vector<array<vec3, 4>>[omp_get_max_threads()];
-    static vector<Matrix<double, 2, 12>>*pt_tk_private = new vector<Matrix<double, 2, 12>>[omp_get_max_threads()], *ee_tk_private = new vector<Matrix<double, 2, 12>>[omp_get_max_threads()];
 
-    #ifdef _FULL_PARALLEL_
+#ifdef _FULL_PARALLEL_
     static vector<int> inner_presum;
     auto n_lists = n_overlap / 2;
     inner_presum.resize(n_lists + 1);
@@ -884,7 +848,6 @@ double primitive_brute_force(
             auto tid = omp_get_thread_num();
             idx_private[tid].resize(0);
             pts_private[tid].resize(0);
-            pt_tk_private[tid].resize(0);
 
             auto& a = thread_starting_index[tid];
             int outer = a[0], inner = a[1];
@@ -898,7 +861,7 @@ double primitive_brute_force(
                 int n_pt = nv * nf;
                 for (int i = inner; i < n_pt; i++) {
                     int vi{ i / nf }, fj{ i % nf };
-                    pt_col_set_task(vi, fj, I, J, ci, cj, pts_private[tid], idx_private[tid], pt_tk_private[tid]);
+                    pt_col_set_task(vi, fj, I, J, ci, cj, pts_private[tid], idx_private[tid]);
                     k_tasks_done++;
                     if (k_tasks_done >= k_threads) break;
                 }
@@ -910,7 +873,6 @@ double primitive_brute_force(
             {
                 pts.insert(pts.end(), pts_private[tid].begin(), pts_private[tid].end());
                 idx.insert(idx.end(), idx_private[tid].begin(), idx_private[tid].end());
-                pt_tk.insert(pt_tk.end(), pt_tk_private[tid].begin(), pt_tk_private[tid].end());
             }
         }
         // triangle-point
@@ -921,7 +883,6 @@ double primitive_brute_force(
             auto tid = omp_get_thread_num();
             idx_private[tid].resize(0);
             pts_private[tid].resize(0);
-            pt_tk_private[tid].resize(0);
 
             auto& a = thread_starting_index[tid];
             int outer = a[0], inner = a[1];
@@ -935,7 +896,7 @@ double primitive_brute_force(
                 int n_pt = nv * nf;
                 for (int i = inner; i < n_pt; i++) {
                     int vj{ i / nf }, fi{ i % nf };
-                    pt_col_set_task(vj, fi, I, J, ci, cj, pts_private[tid], idx_private[tid], pt_tk_private[tid]);
+                    pt_col_set_task(vj, fi, I, J, ci, cj, pts_private[tid], idx_private[tid]);
                     k_tasks_done++;
                     if (k_tasks_done >= k_threads) break;
                 }
@@ -947,7 +908,6 @@ double primitive_brute_force(
             {
                 pts.insert(pts.end(), pts_private[tid].begin(), pts_private[tid].end());
                 idx.insert(idx.end(), idx_private[tid].begin(), idx_private[tid].end());
-                pt_tk.insert(pt_tk.end(), pt_tk_private[tid].begin(), pt_tk_private[tid].end());
             }
         }
         // edge-edge
@@ -958,7 +918,6 @@ double primitive_brute_force(
             auto tid = omp_get_thread_num();
             ees_private[tid].resize(0);
             eidx_private[tid].resize(0);
-            ee_tk_private[tid].resize(0);
 
             auto& a = thread_starting_index[tid];
             int outer = a[0], inner = a[1];
@@ -972,7 +931,7 @@ double primitive_brute_force(
                 int n_ee = nei * nej;
                 for (int i = inner; i < n_ee; i++) {
                     int ei{ i / nej }, ej{ i % nej };
-                    ee_col_set_task(ei, ej, I, J, ci, cj,  ees_private[tid], eidx_private[tid], ee_tk_private[tid]);
+                    ee_col_set_task(ei, ej, I, J, ci, cj, ees_private[tid], eidx_private[tid]);
                     k_tasks_done++;
                     if (k_tasks_done >= k_threads) break;
                 }
@@ -984,7 +943,6 @@ double primitive_brute_force(
             {
                 ees.insert(ees.end(), ees_private[tid].begin(), ees_private[tid].end());
                 eidx.insert(eidx.end(), eidx_private[tid].begin(), eidx_private[tid].end());
-                ee_tk.insert(ee_tk.end(), ee_tk_private[tid].begin(), ee_tk_private[tid].end());
             }
         }
     }
@@ -997,8 +955,6 @@ double primitive_brute_force(
         eidx_private[tid].resize(0);
         pts_private[tid].resize(0);
         ees_private[tid].resize(0);
-        pt_tk_private[tid].resize(0);
-        ee_tk_private[tid].resize(0);
 #pragma omp for schedule(guided) nowait
         for (int _i = 0; _i < n_overlap / 2; _i++) {
             int i = _i * 2;
@@ -1011,18 +967,16 @@ double primitive_brute_force(
             auto& filist{ p.fi };
             auto& fjlist{ p.fj };
 
-            ee_col_set(eilist, ejlist, cubes, I, J, ees_private[tid], eidx_private[tid], ee_tk_private[tid]);
-            vf_col_set(vilist, fjlist, cubes, I, J, pts_private[tid], idx_private[tid], pt_tk_private[tid]);
-            vf_col_set(vjlist, filist, cubes, J, I, pts_private[tid], idx_private[tid], pt_tk_private[tid]);
+            ee_col_set(eilist, ejlist, cubes, I, J, ees_private[tid], eidx_private[tid]);
+            vf_col_set(vilist, fjlist, cubes, I, J, pts_private[tid], idx_private[tid]);
+            vf_col_set(vjlist, filist, cubes, J, I, pts_private[tid], idx_private[tid]);
         }
 #pragma omp critical
         {
             pts.insert(pts.end(), pts_private[tid].begin(), pts_private[tid].end());
             idx.insert(idx.end(), idx_private[tid].begin(), idx_private[tid].end());
-            pt_tk.insert(pt_tk.end(), pt_tk_private[tid].begin(), pt_tk_private[tid].end());
             ees.insert(ees.end(), ees_private[tid].begin(), ees_private[tid].end());
             eidx.insert(eidx.end(), eidx_private[tid].begin(), eidx_private[tid].end());
-            ee_tk.insert(ee_tk.end(), ee_tk_private[tid].begin(), ee_tk_private[tid].end());
         }
     }
     #endif
@@ -1060,41 +1014,33 @@ double iaabb_brute_force(
     const std::vector<std::unique_ptr<AffineBody>>& cubes,
     const std::vector<lu>& aabbs,
     int vtn,
+#ifdef TESTING
+    std::vector<double_int>& pt_tois, std::vector<double_int>& ee_tois,
+#ifndef _BODY_WISE_
+    Globals& globals,
+#endif
+#endif
     std::vector<std::array<vec3, 4>>& pts,
     std::vector<std::array<int, 4>>& idx,
     std::vector<std::array<vec3, 4>>& ees,
     std::vector<std::array<int, 4>>& eidx,
-    std::vector<std::array<int, 2>>& vidx,
-    std::vector<Eigen::Matrix<double, 2, 12>>& pt_tk,
-    std::vector<Eigen::Matrix<double, 2, 12>>& ee_tk,
-#ifdef TESTING
-    std::vector<double_int>& pt_tois, std::vector<double_int>& ee_tois,
-    #ifndef _BODY_WISE_
-    Globals &globals,
-    #endif
-#endif
-
-    bool gen_basis)
+    std::vector<std::array<int, 2>>& vidx)
 {
     auto start = high_resolution_clock::now();
     vector<Intersection> ret;
     intersect_sort(n_cubes, cubes, aabbs, ret, vtn);
     double toi = primitive_brute_force(n_cubes, ret, cubes, vtn,
+#ifdef TESTING
+        pt_tois, ee_tois,
+#ifndef _BODY_WISE_
+        globals,
+        #endif
+#endif
         pts,
         idx,
         ees,
         eidx,
-        vidx,
-        pt_tk,
-        ee_tk,
-#ifdef TESTING
-        pt_tois, ee_tois,
-
-        #ifndef _BODY_WISE_
-        globals,
-        #endif
-#endif
-        gen_basis);
+        vidx);
     auto t = DURATION_TO_DOUBLE(start);
     spdlog::info("time: {} = {:0.6f} ms", vtn == 3 ? "iaabb upper bound": "iAABB", t * 1000);
     return toi;

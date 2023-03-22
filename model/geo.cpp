@@ -138,10 +138,8 @@ void ipc_term(
     vector<HessBlock>& triplets,
 #endif
     Vector<double, 12>& grad_p, Vector<double, 12>& grad_t
-// Matrix<double, 12, 12>& hess_p, Matrix<double, 12, 12>& hess_t,
 #ifdef _FRICTION_
-    ,
-    const Vector2d& _uk, double contact_lambda, const Matrix<double, 12, 2>& Tk
+    ,double &contact_lambda, Matrix<double, 2, 12>& Tk
 #endif
 )
 {
@@ -150,6 +148,9 @@ void ipc_term(
 
     auto p = pt[0], t0 = pt[1], t1 = pt[2], t2 = pt[3];
     auto &ci{ *globals.cubes[_i] }, &cj{ *globals.cubes[_j] };
+
+    Vector2d _uk;
+    contact_lambda = utils::pt_uktk(ci, cj, pt, ij, pt_type, Tk, _uk, dist, globals.dt);
     auto* tidx = cj.indices;
     Vector<double, 12> pt_grad;
     Matrix<double, 12, 12> pt_hess;
@@ -184,7 +185,7 @@ void ipc_term(
         ipc_hess = project_to_psd(ipc_hess);
 #ifdef _FRICTION_
     if (globals.pt_fric)
-        friction(_uk, contact_lambda, Tk, pt_grad, ipc_hess);
+        friction(_uk, contact_lambda, Tk.transpose(), pt_grad, ipc_hess);
 #endif
 
     int ii = _i, jj = _j;
@@ -291,8 +292,7 @@ void ipc_term_ee(
 #endif
     Vector<double, 12>& grad_0, Vector<double, 12>& grad_1
 #ifdef _FRICTION_
-    ,
-    const Vector2d& _uk, double contact_lambda, const Matrix<double, 12, 2>& Tk
+    , double& contact_lambda, Matrix<double, 2, 12>& Tk
 #endif
 )
 {
@@ -300,6 +300,9 @@ void ipc_term_ee(
 
     int _i = ij[0], _ei = ij[1], _j = ij[2], _ej = ij[3];
     auto &ci(*globals.cubes[_i]), &cj(*globals.cubes[_j]);
+    Vector2d _uk;
+    contact_lambda = utils::ee_uktk(ci, cj, ee, ij, ee_type, Tk, _uk, dist, globals.dt);
+
     auto *eidxi = ci.edges, *eidxj = cj.edges;
 
     auto ei0 = ee[0], ei1 = ee[1],
@@ -353,7 +356,7 @@ void ipc_term_ee(
 
 #ifdef _FRICTION_
     if (globals.ee_fric)
-        friction(_uk, contact_lambda, Tk, ee_grad, ipc_hess);
+        friction(_uk, contact_lambda, Tk.transpose(), ee_grad, ipc_hess);
 #endif
 
     int ii = _i, jj = _j;
