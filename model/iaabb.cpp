@@ -663,7 +663,26 @@ double primitive_brute_force(
         for (int i = 0; i < vilist.size(); i ++)
             for (int j = 0; j < fjlist.size(); j ++){
                 int vi = vilist[i], fj = fjlist[j];
-                pt_col_set_task(vi, fj, I, J, vis[i], fjs[j], viaabbs[i], fjaabbs[j], pts, idx, pt_tk);
+                bool pt_intersects = intersects(viaabbs[i], fjaabbs[j]);
+                if (!pt_intersects) continue;
+                auto& v{ vis[i] };
+                auto& f{ fjs[j] };
+                ipc::PointTriangleDistanceType pt_type;
+                double d = vf_distance(v, f, pt_type);
+                if (d < barrier::d_hat) {
+                    array<vec3, 4> pt = { v, f.t0, f.t1, f.t2 };
+                    array<int, 4> ij = { I, vi, J, fj };
+                    Matrix<double, 2, 12> Tk_T;
+                    Tk_T.setZero(2, 12);
+                    // Vector2d uk;
+                    {
+                        pts.push_back(pt);
+                        idx.push_back(ij);
+#ifdef _FRICTION_
+                        pt_tk.push_back(Tk_T);
+#endif
+                    }
+                }
             }
     };
 
@@ -688,7 +707,28 @@ double primitive_brute_force(
         }
         for (int i = 0; i < eilist.size(); i++)
             for (int j = 0; j < ejlist.size(); j++) {
-                ee_col_set_task(eilist[i], ejlist[j], I, J, eis[i], ejs[j], eiaabbs[i], ejaabbs[j], ees, eidx, ee_tk);
+
+                bool ee_intersects = intersects(eiaabbs[i], ejaabbs[j]);
+                if (!ee_intersects) continue;
+                auto &eii{ eis[i] }, &ejj{ ejs[j] };
+                int ei = eilist[i], ej = ejlist[j];
+                auto ee_type = ipc::edge_edge_distance_type(eii.e0, eii.e1, ejj.e0, ejj.e1);
+                double d = ipc::edge_edge_distance(eii.e0, eii.e1, ejj.e0, ejj.e1, ee_type);
+                if (d < barrier::d_hat) {
+                    array<vec3, 4> ee = { eii.e0, eii.e1, ejj.e0, ejj.e1 };
+                    array<int, 4> ij = { I, ei, J, ej };
+                    Matrix<double, 2, 12> Tk_T;
+                    Tk_T.setZero(2, 12);
+                    Vector2d uk;
+
+                    {
+                        ees.push_back(ee);
+                        eidx.push_back(ij);
+#ifdef _FRICTION_
+                        ee_tk.push_back(Tk_T);
+#endif
+                    }
+                }
             }
     };
     const auto vf_col_time = [&](vector<int>& vilist, vector<int>& fjlist,
