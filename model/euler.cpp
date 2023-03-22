@@ -37,106 +37,30 @@ double E_global(const VectorXd& q_plus_dq, const VectorXd& dq, int n_cubes, int 
     const vector<Matrix<double, 2, 12>>& pt_tk,
     const vector<Matrix<double, 2, 12>>& ee_tk,
     const vector<unique_ptr<AffineBody>>& cubes,
-    double dt, double& _ef, bool _vt2)
-{
-    double e = 0.0;
-    double ef = 0.0;
-// inertia energy
-#pragma omp parallel for schedule(static) reduction(+ \
-                                                    : e)
-    for (int i = 0; i < n_cubes; i++) {
-        auto& c(*cubes[i]);
-        c.dq = dq.segment<12>(i * 12);
+    double dt, double& _ef, bool _vt2);
 
-        auto q_tiled = c.q_tile(dt, globals.gravity);
-        auto _q = q_plus_dq.segment<12>(12 * i);
-        double e_inert = E(_q, q_tiled, c, dt);
-        // if (_vt2)
-        //     c.project_vt2();
-        // else
-        // c.project_vt1();
-        c.project_vt2();
-        // used for pt_vstack. vt1 and vt2 should not use buffer
-        e += e_inert;
-    }
-    if (globals.pt)
-// point-triangle energy
-#pragma omp parallel for schedule(static) reduction(+                \
-                                                    : e) reduction(+ \
-                                                                   : ef)
-        for (int k = 0; k < n_pt; k++) {
-            auto& ij = idx[k];
-            Face f(*cubes[ij[2]], ij[3], _vt2, _vt2);
-            vec3 v(cubes[ij[0]]->v_transformed[ij[1]]);
-            if (!_vt2) v = cubes[ij[0]]->vt1(ij[1]);
-            // array<vec3, 4> a = {v, f.t0, f.t1, f.t2};
-            ipc::PointTriangleDistanceType pt_type;
-            double d = vf_distance(v, f, pt_type);
-            // double d = ipc::point_triangle_distance(v, f.t0, f.t1, f.t2);
-            e += barrier::barrier_function(d);
-#ifdef _FRICTION_
-            auto contact_force = -barrier_derivative_d(d) / (dt * dt) * 2 * sqrt(d);
-            auto v_stack = pt_vstack(*cubes[ij[0]], *cubes[ij[2]], ij[1], ij[3]);
-            auto uk = _vt2 ? 0.0 : (pt_tk[k] * v_stack).norm();
-            if (globals.pt_fric)
-                ef += D_f0(uk, contact_force);
-#endif
-        }
 
-    // ee ipc energy
-    if (globals.ee)
-#pragma omp parallel for schedule(static) reduction(+                \
-                                                    : e) reduction(+ \
-                                                                   : ef)
-        for (int k = 0; k < n_ee; k++) {
-            auto& ij(eidx[k]);
-            Edge ei(*cubes[ij[0]], ij[1], _vt2, _vt2), ej(*cubes[ij[2]], ij[3], _vt2, _vt2);
-            double eps_x = (ei.e0 - ei.e1).squaredNorm() * (ej.e0 - ej.e1).squaredNorm() * globals.eps_x;
-            double p = ipc::edge_edge_mollifier(ei.e0, ei.e1, ej.e0, ej.e1, eps_x);
-            double d = ipc::edge_edge_distance(ei.e0, ei.e1, ej.e0, ej.e1);
-#ifdef NO_MOLLIFIER
-            e += barrier_function(d);
-#else
-            e += barrier_function(d) * p;
-#endif
-#ifdef _FRICTION_
-            auto contact_force = -barrier_derivative_d(d) / (dt * dt) * 2 * sqrt(d);
-            auto v_stack = ee_vstack(*cubes[ij[0]], *cubes[ij[2]], ij[1], ij[3]);
-            auto uk = _vt2 ? 0.0 : (ee_tk[k] * v_stack).norm();
-            if (globals.ee_fric)
-                ef += D_f0(uk, contact_force);
-#endif
-        }
+double E_barrier_plus_inert(const VectorXd& q_plus_dq, const VectorXd& dq, int n_cubes,
+    const vector<array<int, 4>>& idx,
+    const vector<array<int, 4>>& eidx,
+    const vector<array<int, 2>>& vidx,
+    const vector<unique_ptr<AffineBody>>& cubes,
+    double dt);
 
-    // vertex-ground ipc energy
-    if (globals.ground)
-#pragma omp parallel for schedule(static) reduction(+                \
-                                                    : e) reduction(+ \
-                                                                   : ef)
-        for (int k = 0; k < n_g; k++) {
-            auto& v{
-                vidx[k]
-            };
-            vec3 vt2 = cubes[v[0]]->v_transformed[v[1]];
-            vec3 vd = _vt2 ? vt2 : cubes[v[0]]->vt1(v[1]);
-            double e_ground = E_ground(vd);
-            e += e_ground;
-#ifdef _FRICTION_
-            auto& c{ *cubes[v[0]] };
-            auto vt0 = c.vt0(v[1]);
-            double d = vg_distance(vd);
-            if (d * d < barrier::d_hat) {
-                auto contact_force = -barrier_derivative_d(d * d) / (dt * dt) * 2 * d;
-                vec3 _uk = vt2 - vt0;
-                double uk = sqrt(_uk(0) * _uk(0) + _uk(1) * _uk(1));
-                if (globals.vg_fric)
-                    ef += D_f0(uk, contact_force);
-            }
-#endif
-        }
-    _ef = ef;
-    return e;
-}
+double E_fric(
+    const VectorXd& dq, int n_cubes, 
+    int n_pt, int n_ee, int n_g,
+    const vector<array<int, 4>>& idx,
+    const vector<array<int, 4>>& eidx,
+    const vector<array<int, 2>>& vidx,
+    const vector<Matrix<double, 2, 12>>& pt_tk,
+    const vector<Matrix<double, 2, 12>>& ee_tk,
+    const vector<double>& pt_contact_forces,
+    const vector<double>& ee_contact_forces,
+    const vector<double>& g_contact_forces,
+    const vector<unique_ptr<AffineBody>>& cubes,
+    double dt);
+
 double line_search(const VectorXd& dq, const VectorXd& grad, VectorXd& q0, double& E0, double& E1,
     int n_cubes, int n_pt, int n_ee, int n_g,
     vector<array<vec3, 4>>& pts,
@@ -144,8 +68,11 @@ double line_search(const VectorXd& dq, const VectorXd& grad, VectorXd& q0, doubl
     vector<array<vec3, 4>>& ees,
     vector<array<int, 4>>& eidx,
     vector<array<int, 2>>& vidx,
-    vector<Matrix<double, 2, 12>>& pt_tk,
-    vector<Matrix<double, 2, 12>>& ee_tk,
+    const vector<Matrix<double, 2, 12>>& pt_tk,
+    const vector<Matrix<double, 2, 12>>& ee_tk,
+    const vector<double> &pt_contact_forces,
+    const vector<double> &ee_contact_forces,
+    const vector<double> &g_contact_forces,
     const vector<unique_ptr<AffineBody>>& cubes,
     double dt)
 {
@@ -221,7 +148,14 @@ double line_search(const VectorXd& dq, const VectorXd& grad, VectorXd& q0, doubl
             pt_tk,
             ee_tk,
             cubes, dt, ef2, true);
-        E1 = E2 + ef1;
+        double E3 = E_barrier_plus_inert(q1, dqk, n_cubes, idx_new, eidx_new, vidx_new, cubes, dt);
+        double ef = E_fric(dqk, n_cubes, n_pt, n_ee, n_g, idx, eidx, vidx, pt_tk, ee_tk, pt_contact_forces, ee_contact_forces, g_contact_forces, cubes,  dt);
+        if (max(abs(E3 - E2), abs(ef - ef1)) > 1e-6) {
+            spdlog::error("wrong energy, E2= {}, E3 = {}", E2, E3);
+            spdlog::error("wrong energy, ef= {}, ef1 = {}", ef, ef1);
+            exit(1);
+        }
+        E1 = E3 + ef;
         wolfe = E1 <= E0 + c1 * alpha * qdg;
         // spdlog::info("wanted descend = {}, E1 - E0 = {}, E1 = {}, E0 = {}, alpha = {}", c1 * alpha * qdg, E1 - E0, E1, E0, alpha);
         alpha /= 2;
@@ -273,7 +207,7 @@ void implicit_euler(vector<unique_ptr<AffineBody>>& cubes, double dt)
     static vector<Matrix<double, 2, 12>> ee_tk;
     static Vector4d times;
     static int n_pt, n_ee, n_g;
-    static vector<double> pt_contact_forces, ee_contact_forces;
+    static vector<double> pt_contact_forces, ee_contact_forces, g_contact_forces;
     times.setZero(4);
     auto frame_start = high_resolution_clock::now();
 #ifdef IAABB_COMPARING
@@ -403,6 +337,7 @@ void implicit_euler(vector<unique_ptr<AffineBody>>& cubes, double dt)
             pt_contact_forces.resize(n_pt);
             ee_tk.resize(n_ee);
             ee_contact_forces.resize(n_ee);
+            g_contact_forces.resize(n_g);
             spdlog::info("constraint size = {}, {}", n_pt, n_ee);
         }
         // clear(sparse_hess);
@@ -465,7 +400,9 @@ void implicit_euler(vector<unique_ptr<AffineBody>>& cubes, double dt)
                 );
             }
         }
-        for (auto _v : vidx) {
+
+        for (int k = 0; k < n_g; k ++) {
+            auto &_v {vidx[k]};
             int i = _v[0], v = _v[1];
             auto& c{ *cubes[i] };
             vec3 p = c.v_transformed[v];
@@ -478,9 +415,9 @@ void implicit_euler(vector<unique_ptr<AffineBody>>& cubes, double dt)
                 Pk.col(1) = vec3(0.0, 0.0, 1.0);
 
                 Vector2d uk = Pk.transpose() * (p - c.vt0(v));
-                auto contact_force = -barrier_derivative_d(d) / (dt * dt) * 2 * _d;
+                g_contact_forces[k] = -barrier_derivative_d(d) / (dt * dt) * 2 * _d;
 
-                ipc_term_vg(c, v, uk, contact_force, Pk);
+                ipc_term_vg(c, v, uk, g_contact_forces[k], Pk);
 #else
                 ipc_term_vg(c, v);
 #endif
@@ -494,17 +431,14 @@ void implicit_euler(vector<unique_ptr<AffineBody>>& cubes, double dt)
             MatrixXd big_hess;
             if (globals.dense)
                 big_hess.setZero(hess_dim, hess_dim);
-            VectorXd r, q0_cat, q_tile_cat, dq;
+            VectorXd r, q0_cat, dq;
             r.setZero(hess_dim);
             dq.setZero(hess_dim);
             q0_cat.setZero(hess_dim);
-            q_tile_cat.setZero(hess_dim);
             for (int k = 0; k < n_cubes; k++) {
                 auto& c = *cubes[k];
                 r.segment<12>(k * 12) = c.grad;
-                auto t = cat(c.q);
-                q0_cat.segment<12>(k * 12) = t;
-                q_tile_cat.segment<12>(k * 12) = c.q_tile(dt, globals.gravity);
+                q0_cat.segment<12>(k * 12) = cat(c.q);
             }
 
 #ifdef _TRIPLETS_
@@ -533,8 +467,6 @@ void implicit_euler(vector<unique_ptr<AffineBody>>& cubes, double dt)
             if (globals.dense)
                 dq = -big_hess.ldlt().solve(r);
             else if (globals.sparse) {
-                // sparse_hess.setFromTriplets(bht.begin(), bht.end());
-                // sparse_hess.finalize();
 #ifdef EIGEN_USE_MKL_ALL
                 PardisoLLT<SparseMatrix<double>> ldlt_solver;
 #else
@@ -617,6 +549,9 @@ void implicit_euler(vector<unique_ptr<AffineBody>>& cubes, double dt)
                     vidx,
                     pt_tk,
                     ee_tk,
+                    pt_contact_forces,
+                    ee_contact_forces,
+                    g_contact_forces,
                     cubes, dt);
             spdlog::info("alpha = {}", alpha);
             dq *= alpha;
@@ -637,28 +572,7 @@ void implicit_euler(vector<unique_ptr<AffineBody>>& cubes, double dt)
             // spdlog::warn("iter {}, time = {} ms, IPC term time = {} \n e0 = {}, e1 = {}, norm_dq = {}\n", iter, iter_duration, ipc_duration, E0, E1, norm_dq);
             spdlog::warn("Newton iter #{}, time = {} ms, upper bound = {}, line search = {}", iter + 1, iter_duration, toi, alpha);
         }
-        //         {
-        //             // updating collision set
-        //             pts.resize(idx.size());
-        //             ees.resize(eidx.size());
-        // #pragma omp parallel for schedule(static)
-        //             for (int k = 0; k < n_cubes; k++) {
-        //                 cubes[k]->project_vt1();
-        //             }
-        // #pragma omp parallel for schedule(static)
-        //             for (int k = 0; k < n_pt; k++) {
-        //                 auto& ij = idx[k];
-        //                 Face f(*cubes[ij[2]], ij[3], false, true);
-        //                 vec3 v(cubes[ij[0]]->v_transformed[ij[1]]);
-        //                 pts[k] = { v, f.t0, f.t1, f.t2 };
-        //             }
-        // #pragma omp parallel for schedule(static)
-        //             for (int k = 0; k < n_ee; k++) {
-        //                 auto& ij = eidx[k];
-        //                 Edge ei(*cubes[ij[0]], ij[1], false, true), ej(*cubes[ij[2]], ij[3], false, true);
-        //                 ees[k] = { ei.e0, ei.e1, ej.e0, ej.e1 };
-        //             }
-        //         }
+
         term_cond = sup_dq < tol || ++iter >= globals.max_iter;
         sup_dq = 0.0;
     } while (!term_cond);

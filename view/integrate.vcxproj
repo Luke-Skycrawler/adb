@@ -162,6 +162,7 @@
     <ClCompile Include="..\model\geometry.cpp" />
     <ClCompile Include="..\model\mutils.cpp" />
     <ClCompile Include="..\model\upper_bound.cpp" />
+    <ClCompile Include="..\model\energy.cpp" />
     <ClCompile Include="..\test_cases\spinning_cube.cpp" />
     <ClCompile Include="..\view\control.cpp" />
     <ClCompile Include="..\view\light.cpp" />
