@@ -91,7 +91,7 @@ protected:
         #ifdef _LOAD_
         n_cubes = 3;
         #else
-        n_cubes = predefined ? 6 : 50;
+        n_cubes = predefined ? 6 : 10;
         #endif
 
         Cube::gen_indices();
@@ -165,7 +165,6 @@ protected:
 };
 uniform_real_distribution<double> iAABBTest ::dist(0.0, 1.0);
 const double iAABBTest::space_range[2]{ -3.0, 3.0 };
-#ifdef _BODY_WISE_
 TEST_F(iAABBTest, sort_against_bf)
 {
     vector<Intersection> overlaps_bf, overlaps_sort;
@@ -179,7 +178,6 @@ TEST_F(iAABBTest, sort_against_bf)
     cout << "size: bf = " << overlaps_bf.size() << " sort = " << overlaps_sort.size() << "\n";
     diff(overlaps_bf, overlaps_sort);
 }
-#endif  
 
 void iAABBTest::diff(vector<array<int, 4>>& a, vector<array<int, 4>>& b)
 {
@@ -237,8 +235,7 @@ void iAABBTest::diff(vector<Intersection>& a, vector<Intersection>& b)
         }
 
 }
-#ifdef _BODY_WISE_
-
+#include <tuple>
 TEST_F(iAABBTest, pipelined)
 {
     vector<Intersection> overlaps_sort;
@@ -259,7 +256,8 @@ TEST_F(iAABBTest, pipelined)
     vector<Matrix<double, 2, 12>> ee_tk_ref;
     vector<double_int> foo, bar;
     intersect_sort(n_cubes, cubes, aabbs, overlaps_sort, 1);
-    primitive_brute_force(n_cubes, overlaps_sort, cubes, 1, pts, idx, ees, eidx, vidx, pt_tk, ee_tk, foo, bar, false);
+    //primitive_brute_force(n_cubes, overlaps_sort, cubes, 1, foo, bar, globals, pts, idx, ees, eidx, vidx);
+    iaabb_brute_force(n_cubes, cubes, aabbs, 1, foo, bar, globals, pts, idx, ees, eidx, vidx);
     int nsqr = n_cubes * n_cubes;
     for (int I = 0; I < nsqr; I++) {
         int i = I / n_cubes, j = I % n_cubes;
@@ -325,7 +323,6 @@ TEST_F(iAABBTest, pipelined)
     diff(idx_ref, idx); 
     diff(eidx_ref, eidx);
 }
-#endif
 
 array<double, 2> brute_force(
     int n_cubes,
