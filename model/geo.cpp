@@ -6,7 +6,12 @@
 #include <ipc/utils/eigen_ext.hpp>
 #include <ipc/distance/edge_edge_mollifier.hpp>
 #include <ipc/friction/smooth_friction_mollifier.hpp>
+#ifndef TESTING
 #include "../view/global_variables.h"
+#else 
+#include "../iAABB/pch.h"
+extern Globals globals;
+#endif
 #include "collision.h"
 #include "time_integrator.h"
 #include <omp.h>
@@ -107,6 +112,7 @@ void friction(
     H += D_k_hessian * h2;
 }
 
+#ifndef TESTING
 void ipc_term_vg(AffineBody& c, int v
 #ifdef _FRICTION_
     ,
@@ -491,3 +497,4 @@ double E_ground(const vec3& v)
     }
     return e;
 };
+#endif

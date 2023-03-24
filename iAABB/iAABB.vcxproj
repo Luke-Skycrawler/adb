@@ -48,6 +48,10 @@
     <ClCompile Include="..\model\collision.cpp">
       <PreprocessorDefinitions Condition="'$(Configuration)|$(Platform)'=='Release|x64'">TESTING;%(PreprocessorDefinitions)</PreprocessorDefinitions>
     </ClCompile>
+    <ClCompile Include="..\model\geo.cpp">
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|x64'">NotUsing</PrecompiledHeader>
+      <PreprocessorDefinitions Condition="'$(Configuration)|$(Platform)'=='Release|x64'">TESTING;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+    </ClCompile>
     <ClCompile Include="..\model\geometry.cpp">
       <PreprocessorDefinitions Condition="'$(Configuration)|$(Platform)'=='Release|x64'">TESTING;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <PreprocessorDefinitions Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">TESTING;%(PreprocessorDefinitions)</PreprocessorDefinitions>

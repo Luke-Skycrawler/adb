@@ -9,5 +9,7 @@
 #include <array>
 struct Globals {
     std::vector<std::array<unsigned, 2>> points, edges, triangles;
+    double mu, evh, dt;
+    bool ground;
 };
 //#define _BODY_WISE_

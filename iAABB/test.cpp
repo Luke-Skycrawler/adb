@@ -66,13 +66,19 @@ void player_load(
     in.close();
 }
 
+Globals globals{
+    {}, {}, {}, 
+    0.5, // mu
+    1e-3, // evh
+    1e-2, // dt
+    false
+};
 class iAABBTest : public ::testing::Test {
 public:
     std::vector<std::unique_ptr<AffineBody>> cubes;
     static const double space_range[2];
     vector<lu> aabbs;
     int n_cubes;
-    Globals globals;
     default_random_engine gen;
     static uniform_real_distribution<double> dist;
     vector<array<double, 6>> args;
@@ -377,11 +383,8 @@ TEST_F(iAABBTest, upper_bound_against_sh)
     vector<Matrix<double, 2, 12>> pt_tk;
     vector<Matrix<double, 2, 12>> ee_tk;
     vector<double_int> pt_tois, ee_tois, pt_toi_iaabb, ee_toi_iaabb;
-    double t = iaabb_brute_force(n_cubes, cubes, aabbs, 3, pts, idx_iaabb, ees, eidx_iaabb, vidx, pt_tk, ee_tk, pt_toi_iaabb, ee_toi_iaabb,
-#ifndef _BODY_WISE_
-        globals,
-#endif
-        false);
+    double t = iaabb_brute_force(n_cubes, cubes, aabbs, 3, pt_toi_iaabb, ee_toi_iaabb, globals,  pts, idx_iaabb, ees, eidx_iaabb, vidx
+        );
     auto t_ref = brute_force(n_cubes, cubes, pt_tois, ee_tois, idx, eidx);
     EXPECT_EQ(min(t_ref[0], t_ref[1]), t);
     sort(idx.begin(), idx.end());
