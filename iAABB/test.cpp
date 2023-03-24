@@ -91,7 +91,7 @@ protected:
         #ifdef _LOAD_
         n_cubes = 3;
         #else
-        n_cubes = predefined ? 6 : 10;
+        n_cubes = predefined ? 6 : 50;
         #endif
 
         Cube::gen_indices();
@@ -151,6 +151,9 @@ protected:
         #ifdef _LOAD_
         failure_load(cubes);
         #endif
+        globals.points.resize(0);
+        globals.edges.resize(0);
+        globals.triangles.resize(0);
         for (unsigned I = 0; I < n_cubes; I++) {
             auto& c{ *cubes[I] };
 
@@ -255,7 +258,7 @@ TEST_F(iAABBTest, pipelined)
     vector<Matrix<double, 2, 12>> pt_tk_ref;
     vector<Matrix<double, 2, 12>> ee_tk_ref;
     vector<double_int> foo, bar;
-    intersect_sort(n_cubes, cubes, aabbs, overlaps_sort, 1);
+    // intersect_sort(n_cubes, cubes, aabbs, overlaps_sort, 1);
     //primitive_brute_force(n_cubes, overlaps_sort, cubes, 1, foo, bar, globals, pts, idx, ees, eidx, vidx);
     iaabb_brute_force(n_cubes, cubes, aabbs, 1, foo, bar, globals, pts, idx, ees, eidx, vidx);
     int nsqr = n_cubes * n_cubes;
@@ -322,6 +325,14 @@ TEST_F(iAABBTest, pipelined)
 
     diff(idx_ref, idx); 
     diff(eidx_ref, eidx);
+
+    iaabb_brute_force(n_cubes, cubes, aabbs, 1, foo, bar, globals, pts, idx, ees, eidx, vidx);
+    sort(idx.begin(), idx.end());
+    sort(eidx.begin(), eidx.end());
+
+    diff(idx_ref, idx); 
+    diff(eidx_ref, eidx);
+
 }
 
 array<double, 2> brute_force(
