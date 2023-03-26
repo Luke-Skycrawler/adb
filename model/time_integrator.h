@@ -83,12 +83,12 @@ std::vector<std::array<unsigned, 2>> gen_triangle_list(
 
 double ee_uktk(
     AffineBody& ci, AffineBody& cj,
-    std::array<vec3, 4>& ee, std::array<int, 4>& ij, ::ipc::EdgeEdgeDistanceType& ee_type,
+    std::array<vec3, 4>& ee, std::array<int, 4>& ij, const ::ipc::EdgeEdgeDistanceType& ee_type,
     Matrix<double, 2, 12>& Tk_T_ret, Vector2d& uk_ret, double d, double dt);
 
 double pt_uktk(
     AffineBody& ci, AffineBody& cj,
-    std::array<vec3, 4>& pt, std::array<int, 4>& ij, ::ipc::PointTriangleDistanceType& pt_type,
+    std::array<vec3, 4>& pt, std::array<int, 4>& ij, const ::ipc::PointTriangleDistanceType& pt_type,
     Matrix<double, 2, 12>& Tk_T_ret, Vector2d& uk_ret, double d, double dt);
 
 

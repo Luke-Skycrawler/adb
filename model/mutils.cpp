@@ -40,6 +40,7 @@ vec12 ee_vstack(AffineBody& ci, AffineBody& cj, int ei, int ej)
     return v_stack;
 }
 
+#ifndef TESTING
 vec12 cat(const q4& q)
 {
     vec12 ret;
@@ -238,10 +239,10 @@ vector<array<unsigned, 2>> gen_triangle_list(
     }
     return ret;
 }
-
+#endif
 double pt_uktk(
     AffineBody& ci, AffineBody& cj,
-    array<vec3, 4>& pt, array<int, 4>& ij, ::ipc::PointTriangleDistanceType& pt_type,
+    array<vec3, 4>& pt, array<int, 4>& ij, const ::ipc::PointTriangleDistanceType& pt_type,
     Matrix<double, 2, 12>& Tk_T_ret, Vector2d& uk_ret, double d, double dt)
 
 {
@@ -291,7 +292,7 @@ double pt_uktk(
 }
 double ee_uktk(
     AffineBody& ci, AffineBody& cj,
-    array<vec3, 4>& ee, array<int, 4>& ij, ::ipc::EdgeEdgeDistanceType& ee_type,
+    array<vec3, 4>& ee, array<int, 4>& ij, const ::ipc::EdgeEdgeDistanceType& ee_type,
     Matrix<double, 2, 12>& Tk_T_ret, Vector2d& uk_ret, double d, double dt)
 {
     auto v_stack = ee_vstack(ci, cj, ij[1], ij[3]);
@@ -381,7 +382,7 @@ double ee_uktk(
     return contact_force;
 }
 };
-
+#ifndef TESTING
 vec12 AffineBody::q_tile(double dt, const vec3& f) const
 {
     auto _q = cat(q0);
@@ -467,3 +468,4 @@ void player_save(
     }
     out.close();
 }
+#endif

@@ -403,6 +403,75 @@ TEST_F(iAABBTest, upper_bound_against_sh)
     diff(idx, idx_iaabb);
     diff(eidx, eidx_iaabb);
 }
+
+#include "finitediff.hpp"
+void friction(
+    const Vector2d& _uk, double contact_lambda, const Matrix<double, 12, 2>& Tk,
+    Vector<double, 12>& g, Matrix<double, 12, 12>& H);
+
+double D_f0(double uk, double lam);
+
+namespace utils {
+
+vec12 pt_vstack(AffineBody& ci, AffineBody& cj, int v, int f);
+vec12 ee_vstack(AffineBody& ci, AffineBody& cj, int ei, int ej);
+
+double ee_uktk(
+    AffineBody& ci, AffineBody& cj,
+    std::array<vec3, 4>& ee, std::array<int, 4>& ij, const ::ipc::EdgeEdgeDistanceType& ee_type,
+    Matrix<double, 2, 12>& Tk_T_ret, Vector2d& uk_ret, double d, double dt);
+
+double pt_uktk(
+    AffineBody& ci, AffineBody& cj,
+    std::array<vec3, 4>& pt, std::array<int, 4>& ij, const ::ipc::PointTriangleDistanceType& pt_type,
+    Matrix<double, 2, 12>& Tk_T_ret, Vector2d& uk_ret, double d, double dt);
+
+};
+TEST_F(iAABBTest, finite_diff)
+{
+    vector<array<vec3, 4>> pts;
+    vector<array<int, 4>> idx;
+    vector<array<vec3, 4>> ees;
+    vector<array<int, 4>> eidx;
+    vector<array<int, 2>> vidx;
+    vector<Matrix<double, 2, 12>> pt_tk;
+    vector<Matrix<double, 2, 12>> ee_tk;
+    vector<double_int> foo, bar;
+
+
+    iaabb_brute_force(n_cubes, cubes, aabbs, 1, foo, bar, globals, pts, idx, ees, eidx, vidx);
+    double dt = 1e-2;
+    int gf = 0, hf = 0;
+    for (int _i = 0; _i < idx.size(); _i++) {
+        auto& pt{ pts[_i] };
+        auto& ij{ idx[_i] };
+        auto &ci{ *cubes[ij[0]] }, &cj{ *cubes[ij[2]] };
+        auto du = utils::pt_vstack(ci, cj, ij[1], ij[3]);
+
+        const auto &[d, pt_type] = vf_distance(ci.vt1(ij[1]), Face{ cj, unsigned(ij[3]) });
+        Vector2d _uk;
+        Matrix<double, 2, 12> Tk;
+        double lam = utils::pt_uktk(ci, cj, pt, ij, pt_type, Tk, _uk, d, dt);
+
+        const auto f = [&](const VectorXd& x) -> double{
+            Vector2d uk = Tk * x;
+            double u = uk.norm();
+            return D_f0(u, lam);
+        };
+        Vector<double, 12> g;
+        Matrix<double, 12, 12> H;
+        friction(_uk, lam, Tk.transpose(), g, H);
+        VectorXd fgrad;
+        MatrixXd fhess;
+        fd::finite_gradient(du, f, fgrad);
+        EXPECT_TRUE(fd::compare_gradient(g, fgrad)) << "idx = " << g.transpose() << "\n"
+                                                    << fgrad.transpose() << "grad failed count = " << gf ++;
+        fd::finite_hessian(du, f, fhess);
+        EXPECT_TRUE(fd::compare_hessian(H, fhess, 1e-3)) << "idx = " << H << "\n"
+                                                         << fhess << "grad failed count = " << hf++;
+    }
+    spdlog::info("all pts {}, failed = {}, {}", idx.size(), gf, hf);
+}
 int main(int argc, char** argv)
 {
     ::testing::InitGoogleTest(&argc, argv);

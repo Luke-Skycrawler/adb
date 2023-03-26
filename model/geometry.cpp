@@ -103,6 +103,13 @@ inline double ev_distance(const Edge& e, const vec3& v)
     return d;
 }
 using namespace ipc;
+
+tuple<double, PointTriangleDistanceType> vf_distance(const vec3& v, const Face& f) {
+    PointTriangleDistanceType pt_type;
+    double d = vf_distance(v, f, pt_type);
+    return {d, pt_type};
+}
+
 double vf_distance(const vec3& _v, const Face& f, PointTriangleDistanceType &pt_type)
 {
     auto n = f.unit_normal();
