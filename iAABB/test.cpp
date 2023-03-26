@@ -140,6 +140,8 @@ protected:
             }
             a->dq.segment<3>(0) = vec3(p0_t2, p1_t2, p2_t2);
             a->q[0] = vec3(p0, p1, p2);
+            a->q0 = a->q;
+
             auto b = compute_aabb(*a);
             aabbs[i] = b;
             cubes.push_back(move(a));
@@ -440,8 +442,12 @@ TEST_F(iAABBTest, finite_diff)
 
 
     iaabb_brute_force(n_cubes, cubes, aabbs, 1, foo, bar, globals, pts, idx, ees, eidx, vidx);
-    double dt = 1e-2;
-    int gf = 0, hf = 0;
+    for (int i = 0; i < n_cubes; i++){
+        auto &c {*cubes[i]};
+        c.dq.setZero(12);
+        c.project_vt1();
+    }
+    int gf = 0, hf = 0, gb = 0, hb = 0;
     for (int _i = 0; _i < idx.size(); _i++) {
         auto& pt{ pts[_i] };
         auto& ij{ idx[_i] };
@@ -458,19 +464,57 @@ TEST_F(iAABBTest, finite_diff)
             double u = uk.norm();
             return D_f0(u, lam);
         };
-        Vector<double, 12> g;
-        Matrix<double, 12, 12> H;
+
+        const auto b = [&](const VectorXd& x) -> double {
+            vec3 pt[4];
+            for (int i = 0; i < 4; i++) pt[i] = x.segment<3>(i * 3);
+            auto [d, pt_type] = vf_distance(pt[0], Face{ pt[1], pt[2], pt[3] });
+            return barrier::barrier_function(d);
+        };
+
+        Vector<double, 12> g, pt_grad;
+        Matrix<double, 12, 12> H, pt_hess;
+        g.setZero(12);
+        pt_grad.setZero(12);
+        H.setZero(12, 12);
+        pt_hess.setZero(12, 12);
+
         friction(_uk, lam, Tk.transpose(), g, H);
-        VectorXd fgrad;
-        MatrixXd fhess;
+
+        ipc::point_triangle_distance_gradient(pt[0], pt[1], pt[2], pt[3], pt_grad, pt_type);
+        ipc::point_triangle_distance_hessian(pt[0], pt[1], pt[2], pt[3], pt_hess, pt_type);
+        double B_ = barrier::barrier_derivative_d(d);
+        double B__ = barrier::barrier_second_derivative(d);
+        pt_hess = pt_hess * B_ + pt_grad * pt_grad.transpose() * B__;
+        pt_grad *= B_;
+        VectorXd fgrad, bgrad;
+        MatrixXd fhess, bhess;
         fd::finite_gradient(du, f, fgrad);
-        EXPECT_TRUE(fd::compare_gradient(g, fgrad)) << "idx = " << g.transpose() << "\n"
-                                                    << fgrad.transpose() << "grad failed count = " << gf ++;
+        fd::finite_gradient(du, b, bgrad);
         fd::finite_hessian(du, f, fhess);
-        EXPECT_TRUE(fd::compare_hessian(H, fhess, 1e-3)) << "idx = " << H << "\n"
-                                                         << fhess << "grad failed count = " << hf++;
+        fd::finite_hessian(du, f, bhess);
+
+
+        bool fgpass = fd::compare_gradient(g, fgrad, 1e-3, "fgrad miss");
+        bool fhpass = fd::compare_hessian(H, fhess, 1e-3, "fhess miss"); 
+        // << "idx = " << H << "\n"
+        //                                                  << fhess << "grad failed count = " << hf++;
+
+        bool bgpass= fd::compare_gradient(pt_grad, bgrad, 1e-3, "b grad miss");
+        //  << "idx = " << pt_grad.transpose() << "\n"
+        //                                             << bgrad.transpose() << "grad failed count = " << gf ++;
+
+        bool bhpass = fd::compare_hessian(pt_hess, bhess, 1e-3, "b hess miss");
+        //  << "idx = " << pt_hess << "\n"
+        //                                                  << bhess << "grad failed count = " << hf++;
+        if (fgpass) gf ++;
+        if (bgpass) gb ++;
+        if (fhpass) hf ++;
+        if (bhpass) hb ++;
+
+        EXPECT_TRUE(fgpass && bgpass && fhpass && bhpass); 
     }
-    spdlog::info("all pts {}, failed = {}, {}", idx.size(), gf, hf);
+    spdlog::info("all pts {}, passed = f, gH {}, {}, B, gH {}, {}", idx.size(), gf, hf, gb, hb);
 }
 int main(int argc, char** argv)
 {

@@ -37,7 +37,7 @@
   <PropertyGroup Label="UserMacros" />
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
     <IncludePath>D:\ref_repos\ipc-toolkit\src;$(IncludePath)</IncludePath>
-    <LibraryPath>D:\ref_repos\ipc-toolkit\build\temp.win-amd64-cpython-38\Release\ipctk\Release;$(LibraryPath)</LibraryPath>
+    <LibraryPath>D:\ref_repos\ipc-toolkit\build\temp.win-amd64-cpython-38\Release\ipctk\Release;D:\ref_repos\ipc-toolkit\build\temp.win-amd64-3.8\Release\ipctk\Release;$(LibraryPath)</LibraryPath>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
     <IncludePath>D:\ref_repos\ipc-toolkit\src;$(IncludePath)</IncludePath>
@@ -111,6 +111,7 @@
       <BasicRuntimeChecks>EnableFastChecks</BasicRuntimeChecks>
       <RuntimeLibrary>MultiThreadedDebugDLL</RuntimeLibrary>
       <WarningLevel>Level3</WarningLevel>
+      <LanguageStandard>stdcpp17</LanguageStandard>
     </ClCompile>
     <Link>
       <GenerateDebugInformation>true</GenerateDebugInformation>
@@ -148,6 +149,7 @@
       <SubSystem>Console</SubSystem>
       <OptimizeReferences>true</OptimizeReferences>
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
+      <AdditionalDependencies>ipc_toolkit.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
   </ItemDefinitionGroup>
   <Target Name="EnsureNuGetPackageBuildImports" BeforeTargets="PrepareForBuild">
