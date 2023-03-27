@@ -170,19 +170,31 @@ protected:
 };
 uniform_real_distribution<double> iAABBTest ::dist(0.0, 1.0);
 const double iAABBTest::space_range[2]{ -3.0, 3.0 };
-TEST_F(iAABBTest, sort_against_bf)
-{
-    vector<Intersection> overlaps_bf, overlaps_sort;
-    intersect_brute_force(n_cubes, cubes, aabbs, overlaps_bf, 1);
-    intersect_sort(n_cubes, cubes, aabbs, overlaps_sort, 1);
-    const auto les = [](const Intersection& a, const Intersection& b) -> bool {
-        return a.i < b.i || (a.i == b.i && a.j < b.j);
-    };
-    std::sort(overlaps_bf.begin(), overlaps_bf.end(), les);
-    std::sort(overlaps_sort.begin(), overlaps_sort.end(), les);
-    cout << "size: bf = " << overlaps_bf.size() << " sort = " << overlaps_sort.size() << "\n";
-    diff(overlaps_bf, overlaps_sort);
-}
+
+
+#include "finitediff.hpp"
+void friction(
+    const Vector2d& _uk, double contact_lambda, const Matrix<double, 12, 2>& Tk,
+    Vector<double, 12>& g, Matrix<double, 12, 12>& H);
+
+double D_f0(double uk, double lam);
+
+namespace utils {
+
+vec12 pt_vstack(AffineBody& ci, AffineBody& cj, int v, int f);
+vec12 ee_vstack(AffineBody& ci, AffineBody& cj, int ei, int ej);
+
+double ee_uktk(
+    AffineBody& ci, AffineBody& cj,
+    std::array<vec3, 4>& ee, std::array<int, 4>& ij, const ::ipc::EdgeEdgeDistanceType& ee_type,
+    Matrix<double, 2, 12>& Tk_T_ret, Vector2d& uk_ret, double d, double dt);
+
+double pt_uktk(
+    AffineBody& ci, AffineBody& cj,
+    std::array<vec3, 4>& pt, std::array<int, 4>& ij, const ::ipc::PointTriangleDistanceType& pt_type,
+    Matrix<double, 2, 12>& Tk_T_ret, Vector2d& uk_ret, double d, double dt);
+
+};
 
 void iAABBTest::diff(vector<array<int, 4>>& a, vector<array<int, 4>>& b)
 {
@@ -240,7 +252,68 @@ void iAABBTest::diff(vector<Intersection>& a, vector<Intersection>& b)
         }
 
 }
-#include <tuple>
+
+array<double, 2> brute_force(
+    int n_cubes,
+    const std::vector<std::unique_ptr<AffineBody>>& cubes,
+    std::vector<double_int>& pt_tois, std::vector<double_int>& ee_tois,
+    std::vector<std::array<int, 4>>& idx,
+    std::vector<std::array<int, 4>>& eidx
+    )
+{
+    double toi_pt = 1.0, toi_ee = 1.0;
+    for (int i = 0; i < n_cubes; i++)
+
+        for (int j = 0; j < n_cubes; j++) {
+            if (i == j) continue;
+            auto &ci{ *cubes[i] }, &cj{ *cubes[j] };
+            for (unsigned v = 0; v < ci.n_vertices; v++) {
+                auto p1{ ci.vt1(v) };
+                auto p2{ ci.vt2(v)};
+                for (unsigned f = 0; f < cj.n_faces; f++) {
+                    Face t1{ cj, f }, t2{ cj, f, true };
+                    double t = pt_collision_time(p1, t1, p2, t2);
+                    if (t < 1.0) {
+                        pt_tois.push_back({t, int(pt_tois.size())});
+                        idx.push_back({i, int(v), j, int(f)});
+                    }
+                    toi_pt = min(toi_pt, t);
+                }
+            }
+        }
+    for (int i = 0; i < n_cubes; i++)
+        for (int j = i + 1; j < n_cubes; j++) {
+            auto &ci{ *cubes[i] }, &cj{ *cubes[j] };
+            for (unsigned ei = 0; ei < ci.n_edges; ei++) {
+                Edge ei1{ ci, ei }, ei2{ ci, ei, true };
+                for (unsigned ej = 0; ej < cj.n_edges; ej++) {
+                    Edge ej1{ cj, ej }, ej2{ cj, ej, true };
+                    double t = ee_collision_time(ei1, ej1, ei2, ej2);
+                    if (t < 1.0) {
+                        ee_tois.push_back({t, int(ee_tois.size())});
+                        eidx.push_back({i, int(ei), j, int(ej)});
+                    }
+                    toi_ee = min(toi_ee, t);
+                }
+            }
+        }
+    return { toi_pt, toi_ee };
+}
+#ifdef ALL_TESTS
+TEST_F(iAABBTest, sort_against_bf)
+{
+    vector<Intersection> overlaps_bf, overlaps_sort;
+    intersect_brute_force(n_cubes, cubes, aabbs, overlaps_bf, 1);
+    intersect_sort(n_cubes, cubes, aabbs, overlaps_sort, 1);
+    const auto les = [](const Intersection& a, const Intersection& b) -> bool {
+        return a.i < b.i || (a.i == b.i && a.j < b.j);
+    };
+    std::sort(overlaps_bf.begin(), overlaps_bf.end(), les);
+    std::sort(overlaps_sort.begin(), overlaps_sort.end(), les);
+    cout << "size: bf = " << overlaps_bf.size() << " sort = " << overlaps_sort.size() << "\n";
+    diff(overlaps_bf, overlaps_sort);
+}
+
 TEST_F(iAABBTest, pipelined)
 {
     vector<Intersection> overlaps_sort;
@@ -337,52 +410,6 @@ TEST_F(iAABBTest, pipelined)
 
 }
 
-array<double, 2> brute_force(
-    int n_cubes,
-    const std::vector<std::unique_ptr<AffineBody>>& cubes,
-    std::vector<double_int>& pt_tois, std::vector<double_int>& ee_tois,
-    std::vector<std::array<int, 4>>& idx,
-    std::vector<std::array<int, 4>>& eidx
-    )
-{
-    double toi_pt = 1.0, toi_ee = 1.0;
-    for (int i = 0; i < n_cubes; i++)
-
-        for (int j = 0; j < n_cubes; j++) {
-            if (i == j) continue;
-            auto &ci{ *cubes[i] }, &cj{ *cubes[j] };
-            for (unsigned v = 0; v < ci.n_vertices; v++) {
-                auto p1{ ci.vt1(v) };
-                auto p2{ ci.vt2(v)};
-                for (unsigned f = 0; f < cj.n_faces; f++) {
-                    Face t1{ cj, f }, t2{ cj, f, true };
-                    double t = pt_collision_time(p1, t1, p2, t2);
-                    if (t < 1.0) {
-                        pt_tois.push_back({t, int(pt_tois.size())});
-                        idx.push_back({i, int(v), j, int(f)});
-                    }
-                    toi_pt = min(toi_pt, t);
-                }
-            }
-        }
-    for (int i = 0; i < n_cubes; i++)
-        for (int j = i + 1; j < n_cubes; j++) {
-            auto &ci{ *cubes[i] }, &cj{ *cubes[j] };
-            for (unsigned ei = 0; ei < ci.n_edges; ei++) {
-                Edge ei1{ ci, ei }, ei2{ ci, ei, true };
-                for (unsigned ej = 0; ej < cj.n_edges; ej++) {
-                    Edge ej1{ cj, ej }, ej2{ cj, ej, true };
-                    double t = ee_collision_time(ei1, ej1, ei2, ej2);
-                    if (t < 1.0) {
-                        ee_tois.push_back({t, int(ee_tois.size())});
-                        eidx.push_back({i, int(ei), j, int(ej)});
-                    }
-                    toi_ee = min(toi_ee, t);
-                }
-            }
-        }
-    return { toi_pt, toi_ee };
-}
 TEST_F(iAABBTest, upper_bound_against_sh)
 {
     vector<array<vec3, 4>> pts;
@@ -405,30 +432,7 @@ TEST_F(iAABBTest, upper_bound_against_sh)
     diff(idx, idx_iaabb);
     diff(eidx, eidx_iaabb);
 }
-
-#include "finitediff.hpp"
-void friction(
-    const Vector2d& _uk, double contact_lambda, const Matrix<double, 12, 2>& Tk,
-    Vector<double, 12>& g, Matrix<double, 12, 12>& H);
-
-double D_f0(double uk, double lam);
-
-namespace utils {
-
-vec12 pt_vstack(AffineBody& ci, AffineBody& cj, int v, int f);
-vec12 ee_vstack(AffineBody& ci, AffineBody& cj, int ei, int ej);
-
-double ee_uktk(
-    AffineBody& ci, AffineBody& cj,
-    std::array<vec3, 4>& ee, std::array<int, 4>& ij, const ::ipc::EdgeEdgeDistanceType& ee_type,
-    Matrix<double, 2, 12>& Tk_T_ret, Vector2d& uk_ret, double d, double dt);
-
-double pt_uktk(
-    AffineBody& ci, AffineBody& cj,
-    std::array<vec3, 4>& pt, std::array<int, 4>& ij, const ::ipc::PointTriangleDistanceType& pt_type,
-    Matrix<double, 2, 12>& Tk_T_ret, Vector2d& uk_ret, double d, double dt);
-
-};
+#endif
 TEST_F(iAABBTest, finite_diff)
 {
     vector<array<vec3, 4>> pts;
@@ -445,7 +449,7 @@ TEST_F(iAABBTest, finite_diff)
     for (int i = 0; i < n_cubes; i++){
         auto &c {*cubes[i]};
         c.dq.setZero(12);
-        c.project_vt1();
+        c.project_vt2();
     }
     int gf = 0, hf = 0, gb = 0, hb = 0;
     for (int _i = 0; _i < idx.size(); _i++) {
@@ -457,12 +461,13 @@ TEST_F(iAABBTest, finite_diff)
         const auto &[d, pt_type] = vf_distance(ci.vt1(ij[1]), Face{ cj, unsigned(ij[3]) });
         Vector2d _uk;
         Matrix<double, 2, 12> Tk;
-        double lam = utils::pt_uktk(ci, cj, pt, ij, pt_type, Tk, _uk, d, dt);
+        double lam = utils::pt_uktk(ci, cj, pt, ij, pt_type, Tk, _uk, d, globals.dt);
 
         const auto f = [&](const VectorXd& x) -> double{
             Vector2d uk = Tk * x;
             double u = uk.norm();
-            return D_f0(u, lam);
+            auto ret = D_f0(u, lam);
+            return ret;
         };
 
         const auto b = [&](const VectorXd& x) -> double {
@@ -507,8 +512,15 @@ TEST_F(iAABBTest, finite_diff)
         bool bhpass = fd::compare_hessian(pt_hess, bhess, 1e-3, "b hess miss");
         //  << "idx = " << pt_hess << "\n"
         //                                                  << bhess << "grad failed count = " << hf++;
-        if (fgpass) gf ++;
-        if (bgpass) gb ++;
+        if (fgpass) {
+            gf ++;
+            cout << fgrad.transpose() <<"\n" << g.transpose() <<"\n\n";
+        }
+        
+        if (bgpass) {
+            gb ++;
+            cout << bgrad.transpose() << "\n" << pt_grad.transpose() << "\n\n";
+        }
         if (fhpass) hf ++;
         if (bhpass) hb ++;
 
