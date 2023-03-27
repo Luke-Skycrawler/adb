@@ -2,12 +2,12 @@
     "player": false,
     "starting_ts": -1,
     "ending_ts": 5000,
-    "dt": 1e-2,
+    "dt": 5e-3,
     "max_iter": 1000,
     "predefined_case" : {
         "enable": false,
         "id" : 2,
-        "custom": "../test_cases/cubic.json"
+        "custom": "../test_cases/ground_friction.json"
     },
     "solver": "sparse",
     "gravity": true, 
@@ -18,7 +18,7 @@
     "ground": true,
     "safe_factor": 1.0,
     "uppper_bound": true, 
-    "mu": 0.0,
+    "mu": 0.3,
     "log": 1,
     "backoff": 0.95,
     "damping": {
@@ -48,7 +48,7 @@
     "align_com": false,
     "trace_folder": "trace",
     "iaabb": 3,
-    "evh": 1e-2,
+    "evh": 1e-3,
     "vg_friction": true,
     "pt_friction": true,
     "ee_friction": true,
@@ -57,7 +57,8 @@
         "tol": 1e-2,
         "dhat_sqr": 1e-2,
         "kappa": 1e1,
-        "c1": 1e-4
+        "c1": 0.0,
+        "max_uk": 0.0
     },
     "params_int": {
         "clip": 0

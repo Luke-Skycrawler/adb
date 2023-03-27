@@ -292,8 +292,9 @@ double pt_uktk(
 }
 double ee_uktk(
     AffineBody& ci, AffineBody& cj,
-    array<vec3, 4>& ee, array<int, 4>& ij, const ::ipc::EdgeEdgeDistanceType& ee_type,
-    Matrix<double, 2, 12>& Tk_T_ret, Vector2d& uk_ret, double d, double dt)
+    array<vec3, 4>& ee, array<int, 4>& ij, ::ipc::EdgeEdgeDistanceType& ee_type,
+    Matrix<double, 2, 12>& Tk_T_ret, Vector2d& uk_ret, double d, double dt,
+    double mollifier)
 {
     auto v_stack = ee_vstack(ci, cj, ij[1], ij[3]);
     auto ei0 = ee[0], ei1 = ee[1], ej0 = ee[2], ej1 = ee[3];
@@ -303,7 +304,8 @@ double ee_uktk(
     Matrix<double, 3, 2> degeneracy;
     degeneracy.col(0) = rei.normalized();
     degeneracy.col(1) = (ej0 - ei0).cross(rei).normalized();
-    bool par = sin2 < 1e-8;
+    // bool par = sin2 < 1e-8;
+    bool par = mollifier != 1.0;
 
     auto lams = ::ipc::edge_edge_closest_point(ei0, ei1, ej0, ej1);
 

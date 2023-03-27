@@ -84,15 +84,22 @@ double line_search(const VectorXd& dq, const VectorXd& grad, VectorXd& q0, doubl
     double alpha = 1.0;
     bool wolfe = false;
     double ef0 = 0.0;
-    E0 = E_global(q0, 0.0 * dq,
-        n_cubes, n_pt, n_ee, n_g,
-        idx,
-        eidx,
-        vidx,
-        pt_tk,
-        ee_tk,
-        cubes, dt, ef0, false);
-    E0 += ef0;
+    // E0 = E_global(q0, 0.0 * dq,
+    //     n_cubes, n_pt, n_ee, n_g,
+    //     idx,
+    //     eidx,
+    //     vidx,
+    //     pt_tk,
+    //     ee_tk,
+    //     cubes, dt, ef0, false);
+    // E0 += ef0;
+    E0 = E_barrier_plus_inert(q0, 0.0 * dq, n_cubes, idx, eidx, vidx, cubes, dt) 
+    + E_fric(0.0 * dq, n_cubes, n_pt, n_ee, n_g,
+        idx, eidx, vidx,
+        pt_tk, ee_tk, 
+        pt_contact_forces, ee_contact_forces, g_contact_forces, 
+        cubes, dt    
+    );
     double qdg = dq.dot(grad);
     VectorXd q1;
     static vector<array<vec3, 4>> pts_new, pts_iaab;
@@ -135,26 +142,26 @@ double line_search(const VectorXd& dq, const VectorXd& grad, VectorXd& q0, doubl
             eidx_new,
             vidx_new);
         double ef1 = 0.0, E2 = 0.0, ef2 = 0.0;
-        E1 = E_global(q1, dqk,
-            n_cubes, n_pt, n_ee, n_g,
-            idx,
-            eidx,
-            vidx,
-            pt_tk,
-            ee_tk,
-            cubes, dt, ef1, false);
-        E2 = E_global(q1, dqk, n_cubes, pts_new.size(), ees_new.size(), vidx_new.size(),
-            idx_new, eidx_new, vidx_new,
-            pt_tk,
-            ee_tk,
-            cubes, dt, ef2, true);
+        // E1 = E_global(q1, dqk,
+        //     n_cubes, n_pt, n_ee, n_g,
+        //     idx,
+        //     eidx,
+        //     vidx,
+        //     pt_tk,
+        //     ee_tk,
+        //     cubes, dt, ef1, false);
+        // E2 = E_global(q1, dqk, n_cubes, pts_new.size(), ees_new.size(), vidx_new.size(),
+        //     idx_new, eidx_new, vidx_new,
+        //     pt_tk,
+        //     ee_tk,
+        //     cubes, dt, ef2, true);
         double E3 = E_barrier_plus_inert(q1, dqk, n_cubes, idx_new, eidx_new, vidx_new, cubes, dt);
         double ef = E_fric(dqk, n_cubes, n_pt, n_ee, n_g, idx, eidx, vidx, pt_tk, ee_tk, pt_contact_forces, ee_contact_forces, g_contact_forces, cubes,  dt);
-        if (max(abs(E3 - E2), abs(ef - ef1)) > 1e-6) {
-            spdlog::error("wrong energy, E2= {}, E3 = {}", E2, E3);
-            spdlog::error("wrong energy, ef= {}, ef1 = {}", ef, ef1);
-            exit(1);
-        }
+        // if (max(abs(E3 - E2), abs(ef - ef1)) > 1e-6) {
+        //     spdlog::error("wrong energy, E2= {}, E3 = {}", E2, E3);
+        //     spdlog::error("wrong energy, ef= {}, ef1 = {}", ef, ef1);
+        //     exit(1);
+        // }
         E1 = E3 + ef;
         wolfe = E1 <= E0 + c1 * alpha * qdg;
         // spdlog::info("wanted descend = {}, E1 - E0 = {}, E1 = {}, E0 = {}, alpha = {}", c1 * alpha * qdg, E1 - E0, E1, E0, alpha);
