@@ -84,7 +84,7 @@ std::vector<std::array<unsigned, 2>> gen_triangle_list(
 double ee_uktk(
     AffineBody& ci, AffineBody& cj,
     std::array<vec3, 4>& ee, std::array<int, 4>& ij, ::ipc::EdgeEdgeDistanceType& ee_type,
-    Matrix<double, 2, 12>& Tk_T_ret, Vector2d& uk_ret, double d, double dt);
+    Matrix<double, 2, 12>& Tk_T_ret, Vector2d& uk_ret, double d, double dt, double mollifier);
 
 double pt_uktk(
     AffineBody& ci, AffineBody& cj,

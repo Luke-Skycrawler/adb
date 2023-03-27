@@ -218,7 +218,7 @@ double E_fric(
         c.project_vt2();
     }
 
-    if (globals.pt) {
+    if (globals.pt && globals.pt_fric) {
 #pragma omp parallel for schedule(static) reduction(+ \
                                                     : ef)
         for (int k = 0; k < n_pt; k++) {
@@ -230,7 +230,7 @@ double E_fric(
         }
     }
 
-    if (globals.ee) {
+    if (globals.ee && globals.ee_fric) {
 #pragma omp parallel for schedule(static) reduction(+ \
                                                     : ef)
         for (int k = 0; k < n_ee; k++) {
@@ -242,7 +242,7 @@ double E_fric(
         }
     }
 
-    if (globals.ground) {
+    if (globals.ground && globals.vg_fric) {
 #pragma omp parallel for schedule(static) reduction(+ \
                                                     : ef)
         for (int k = 0; k < n_g; k++) {

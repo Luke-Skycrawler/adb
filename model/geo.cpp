@@ -93,7 +93,7 @@ void friction(
         Vector2d ut{ -_uk(1), _uk(0) };
         D_k_hessian = mu * contact_lambda * f1 / (uk * uk) * Tk * ut * (ut.transpose() * Tk.transpose());
     }
-    else if (uk <= 1e-10) {
+    else if (uk <= globals.params_double["max_uk"]) {
         D_k_hessian = mu * contact_lambda * f1 * Tk * Tk.transpose();
     }
     else {
@@ -181,12 +181,13 @@ void ipc_term(
 
     pt_grad *= B_;
 
-    if (globals.psd)
-        ipc_hess = project_to_psd(ipc_hess);
 #ifdef _FRICTION_
     if (globals.pt_fric)
         friction(_uk, contact_lambda, Tk.transpose(), pt_grad, ipc_hess);
 #endif
+
+    if (globals.psd)
+        ipc_hess = project_to_psd(ipc_hess);
 
     int ii = _i, jj = _j;
     // mat12 hess_p = Jp.transpose() * ipc_hess.block<3, 3>(0, 0) * Jp;
@@ -300,8 +301,6 @@ void ipc_term_ee(
 
     int _i = ij[0], _ei = ij[1], _j = ij[2], _ej = ij[3];
     auto &ci(*globals.cubes[_i]), &cj(*globals.cubes[_j]);
-    Vector2d _uk;
-    contact_lambda = utils::ee_uktk(ci, cj, ee, ij, ee_type, Tk, _uk, dist, globals.dt);
 
     auto *eidxi = ci.edges, *eidxj = cj.edges;
 
@@ -323,6 +322,9 @@ void ipc_term_ee(
     double B_ = barrier::barrier_derivative_d(dist);
     double B__ = barrier::barrier_second_derivative(dist);
     double B = barrier::barrier_function(dist);
+
+    Vector2d _uk;
+    contact_lambda = utils::ee_uktk(ci, cj, ee, ij, ee_type, Tk, _uk, dist, globals.dt, p);
 
     // spdlog::info("dist = {}, B = {}, B__ = {}", dist, B_, B__);
 
@@ -350,14 +352,15 @@ void ipc_term_ee(
     ee_grad = p * ee_grad * B_ + p_grad * B;
 #endif
 
+#ifdef _FRICTION_
+    if (globals.ee_fric && p == 1.0)
+        friction(_uk, contact_lambda, Tk.transpose(), ee_grad, ipc_hess);
+    if (p != 1.0)
+        contact_lambda = 0.0;
+#endif
 
     if (globals.psd)
         ipc_hess = project_to_psd(ipc_hess);
-
-#ifdef _FRICTION_
-    if (globals.ee_fric)
-        friction(_uk, contact_lambda, Tk.transpose(), ee_grad, ipc_hess);
-#endif
 
     int ii = _i, jj = _j;
     // mat12 hess_p = Jp.transpose() * ipc_hess.block<3, 3>(0, 0) * Jp;
