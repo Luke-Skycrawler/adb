@@ -2,12 +2,12 @@
     "player": false,
     "starting_ts": -1,
     "ending_ts": 5000,
-    "dt": 5e-3,
+    "dt": 2e-2,
     "max_iter": 1000,
     "predefined_case" : {
         "enable": false,
         "id" : 2,
-        "custom": "../test_cases/friction.json"
+        "custom": "../test_cases/friction_pt.json"
     },
     "solver": "sparse",
     "gravity": true, 
@@ -15,12 +15,12 @@
     "col_set": true,
     "ee": true,
     "pt": true,
-    "ground": true,
+    "ground": false,
     "safe_factor": 1.0,
     "uppper_bound": true, 
-    "mu": 0.2,
+    "mu": 0.0,
     "log": 1,
-    "backoff": 0.8,
+    "backoff": 0.95,
     "damping": {
         "enable": false,
         "alpha": 5e-2,
@@ -57,7 +57,7 @@
         "tol": 1e-4,
         "dhat_sqr": 1e-2,
         "kappa": 1e1,
-        "c1": 1e-4,
+        "c1": 0.0,
         "max_uk": 0.0
     },
     "params_int": {

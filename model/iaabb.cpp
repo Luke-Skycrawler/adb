@@ -317,7 +317,7 @@ double primitive_brute_force(
     vector<array<int, 2>>& vidx)
 {
 
-    double toi_global = 1.0;
+    double toi_global = 1.0, toi_ee_pt = 1.0;
     bool cull_trajectory = vtn == 3;
     int n_overlap = overlaps.size();
     if (!cull_trajectory) {
@@ -405,6 +405,19 @@ double primitive_brute_force(
 #pragma omp critical
             vidx.insert(vidx.end(), vidx_thread_local[tid].begin(), vidx_thread_local[tid].end());
         }
+    }
+
+    if (cull_trajectory) {
+        if (toi_global < 1e-6) {
+            spdlog::error("vertex ground toi_global = {}", toi_global);
+            if (globals.params_int.find("g_cnt") != globals.params_int.end())
+                globals.params_int["g_cnt"]++;
+            else
+                globals.params_int["g_cnt"] = 0;
+            if (globals.params_int["g_cnt"] > 1) exit(1);
+        }
+        else
+            globals.params_int["g_cnt"] = 0;
     }
 #ifdef _BODY_WISE_
 #pragma omp parallel for schedule(guided)
@@ -1003,9 +1016,22 @@ double primitive_brute_force(
         }
 #pragma omp critical
         {
-            toi_global = min(toi_global, toi);
+            toi_ee_pt = min(toi_ee_pt, toi);
         }
     }
+    if (cull_trajectory) {
+        if (toi_ee_pt < 1e-6) {
+            spdlog::error("pt/ee toi_global = {}", toi_ee_pt);
+            if (globals.params_int.find("p_cnt") != globals.params_int.end())
+                globals.params_int["p_cnt"]++;
+            else
+                globals.params_int["p_cnt"] = 0;
+            if (globals.params_int["p_cnt"] > 1) exit(1);
+        }
+        else
+            globals.params_int["p_cnt"] = 0;
+    }
+    toi_global = min(toi_global, toi_ee_pt);
     return cull_trajectory? toi_global: 1.0;
 }
 

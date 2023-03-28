@@ -31,7 +31,7 @@ namespace barrier
     VectorXd barrier_gradient_q(const vec3 &tilex, const vec3 &vertex)
     {
         // return distance_gradient_q(vertex) * barrier_derivative_d(vf_distance(vertex));
-        return barrier_gradient_x(vertex).adjoint() * x_jacobian_q(tilex);
+        return barrier_gradient_x(vertex).transpose() * x_jacobian_q(tilex);
     }
 
     MatrixXd x_jacobian_q(const vec3 &tilex)
@@ -51,7 +51,7 @@ namespace barrier
     inline VectorXd distance_gradient_q(const vec3 &tilex, const vec3 &vertex)
     {
         double d = vg_distance(vertex);
-        return vg_distance_gradient_x(vertex).adjoint() * x_jacobian_q(tilex) * d * 2;
+        return vg_distance_gradient_x(vertex).transpose() * x_jacobian_q(tilex) * d * 2;
     }
 
     MatrixXd barrier_hessian_q(const vec3 &tilex, const vec3 &vertex)
@@ -60,7 +60,7 @@ namespace barrier
         auto g(distance_gradient_q(tilex, vertex));
         // because distance hessian is 0, the first term of J^T B' hess_d J is 0
         double d = vg_distance(vertex);
-        return barrier_second_derivative(d * d) * g * g.adjoint();
+        return barrier_second_derivative(d * d) * g * g.transpose();
     }
 
     
