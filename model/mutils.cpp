@@ -251,32 +251,67 @@ double pt_uktk(
 
     auto lams = ::ipc::point_triangle_closest_point(pt[0], pt[1], pt[2], pt[3]);
     array<double, 3> tlams = { 1 - lams(0) - lams(1), lams(0), lams(1) };
+    auto Pk = ::ipc::point_triangle_tangent_basis(pt[0], pt[1], pt[2], pt[3]);
 
     if (pt_type == ::ipc::PointTriangleDistanceType::P_T)
         ; // do nothing
-    else if (pt_type == ::ipc::PointTriangleDistanceType::P_T0)
+    else if (pt_type == ::ipc::PointTriangleDistanceType::P_T0){
+        Pk = ::ipc::point_point_tangent_basis(pt[0], pt[1]);
         tlams = { 1.0, 0.0, 0.0 };
-    else if (pt_type == ::ipc::PointTriangleDistanceType::P_T1)
+    }
+    else if (pt_type == ::ipc::PointTriangleDistanceType::P_T1){
+        Pk = ::ipc::point_point_tangent_basis(pt[0], pt[2]);
         tlams = { 0.0, 1.0, 0.0 };
-    else if (pt_type == ::ipc::PointTriangleDistanceType::P_T2)
+    }
+    else if (pt_type == ::ipc::PointTriangleDistanceType::P_T2){
+        Pk = ::ipc::point_point_tangent_basis(pt[0], pt[3]);
         tlams = { 0.0, 0.0, 1.0 };
+    }
     else if (pt_type == ::ipc::PointTriangleDistanceType::P_E0) {
         auto elam = ::ipc::point_edge_closest_point(pt[0], pt[1], pt[2]);
-        tlams = { 1.0 - elam, elam, 0.0 };
+        tlams = {1.0 - elam, elam, 0.0 };
+        Pk = ::ipc::point_edge_tangent_basis(pt[0], pt[1], pt[2]);
     }
     else if (pt_type == ::ipc::PointTriangleDistanceType::P_E1) {
         auto elam = ::ipc::point_edge_closest_point(pt[0], pt[2], pt[3]);
         tlams = { 0.0, 1.0 - elam, elam };
+        Pk = ::ipc::point_edge_tangent_basis(pt[0], pt[2], pt[3]);
     }
     else if (pt_type == ::ipc::PointTriangleDistanceType::P_E2) {
         auto elam = ::ipc::point_edge_closest_point(pt[0], pt[3], pt[1]);
         tlams = { elam, 0.0, 1.0 - elam };
+        Pk = ::ipc::point_edge_tangent_basis(pt[0], pt[3], pt[1]);
     }
 
     auto tp = (pt[1] * tlams[0] + pt[2] * tlams[1] + pt[3] * tlams[2]);
     auto closest = (pt[0] - tp).squaredNorm();
-    assert(abs(d - closest) < 1e-8);
-    auto Pk = ::ipc::point_triangle_tangent_basis(pt[0], pt[1], pt[2], pt[3]);
+    assert(abs(d - closest) < 1e-12);
+    const auto to_int = [](const ::ipc::PointTriangleDistanceType& pt_type) {
+        if (pt_type == ::ipc::PointTriangleDistanceType::P_T)
+            return 0;
+        else if (pt_type == ::ipc::PointTriangleDistanceType::P_T0)
+            return 1;
+        else if (pt_type == ::ipc::PointTriangleDistanceType::P_T1)
+            return 2;
+        else if (pt_type == ::ipc::PointTriangleDistanceType::P_T2)
+            return 3;
+        else if (pt_type == ::ipc::PointTriangleDistanceType::P_E0)
+            return 4;
+        else if (pt_type == ::ipc::PointTriangleDistanceType::P_E1)
+            return 5;
+        else if (pt_type == ::ipc::PointTriangleDistanceType::P_E2)
+            return 6;
+        else
+            assert(false);
+    };
+    if (!(abs(d - closest) < 1e-12)) {
+        std::cerr << "pt error\n";
+        std::cerr << "d: " << d << std::endl;
+        std::cerr << "closest: " << closest << std::endl;
+        std::cerr << "diff: " << abs(d - closest) << std::endl;
+        std::cerr << "type" << to_int(pt_type) << std::endl;
+        // exit(1);
+    }
     Matrix<double, 3, 12> gamma;
     gamma.setZero(3, 12);
     for (int i = 0; i < 3; i++) {
@@ -287,7 +322,7 @@ double pt_uktk(
 
     Tk_T_ret = Pk.transpose() * gamma;
     uk_ret = Tk_T_ret * v_stack;
-    double contact_force = -barrier::barrier_derivative_d(d) / (dt * dt) * 2 * sqrt(d);
+    double contact_force = -barrier::barrier_derivative_d(d) * 2 * sqrt(d);
     return contact_force;
 }
 double ee_uktk(
@@ -308,33 +343,46 @@ double ee_uktk(
     bool par = mollifier != 1.0;
 
     auto lams = ::ipc::edge_edge_closest_point(ei0, ei1, ej0, ej1);
+    auto Pk = par ? degeneracy : ::ipc::edge_edge_tangent_basis(ei0, ei1, ej0, ej1);
 
     if (ee_type == ::ipc::EdgeEdgeDistanceType::EA_EB)
         ;
 
-    else if (ee_type == ::ipc::EdgeEdgeDistanceType::EA0_EB0)
+    else if (ee_type == ::ipc::EdgeEdgeDistanceType::EA0_EB0) {
+        Pk = ::ipc::point_point_tangent_basis(ei0, ej0);
         lams = { 0.0, 0.0 };
-    else if (ee_type == ::ipc::EdgeEdgeDistanceType::EA0_EB1)
+    }
+    else if (ee_type == ::ipc::EdgeEdgeDistanceType::EA0_EB1) {
+        Pk = ::ipc::point_point_tangent_basis(ei0, ej1);
         lams = { 0.0, 1.0 };
-    else if (ee_type == ::ipc::EdgeEdgeDistanceType::EA1_EB0)
+    }
+    else if (ee_type == ::ipc::EdgeEdgeDistanceType::EA1_EB0) {
+        Pk = ::ipc::point_point_tangent_basis(ei1, ej0);
         lams = { 1.0, 0.0 };
-    else if (ee_type == ::ipc::EdgeEdgeDistanceType::EA1_EB1)
+    }
+    else if (ee_type == ::ipc::EdgeEdgeDistanceType::EA1_EB1) {
+        Pk = ::ipc::point_point_tangent_basis(ei1, ej1);
         lams = { 1.0, 1.0 };
+    }
     else if (ee_type == ::ipc::EdgeEdgeDistanceType::EA_EB0) {
         auto pe = ::ipc::point_edge_closest_point(ej0, ei0, ei1);
         lams = { pe, 0.0 };
+        Pk = ::ipc::point_edge_tangent_basis(ej0, ei0, ei1);
     }
     else if (ee_type == ::ipc::EdgeEdgeDistanceType::EA_EB1) {
         auto pe = ::ipc::point_edge_closest_point(ej1, ei0, ei1);
         lams = { pe, 1.0 };
+        Pk = ::ipc::point_edge_tangent_basis(ej1, ei0, ei1);
     }
     else if (ee_type == ::ipc::EdgeEdgeDistanceType::EA0_EB) {
         auto pe = ::ipc::point_edge_closest_point(ei0, ej0, ej1);
         lams = { 0.0, pe };
+        Pk = ::ipc::point_edge_tangent_basis(ei0, ej0, ej1);
     }
     else if (ee_type == ::ipc::EdgeEdgeDistanceType::EA1_EB) {
         auto pe = ::ipc::point_edge_closest_point(ei1, ej0, ej1);
         lams = { 1.0, pe };
+        Pk = ::ipc::point_edge_tangent_basis(ei1, ej0, ej1);
     }
     const auto clip = [&](double& a, double l, double u) {
         a = max(min(u, a), l);
@@ -350,9 +398,15 @@ double ee_uktk(
     auto pei = ei0 * lambdas[0] + ei1 * lambdas[1];
     auto pej = ej0 * lambdas[2] + ej1 * lambdas[3];
     auto closest = (pei - pej).squaredNorm();
-    assert(par || abs(d - closest) < 1e-8);
+    assert(par || abs(d - closest) < 1e-12);
+    if (!(par || abs(d - closest) < 1e-12)) {
+        std::cerr << "ee error\n";
+        std::cerr << "d: " << d << std::endl;
+        std::cerr << "closest: " << closest << std::endl;
+        std::cerr << "diff: " << abs(d - closest) << std::endl;
+        exit(1);
+    }
 
-    auto Pk = par ? degeneracy : ::ipc::edge_edge_tangent_basis(ei0, ei1, ej0, ej1);
     Matrix<double, 3, 12> gamma;
     gamma.setZero(3, 12);
     for (int i = 0; i < 3; i++) {
@@ -377,7 +431,7 @@ double ee_uktk(
 
     // auto contact_force_lam = barrier_derivative_d(d) / (dt * dt) * 2 * sqrt(d);
     Vector2d uk = Tk_T * v_stack;
-    auto contact_force = -barrier::barrier_derivative_d(d) / (dt * dt) * 2 * sqrt(d);
+    auto contact_force = -barrier::barrier_derivative_d(d) * 2 * sqrt(d);
     Tk_T_ret = Tk_T;
     uk_ret = uk;
 

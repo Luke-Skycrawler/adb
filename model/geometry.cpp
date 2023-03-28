@@ -119,7 +119,7 @@ double vf_distance(const vec3& _v, const Face& f, PointTriangleDistanceType &pt_
     d = d * d;
     // double a2 = ((f.t0 - v).cross(f.t1 - v).norm() + (f.t1 - v).cross(f.t2 - v).norm() + (f.t2 - v).cross(f.t0 - v).norm());
     double a2 = area(f.t0, f.t1, v) + area(f.t1, f.t2, v) + area(f.t2, f.t0, v);
-    if (a2 > a1 + 1e-8) {
+    if (a2 > a1) {
         // projection outside of triangle
 
         double d_ab = h(f.t0, f.t1, v);
@@ -131,11 +131,11 @@ double vf_distance(const vec3& _v, const Face& f, PointTriangleDistanceType &pt_
         double d_c = ab(v, f.t2);
 
 
-        d_ab = is_obtuse_triangle(f.t0, f.t1, v) ? min(d_a, d_b): d_ab;
-        d_bc = is_obtuse_triangle(f.t2, f.t1, v) ? min(d_c, d_b): d_bc;
-        d_ac = is_obtuse_triangle(f.t0, f.t2, v) ? min(d_a, d_c): d_ac;
+        double dab = is_obtuse_triangle(f.t0, f.t1, v) ? min(d_a, d_b): d_ab;
+        double dbc = is_obtuse_triangle(f.t2, f.t1, v) ? min(d_c, d_b): d_bc;
+        double dac = is_obtuse_triangle(f.t0, f.t2, v) ? min(d_a, d_c): d_ac;
 
-        double d_projected = min(d_ab, min(d_bc, d_ac));
+        double d_projected = std::min({dab, dbc, dac});
         d += d_projected * d_projected;
 
         if (d_projected == d_ab) pt_type = PointTriangleDistanceType::P_E0;

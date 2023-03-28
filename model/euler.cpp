@@ -422,7 +422,7 @@ void implicit_euler(vector<unique_ptr<AffineBody>>& cubes, double dt)
                 Pk.col(1) = vec3(0.0, 0.0, 1.0);
 
                 Vector2d uk = Pk.transpose() * (p - c.vt0(v));
-                g_contact_forces[k] = -barrier_derivative_d(d) / (dt * dt) * 2 * _d;
+                g_contact_forces[k] = -barrier_derivative_d(d) * 2 * _d;
 
                 ipc_term_vg(c, v, uk, g_contact_forces[k], Pk);
 #else

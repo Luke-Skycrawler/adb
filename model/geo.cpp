@@ -77,7 +77,7 @@ double D_f0(double uk, double lam)
 {
     static double mu = globals.mu, evh = globals.dt * globals.evh, h2 = globals.dt * globals.dt;
     double D_k = mu * lam * ipc::f0_SF(uk, evh);
-    return D_k * h2;
+    return D_k;
 }
 
 void friction(
@@ -102,14 +102,16 @@ void friction(
         D_k_hessian = mu * contact_lambda * f1 * Tk * Tk.transpose();
     }
     else {
-        double df1_term = ipc::df1_x_minus_f1_over_x3(uk, evh);
-        Matrix2d M2x2 = (df1_term * _uk * _uk.transpose());
+        double f2_term = -1.0 / (evh * evh);
+        Matrix2d M2x2 = f2_term / uk * _uk * _uk.transpose();
+        // Matrix2d M2x2 = (df1_term * _uk * _uk.transpose());
         M2x2 += f1 * Matrix2d::Identity(2, 2);
+        M2x2 *= mu * contact_lambda;
         // M2x2 = project_to_psd(M2x2);
-        D_k_hessian = mu * contact_lambda * Tk * M2x2 * Tk.transpose();
+        D_k_hessian = Tk * M2x2 * Tk.transpose();
     }
-    g += F_k * h2;
-    H += D_k_hessian * h2;
+    g += F_k;
+    H += D_k_hessian;
 }
 
 #ifndef TESTING
