@@ -1,6 +1,7 @@
 #include "geometry.h"
 #include <Eigen/Geometry>
 #include <cmath>
+
 using namespace std;
 Edge::Edge(const AffineBody& c, unsigned id, bool b, bool batch)
 {
@@ -105,8 +106,15 @@ inline double ev_distance(const Edge& e, const vec3& v)
 using namespace ipc;
 
 tuple<double, PointTriangleDistanceType> vf_distance(const vec3& v, const Face& f) {
+
+#define STEAL_IPC
+#ifndef STEAL_IPC
     PointTriangleDistanceType pt_type;
     double d = vf_distance(v, f, pt_type);
+#else
+    auto pt_type = ipc::point_triangle_distance_type(v, f.t0, f.t1, f.t2);
+    double d = ipc::point_triangle_distance(v, f.t0, f.t1, f.t2, pt_type);
+#endif
     return {d, pt_type};
 }
 

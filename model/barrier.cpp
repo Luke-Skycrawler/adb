@@ -30,7 +30,6 @@ namespace barrier
 
     VectorXd barrier_gradient_q(const vec3 &tilex, const vec3 &vertex)
     {
-        // return distance_gradient_q(vertex) * barrier_derivative_d(vf_distance(vertex));
         return barrier_gradient_x(vertex).transpose() * x_jacobian_q(tilex);
     }
 

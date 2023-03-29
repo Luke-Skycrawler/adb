@@ -360,9 +360,7 @@ void implicit_euler(vector<unique_ptr<AffineBody>>& cubes, double dt)
             auto &ci(*cubes[i]), &cj(*cubes[j]);
             Face f{ cj, unsigned(ij[3]), false, true };
             array<vec3, 4> pt{ ci.v_transformed[ij[1]], f.t0, f.t1, f.t2 };
-            // auto pt_type = ipc::point_triangle_distance_type(pt[0], pt[1], pt[2], pt[3]);
-            ipc::PointTriangleDistanceType pt_type;
-            double d = vf_distance(pt[0], f, pt_type);
+            auto [d, pt_type] = vf_distance(pt[0], f);
             if (d < barrier::d_hat) {
                 ipc_term(
                     pt, ij, pt_type, d,

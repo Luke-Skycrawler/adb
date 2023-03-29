@@ -47,9 +47,7 @@ double E_barrier_plus_inert(
             auto& ij = idx[k];
             Face f(*cubes[ij[2]], ij[3], true, true);
             vec3 v(cubes[ij[0]]->v_transformed[ij[1]]);
-            ipc::PointTriangleDistanceType pt_type;
-            double d = vf_distance(v, f, pt_type);
-            // double d = ipc::point_triangle_distance(v, f.t0, f.t1, f.t2);
+            auto [d, pt_type] = vf_distance(v, f);
             e += barrier::barrier_function(d);
         }
 
@@ -123,8 +121,7 @@ double E_global(const VectorXd& q_plus_dq, const VectorXd& dq, int n_cubes, int 
             vec3 v(cubes[ij[0]]->v_transformed[ij[1]]);
             if (!_vt2) v = cubes[ij[0]]->vt1(ij[1]);
             // array<vec3, 4> a = {v, f.t0, f.t1, f.t2};
-            ipc::PointTriangleDistanceType pt_type;
-            double d = vf_distance(v, f, pt_type);
+            auto [d, pt_type] = vf_distance(v, f);
             // double d = ipc::point_triangle_distance(v, f.t0, f.t1, f.t2);
             e += barrier::barrier_function(d);
 #ifdef _FRICTION_

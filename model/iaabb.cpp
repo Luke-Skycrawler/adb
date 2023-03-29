@@ -266,8 +266,7 @@ inline void pt_col_set_task(
 {
     bool pt_intersects = intersects(aabb_i, aabb_j);
     if (!pt_intersects) return;
-    ipc::PointTriangleDistanceType pt_type;
-    double d = vf_distance(v, f, pt_type);
+    auto [d, pt_type] = vf_distance(v, f);
     if (d < barrier::d_hat) {
         array<vec3, 4> pt = { v, f.t0, f.t1, f.t2 };
         array<int, 4> ij = { I, vi, J, fj };
@@ -659,8 +658,7 @@ double primitive_brute_force(
                 if (!pt_intersects) continue;
                 auto& v{ vis[i] };
                 auto& f{ fjs[j] };
-                ipc::PointTriangleDistanceType pt_type;
-                double d = vf_distance(v, f, pt_type);
+                auto [d, pt_type] = vf_distance(v, f);
                 if (d < barrier::d_hat) {
                     array<vec3, 4> pt = { v, f.t0, f.t1, f.t2 };
                     array<int, 4> ij = { I, vi, J, fj };
