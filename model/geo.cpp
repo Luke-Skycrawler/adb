@@ -1,3 +1,4 @@
+#include "math.h"
 #include "cube.h"
 // #include "geometry.h"
 #include "barrier.h"
@@ -16,7 +17,6 @@ extern Globals globals;
 #include "time_integrator.h"
 #include <omp.h>
 #include <tuple>
-
 using namespace std;
 using mat12 = Matrix<double, 12, 12>;
 void put(double* values, int offset, int _stride, const Matrix<double, 12, 12>& block)
@@ -38,43 +38,6 @@ void put2(double* values, int offset, int _stride, mat3 block[4][4])
             values[ofs] += db;
         }
 }
-MatrixXd PSD_projection(const MatrixXd& A12x12)
-{
-
-    SelfAdjointEigenSolver<MatrixXd> eig(A12x12);
-    VectorXd lam = eig.eigenvalues();
-    MatrixXd U = eig.eigenvectors();
-    for (int i = 0; i < 12; i++) {
-        lam(i) = max(lam(i), 0.0);
-    }
-    return U * lam.asDiagonal() * U.transpose();
-}
-Eigen::MatrixXd project_to_psd(
-    const Eigen::MatrixXd& A)
-{   
-    // https://math.stackexchange.com/q/2776803
-    Eigen::SelfAdjointEigenSolver<
-        Eigen::MatrixXd>
-        eigensolver(A);
-    // Check if all eigen values are zero or positive.
-    // The eigenvalues are sorted in increasing order.
-    if (eigensolver.eigenvalues()[0] >= 0.0) {
-        return A;
-    }
-    Eigen::DiagonalMatrix<double, Eigen::Dynamic> D(eigensolver.eigenvalues());
-    // Save a little time and only project the negative values
-    for (int i = 0; i < A.rows(); i++) {
-        if (D.diagonal()[i] < 0.0) {
-            D.diagonal()[i] = 0.0;
-        }
-        else {
-            break;
-        }
-    }
-    return eigensolver.eigenvectors() * D
-        * eigensolver.eigenvectors().transpose();
-}
-
 double D_f0(double uk, double lam)
 {
     static double mu = globals.mu, evh = globals.dt * globals.evh, h2 = globals.dt * globals.dt;

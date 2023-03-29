@@ -152,6 +152,7 @@
     <ClCompile Include="..\model\col_set.cpp" />
     <ClCompile Include="..\model\geo.cpp" />
     <ClCompile Include="..\model\iaabb.cpp" />
+    <ClCompile Include="..\model\IpcCollisionConstraint.cpp" />
     <ClCompile Include="..\model\othogonal_energy.cpp" />
     <ClCompile Include="..\model\barrier.cpp" />
     <!-- <ClCompile Include="..\model\time_integrator.cpp" /> -->
@@ -177,6 +178,8 @@
     <ClInclude Include="..\model\cube.h" />
     <ClInclude Include="..\model\glue.h" />
     <ClInclude Include="..\model\iaabb.h" />
+    <ClInclude Include="..\model\IpcCollisionConstraint.h" />
+    <ClInclude Include="..\model\math.h" />
     <ClInclude Include="..\model\othogonal_energy.h" />
     <ClInclude Include="..\model\time_integrator.h" />
     <ClInclude Include="..\model\barrier.h" />
