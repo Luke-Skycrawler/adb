@@ -15,6 +15,8 @@ extern Globals globals;
 #include "collision.h"
 #include "time_integrator.h"
 #include <omp.h>
+#include <tuple>
+
 using namespace std;
 using mat12 = Matrix<double, 12, 12>;
 void put(double* values, int offset, int _stride, const Matrix<double, 12, 12>& block)
@@ -291,24 +293,10 @@ void ipc_term(
         }
     }
 }
-
-void ipc_term_ee(
-    array<vec3, 4> ee, array<int, 4> ij, ipc::EdgeEdgeDistanceType ee_type, double dist,
-#ifdef _SM_
-    const std::map<std::array<int, 2>, int>& lut,
-    SparseMatrix<double>& sparse_hess,
-#endif
-#ifdef _TRIPLETS_
-    vector<HessBlock>& triplets,
-#endif
-    Vector<double, 12>& grad_0, Vector<double, 12>& grad_1
-#ifdef _FRICTION_
-    , double& contact_lambda, Matrix<double, 2, 12>& Tk
-#endif
-)
+tuple<mat12, vec12, double> ipc_hess_pt_12x12(
+    array<vec3, 4> ee, array<int, 4> ij,
+    ipc::EdgeEdgeDistanceType ee_type, double dist)
 {
-    // static auto vnp = Cube::_vertices();
-
     int _i = ij[0], _ei = ij[1], _j = ij[2], _ej = ij[3];
     auto &ci(*globals.cubes[_i]), &cj(*globals.cubes[_j]);
 
@@ -316,8 +304,8 @@ void ipc_term_ee(
 
     auto ei0 = ee[0], ei1 = ee[1],
          ej0 = ee[2], ej1 = ee[3];
-    Vector<double, 12> ee_grad, p_grad;
-    Matrix<double, 12, 12> ee_hess, p_hess;
+    vec12 ee_grad, p_grad;
+    mat12 ee_hess, p_hess;
     double eps_x = globals.eps_x * (ei0 - ei1).squaredNorm() * (ej0 - ej1).squaredNorm();
 
     // 1e-3 * edge length square
@@ -333,38 +321,48 @@ void ipc_term_ee(
     double B__ = barrier::barrier_second_derivative(dist);
     double B = barrier::barrier_function(dist);
 
-    Vector2d _uk;
-    contact_lambda = utils::ee_uktk(ci, cj, ee, ij, ee_type, Tk, _uk, dist, globals.dt, p);
-
-    // spdlog::info("dist = {}, B = {}, B__ = {}", dist, B_, B__);
-
-    // Matrix<double, 6, 12> J0;
-    // Matrix<double, 6, 12> J1;
-    auto ei0_tile = ci.vertices(eidxi[2 * _ei]), ei1_tile = ci.vertices(eidxi[2 * _ei + 1]),
-         ej0_tile = cj.vertices(eidxj[2 * _ej]), ej1_tile = cj.vertices(eidxj[2 * _ej + 1]);
-    // auto ei0_tile = vnp[eidx[2 * _ei]], ei1_tile = vnp[eidx[2 * _ei + 1]],
-    //     ej0_tile = vnp[eidx[2 * _ej]], ej1_tile = vnp[eidx[2 * _ej + 1]];
-
-    // J0.block<3, 12>(0, 0) = barrier::x_jacobian_q(ei0_tile);
-    // J0.block<3, 12>(3, 0) = barrier::x_jacobian_q(ei1_tile);
-    // J1.block<3, 12>(0, 0) = barrier::x_jacobian_q(ej0_tile);
-    // J1.block<3, 12>(3, 0) = barrier::x_jacobian_q(ej1_tile);
-
     mat12 ipc_hess;
     ipc_hess.setZero(12, 12);
     ipc_hess = p_hess * B + B_ * (p_grad * ee_grad.transpose() + ee_grad * p_grad.transpose()) + p * (B__ * ee_grad * ee_grad.transpose() + B_ * ee_hess);
     // ipc_hess = B__ * ee_grad * ee_grad.transpose() + project_to_psd(B_ * ee_hess);
 
-#ifdef NO_MOLLIFIER
-    ipc_hess = B__ * ee_grad * ee_grad.transpose() + B_ * ee_hess;
-
-#else
     ee_grad = p * ee_grad * B_ + p_grad * B;
-#endif
 
     if (globals.psd)
         ipc_hess = project_to_psd(ipc_hess);
 
+    return { ipc_hess, ee_grad, p };
+}
+void ipc_term_ee(
+    array<vec3, 4> ee, array<int, 4> ij, ipc::EdgeEdgeDistanceType ee_type, double dist,
+#ifdef _SM_
+    const std::map<std::array<int, 2>, int>& lut,
+    SparseMatrix<double>& sparse_hess,
+#endif
+#ifdef _TRIPLETS_
+    vector<HessBlock>& triplets,
+#endif
+    Vector<double, 12>& grad_0, Vector<double, 12>& grad_1
+#ifdef _FRICTION_
+    ,
+    double& contact_lambda, Matrix<double, 2, 12>& Tk
+#endif
+)
+{
+    int _i = ij[0], _ei = ij[1], _j = ij[2], _ej = ij[3];
+    auto &ci(*globals.cubes[_i]), &cj(*globals.cubes[_j]);
+
+    auto *eidxi = ci.edges, *eidxj = cj.edges;
+
+    auto ei0 = ee[0], ei1 = ee[1],
+         ej0 = ee[2], ej1 = ee[3];
+
+    int ii = _i, jj = _j;
+
+    auto [ipc_hess, ee_grad, p] = ipc_hess_pt_12x12(ee, ij, ee_type, dist);
+
+    Vector2d _uk;
+    contact_lambda = utils::ee_uktk(ci, cj, ee, ij, ee_type, Tk, _uk, dist, globals.dt, p);
 
 #ifdef _FRICTION_
     if (globals.ee_fric && p == 1.0)
@@ -373,24 +371,47 @@ void ipc_term_ee(
         contact_lambda = 0.0;
 #endif
 
+#ifdef _SM_
+    auto outers = sparse_hess.outerIndexPtr();
+    auto values = sparse_hess.valuePtr();
 
-    int ii = _i, jj = _j;
-    // mat12 hess_p = Jp.transpose() * ipc_hess.block<3, 3>(0, 0) * Jp;
-    // mat12 hess_t = Jt.transpose() * ipc_hess.block<9, 9>(3, 3) * Jt;
+    auto stride_j = stride(jj, outers), stride_i = stride(ii, outers);
+    auto oii = starting_offset(ii, ii, lut, outers), ojj = starting_offset(jj, jj, lut, outers), oij = starting_offset(ii, jj, lut, outers), oji = starting_offset(jj, ii, lut, outers);
+    auto ptr = globals.writelock_cols.data();
 
-    // mat12 off_diag = Jp.transpose() * ipc_hess.block<3, 9>(0, 3) * Jt;
+#endif
+#ifdef _TRIPLETS_
 
-    // Vector4d keri0;
-    // keri0 << 1.0, ei0_tile;
-    // Vector4d keri1;
-    // keri1 << 1.0, ei1_tile;
-    // Vector4d kerj0;
-    // kerj0 << 1.0, ej0_tile;
-    // Vector4d kerj1;
-    // kerj1 << 1.0, ej1_tile;
-    // Matrix<double, 4, 2> ker0, ker1;
-    // ker0 << keri0, keri1;
-    // ker1 << kerj0, kerj1;
+#pragma omp critical
+    for (int i = 0; i < 12; i++) {
+        triplets.push_back(HessBlock(ii * 12, jj * 12 + i, off_diag.block<12, 1>(0, i)));
+        triplets.push_back(HessBlock(jj * 12, ii * 12 + i, off_T.block<12, 1>(0, i)));
+        triplets.push_back(HessBlock(ii * 12, ii * 12 + i, hess_0.block<12, 1>(0, i)));
+        triplets.push_back(HessBlock(jj * 12, jj * 12 + i, hess_1.block<12, 1>(0, i)));
+    }
+
+#endif
+    auto ei0_tile = ci.vertices(eidxi[2 * _ei]), ei1_tile = ci.vertices(eidxi[2 * _ei + 1]),
+         ej0_tile = cj.vertices(eidxj[2 * _ej]), ej1_tile = cj.vertices(eidxj[2 * _ej + 1]);
+#define _NO_FANCY_
+#ifdef _NO_FANCY_
+    Matrix<double, 6, 12> J0;
+    Matrix<double, 6, 12> J1;
+
+    J0.block<3, 12>(0, 0) = barrier::x_jacobian_q(ei0_tile);
+    J0.block<3, 12>(3, 0) = barrier::x_jacobian_q(ei1_tile);
+    J1.block<3, 12>(0, 0) = barrier::x_jacobian_q(ej0_tile);
+    J1.block<3, 12>(3, 0) = barrier::x_jacobian_q(ej1_tile);
+
+    mat12 hess_0 = J0.transpose() * ipc_hess.block<6, 6>(0, 0) * J0;
+    mat12 hess_1 = J1.transpose() * ipc_hess.block<6, 6>(6, 6) * J1;
+    mat12 off_diag = J0.transpose() * ipc_hess.block<6, 6>(0, 6) * J1;
+    mat12 off_T = off_diag.transpose();
+    Vector<double, 12> d0, d1;
+    d0 = J0.transpose() * ee_grad.segment<6>(0);
+    d1 = J1.transpose() * ee_grad.segment<6>(6);
+#else
+
     double ker0[4][2], ker1[4][2];
 
     for (int i = 0; i < 4; i++) {
@@ -407,7 +428,6 @@ void ipc_term_ee(
     mat3 Akl[4][4];
     for (int i = 0; i < 4; i++)
         for (int j = 0; j < 4; j++) Akl[i][j] = ipc_hess.block<3, 3>(i * 3, j * 3);
-    // mat12 hess_p, hess_t, hess__off;
     for (int i = 0; i < 4; i++)
         for (int j = 0; j < 4; j++) {
             hess_0[i][j].setZero(3, 3);
@@ -431,33 +451,6 @@ void ipc_term_ee(
         }
         // mat12 off_T = off_diag.transpose();
 
-        // mat12 hess_0 = J0.transpose() * ipc_hess.block<6, 6>(0, 0) * J0;
-        // mat12 hess_1 = J1.transpose() * ipc_hess.block<6, 6>(6, 6) * J1;
-        // mat12 off_diag = J0.transpose() * ipc_hess.block<6, 6>(0, 6) * J1;
-        // mat12 off_T = off_diag.transpose();
-#ifdef _SM_
-    auto outers = sparse_hess.outerIndexPtr();
-    auto values = sparse_hess.valuePtr();
-
-    auto stride_j = stride(jj, outers), stride_i = stride(ii, outers);
-    auto oii = starting_offset(ii, ii, lut, outers), ojj = starting_offset(jj, jj, lut, outers), oij = starting_offset(ii, jj, lut, outers), oji = starting_offset(jj, ii, lut, outers);
-
-#endif
-#ifdef _TRIPLETS_
-
-#pragma omp critical
-    for (int i = 0; i < 12; i++) {
-        triplets.push_back(HessBlock(ii * 12, jj * 12 + i, off_diag.block<12, 1>(0, i)));
-        triplets.push_back(HessBlock(jj * 12, ii * 12 + i, off_T.block<12, 1>(0, i)));
-        triplets.push_back(HessBlock(ii * 12, ii * 12 + i, hess_0.block<12, 1>(0, i)));
-        triplets.push_back(HessBlock(jj * 12, jj * 12 + i, hess_1.block<12, 1>(0, i)));
-    }
-
-#endif
-    // Vector<double, 12> d0, d1;
-    // d0 = J0.transpose() * ee_grad.segment<6>(0);
-    // d1 = J1.transpose() * ee_grad.segment<6>(6);
-
     Vector<double, 12> d0, d1;
     vec3 i0 = ee_grad.segment<3>(0), i1 = ee_grad.segment<3>(3);
     vec3 j0 = ee_grad.segment<3>(6), j1 = ee_grad.segment<3>(9);
@@ -476,21 +469,28 @@ void ipc_term_ee(
     //     j0 * ej0_tile(0) + j1 * ej1_tile(0),
     //     j0 * ej0_tile(1) + j1 * ej1_tile(1),
     //     j0 * ej0_tile(2) + j1 * ej1_tile(2);
-    auto ptr = globals.writelock_cols.data();
+
+#endif
     {
+        #ifdef _NO_FANCY_
+        #define PUT put
+        #else
+        #define PUT put2
+        #endif
         if (cj.mass > 0.0) {
             omp_set_lock(ptr + jj);
-            if (ci.mass > 0.0)
-                put2(values, oij, stride_j, off_diag);
-            put2(values, ojj, stride_j, hess_1);
+            if (ci.mass > 0.0) {
+                PUT(values, oij, stride_j, off_diag);
+            }
+            PUT(values, ojj, stride_j, hess_1);
             grad_1 += d1;
             omp_unset_lock(ptr + jj);
         }
         if (ci.mass > 0.0) {
             omp_set_lock(ptr + ii);
             if (cj.mass > 0.0)
-                put2(values, oji, stride_i, off_T);
-            put2(values, oii, stride_i, hess_0);
+                PUT(values, oji, stride_i, off_T);
+            PUT(values, oii, stride_i, hess_0);
             grad_0 += d0;
             omp_unset_lock(ptr + ii);
         }
