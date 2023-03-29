@@ -51,7 +51,7 @@ MatrixXd PSD_projection(const MatrixXd& A12x12)
 }
 Eigen::MatrixXd project_to_psd(
     const Eigen::MatrixXd& A)
-{
+{   
     // https://math.stackexchange.com/q/2776803
     Eigen::SelfAdjointEigenSolver<
         Eigen::MatrixXd>
@@ -109,7 +109,7 @@ void friction(
         // Matrix2d M2x2 = (df1_term * _uk * _uk.transpose());
         M2x2 += f1 * Matrix2d::Identity(2, 2);
         M2x2 *= mu * contact_lambda;
-        // M2x2 = project_to_psd(M2x2);
+        M2x2 = project_to_psd(M2x2);
         D_k_hessian = Tk * M2x2 * Tk.transpose();
     }
     g += F_k;
