@@ -189,13 +189,15 @@ void ipc_term(
 
     pt_grad *= B_;
 
+
+    if (globals.psd)
+        ipc_hess = project_to_psd(ipc_hess);
+        
 #ifdef _FRICTION_
     if (globals.pt_fric)
         friction(_uk, contact_lambda, Tk.transpose(), pt_grad, ipc_hess);
 #endif
 
-    if (globals.psd)
-        ipc_hess = project_to_psd(ipc_hess);
 
     int ii = _i, jj = _j;
     // mat12 hess_p = Jp.transpose() * ipc_hess.block<3, 3>(0, 0) * Jp;
@@ -360,6 +362,10 @@ void ipc_term_ee(
     ee_grad = p * ee_grad * B_ + p_grad * B;
 #endif
 
+    if (globals.psd)
+        ipc_hess = project_to_psd(ipc_hess);
+
+
 #ifdef _FRICTION_
     if (globals.ee_fric && p == 1.0)
         friction(_uk, contact_lambda, Tk.transpose(), ee_grad, ipc_hess);
@@ -367,8 +373,6 @@ void ipc_term_ee(
         contact_lambda = 0.0;
 #endif
 
-    if (globals.psd)
-        ipc_hess = project_to_psd(ipc_hess);
 
     int ii = _i, jj = _j;
     // mat12 hess_p = Jp.transpose() * ipc_hess.block<3, 3>(0, 0) * Jp;

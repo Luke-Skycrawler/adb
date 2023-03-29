@@ -7,7 +7,7 @@
     "predefined_case" : {
         "enable": false,
         "id" : 2,
-        "custom": "../test_cases/friction_pt.json"
+        "custom": "../test_cases/friction.json"
     },
     "solver": "sparse",
     "gravity": true, 
@@ -15,10 +15,10 @@
     "col_set": true,
     "ee": true,
     "pt": true,
-    "ground": false,
+    "ground": true,
     "safe_factor": 1.0,
     "uppper_bound": true, 
-    "mu": 0.0,
+    "mu": 0.3,
     "log": 1,
     "backoff": 0.95,
     "damping": {
@@ -57,7 +57,7 @@
         "tol": 1e-4,
         "dhat_sqr": 1e-2,
         "kappa": 1e1,
-        "c1": 0.0,
+        "c1": 1e-4,
         "max_uk": 0.0
     },
     "params_int": {
