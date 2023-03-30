@@ -79,7 +79,7 @@ namespace AIPC
 			barrier_gradient = _barrier_gradient(dist2, dHat2, kappa);
 
 			normalForce = -barrier_gradient * 2 * area * dHat * std::sqrt(dist2);
-			tanBasis = ::ipc::point_point_tangent_basis(surface_x[c_nodes[0]], surface_x[c_nodes[1]], surface_x[c_nodes[2]]);
+			tanBasis = ::ipc::point_edge_tangent_basis(surface_x[c_nodes[0]], surface_x[c_nodes[1]], surface_x[c_nodes[2]]);
 			compute_PE_yita_3D(surface_x[c_nodes[0]], surface_x[c_nodes[1]], surface_x[c_nodes[2]], yita[0]);
 		}
 

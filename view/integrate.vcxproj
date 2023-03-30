@@ -153,6 +153,7 @@
     <ClCompile Include="..\model\geo.cpp" />
     <ClCompile Include="..\model\iaabb.cpp" />
     <ClCompile Include="..\model\IpcCollisionConstraint.cpp" />
+    <ClCompile Include="..\model\IpcFrictionConstraint.cpp" />
     <ClCompile Include="..\model\othogonal_energy.cpp" />
     <ClCompile Include="..\model\barrier.cpp" />
     <!-- <ClCompile Include="..\model\time_integrator.cpp" /> -->
