@@ -352,7 +352,36 @@ void implicit_euler(vector<unique_ptr<AffineBody>>& cubes, double dt)
 #endif
 
         auto ipc_start = high_resolution_clock::now();
+//#define _PLUG_IN_LAN_
+#ifdef _PLUG_IN_LAN_
+        // #pragma omp parallel for schedule(static)
+        const auto evh = globals.dt * globals.evh;
+        for (int k = 0; k < n_pt; k++) {
+            auto& ij(idx[k]);
+            int i = ij[0], j = ij[2];
+            auto &ci(*cubes[i]), &cj(*cubes[j]);
+            Face f{ cj, unsigned(ij[3]), false, true };
+            auto p{ ci.v_transformed[ij[1]] };
+            array<vec3, 4> pt{ p, f.t0, f.t1, f.t2 };
+            auto [d, pt_type] = vf_distance(pt[0], f);
 
+            Vector4i cids0{ 0, 0, 0, 0 };
+            Vector4i cids1{ 4, 4, 4, 4 };
+            auto pr{ ci.vertices(ij[1]) }, t0r{ cj.vertices(cj.indices[ij[3] * 3]) };
+            Vector4d w0{ 1.0, pr[0], pr[1], pr[2] };
+            Vector4d w1{ 1.0, t0r[0], t0r[1], t0r[2] };
+            //vector<vec3> surface_x{ p, f.t0 };
+            if (pt_type == ipc::PointTriangleDistanceType::P_T0) {
+                AIPC::IpcPPFConstraint ppf(0, 0, 1, { { cids0, w0 }, { cids1, w1 } }, { p, f.t0 }, { p, f.t0 }, barrier::d_hat, barrier::kappa, globals.mu, globals.dt, evh, 1.0, 1.0);
+                VectorXd ga, gb;
+                MatrixXd ha, hb, hab;
+                ppf.gradient({}, { p, f.t0 }, { pr, t0r }, { p, f.t0 }, {}, ga, gb);
+                ppf.hessian({}, { p, f.t0 }, { pr, t0r }, { p, f.t0 }, {}, ha, hb, hab);
+            }
+            
+        }
+
+#else
 #pragma omp parallel for schedule(static)
         for (int k = 0; k < n_pt; k++) {
             // auto& pt(pts[k]);
@@ -429,6 +458,7 @@ void implicit_euler(vector<unique_ptr<AffineBody>>& cubes, double dt)
 #endif
             }
         }
+        #endif
         auto ipc_duration = DURATION_TO_DOUBLE(ipc_start);
         times[__IPC__] += ipc_duration;
         double toi = 1.0, factor = 1.0, alpha = 1.0;
