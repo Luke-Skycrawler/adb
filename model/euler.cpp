@@ -193,7 +193,7 @@ void implicit_euler(vector<unique_ptr<AffineBody>>& cubes, double dt)
     bool term_cond;
     int& ts = globals.ts;
     static double tol = globals.params_double["tol"];
-    
+    static VectorXd lastdq;
     int iter = 0;
     double sup_dq = 0.0;
     for (int k = 0; k < cubes.size(); k++) {
@@ -350,38 +350,8 @@ void implicit_euler(vector<unique_ptr<AffineBody>>& cubes, double dt)
         }
         // clear(sparse_hess);
 #endif
-
+        double evh = globals.evh * globals.dt;
         auto ipc_start = high_resolution_clock::now();
-//#define _PLUG_IN_LAN_
-#ifdef _PLUG_IN_LAN_
-        // #pragma omp parallel for schedule(static)
-        const auto evh = globals.dt * globals.evh;
-        for (int k = 0; k < n_pt; k++) {
-            auto& ij(idx[k]);
-            int i = ij[0], j = ij[2];
-            auto &ci(*cubes[i]), &cj(*cubes[j]);
-            Face f{ cj, unsigned(ij[3]), false, true };
-            auto p{ ci.v_transformed[ij[1]] };
-            array<vec3, 4> pt{ p, f.t0, f.t1, f.t2 };
-            auto [d, pt_type] = vf_distance(pt[0], f);
-
-            Vector4i cids0{ 0, 0, 0, 0 };
-            Vector4i cids1{ 4, 4, 4, 4 };
-            auto pr{ ci.vertices(ij[1]) }, t0r{ cj.vertices(cj.indices[ij[3] * 3]) };
-            Vector4d w0{ 1.0, pr[0], pr[1], pr[2] };
-            Vector4d w1{ 1.0, t0r[0], t0r[1], t0r[2] };
-            //vector<vec3> surface_x{ p, f.t0 };
-            if (pt_type == ipc::PointTriangleDistanceType::P_T0) {
-                AIPC::IpcPPFConstraint ppf(0, 0, 1, { { cids0, w0 }, { cids1, w1 } }, { p, f.t0 }, { p, f.t0 }, barrier::d_hat, barrier::kappa, globals.mu, globals.dt, evh, 1.0, 1.0);
-                VectorXd ga, gb;
-                MatrixXd ha, hb, hab;
-                ppf.gradient({}, { p, f.t0 }, { pr, t0r }, { p, f.t0 }, {}, ga, gb);
-                ppf.hessian({}, { p, f.t0 }, { pr, t0r }, { p, f.t0 }, {}, ha, hb, hab);
-            }
-            
-        }
-
-#else
 #pragma omp parallel for schedule(static)
         for (int k = 0; k < n_pt; k++) {
             // auto& pt(pts[k]);
@@ -389,9 +359,77 @@ void implicit_euler(vector<unique_ptr<AffineBody>>& cubes, double dt)
             int i = ij[0], j = ij[2];
             auto &ci(*cubes[i]), &cj(*cubes[j]);
             Face f{ cj, unsigned(ij[3]), false, true };
-            array<vec3, 4> pt{ ci.v_transformed[ij[1]], f.t0, f.t1, f.t2 };
+            vec3 p{ ci.v_transformed[ij[1]] };
+            array<vec3, 4> pt{ p, f.t0, f.t1, f.t2 };
             auto [d, pt_type] = vf_distance(pt[0], f);
             if (d < barrier::d_hat) {
+#ifdef _PLUG_IN_LAN_
+
+                Vector4i cid_p{ 0, 0, 0, 0 };
+                Vector4i cid_t0{ 4, 4, 4, 4 };
+                Vector4i cid_t1{ 4, 4, 4, 4 };
+                Vector4i cid_t2{ 4, 4, 4, 4 };
+
+                auto pr{ ci.vertices(ij[1]) },
+                    t0r{ cj.vertices(cj.indices[ij[3] * 3]) },
+                    t1r{ cj.vertices(cj.indices[ij[3] * 3 + 1]) },
+                    t2r{ cj.vertices(cj.indices[ij[3] * 3 + 2]) };
+
+                auto p0{ ci.vt0(ij[1]) },
+                    t00{ cj.vt0(cj.indices[ij[3] * 3]) },
+                    t10{ cj.vt0(cj.indices[ij[3] * 3 + 1]) },
+                    t20{ cj.vt0(cj.indices[ij[3] * 3 + 2]) };
+
+                Vector4d w_p{ 1.0, pr[0], pr[1], pr[2] };
+                Vector4d w_t0{ 1.0, t0r[0], t0r[1], t0r[2] };
+                Vector4d w_t1{ 1.0, t1r[0], t1r[1], t1r[2] };
+                Vector4d w_t2{ 1.0, t2r[0], t2r[1], t2r[2] };
+
+                vector<vec3> surface_x{ p, f.t0, f.t1, f.t2 }, surface_xhat{ p0, t00, t10, t20 }, surface_X{ pr, t0r, t1r, t2r };
+
+                vector<pair<Vector4i, Vector4d>> dpdx{ { cid_p, w_p }, { cid_t0, w_t0 }, { cid_t1, w_t1 }, { cid_t2, w_t2 } };
+                VectorXd ga, gb;
+                MatrixXd ha, hb, hab;
+                if (pt_type == ipc::PointTriangleDistanceType::P_T0) {
+                    AIPC::IpcPPFConstraint ppf(0, 0, 1, dpdx, surface_x, surface_X, barrier::d_hat, barrier::kappa, globals.mu, globals.dt, evh, 1.0, 1.0);
+                    ppf.gradient({}, surface_x, surface_X, surface_xhat, {}, ga, gb);
+                    ppf.hessian({}, surface_x, surface_X, surface_xhat, {}, ha, hb, hab);
+                }
+
+                else if (pt_type == ipc::PointTriangleDistanceType::P_T1) {
+                    AIPC::IpcPPFConstraint ppf(0, 0, 2, dpdx, surface_x, surface_X, barrier::d_hat, barrier::kappa, globals.mu, globals.dt, evh, 1.0, 1.0);
+                    ppf.gradient({}, surface_x, surface_X, surface_xhat, {}, ga, gb);
+                    ppf.hessian({}, surface_x, surface_X, surface_xhat, {}, ha, hb, hab);
+                }
+                else if (pt_type == ipc::PointTriangleDistanceType::P_T2) {
+                    AIPC::IpcPPFConstraint ppf(0, 0, 3, dpdx, surface_x, surface_X, barrier::d_hat, barrier::kappa, globals.mu, globals.dt, evh, 1.0, 1.0);
+                    ppf.gradient({}, surface_x, surface_X, surface_xhat, {}, ga, gb);
+                    ppf.hessian({}, surface_x, surface_X, surface_xhat, {}, ha, hb, hab);
+                }
+                else if (pt_type == ipc::PointTriangleDistanceType::P_E0) {
+                    AIPC::IpcPEFConstraint pef(0, 0, 1, 2, dpdx, surface_x, surface_X, barrier::d_hat, barrier::kappa, globals.mu, globals.dt, evh, 1.0, 1.0);
+                    pef.gradient({}, surface_x, surface_X, surface_xhat, {}, ga, gb);
+                    pef.hessian({}, surface_x, surface_X, surface_xhat, {}, ha, hb, hab);
+                }
+                else if (pt_type == ipc::PointTriangleDistanceType::P_E1) {
+                    AIPC::IpcPEFConstraint pef(0, 0, 2, 3, dpdx, surface_x, surface_X, barrier::d_hat, barrier::kappa, globals.mu, globals.dt, evh, 1.0, 1.0);
+                    pef.gradient({}, surface_x, surface_X, surface_xhat, {}, ga, gb);
+                    pef.hessian({}, surface_x, surface_X, surface_xhat, {}, ha, hb, hab);
+                }
+                else if (pt_type == ipc::PointTriangleDistanceType::P_E2) {
+                    AIPC::IpcPEFConstraint pef(0, 0, 3, 1, dpdx, surface_x, surface_X, barrier::d_hat, barrier::kappa, globals.mu, globals.dt, evh, 1.0, 1.0);
+                    pef.gradient({}, surface_x, surface_X, surface_xhat, {}, ga, gb);
+                    pef.hessian({}, surface_x, surface_X, surface_xhat, {}, ha, hb, hab);
+                }
+                else {
+                    AIPC::IpcPTFConstraint ptf(0, 0, 1, 2, 3, dpdx, surface_x, surface_X, barrier::d_hat, barrier::kappa, globals.mu, globals.dt, evh, 1.0, 1.0);
+                    ptf.gradient({}, surface_x, surface_X, surface_xhat, {}, ga, gb);
+                    ptf.hessian({}, surface_x, surface_X, surface_xhat, {}, ha, hb, hab);
+                }
+
+#endif
+                vec12 gradp, gradt;
+                mat12 hess_p, hess_t, off_diag;
                 ipc_term(
                     pt, ij, pt_type, d,
 #ifdef _SM_
@@ -400,14 +438,47 @@ void implicit_euler(vector<unique_ptr<AffineBody>>& cubes, double dt)
 #ifdef _TRIPLETS_
                     globals.hess_triplets,
 #endif
+#ifdef _DIRECT_OUT_
+                    hess_p, hess_t, off_diag,
+                    gradp, gradt
+#else
                     ci.grad, cj.grad
+#endif
 #ifdef _FRICTION_
                     ,
                     pt_contact_forces[k], pt_tk[k]
 #endif
                 );
+#ifdef _PLUG_IN_LAN_
+
+                bool b0 = compare_gradient(ga, gradp);
+                bool b1 = compare_gradient(gb, gradt);
+
+                bool b2 = compare_hessian(ha, hess_p);
+                bool b3 = compare_hessian(hb, hess_t);
+                bool b4 = compare_hessian(hab, off_diag);
+
+                ci.grad += gradp;
+                cj.grad += gradt;
+                if (!b0) {
+                    spdlog::error("gradient p error");
+                }
+                if (!b1) {
+                    spdlog::error("gradient t error");
+                }
+                if (!b2) {
+                    spdlog::error("hessian p error");
+                }
+                if (!b3) {
+                    spdlog::error("hessian t error");
+                }
+                if (!b4) {
+                    spdlog::error("hessian off_diag error");
+                }
+#endif
             }
         }
+    }
 #pragma omp parallel for schedule(static)
         for (int k = 0; k < n_ee; k++) {
             // auto& ee(ees[k]);
@@ -419,20 +490,21 @@ void implicit_euler(vector<unique_ptr<AffineBody>>& cubes, double dt)
             auto ee_type = ipc::edge_edge_distance_type(ee[0], ee[1], ee[2], ee[3]);
             double d = edge_edge_distance(ee[0], ee[1], ee[2], ee[3], ee_type);
             if (d < barrier::d_hat) {
-                ipc_term_ee(
-                    ee, ij, ee_type, d,
+            mat12 hess_p, hess_t, off_diag;
+            ipc_term_ee(
+                ee, ij, ee_type, d,
 #ifdef _SM_
-                    lut, sparse_hess,
+                lut, sparse_hess,
 #endif
 #ifdef _TRIPLETS_
-                    globals.hess_triplets,
+                globals.hess_triplets,
 #endif
-                    ci.grad, cj.grad
+                ci.grad, cj.grad
 #ifdef _FRICTION_
-                    ,
-                    ee_contact_forces[k], ee_tk[k]
+                ,
+                ee_contact_forces[k], ee_tk[k]
 #endif
-                );
+            );
             }
         }
 
@@ -458,7 +530,6 @@ void implicit_euler(vector<unique_ptr<AffineBody>>& cubes, double dt)
 #endif
             }
         }
-        #endif
         auto ipc_duration = DURATION_TO_DOUBLE(ipc_start);
         times[__IPC__] += ipc_duration;
         double toi = 1.0, factor = 1.0, alpha = 1.0;
@@ -569,7 +640,17 @@ void implicit_euler(vector<unique_ptr<AffineBody>>& cubes, double dt)
                 spdlog::warn("collision at {}, toi = {}", iter, toi);
                 factor = globals.backoff;
             }
-
+            if (iter) {
+                double cos_dq_lastdq = dq.dot(lastdq) / (dq.norm() * lastdq.norm());
+                if (abs(cos_dq_lastdq) > 1.0 - globals.params_double["dq_tol"]) {
+                    double ddq = (dq - lastdq).norm() / dq.norm();
+                    if (ddq < globals.params_double["dq_tol"]) {
+                        spdlog::error("same direction, cos = {}", cos_dq_lastdq);
+                        exit(1);
+                    }
+                }
+            }
+            lastdq = dq;
             dq *= factor * toi;
 
             alpha = 1.0;

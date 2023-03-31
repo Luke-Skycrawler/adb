@@ -138,6 +138,9 @@ void ipc_term(
 
     vector<HessBlock>& triplets,
 #endif
+#ifdef _DIRECT_OUT_
+    mat12 & hess_p_ret, mat12 & hess_t_ret, mat12 & off_diag_ret, 
+#endif
     Vector<double, 12>& grad_p, Vector<double, 12>& grad_t
 #ifdef _FRICTION_
     ,double &contact_lambda, Matrix<double, 2, 12>& Tk
@@ -237,6 +240,8 @@ void ipc_term(
         _0 * t0_tile(1) + _1 * t1_tile(1) + _2 * t2_tile(1),
         _0 * t0_tile(2) + _1 * t1_tile(2) + _2 * t2_tile(2);
 #endif
+
+#ifdef _SM_
     {
 #ifdef _NO_FANCY_
 #define PUT put
@@ -261,6 +266,16 @@ void ipc_term(
         }
 #undef PUT
     }
+#endif
+#ifdef _DIRECT_OUT_
+    {
+        hess_p_ret = hess_p;
+        hess_t_ret = hess_t;
+        off_diag_ret = off_diag;
+        grad_p = dgp; 
+        grad_t = dgt; 
+    }
+#endif
 #ifdef _TRIPLETS_
 
     for (int i = 0; i < 12; i++) {

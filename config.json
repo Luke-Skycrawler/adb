@@ -7,7 +7,7 @@
     "predefined_case" : {
         "enable": false,
         "id" : 2,
-        "custom": "../test_cases/friction.json"
+        "custom": "../test_cases/ground_friction.json"
     },
     "solver": "sparse",
     "gravity": true, 
@@ -50,17 +50,20 @@
     "iaabb": 3,
     "evh": 1e-3,
     "vg_friction": true,
-    "pt_friction": true,
-    "ee_friction": true,
+    "pt_friction": false,
+    "ee_friction": false,
 
     "params_double": {
         "tol": 1e-4,
         "dhat_sqr": 1e-2,
         "kappa": 1e1,
         "c1": 1e-4,
-        "max_uk": 0.0
+        "max_uk": 0.0,
+        "dq_tol": 0.05
     },
     "params_int": {
-        "clip": 0
+        "clip": 0,
+        "gfk": 1,
+        "hdk": 1
     }
 }

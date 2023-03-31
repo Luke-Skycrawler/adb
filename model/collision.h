@@ -8,6 +8,10 @@
 #define _SM_
 // #define NO_MOLLIFIER
 // #define _TRIPLETS_
+#define _PLUG_IN_LAN_
+#ifdef _PLUG_IN_LAN_
+#define _DIRECT_OUT_
+#endif
 #ifdef _TRIPLETS_
 #include "../view/global_variables.h"
 #endif
@@ -51,6 +55,9 @@ void ipc_term(
 #endif
 #ifdef _TRIPLETS_
     std::vector<HessBlock>& triplets,
+#endif
+#ifdef _DIRECT_OUT_
+    mat12 & hess_p_ret, mat12 & hess_t_ret, mat12 & off_diag_ret, 
 #endif
     vec12& grad_p, vec12& grad_t
 

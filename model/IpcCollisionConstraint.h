@@ -19,7 +19,7 @@ using T = double;
 using _StorageIndex = int;
 using StorageIndex = int;
 template <typename DerivedV>
-using Field = std::vector<DerivedV, Eigen::aligned_allocator<DerivedV>>;
+using Field = std::vector<DerivedV>;
 using namespace Eigen;
 void mollifier_info(const int ei0, const int ei1, const int ej0, const int ej1, const Field<Vector<T, dim>>& surface_x, const Field<Vector<T, dim>>& surface_X, T& eps, T& mollifier);
 
