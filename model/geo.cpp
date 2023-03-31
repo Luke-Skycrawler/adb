@@ -422,7 +422,9 @@ void ipc_term_ee(
     contact_lambda = utils::ee_uktk(ci, cj, ee, ij, ee_type, Tk, _uk, dist, globals.dt, p);
 
 #ifdef _FRICTION_
-    if (globals.ee_fric && p == 1.0)
+    bool ee_parallel = ee_type == ::ipc::EdgeEdgeDistanceType::EA_EB && p != 1.0;
+
+    if (globals.ee_fric && !ee_parallel)
         friction(_uk, contact_lambda, Tk.transpose(), ee_grad, ipc_hess);
     if (p != 1.0)
         contact_lambda = 0.0;

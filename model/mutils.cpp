@@ -340,7 +340,7 @@ double ee_uktk(
     degeneracy.col(0) = rei.normalized();
     degeneracy.col(1) = (ej0 - ei0).cross(rei).normalized();
     // bool par = sin2 < 1e-8;
-    bool par = mollifier != 1.0;
+    bool par = ee_type == ::ipc::EdgeEdgeDistanceType::EA_EB && mollifier != 1.0;
 
     auto lams = ::ipc::edge_edge_closest_point(ei0, ei1, ej0, ej1);
     auto Pk = par ? degeneracy : ::ipc::edge_edge_tangent_basis(ei0, ei1, ej0, ej1);
