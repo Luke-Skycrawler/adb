@@ -473,8 +473,8 @@ void implicit_euler(vector<unique_ptr<AffineBody>>& cubes, double dt)
                     i, j, ci.mass > 0.0, cj.mass > 0.0,
                     ci.grad, cj.grad,
 
-                    gradp, gradt, hess_p, hess_t, off_diag, off_diag.transpose()
-                    // ga, gb, ha, hb, hab, hab.transpose()
+                    // gradp, gradt, hess_p, hess_t, off_diag, off_diag.transpose()
+                    ga, gb, ha, hb, hab, hab.transpose()
 
                 );
                 ga += gaf;

@@ -49,6 +49,9 @@ double E_barrier_plus_inert(
             vec3 v(cubes[ij[0]]->v_transformed[ij[1]]);
             auto [d, pt_type] = vf_distance(v, f);
             e += barrier::barrier_function(d);
+            #ifdef _PLUG_IN_LAN_
+            // auto &ptf {};
+            #endif
         }
 
     // ee ipc energy
