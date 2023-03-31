@@ -517,15 +517,18 @@ void implicit_euler(vector<unique_ptr<AffineBody>>& cubes, double dt)
             auto ee_type = ipc::edge_edge_distance_type(ee[0], ee[1], ee[2], ee[3]);
             double d = edge_edge_distance(ee[0], ee[1], ee[2], ee[3], ee_type);
             if (d < barrier::d_hat) {
-            mat12 hess_p, hess_t, off_diag;
+            mat12 hess_0, hess_1, off_diag;
             ipc_term_ee(
                 ee, ij, ee_type, d,
-#ifdef _SM_
+#ifdef _SM_OUT_
                 lut, sparse_hess,
 #endif
 #ifdef _TRIPLETS_
                 globals.hess_triplets,
 #endif
+                #ifdef _DIRECT_OUT_
+                hess_0, hess_1, off_diag,
+                #endif
                 ci.grad, cj.grad
 #ifdef _FRICTION_
                 ,

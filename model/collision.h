@@ -89,12 +89,15 @@ void ipc_term(
 void ipc_term_ee(
     std::array<vec3, 4> ee, std::array<int, 4> ij, ipc::EdgeEdgeDistanceType ee_type, double dist, 
 
-#ifdef _SM_
+#ifdef _SM_OUT_
     const std::map<std::array<int, 2>, int>& lut,
     Eigen::SparseMatrix<double>& sparse_hess,
 #endif
 #ifdef _TRIPLETS_
     std::vector<HessBlock>& triplets,
+#endif
+#ifdef _DIRECT_OUT_
+    mat12& hess_0_ret, mat12& hess_1_ret, mat12& off_diag_ret,
 #endif
     vec12& grad_0, vec12& grad_1
 
