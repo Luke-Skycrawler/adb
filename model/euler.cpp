@@ -444,7 +444,7 @@ void implicit_euler(vector<unique_ptr<AffineBody>>& cubes, double dt)
 
 #endif
 
-                               vec12 gradp, gradt;
+                vec12 gradp, gradt;
                 mat12 hess_p, hess_t, off_diag;
                 ipc_term(
                     pt, ij, pt_type, d,
@@ -553,11 +553,176 @@ void implicit_euler(vector<unique_ptr<AffineBody>>& cubes, double dt)
                 );
 
 #ifdef _PLUG_IN_LAN_
+
+                Vector4i cid_ei0{ 0, 0, 0, 0 };
+                Vector4i cid_ei1{ 0, 0, 0, 0 };
+                Vector4i cid_ej0{ 4, 4, 4, 4 };
+                Vector4i cid_ej1{ 4, 4, 4, 4 };
+
+                auto ei0r{ ci.vertices(ci.edges[ij[1] * 2]) },
+                    ei1r{ ci.vertices(ci.edges[ij[1] * 2 + 1]) },
+                    ej0r{ cj.vertices(cj.edges[ij[3] * 2]) },
+                    ej1r{ cj.vertices(cj.edges[ij[3] * 2 + 1]) };
+
+                auto ei00{ ci.vt0(ci.edges[ij[1] * 2]) },
+                    ei10{ ci.vt0(ci.edges[ij[1] * 2 + 1]) },
+                    ej00{ cj.vt0(cj.edges[ij[3] * 2]) },
+                    ej10{ cj.vt0(cj.edges[ij[3] * 2 + 1]) };
+
+                Vector4d w_ei0{ 1.0, ei0r[0], ei0r[1], ei0r[2] };
+                Vector4d w_ei1{ 1.0, ei1r[0], ei1r[1], ei1r[2] };
+                Vector4d w_ej0{ 1.0, ej0r[0], ej0r[1], ej0r[2] };
+                Vector4d w_ej1{ 1.0, ej1r[0], ej1r[1], ej1r[2] };
+
+                vector<vec3> surface_x{ ee[0], ee[1], ee[2], ee[3] }, surface_xhat{ ei00, ei10, ej00, ej10 }, surface_X{ ei0r, ei1r, ej0r, ej1r };
+                vector<pair<Vector4i, Vector4d>> dpdx{ { cid_ei0, w_ei0 }, { cid_ei1, w_ei1 }, { cid_ej0, w_ej0 }, { cid_ej1, w_ej1 } };
+
+                vec12 ga, gb;
+                ga.setZero(12);
+                gb.setZero(12);
+                mat12 ha, hb, hab;
+                ha.setZero(12, 12);
+                hb.setZero(12, 12);
+                hab.setZero(12, 12);
+                VectorXd gaf, gbf;
+                gaf.setZero(12);
+                gbf.setZero(12);
+                MatrixXd haf, hbf, habf;
+                haf.setZero(12, 12);
+                hbf.setZero(12, 12);
+                habf.setZero(12, 12);
+                VectorXd gac, gbc;
+                gac.setZero(12);
+                gbc.setZero(12);
+                MatrixXd hac, hbc, habc;
+                hac.setZero(12, 12);
+                hbc.setZero(12, 12);
+                habc.setZero(12, 12);
+                AIPC::IpcFrictionConstraintOp3D* friction_constraint;
+                AIPC::IpcConstraintOp3D* constraint;
+                if (ee_type == ipc::EdgeEdgeDistanceType::EA0_EB0) {
+                    friction_constraint = new AIPC::IpcPPFConstraint(0, 0, 2, dpdx, surface_x, surface_X, barrier::d_hat, barrier::kappa, globals.mu, globals.dt, evh, 1.0, 1.0);
+                    constraint = new AIPC::IpcPPConstraint(0, 0, 2, dpdx, surface_x, surface_X, barrier::d_hat, barrier::kappa, globals.dt, 1.0);
+                }
+                else if (ee_type == ipc::EdgeEdgeDistanceType::EA0_EB1) {
+                    friction_constraint = new AIPC::IpcPPFConstraint(0, 0, 3, dpdx, surface_x, surface_X, barrier::d_hat, barrier::kappa, globals.mu, globals.dt, evh, 1.0, 1.0);
+                    constraint = new AIPC::IpcPPConstraint(0, 0, 3, dpdx, surface_x, surface_X, barrier::d_hat, barrier::kappa, globals.dt, 1.0);
+                }
+                else if (ee_type == ipc::EdgeEdgeDistanceType::EA1_EB0) {
+                    friction_constraint = new AIPC::IpcPPFConstraint(0, 1, 2, dpdx, surface_x, surface_X, barrier::d_hat, barrier::kappa, globals.mu, globals.dt, evh, 1.0, 1.0);
+                    constraint = new AIPC::IpcPPConstraint(0, 1, 2, dpdx, surface_x, surface_X, barrier::d_hat, barrier::kappa, globals.dt, 1.0);
+                }
+                else if (ee_type == ipc::EdgeEdgeDistanceType::EA1_EB1) {
+                    friction_constraint = new AIPC::IpcPPFConstraint(0, 1, 3, dpdx, surface_x, surface_X, barrier::d_hat, barrier::kappa, globals.mu, globals.dt, evh, 1.0, 1.0);
+                    constraint = new AIPC::IpcPPConstraint(0, 1, 3, dpdx, surface_x, surface_X, barrier::d_hat, barrier::kappa, globals.dt, 1.0);
+                }
+                else if (ee_type == ipc::EdgeEdgeDistanceType::EA_EB0) {
+                    friction_constraint = new AIPC::IpcPEFConstraint(0, 2, 0, 1, dpdx, surface_x, surface_X, barrier::d_hat, barrier::kappa, globals.mu, globals.dt, evh, 1.0, 1.0);
+                    constraint = new AIPC::IpcPEConstraint(0, 2, 0, 1, dpdx, surface_x, surface_X, barrier::d_hat, barrier::kappa, globals.dt, 1.0);
+                }
+                else if (ee_type == ipc::EdgeEdgeDistanceType::EA_EB1) {
+                    friction_constraint = new AIPC::IpcPEFConstraint(0, 3, 0, 1, dpdx, surface_x, surface_X, barrier::d_hat, barrier::kappa, globals.mu, globals.dt, evh, 1.0, 1.0);
+                    constraint = new AIPC::IpcPEConstraint(0, 3, 0, 1, dpdx, surface_x, surface_X, barrier::d_hat, barrier::kappa, globals.dt, 1.0);
+                }
+                else if (ee_type == ipc::EdgeEdgeDistanceType::EA0_EB) {
+                    friction_constraint = new AIPC::IpcPEFConstraint(0, 0, 2, 3, dpdx, surface_x, surface_X, barrier::d_hat, barrier::kappa, globals.mu, globals.dt, evh, 1.0, 1.0);
+                    constraint = new AIPC::IpcPEConstraint(0, 0, 2, 3, dpdx, surface_x, surface_X, barrier::d_hat, barrier::kappa, globals.dt, 1.0);
+                }
+                else if (ee_type == ipc::EdgeEdgeDistanceType::EA1_EB) {
+                    friction_constraint = new AIPC::IpcPEFConstraint(0, 1, 2, 3, dpdx, surface_x, surface_X, barrier::d_hat, barrier::kappa, globals.mu, globals.dt, evh, 1.0, 1.0);
+                    constraint = new AIPC::IpcPEConstraint(0, 1, 2, 3, dpdx, surface_x, surface_X, barrier::d_hat, barrier::kappa, globals.dt, 1.0);
+                }
+                else {
+                    friction_constraint = new AIPC::IpcEEFConstraint(0, 0, 1, 2, 3, dpdx, surface_x, surface_X, barrier::d_hat, barrier::kappa, globals.mu, globals.dt, evh, 1.0, 1.0);
+                    constraint = new AIPC::IpcEEConstraint(0, 0, 1, 2, 3, dpdx, surface_x, surface_X, barrier::d_hat, barrier::kappa, globals.dt, 1.0);
+                }
+                //if (false) {
+                if (ee_type == ipc::EdgeEdgeDistanceType::EA_EB0 || ee_type == ipc::EdgeEdgeDistanceType::EA_EB1) {
+                    MatrixXd _habf, _habc;
+                    _habf.setZero(12, 12);
+                    _habc.setZero(12, 12);
+                    friction_constraint->gradient({}, surface_x, surface_X, surface_xhat, {}, gbf, gaf);
+                    friction_constraint->hessian({}, surface_x, surface_X, surface_xhat, {}, hbf, haf, _habf);
+                    constraint->gradient({}, surface_x, surface_X, surface_xhat, {}, gbc, gac);
+                    constraint->hessian({}, surface_x, surface_X, surface_xhat, {}, hbc, hac, _habc);
+                    habf = _habf; // .transpose();
+                    habc = _habc;
+                     //.transpose();
+                }
+                else {
+                    friction_constraint->gradient({}, surface_x, surface_X, surface_xhat, {}, gaf, gbf);
+                    friction_constraint->hessian({}, surface_x, surface_X, surface_xhat, {}, haf, hbf, habf);
+                    constraint->gradient({}, surface_x, surface_X, surface_xhat, {}, gac, gbc);
+                    constraint->hessian({}, surface_x, surface_X, surface_xhat, {}, hac, hbc, habc);
+                }
+
+                ga = gaf + gac;
+                gb = gbf + gbc;
+                ha = haf + hac;
+                hb = hbf + hbc;
+                hab = habf + habc;
+
+                ga /= barrier::d_hat;
+                gb /= barrier::d_hat;
+                ha /= barrier::d_hat;
+                hb /= barrier::d_hat;
+                hab /= barrier::d_hat;
+
                 output_hessian_gradient(
                     lut, sparse_hess,
                     i, j, ci.mass > 0.0, cj.mass > 0.0,
                     ci.grad, cj.grad, grad_0, grad_1, hess_0, hess_1, off_diag, off_diag.transpose());
 
+                bool b0 = ::fd::compare_gradient(ga, grad_0);
+                bool b1 = ::fd::compare_gradient(gb, grad_1);
+
+                bool b2 = fd::compare_hessian(ha, hess_0);
+                bool b3 = fd::compare_hessian(hb, hess_1);
+                bool b4 = fd::compare_hessian(hab, off_diag);
+                const auto to_int = [](const ipc::EdgeEdgeDistanceType& type) {
+                    if (type == ipc::EdgeEdgeDistanceType::EA0_EB) {
+                        return 0;
+                    }
+                    else if (type == ipc::EdgeEdgeDistanceType::EA1_EB) {
+                        return 1;
+                    }
+                    else if (type == ipc::EdgeEdgeDistanceType::EA_EB0) {
+                        return 2;
+                    }
+                    else if (type == ipc::EdgeEdgeDistanceType::EA_EB1) {
+                        return 3;
+                    }
+                    else if (type == ipc::EdgeEdgeDistanceType::EA0_EB0) {
+                        return 4;
+                    }
+                    else if (type == ipc::EdgeEdgeDistanceType::EA0_EB1) {
+                        return 5;
+                    }
+                    else if (type == ipc::EdgeEdgeDistanceType::EA1_EB0) {
+                        return 6;
+                    }
+                    else if (type == ipc::EdgeEdgeDistanceType::EA1_EB1) {
+                        return 7;
+                    }
+                    else {
+                        return 8;
+                    }
+                };
+                if (!b0) {
+                    spdlog::error("ee gradient p error, {}", to_int(ee_type));
+                }
+                if (!b1) {
+                    spdlog::error("ee gradient t error, {}", to_int(ee_type));
+                }
+                if (!b2) {
+                    spdlog::error("ee hessian p error, {}", to_int(ee_type));
+                }
+                if (!b3) {
+                    spdlog::error("ee hessian t error, {}", to_int(ee_type));
+                }
+                if (!b4) {
+                    spdlog::error("ee hessian off_diag error, {}", to_int(ee_type));
+                }
 #endif
             }
         }
