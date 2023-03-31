@@ -148,6 +148,7 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClCompile Include="..\iAABB\finitediff.cpp" />
     <ClCompile Include="..\model\affine_obj.cpp" />
     <ClCompile Include="..\model\col_set.cpp" />
     <ClCompile Include="..\model\geo.cpp" />
@@ -174,6 +175,7 @@
   <ItemGroup>
     <ClInclude Include="..\cyCodeBase\cyCore.h" />
     <ClInclude Include="..\cyCodeBase\cyPolynomial.h" />
+    <ClInclude Include="..\iAABB\finitediff.hpp" />
     <ClInclude Include="..\model\affine_body.h" />
     <ClInclude Include="..\model\affine_obj.h" />
     <ClInclude Include="..\model\cube.h" />

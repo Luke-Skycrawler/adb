@@ -7,6 +7,8 @@
 #include <assert.h>
 #include <array>
 #include "timer.h"
+#include "../iAABB/finitediff.hpp"
+
 // #include <ipc/distance/point_triangle.hpp>
 // #include <ipc/distance/edge_edge.hpp>
 #include <ipc/friction/closest_point.hpp>
@@ -18,7 +20,6 @@
 //#define IAABB_COMPARING
 // #define IAABB_INTERNSHIP
 #ifdef IAABB_COMPARING
-
 #include <algorithm>
 #endif
 using namespace std;
@@ -389,7 +390,19 @@ void implicit_euler(vector<unique_ptr<AffineBody>>& cubes, double dt)
 
                 vector<pair<Vector4i, Vector4d>> dpdx{ { cid_p, w_p }, { cid_t0, w_t0 }, { cid_t1, w_t1 }, { cid_t2, w_t2 } };
                 VectorXd ga, gb;
+                ga.setZero(12);
+                gb.setZero(12);
                 MatrixXd ha, hb, hab;
+                ha.setZero(12, 12);
+                hb.setZero(12, 12);
+                hab.setZero(12, 12);
+                VectorXd gaf, gbf;
+                gaf.setZero(12);
+                gbf.setZero(12);
+                MatrixXd haf, hbf, habf;
+                haf.setZero(12, 12);
+                hbf.setZero(12, 12);
+                habf.setZero(12, 12);
                 if (pt_type == ipc::PointTriangleDistanceType::P_T0) {
                     AIPC::IpcPPFConstraint ppf(0, 0, 1, dpdx, surface_x, surface_X, barrier::d_hat, barrier::kappa, globals.mu, globals.dt, evh, 1.0, 1.0);
                     ppf.gradient({}, surface_x, surface_X, surface_xhat, {}, ga, gb);
@@ -423,8 +436,12 @@ void implicit_euler(vector<unique_ptr<AffineBody>>& cubes, double dt)
                 }
                 else {
                     AIPC::IpcPTFConstraint ptf(0, 0, 1, 2, 3, dpdx, surface_x, surface_X, barrier::d_hat, barrier::kappa, globals.mu, globals.dt, evh, 1.0, 1.0);
-                    ptf.gradient({}, surface_x, surface_X, surface_xhat, {}, ga, gb);
-                    ptf.hessian({}, surface_x, surface_X, surface_xhat, {}, ha, hb, hab);
+                    ptf.gradient({}, surface_x, surface_X, surface_xhat, {}, gaf, gbf);
+                    ptf.hessian({}, surface_x, surface_X, surface_xhat, {}, haf, hbf, habf);
+                    
+                    AIPC::IpcPTConstraint ptc(0, 0, 1, 2, 3, dpdx, surface_x, surface_X, barrier::d_hat, barrier::kappa, globals.dt, 1.0);
+                    ptc.gradient({}, surface_x, surface_X, surface_xhat, {}, ga, gb);
+                    ptc.hessian({}, surface_x, surface_X, surface_xhat, {}, ha, hb, hab);
                 }
 
 #endif
@@ -450,15 +467,26 @@ void implicit_euler(vector<unique_ptr<AffineBody>>& cubes, double dt)
 #endif
                 );
 #ifdef _PLUG_IN_LAN_
+                ga += gaf;
+                gb += gbf;
+                ha += haf;
+                hb += hbf;
+                hab += habf;
+                ga /= barrier::d_hat;
+                gb /= barrier::d_hat;
+                ha /= barrier::d_hat;
+                hb /= barrier::d_hat;
+                hab /= barrier::d_hat;
+                bool b0 = ::fd::compare_gradient(ga, gradp);
+                bool b1 = ::fd::compare_gradient(gb, gradt);
 
-                bool b0 = compare_gradient(ga, gradp);
-                bool b1 = compare_gradient(gb, gradt);
+                bool b2 = fd::compare_hessian(ha, hess_p);
+                bool b3 = fd::compare_hessian(hb, hess_t);
+                bool b4 = fd::compare_hessian(hab, off_diag);
 
-                bool b2 = compare_hessian(ha, hess_p);
-                bool b3 = compare_hessian(hb, hess_t);
-                bool b4 = compare_hessian(hab, off_diag);
-
+                if (ci.mass > 0.0)
                 ci.grad += gradp;
+                if (cj.mass > 0.0)
                 cj.grad += gradt;
                 if (!b0) {
                     spdlog::error("gradient p error");
@@ -477,7 +505,6 @@ void implicit_euler(vector<unique_ptr<AffineBody>>& cubes, double dt)
                 }
 #endif
             }
-        }
     }
 #pragma omp parallel for schedule(static)
         for (int k = 0; k < n_ee; k++) {
