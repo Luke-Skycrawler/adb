@@ -4,7 +4,7 @@
 #include "geometry.h"
 
 namespace barrier {
-const double d_hat = 1e-4, kappa = 1e1;
+const double d_hat = 1e-4, kappa = 1e-3;
 const double d_sqrt = 1e-2;
 MatrixXd barrier_hessian_q(const vec3& x, const vec3& vertex);
 MatrixXd x_jacobian_q(const vec3& x);

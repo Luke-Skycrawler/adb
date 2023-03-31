@@ -7,7 +7,7 @@
     "predefined_case" : {
         "enable": false,
         "id" : 2,
-        "custom": "../test_cases/friction_pt.json"
+        "custom": "../test_cases/friction.json"
     },
     "solver": "sparse",
     "gravity": true, 
@@ -15,7 +15,7 @@
     "col_set": true,
     "ee": true,
     "pt": true,
-    "ground": false,
+    "ground": true,
     "safe_factor": 1.0,
     "uppper_bound": true, 
     "mu": 0.3,
@@ -51,7 +51,7 @@
     "evh": 1e-3,
     "vg_friction": true,
     "pt_friction": true,
-    "ee_friction": false,
+    "ee_friction": true,
 
     "params_double": {
         "tol": 1e-4,

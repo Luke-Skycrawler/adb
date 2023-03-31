@@ -351,7 +351,7 @@ void implicit_euler(vector<unique_ptr<AffineBody>>& cubes, double dt)
         }
         // clear(sparse_hess);
 #endif
-        double evh = globals.evh * globals.dt;
+        double evh = globals.evh;
         auto ipc_start = high_resolution_clock::now();
 #pragma omp parallel for schedule(static)
         for (int k = 0; k < n_pt; k++) {
@@ -389,10 +389,10 @@ void implicit_euler(vector<unique_ptr<AffineBody>>& cubes, double dt)
                 vector<vec3> surface_x{ p, f.t0, f.t1, f.t2 }, surface_xhat{ p0, t00, t10, t20 }, surface_X{ pr, t0r, t1r, t2r };
 
                 vector<pair<Vector4i, Vector4d>> dpdx{ { cid_p, w_p }, { cid_t0, w_t0 }, { cid_t1, w_t1 }, { cid_t2, w_t2 } };
-                VectorXd ga, gb;
+                vec12 ga, gb;
                 ga.setZero(12);
                 gb.setZero(12);
-                MatrixXd ha, hb, hab;
+                mat12 ha, hb, hab;
                 ha.setZero(12, 12);
                 hb.setZero(12, 12);
                 hab.setZero(12, 12);
@@ -403,48 +403,53 @@ void implicit_euler(vector<unique_ptr<AffineBody>>& cubes, double dt)
                 haf.setZero(12, 12);
                 hbf.setZero(12, 12);
                 habf.setZero(12, 12);
+                VectorXd gac, gbc;
+                gac.setZero(12);
+                gbc.setZero(12);
+                MatrixXd hac, hbc, habc;
+                hac.setZero(12, 12);
+                hbc.setZero(12, 12);
+                habc.setZero(12, 12);
+                AIPC::IpcFrictionConstraintOp3D* friction_constraint;
+                AIPC::IpcConstraintOp3D* constraint;
                 if (pt_type == ipc::PointTriangleDistanceType::P_T0) {
-                    AIPC::IpcPPFConstraint ppf(0, 0, 1, dpdx, surface_x, surface_X, barrier::d_hat, barrier::kappa, globals.mu, globals.dt, evh, 1.0, 1.0);
-                    ppf.gradient({}, surface_x, surface_X, surface_xhat, {}, ga, gb);
-                    ppf.hessian({}, surface_x, surface_X, surface_xhat, {}, ha, hb, hab);
+                    friction_constraint = new AIPC::IpcPPFConstraint(0, 0, 1, dpdx, surface_x, surface_X, barrier::d_hat, barrier::kappa, globals.mu, globals.dt, evh, 1.0, 1.0);
+                    constraint = new AIPC::IpcPPConstraint(0, 0, 1, dpdx, surface_x, surface_X, barrier::d_hat, barrier::kappa, globals.dt, 1.0);
                 }
 
                 else if (pt_type == ipc::PointTriangleDistanceType::P_T1) {
-                    AIPC::IpcPPFConstraint ppf(0, 0, 2, dpdx, surface_x, surface_X, barrier::d_hat, barrier::kappa, globals.mu, globals.dt, evh, 1.0, 1.0);
-                    ppf.gradient({}, surface_x, surface_X, surface_xhat, {}, ga, gb);
-                    ppf.hessian({}, surface_x, surface_X, surface_xhat, {}, ha, hb, hab);
+                    friction_constraint = new AIPC::IpcPPFConstraint(0, 0, 2, dpdx, surface_x, surface_X, barrier::d_hat, barrier::kappa, globals.mu, globals.dt, evh, 1.0, 1.0);
+                    constraint = new AIPC::IpcPPConstraint(0, 0, 2, dpdx, surface_x, surface_X, barrier::d_hat, barrier::kappa, globals.dt, 1.0);
                 }
                 else if (pt_type == ipc::PointTriangleDistanceType::P_T2) {
-                    AIPC::IpcPPFConstraint ppf(0, 0, 3, dpdx, surface_x, surface_X, barrier::d_hat, barrier::kappa, globals.mu, globals.dt, evh, 1.0, 1.0);
-                    ppf.gradient({}, surface_x, surface_X, surface_xhat, {}, ga, gb);
-                    ppf.hessian({}, surface_x, surface_X, surface_xhat, {}, ha, hb, hab);
+                    friction_constraint = new AIPC::IpcPPFConstraint(0, 0, 3, dpdx, surface_x, surface_X, barrier::d_hat, barrier::kappa, globals.mu, globals.dt, evh, 1.0, 1.0);
+                    constraint = new AIPC::IpcPPConstraint(0, 0, 3, dpdx, surface_x, surface_X, barrier::d_hat, barrier::kappa, globals.dt, 1.0);
                 }
                 else if (pt_type == ipc::PointTriangleDistanceType::P_E0) {
-                    AIPC::IpcPEFConstraint pef(0, 0, 1, 2, dpdx, surface_x, surface_X, barrier::d_hat, barrier::kappa, globals.mu, globals.dt, evh, 1.0, 1.0);
-                    pef.gradient({}, surface_x, surface_X, surface_xhat, {}, ga, gb);
-                    pef.hessian({}, surface_x, surface_X, surface_xhat, {}, ha, hb, hab);
+                    friction_constraint = new AIPC::IpcPEFConstraint(0, 0, 1, 2, dpdx, surface_x, surface_X, barrier::d_hat, barrier::kappa, globals.mu, globals.dt, evh, 1.0, 1.0);
+                    constraint = new AIPC::IpcPEConstraint(0, 0, 1, 2, dpdx, surface_x, surface_X, barrier::d_hat, barrier::kappa, globals.dt, 1.0);
                 }
                 else if (pt_type == ipc::PointTriangleDistanceType::P_E1) {
-                    AIPC::IpcPEFConstraint pef(0, 0, 2, 3, dpdx, surface_x, surface_X, barrier::d_hat, barrier::kappa, globals.mu, globals.dt, evh, 1.0, 1.0);
-                    pef.gradient({}, surface_x, surface_X, surface_xhat, {}, ga, gb);
-                    pef.hessian({}, surface_x, surface_X, surface_xhat, {}, ha, hb, hab);
+                    friction_constraint = new AIPC::IpcPEFConstraint(0, 0, 2, 3, dpdx, surface_x, surface_X, barrier::d_hat, barrier::kappa, globals.mu, globals.dt, evh, 1.0, 1.0);
+                    constraint = new AIPC::IpcPEConstraint(0, 0, 2, 3, dpdx, surface_x, surface_X, barrier::d_hat, barrier::kappa, globals.dt, 1.0);
                 }
                 else if (pt_type == ipc::PointTriangleDistanceType::P_E2) {
-                    AIPC::IpcPEFConstraint pef(0, 0, 3, 1, dpdx, surface_x, surface_X, barrier::d_hat, barrier::kappa, globals.mu, globals.dt, evh, 1.0, 1.0);
-                    pef.gradient({}, surface_x, surface_X, surface_xhat, {}, ga, gb);
-                    pef.hessian({}, surface_x, surface_X, surface_xhat, {}, ha, hb, hab);
+                    friction_constraint = new AIPC::IpcPEFConstraint(0, 0, 3, 1, dpdx, surface_x, surface_X, barrier::d_hat, barrier::kappa, globals.mu, globals.dt, evh, 1.0, 1.0);
+                    constraint = new AIPC::IpcPEConstraint(0, 0, 3, 1, dpdx, surface_x, surface_X, barrier::d_hat, barrier::kappa, globals.dt, 1.0);
                 }
                 else {
-                    AIPC::IpcPTFConstraint ptf(0, 0, 1, 2, 3, dpdx, surface_x, surface_X, barrier::d_hat, barrier::kappa, globals.mu, globals.dt, evh, 1.0, 1.0);
-                    ptf.gradient({}, surface_x, surface_X, surface_xhat, {}, gaf, gbf);
-                    ptf.hessian({}, surface_x, surface_X, surface_xhat, {}, haf, hbf, habf);
-                    
-                    AIPC::IpcPTConstraint ptc(0, 0, 1, 2, 3, dpdx, surface_x, surface_X, barrier::d_hat, barrier::kappa, globals.dt, 1.0);
-                    ptc.gradient({}, surface_x, surface_X, surface_xhat, {}, ga, gb);
-                    ptc.hessian({}, surface_x, surface_X, surface_xhat, {}, ha, hb, hab);
+                    friction_constraint = new AIPC::IpcPTFConstraint(0, 0, 1, 2, 3, dpdx, surface_x, surface_X, barrier::d_hat, barrier::kappa, globals.mu, globals.dt, evh, 1.0, 1.0);
+                    constraint = new AIPC::IpcPTConstraint(0, 0, 1, 2, 3, dpdx, surface_x, surface_X, barrier::d_hat, barrier::kappa, globals.dt, 1.0);
                 }
 
 #endif
+
+                constraint->gradient({}, surface_x, surface_X, surface_xhat, {}, gac, gbc);
+                constraint->hessian({}, surface_x, surface_X, surface_xhat, {}, hac, hbc, habc);
+
+                friction_constraint->gradient({}, surface_x, surface_X, surface_xhat, {}, gaf, gbf);
+                friction_constraint->hessian({}, surface_x, surface_X, surface_xhat, {}, haf, hbf, habf);
+
                 vec12 gradp, gradt;
                 mat12 hess_p, hess_t, off_diag;
                 ipc_term(
@@ -473,15 +478,16 @@ void implicit_euler(vector<unique_ptr<AffineBody>>& cubes, double dt)
                     i, j, ci.mass > 0.0, cj.mass > 0.0,
                     ci.grad, cj.grad,
 
-                    // gradp, gradt, hess_p, hess_t, off_diag, off_diag.transpose()
-                    ga, gb, ha, hb, hab, hab.transpose()
+                    gradp, gradt, hess_p, hess_t, off_diag, off_diag.transpose()
+                    // ga, gb, ha, hb, hab, hab.transpose()
 
                 );
-                ga += gaf;
-                gb += gbf;
-                ha += haf;
-                hb += hbf;
-                hab += habf;
+                ga = gaf + gac;
+                gb = gbf + gbc;
+                ha = haf + hac;
+                hb = hbf + hbc;
+                hab = habf + habc;
+
                 ga /= barrier::d_hat;
                 gb /= barrier::d_hat;
                 ha /= barrier::d_hat;
