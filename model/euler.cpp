@@ -444,13 +444,7 @@ void implicit_euler(vector<unique_ptr<AffineBody>>& cubes, double dt)
 
 #endif
 
-                constraint->gradient({}, surface_x, surface_X, surface_xhat, {}, gac, gbc);
-                constraint->hessian({}, surface_x, surface_X, surface_xhat, {}, hac, hbc, habc);
-
-                friction_constraint->gradient({}, surface_x, surface_X, surface_xhat, {}, gaf, gbf);
-                friction_constraint->hessian({}, surface_x, surface_X, surface_xhat, {}, haf, hbf, habf);
-
-                vec12 gradp, gradt;
+                               vec12 gradp, gradt;
                 mat12 hess_p, hess_t, off_diag;
                 ipc_term(
                     pt, ij, pt_type, d,
@@ -472,16 +466,13 @@ void implicit_euler(vector<unique_ptr<AffineBody>>& cubes, double dt)
 #endif
                 );
 #ifdef _PLUG_IN_LAN_
+                constraint->gradient({}, surface_x, surface_X, surface_xhat, {}, gac, gbc);
+                constraint->hessian({}, surface_x, surface_X, surface_xhat, {}, hac, hbc, habc);
 
-                output_hessian_gradient(
-                    lut, sparse_hess,
-                    i, j, ci.mass > 0.0, cj.mass > 0.0,
-                    ci.grad, cj.grad,
+                friction_constraint->gradient({}, surface_x, surface_X, surface_xhat, {}, gaf, gbf);
+                friction_constraint->hessian({}, surface_x, surface_X, surface_xhat, {}, haf, hbf, habf);
 
-                    gradp, gradt, hess_p, hess_t, off_diag, off_diag.transpose()
-                    // ga, gb, ha, hb, hab, hab.transpose()
-
-                );
+              
                 ga = gaf + gac;
                 gb = gbf + gbc;
                 ha = haf + hac;
@@ -493,6 +484,15 @@ void implicit_euler(vector<unique_ptr<AffineBody>>& cubes, double dt)
                 ha /= barrier::d_hat;
                 hb /= barrier::d_hat;
                 hab /= barrier::d_hat;
+                output_hessian_gradient(
+                    lut, sparse_hess,
+                    i, j, ci.mass > 0.0, cj.mass > 0.0,
+                    ci.grad, cj.grad,
+
+                    // gradp, gradt, hess_p, hess_t, off_diag, off_diag.transpose()
+                    ga, gb, ha, hb, hab, hab.transpose()
+                    
+                );
                 bool b0 = ::fd::compare_gradient(ga, gradp);
                 bool b1 = ::fd::compare_gradient(gb, gradt);
 
@@ -541,8 +541,11 @@ void implicit_euler(vector<unique_ptr<AffineBody>>& cubes, double dt)
 #endif
 #ifdef _DIRECT_OUT_
                     hess_0, hess_1, off_diag,
-#endif
                     grad_0, grad_1
+
+#else
+                    ci.grad, cj.grad
+#endif
 #ifdef _FRICTION_
                     ,
                     ee_contact_forces[k], ee_tk[k]

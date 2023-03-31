@@ -1,5 +1,5 @@
 {
-    "player": false,
+    "player": true,
     "starting_ts": -1,
     "ending_ts": 5000,
     "dt": 1e-2,
@@ -7,7 +7,7 @@
     "predefined_case" : {
         "enable": false,
         "id" : 2,
-        "custom": "../test_cases/friction.json"
+        "custom": "../test_cases/cards.json"
     },
     "solver": "sparse",
     "gravity": true, 
@@ -20,7 +20,7 @@
     "uppper_bound": true, 
     "mu": 0.3,
     "log": 1,
-    "backoff": 0.95,
+    "backoff": 0.8,
     "damping": {
         "enable": false,
         "alpha": 5e-2,
@@ -54,7 +54,7 @@
     "ee_friction": true,
 
     "params_double": {
-        "tol": 1e-4,
+        "tol": 1e-2,
         "dhat_sqr": 1e-2,
         "kappa": 1e1,
         "c1": 1e-4,
