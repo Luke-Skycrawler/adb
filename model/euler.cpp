@@ -449,7 +449,7 @@ void implicit_euler(vector<unique_ptr<AffineBody>>& cubes, double dt)
                 mat12 hess_p, hess_t, off_diag;
                 ipc_term(
                     pt, ij, pt_type, d,
-#ifdef _SM_
+#ifdef _SM_OUT_
                     lut, sparse_hess,
 #endif
 #ifdef _TRIPLETS_

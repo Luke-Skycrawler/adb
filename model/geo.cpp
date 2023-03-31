@@ -78,6 +78,80 @@ void friction(
     g += F_k;
     H += D_k_hessian;
 }
+void output_hessian_gradient(
+    const std::map<std::array<int, 2>, int>& lut,
+    SparseMatrix<double>& sparse_hess,
+    int ii, int jj, bool ci_nonstatic, bool cj_nonstatic,
+    vec12& grad_p, vec12& grad_t,
+    const vec12& dgp, const vec12& dgt,
+    const mat12& hess_p, const mat12& hess_t, const mat12& off_diag, const mat12& off_T)
+{
+    {
+        auto outers = sparse_hess.outerIndexPtr();
+        auto values = sparse_hess.valuePtr();
+
+        auto stride_j = stride(jj, outers), stride_i = stride(ii, outers);
+        auto oii = starting_offset(ii, ii, lut, outers), ojj = starting_offset(jj, jj, lut, outers), oij = starting_offset(ii, jj, lut, outers), oji = starting_offset(jj, ii, lut, outers);
+        auto ptr = globals.writelock_cols.data();
+
+#ifdef _NO_FANCY_
+#define PUT put
+#else
+#define PUT put2
+#endif
+        if (cj_nonstatic) {
+            omp_set_lock(ptr + jj);
+            if (ci_nonstatic)
+                put(values, oij, stride_j, off_diag);
+            put(values, ojj, stride_j, hess_t);
+            grad_t += dgt;
+            omp_unset_lock(ptr + jj);
+        }
+        if (ci_nonstatic) {
+            omp_set_lock(ptr + ii);
+            if (cj_nonstatic)
+                put(values, oji, stride_i, off_T);
+            put(values, oii, stride_i, hess_p);
+            grad_p += dgp;
+            omp_unset_lock(ptr + ii);
+        }
+#undef PUT
+    }
+}
+
+void output_hessian_gradient(
+
+    vector<HessBlock>& triplets,
+    int ii, int jj,
+    vec12& grad_p, vec12& grad_t,
+    const vec12& dgp, const vec12& dgt,
+    const mat12& hess_p, const mat12& hess_t, const mat12& off_diag, const mat12& off_T)
+{
+
+    for (int i = 0; i < 12; i++) {
+        triplets.push_back(HessBlock(ii * 12, jj * 12 + i, off_diag.block<12, 1>(0, i)));
+        triplets.push_back(HessBlock(jj * 12, ii * 12 + i, off_T.block<12, 1>(0, i)));
+        triplets.push_back(HessBlock(ii * 12, ii * 12 + i, hess_p.block<12, 1>(0, i)));
+        triplets.push_back(HessBlock(jj * 12, jj * 12 + i, hess_t.block<12, 1>(0, i)));
+    }
+    // globals.hess_triplets.push_back({ii * 12, jj * 12, off_diag});
+    // globals.hess_triplets.push_back({jj * 12, ii * 12, off_T});
+}
+
+void output_hessian_gradient(
+    mat12& hess_p_ret, mat12& hess_t_ret, mat12& off_diag_ret,
+    vec12& grad_p, vec12& grad_t,
+    const vec12& dgp, const vec12& dgt,
+    const mat12& hess_p, const mat12& hess_t, const mat12& off_diag, const mat12& off_T)
+{
+    {
+        hess_p_ret = hess_p;
+        hess_t_ret = hess_t;
+        off_diag_ret = off_diag;
+        grad_p = dgp;
+        grad_t = dgt;
+    }
+}
 
 #ifndef TESTING
 void ipc_term_vg(AffineBody& c, int v
@@ -130,7 +204,7 @@ tuple<mat12, vec12> ipc_hess_pt_12x12(
 }
 void ipc_term(
     array<vec3, 4> pt, array<int, 4> ij, ipc::PointTriangleDistanceType pt_type, double dist,
-#ifdef _SM_
+#ifdef _SM_OUT_
     const std::map<std::array<int, 2>, int>& lut,
     SparseMatrix<double>& sparse_hess,
 #endif
@@ -139,11 +213,12 @@ void ipc_term(
     vector<HessBlock>& triplets,
 #endif
 #ifdef _DIRECT_OUT_
-    mat12 & hess_p_ret, mat12 & hess_t_ret, mat12 & off_diag_ret, 
+    mat12& hess_p_ret, mat12& hess_t_ret, mat12& off_diag_ret,
 #endif
     Vector<double, 12>& grad_p, Vector<double, 12>& grad_t
 #ifdef _FRICTION_
-    ,double &contact_lambda, Matrix<double, 2, 12>& Tk
+    ,
+    double& contact_lambda, Matrix<double, 2, 12>& Tk
 #endif
 )
 {
@@ -164,15 +239,6 @@ void ipc_term(
 
         auto p_tile = ci.vertices(v), t0_tile = cj.vertices(tidx[3 * f]), t1_tile = cj.vertices(tidx[3 * f + 1]), t2_tile = cj.vertices(tidx[3 * f + 2]);
 
-#ifdef _SM_
-    auto outers = sparse_hess.outerIndexPtr();
-    auto values = sparse_hess.valuePtr();
-
-    auto stride_j = stride(jj, outers), stride_i = stride(ii, outers);
-    auto oii = starting_offset(ii, ii, lut, outers), ojj = starting_offset(jj, jj, lut, outers), oij = starting_offset(ii, jj, lut, outers), oji = starting_offset(jj, ii, lut, outers);
-    auto ptr = globals.writelock_cols.data();
-
-#endif
 #define _NO_FANCY_
 #ifdef _NO_FANCY_
 
@@ -241,53 +307,21 @@ void ipc_term(
         _0 * t0_tile(2) + _1 * t1_tile(2) + _2 * t2_tile(2);
 #endif
 
-#ifdef _SM_
-    {
-#ifdef _NO_FANCY_
-#define PUT put
-#else
-#define PUT put2
-#endif
-        if (cj.mass > 0.0) {
-            omp_set_lock(ptr + jj);
-            if (ci.mass > 0.0)
-                put(values, oij, stride_j, off_diag);
-            put(values, ojj, stride_j, hess_t);
-            grad_t += dgt;
-            omp_unset_lock(ptr + jj);
-        }
-        if (ci.mass > 0.0) {
-            omp_set_lock(ptr + ii);
-            if (cj.mass > 0.0)
-                put(values, oji, stride_i, off_T);
-            put(values, oii, stride_i, hess_p);
-            grad_p += dgp;
-            omp_unset_lock(ptr + ii);
-        }
-#undef PUT
-    }
-#endif
-#ifdef _DIRECT_OUT_
-    {
-        hess_p_ret = hess_p;
-        hess_t_ret = hess_t;
-        off_diag_ret = off_diag;
-        grad_p = dgp; 
-        grad_t = dgt; 
-    }
+    output_hessian_gradient(
+#ifdef _SM_OUT_
+        lut, sparse_hess,
+        ii, jj, ci.mass > 0.0, cj.mass > 0.0,
 #endif
 #ifdef _TRIPLETS_
-
-    for (int i = 0; i < 12; i++) {
-        triplets.push_back(HessBlock(ii * 12, jj * 12 + i, off_diag.block<12, 1>(0, i)));
-        triplets.push_back(HessBlock(jj * 12, ii * 12 + i, off_T.block<12, 1>(0, i)));
-        triplets.push_back(HessBlock(ii * 12, ii * 12 + i, hess_p.block<12, 1>(0, i)));
-        triplets.push_back(HessBlock(jj * 12, jj * 12 + i, hess_t.block<12, 1>(0, i)));
-    }
-    // globals.hess_triplets.push_back({ii * 12, jj * 12, off_diag});
-    // globals.hess_triplets.push_back({jj * 12, ii * 12, off_T});
-
+        ii, jj,
+        triplets,
 #endif
+#ifdef _DIRECT_OUT_
+        hess_p_ret, hess_t_ret, off_diag_ret,
+#endif
+        grad_p, grad_t,
+        dgp, dgt,
+        hess_p, hess_t, off_diag, off_T);
 }
 tuple<mat12, vec12, double> ipc_hess_ee_12x12(
     array<vec3, 4> ee, array<int, 4> ij,

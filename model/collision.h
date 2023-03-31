@@ -6,11 +6,16 @@
 #include <ipc/distance/distance_type.hpp>
 #define _FRICTION_
 #define _SM_
+#ifdef _SM_
+#define _SM_OUT_
+#endif
 // #define NO_MOLLIFIER
 // #define _TRIPLETS_
 #define _PLUG_IN_LAN_
 #ifdef _PLUG_IN_LAN_
 #define _DIRECT_OUT_
+#undef _SM_OUT_
+#undef _TRIPLETS_
 #endif
 #ifdef _TRIPLETS_
 #include "../view/global_variables.h"
@@ -47,9 +52,25 @@ void ipc_term_vg(AffineBody& c, int v
     const Eigen::Vector2d& _uk, double contact_lambda, const Eigen::Matrix<double, 3, 2>& Tk
 #endif
 );
+
+// void output_hessian_gradient(
+// #ifdef _SM_OUT_
+//     const std::map<std::array<int, 2>, int>& lut,
+//     SparseMatrix<double>& sparse_hess,
+// #endif
+// #ifdef _TRIPLETS_
+//     vector<HessBlock>& triplets,
+// #endif
+// #ifdef _DIRECT_OUT_
+//     mat12& hess_p_ret, mat12& hess_t_ret, mat12& off_diag_ret,
+// #endif
+//     vec12& grad_p, vec12& grad_t,
+//     const vec12& dgp, const vec12& dgt,
+//     const mat12& hess_p, const mat12& hess_t, const mat12& off_diag, const mat12& off_T);
+
 void ipc_term(
     std::array<vec3, 4> pt, std::array<int, 4> ij, ipc::PointTriangleDistanceType pt_type, double dist, 
-#ifdef _SM_
+#ifdef _SM_OUT_
     const std::map<std::array<int, 2>, int>& lut,
     Eigen::SparseMatrix<double>& sparse_hess,
 #endif
