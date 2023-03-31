@@ -467,6 +467,16 @@ void implicit_euler(vector<unique_ptr<AffineBody>>& cubes, double dt)
 #endif
                 );
 #ifdef _PLUG_IN_LAN_
+
+                output_hessian_gradient(
+                    lut, sparse_hess,
+                    i, j, ci.mass > 0.0, cj.mass > 0.0,
+                    ci.grad, cj.grad,
+
+                    gradp, gradt, hess_p, hess_t, off_diag, off_diag.transpose()
+                    // ga, gb, ha, hb, hab, hab.transpose()
+
+                );
                 ga += gaf;
                 gb += gbf;
                 ha += haf;
@@ -484,10 +494,6 @@ void implicit_euler(vector<unique_ptr<AffineBody>>& cubes, double dt)
                 bool b3 = fd::compare_hessian(hb, hess_t);
                 bool b4 = fd::compare_hessian(hab, off_diag);
 
-                if (ci.mass > 0.0)
-                ci.grad += gradp;
-                if (cj.mass > 0.0)
-                cj.grad += gradt;
                 if (!b0) {
                     spdlog::error("gradient p error");
                 }
@@ -517,24 +523,33 @@ void implicit_euler(vector<unique_ptr<AffineBody>>& cubes, double dt)
             auto ee_type = ipc::edge_edge_distance_type(ee[0], ee[1], ee[2], ee[3]);
             double d = edge_edge_distance(ee[0], ee[1], ee[2], ee[3], ee_type);
             if (d < barrier::d_hat) {
-            mat12 hess_0, hess_1, off_diag;
-            ipc_term_ee(
-                ee, ij, ee_type, d,
+                mat12 hess_0, hess_1, off_diag;
+                vec12 grad_0, grad_1;
+                ipc_term_ee(
+                    ee, ij, ee_type, d,
 #ifdef _SM_OUT_
-                lut, sparse_hess,
+                    lut, sparse_hess,
 #endif
 #ifdef _TRIPLETS_
-                globals.hess_triplets,
+                    globals.hess_triplets,
 #endif
-                #ifdef _DIRECT_OUT_
-                hess_0, hess_1, off_diag,
-                #endif
-                ci.grad, cj.grad
+#ifdef _DIRECT_OUT_
+                    hess_0, hess_1, off_diag,
+#endif
+                    grad_0, grad_1
 #ifdef _FRICTION_
-                ,
-                ee_contact_forces[k], ee_tk[k]
+                    ,
+                    ee_contact_forces[k], ee_tk[k]
 #endif
-            );
+                );
+
+#ifdef _PLUG_IN_LAN_
+                output_hessian_gradient(
+                    lut, sparse_hess,
+                    i, j, ci.mass > 0.0, cj.mass > 0.0,
+                    ci.grad, cj.grad, grad_0, grad_1, hess_0, hess_1, off_diag, off_diag.transpose());
+
+#endif
             }
         }
 

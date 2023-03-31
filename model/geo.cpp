@@ -86,7 +86,38 @@ void output_hessian_gradient(
     const vec12& dgp, const vec12& dgt,
     const mat12& hess_p, const mat12& hess_t, const mat12& off_diag, const mat12& off_T)
 {
-    {
+    auto outers = sparse_hess.outerIndexPtr();
+    auto values = sparse_hess.valuePtr();
+
+    auto stride_j = stride(jj, outers), stride_i = stride(ii, outers);
+    auto oii = starting_offset(ii, ii, lut, outers), ojj = starting_offset(jj, jj, lut, outers), oij = starting_offset(ii, jj, lut, outers), oji = starting_offset(jj, ii, lut, outers);
+    auto ptr = globals.writelock_cols.data();
+
+    if (cj_nonstatic) {
+        omp_set_lock(ptr + jj);
+        if (ci_nonstatic)
+            put(values, oij, stride_j, off_diag);
+        put(values, ojj, stride_j, hess_t);
+        grad_t += dgt;
+        omp_unset_lock(ptr + jj);
+    }
+    if (ci_nonstatic) {
+        omp_set_lock(ptr + ii);
+        if (cj_nonstatic)
+            put(values, oji, stride_i, off_T);
+        put(values, oii, stride_i, hess_p);
+        grad_p += dgp;
+        omp_unset_lock(ptr + ii);
+    }
+}
+void output_hessian_gradient(
+    const std::map<std::array<int, 2>, int>& lut,
+    SparseMatrix<double>& sparse_hess,
+    int ii, int jj, bool ci_nonstatic, bool cj_nonstatic,
+    vec12& grad_p, vec12& grad_t,
+    const vec12& dgp, const vec12& dgt,
+    mat3 hess_p[4][4], mat3 hess_t[4][4], mat3 off_diag[4][4], mat3 off_T[4][4])
+{
         auto outers = sparse_hess.outerIndexPtr();
         auto values = sparse_hess.valuePtr();
 
@@ -94,29 +125,22 @@ void output_hessian_gradient(
         auto oii = starting_offset(ii, ii, lut, outers), ojj = starting_offset(jj, jj, lut, outers), oij = starting_offset(ii, jj, lut, outers), oji = starting_offset(jj, ii, lut, outers);
         auto ptr = globals.writelock_cols.data();
 
-#ifdef _NO_FANCY_
-#define PUT put
-#else
-#define PUT put2
-#endif
         if (cj_nonstatic) {
             omp_set_lock(ptr + jj);
             if (ci_nonstatic)
-                put(values, oij, stride_j, off_diag);
-            put(values, ojj, stride_j, hess_t);
+                put2(values, oij, stride_j, off_diag);
+            put2(values, ojj, stride_j, hess_t);
             grad_t += dgt;
             omp_unset_lock(ptr + jj);
         }
         if (ci_nonstatic) {
             omp_set_lock(ptr + ii);
             if (cj_nonstatic)
-                put(values, oji, stride_i, off_T);
-            put(values, oii, stride_i, hess_p);
+                put2(values, oji, stride_i, off_T);
+            put2(values, oii, stride_i, hess_p);
             grad_p += dgp;
             omp_unset_lock(ptr + ii);
         }
-#undef PUT
-    }
 }
 
 void output_hessian_gradient(

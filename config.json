@@ -50,7 +50,7 @@
     "iaabb": 3,
     "evh": 1e-3,
     "vg_friction": true,
-    "pt_friction": false,
+    "pt_friction": true,
     "ee_friction": false,
 
     "params_double": {

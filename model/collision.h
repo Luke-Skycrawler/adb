@@ -106,3 +106,11 @@ void ipc_term_ee(
     double& contact_lambda, Eigen::Matrix<double, 2, 12>& Tk
 #endif
 );
+
+void output_hessian_gradient(
+    const std::map<std::array<int, 2>, int>& lut,
+    Eigen::SparseMatrix<double>& sparse_hess,
+    int ii, int jj, bool ci_nonstatic, bool cj_nonstatic,
+    vec12& grad_p, vec12& grad_t,
+    const vec12& dgp, const vec12& dgt,
+    const mat12& hess_p, const mat12& hess_t, const mat12& off_diag, const mat12& off_T);
