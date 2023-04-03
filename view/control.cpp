@@ -42,6 +42,7 @@ void reset(bool init)
     globals.trace_folder = data["trace_folder"];
     globals.iaabb = data["iaabb"];
     globals.evh = data["evh"];
+    globals.kappa = data["kappa"];
     {
         globals.vg_fric = data["vg_friction"];
         globals.pt_fric = data["pt_friction"];

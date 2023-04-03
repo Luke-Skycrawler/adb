@@ -13,7 +13,7 @@
     "gravity": true, 
     "line_search": true,
     "col_set": true,
-    "ee": true,
+    "ee": false,
     "pt": true,
     "ground": true,
     "safe_factor": 1.0,
@@ -52,9 +52,9 @@
     "vg_friction": true,
     "pt_friction": true,
     "ee_friction": true,
-
+    "kappa": 1e-3,
     "params_double": {
-        "tol": 1e-2,
+        "tol": 1e-3,
         "dhat_sqr": 1e-2,
         "kappa": 1e1,
         "c1": 1e-4,

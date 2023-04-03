@@ -671,7 +671,10 @@ void implicit_euler(vector<unique_ptr<AffineBody>>& cubes, double dt)
                 output_hessian_gradient(
                     lut, sparse_hess,
                     i, j, ci.mass > 0.0, cj.mass > 0.0,
-                    ci.grad, cj.grad, grad_0, grad_1, hess_0, hess_1, off_diag, off_diag.transpose());
+                    ci.grad, cj.grad, 
+                    // grad_0, grad_1, hess_0, hess_1, off_diag, off_diag.transpose()
+                    ga, gb, ha, hb, hab, hab.transpose()
+                    );
 
                 bool b0 = ::fd::compare_gradient(ga, grad_0);
                 bool b1 = ::fd::compare_gradient(gb, grad_1);
