@@ -8,7 +8,7 @@
 #include <chrono>
 #include "../model/time_integrator.h"
 #include "spdlog/sinks/basic_file_sink.h"
-
+#include "../model/barrier.h"
 #define __IPC__ 0
 #define __SOLVER__ 1
 #define __CCD__ 2
@@ -122,6 +122,7 @@ void reset(bool init)
     for (auto p: params_int.items()) {
         globals.params_int[p.key()] = p.value();
     }
+    barrier::kappa = globals.kappa;
 }
 // process all input: query GLFW whether relevant keys are pressed/released this frame and react accordingly
 // ---------------------------------------------------------------------------------------------------------

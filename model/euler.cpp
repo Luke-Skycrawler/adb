@@ -413,33 +413,33 @@ void implicit_euler(vector<unique_ptr<AffineBody>>& cubes, double dt)
                 AIPC::IpcFrictionConstraintOp3D* friction_constraint;
                 AIPC::IpcConstraintOp3D* constraint;
                 if (pt_type == ipc::PointTriangleDistanceType::P_T0) {
-                    friction_constraint = new AIPC::IpcPPFConstraint(0, 0, 1, dpdx, surface_x, surface_X, barrier::d_hat, barrier::kappa, globals.mu, globals.dt, evh, 1.0, 1.0);
-                    constraint = new AIPC::IpcPPConstraint(0, 0, 1, dpdx, surface_x, surface_X, barrier::d_hat, barrier::kappa, globals.dt, 1.0);
+                    friction_constraint = new AIPC::IpcPPFConstraint(0, 0, 1, dpdx, surface_x, surface_X, barrier::d_hat, globals.kappa, globals.mu, globals.dt, evh, 1.0, 1.0);
+                    constraint = new AIPC::IpcPPConstraint(0, 0, 1, dpdx, surface_x, surface_X, barrier::d_hat, globals.kappa, globals.dt, 1.0);
                 }
 
                 else if (pt_type == ipc::PointTriangleDistanceType::P_T1) {
-                    friction_constraint = new AIPC::IpcPPFConstraint(0, 0, 2, dpdx, surface_x, surface_X, barrier::d_hat, barrier::kappa, globals.mu, globals.dt, evh, 1.0, 1.0);
-                    constraint = new AIPC::IpcPPConstraint(0, 0, 2, dpdx, surface_x, surface_X, barrier::d_hat, barrier::kappa, globals.dt, 1.0);
+                    friction_constraint = new AIPC::IpcPPFConstraint(0, 0, 2, dpdx, surface_x, surface_X, barrier::d_hat, globals.kappa, globals.mu, globals.dt, evh, 1.0, 1.0);
+                    constraint = new AIPC::IpcPPConstraint(0, 0, 2, dpdx, surface_x, surface_X, barrier::d_hat, globals.kappa, globals.dt, 1.0);
                 }
                 else if (pt_type == ipc::PointTriangleDistanceType::P_T2) {
-                    friction_constraint = new AIPC::IpcPPFConstraint(0, 0, 3, dpdx, surface_x, surface_X, barrier::d_hat, barrier::kappa, globals.mu, globals.dt, evh, 1.0, 1.0);
-                    constraint = new AIPC::IpcPPConstraint(0, 0, 3, dpdx, surface_x, surface_X, barrier::d_hat, barrier::kappa, globals.dt, 1.0);
+                    friction_constraint = new AIPC::IpcPPFConstraint(0, 0, 3, dpdx, surface_x, surface_X, barrier::d_hat, globals.kappa, globals.mu, globals.dt, evh, 1.0, 1.0);
+                    constraint = new AIPC::IpcPPConstraint(0, 0, 3, dpdx, surface_x, surface_X, barrier::d_hat, globals.kappa, globals.dt, 1.0);
                 }
                 else if (pt_type == ipc::PointTriangleDistanceType::P_E0) {
-                    friction_constraint = new AIPC::IpcPEFConstraint(0, 0, 1, 2, dpdx, surface_x, surface_X, barrier::d_hat, barrier::kappa, globals.mu, globals.dt, evh, 1.0, 1.0);
-                    constraint = new AIPC::IpcPEConstraint(0, 0, 1, 2, dpdx, surface_x, surface_X, barrier::d_hat, barrier::kappa, globals.dt, 1.0);
+                    friction_constraint = new AIPC::IpcPEFConstraint(0, 0, 1, 2, dpdx, surface_x, surface_X, barrier::d_hat, globals.kappa, globals.mu, globals.dt, evh, 1.0, 1.0);
+                    constraint = new AIPC::IpcPEConstraint(0, 0, 1, 2, dpdx, surface_x, surface_X, barrier::d_hat, globals.kappa, globals.dt, 1.0);
                 }
                 else if (pt_type == ipc::PointTriangleDistanceType::P_E1) {
-                    friction_constraint = new AIPC::IpcPEFConstraint(0, 0, 2, 3, dpdx, surface_x, surface_X, barrier::d_hat, barrier::kappa, globals.mu, globals.dt, evh, 1.0, 1.0);
-                    constraint = new AIPC::IpcPEConstraint(0, 0, 2, 3, dpdx, surface_x, surface_X, barrier::d_hat, barrier::kappa, globals.dt, 1.0);
+                    friction_constraint = new AIPC::IpcPEFConstraint(0, 0, 2, 3, dpdx, surface_x, surface_X, barrier::d_hat, globals.kappa, globals.mu, globals.dt, evh, 1.0, 1.0);
+                    constraint = new AIPC::IpcPEConstraint(0, 0, 2, 3, dpdx, surface_x, surface_X, barrier::d_hat, globals.kappa, globals.dt, 1.0);
                 }
                 else if (pt_type == ipc::PointTriangleDistanceType::P_E2) {
-                    friction_constraint = new AIPC::IpcPEFConstraint(0, 0, 3, 1, dpdx, surface_x, surface_X, barrier::d_hat, barrier::kappa, globals.mu, globals.dt, evh, 1.0, 1.0);
-                    constraint = new AIPC::IpcPEConstraint(0, 0, 3, 1, dpdx, surface_x, surface_X, barrier::d_hat, barrier::kappa, globals.dt, 1.0);
+                    friction_constraint = new AIPC::IpcPEFConstraint(0, 0, 3, 1, dpdx, surface_x, surface_X, barrier::d_hat, globals.kappa, globals.mu, globals.dt, evh, 1.0, 1.0);
+                    constraint = new AIPC::IpcPEConstraint(0, 0, 3, 1, dpdx, surface_x, surface_X, barrier::d_hat, globals.kappa, globals.dt, 1.0);
                 }
                 else {
-                    friction_constraint = new AIPC::IpcPTFConstraint(0, 0, 1, 2, 3, dpdx, surface_x, surface_X, barrier::d_hat, barrier::kappa, globals.mu, globals.dt, evh, 1.0, 1.0);
-                    constraint = new AIPC::IpcPTConstraint(0, 0, 1, 2, 3, dpdx, surface_x, surface_X, barrier::d_hat, barrier::kappa, globals.dt, 1.0);
+                    friction_constraint = new AIPC::IpcPTFConstraint(0, 0, 1, 2, 3, dpdx, surface_x, surface_X, barrier::d_hat, globals.kappa, globals.mu, globals.dt, evh, 1.0, 1.0);
+                    constraint = new AIPC::IpcPTConstraint(0, 0, 1, 2, 3, dpdx, surface_x, surface_X, barrier::d_hat, globals.kappa, globals.dt, 1.0);
                 }
 
 #endif
@@ -601,40 +601,40 @@ void implicit_euler(vector<unique_ptr<AffineBody>>& cubes, double dt)
                 AIPC::IpcFrictionConstraintOp3D* friction_constraint;
                 AIPC::IpcConstraintOp3D* constraint;
                 if (ee_type == ipc::EdgeEdgeDistanceType::EA0_EB0) {
-                    friction_constraint = new AIPC::IpcPPFConstraint(0, 0, 2, dpdx, surface_x, surface_X, barrier::d_hat, barrier::kappa, globals.mu, globals.dt, evh, 1.0, 1.0);
-                    constraint = new AIPC::IpcPPConstraint(0, 0, 2, dpdx, surface_x, surface_X, barrier::d_hat, barrier::kappa, globals.dt, 1.0);
+                    friction_constraint = new AIPC::IpcPPFConstraint(0, 0, 2, dpdx, surface_x, surface_X, barrier::d_hat, globals.kappa, globals.mu, globals.dt, evh, 1.0, 1.0);
+                    constraint = new AIPC::IpcPPConstraint(0, 0, 2, dpdx, surface_x, surface_X, barrier::d_hat, globals.kappa, globals.dt, 1.0);
                 }
                 else if (ee_type == ipc::EdgeEdgeDistanceType::EA0_EB1) {
-                    friction_constraint = new AIPC::IpcPPFConstraint(0, 0, 3, dpdx, surface_x, surface_X, barrier::d_hat, barrier::kappa, globals.mu, globals.dt, evh, 1.0, 1.0);
-                    constraint = new AIPC::IpcPPConstraint(0, 0, 3, dpdx, surface_x, surface_X, barrier::d_hat, barrier::kappa, globals.dt, 1.0);
+                    friction_constraint = new AIPC::IpcPPFConstraint(0, 0, 3, dpdx, surface_x, surface_X, barrier::d_hat, globals.kappa, globals.mu, globals.dt, evh, 1.0, 1.0);
+                    constraint = new AIPC::IpcPPConstraint(0, 0, 3, dpdx, surface_x, surface_X, barrier::d_hat, globals.kappa, globals.dt, 1.0);
                 }
                 else if (ee_type == ipc::EdgeEdgeDistanceType::EA1_EB0) {
-                    friction_constraint = new AIPC::IpcPPFConstraint(0, 1, 2, dpdx, surface_x, surface_X, barrier::d_hat, barrier::kappa, globals.mu, globals.dt, evh, 1.0, 1.0);
-                    constraint = new AIPC::IpcPPConstraint(0, 1, 2, dpdx, surface_x, surface_X, barrier::d_hat, barrier::kappa, globals.dt, 1.0);
+                    friction_constraint = new AIPC::IpcPPFConstraint(0, 1, 2, dpdx, surface_x, surface_X, barrier::d_hat, globals.kappa, globals.mu, globals.dt, evh, 1.0, 1.0);
+                    constraint = new AIPC::IpcPPConstraint(0, 1, 2, dpdx, surface_x, surface_X, barrier::d_hat, globals.kappa, globals.dt, 1.0);
                 }
                 else if (ee_type == ipc::EdgeEdgeDistanceType::EA1_EB1) {
-                    friction_constraint = new AIPC::IpcPPFConstraint(0, 1, 3, dpdx, surface_x, surface_X, barrier::d_hat, barrier::kappa, globals.mu, globals.dt, evh, 1.0, 1.0);
-                    constraint = new AIPC::IpcPPConstraint(0, 1, 3, dpdx, surface_x, surface_X, barrier::d_hat, barrier::kappa, globals.dt, 1.0);
+                    friction_constraint = new AIPC::IpcPPFConstraint(0, 1, 3, dpdx, surface_x, surface_X, barrier::d_hat, globals.kappa, globals.mu, globals.dt, evh, 1.0, 1.0);
+                    constraint = new AIPC::IpcPPConstraint(0, 1, 3, dpdx, surface_x, surface_X, barrier::d_hat, globals.kappa, globals.dt, 1.0);
                 }
                 else if (ee_type == ipc::EdgeEdgeDistanceType::EA_EB0) {
-                    friction_constraint = new AIPC::IpcPEFConstraint(0, 2, 0, 1, dpdx, surface_x, surface_X, barrier::d_hat, barrier::kappa, globals.mu, globals.dt, evh, 1.0, 1.0);
-                    constraint = new AIPC::IpcPEConstraint(0, 2, 0, 1, dpdx, surface_x, surface_X, barrier::d_hat, barrier::kappa, globals.dt, 1.0);
+                    friction_constraint = new AIPC::IpcPEFConstraint(0, 2, 0, 1, dpdx, surface_x, surface_X, barrier::d_hat, globals.kappa, globals.mu, globals.dt, evh, 1.0, 1.0);
+                    constraint = new AIPC::IpcPEConstraint(0, 2, 0, 1, dpdx, surface_x, surface_X, barrier::d_hat, globals.kappa, globals.dt, 1.0);
                 }
                 else if (ee_type == ipc::EdgeEdgeDistanceType::EA_EB1) {
-                    friction_constraint = new AIPC::IpcPEFConstraint(0, 3, 0, 1, dpdx, surface_x, surface_X, barrier::d_hat, barrier::kappa, globals.mu, globals.dt, evh, 1.0, 1.0);
-                    constraint = new AIPC::IpcPEConstraint(0, 3, 0, 1, dpdx, surface_x, surface_X, barrier::d_hat, barrier::kappa, globals.dt, 1.0);
+                    friction_constraint = new AIPC::IpcPEFConstraint(0, 3, 0, 1, dpdx, surface_x, surface_X, barrier::d_hat, globals.kappa, globals.mu, globals.dt, evh, 1.0, 1.0);
+                    constraint = new AIPC::IpcPEConstraint(0, 3, 0, 1, dpdx, surface_x, surface_X, barrier::d_hat, globals.kappa, globals.dt, 1.0);
                 }
                 else if (ee_type == ipc::EdgeEdgeDistanceType::EA0_EB) {
-                    friction_constraint = new AIPC::IpcPEFConstraint(0, 0, 2, 3, dpdx, surface_x, surface_X, barrier::d_hat, barrier::kappa, globals.mu, globals.dt, evh, 1.0, 1.0);
-                    constraint = new AIPC::IpcPEConstraint(0, 0, 2, 3, dpdx, surface_x, surface_X, barrier::d_hat, barrier::kappa, globals.dt, 1.0);
+                    friction_constraint = new AIPC::IpcPEFConstraint(0, 0, 2, 3, dpdx, surface_x, surface_X, barrier::d_hat, globals.kappa, globals.mu, globals.dt, evh, 1.0, 1.0);
+                    constraint = new AIPC::IpcPEConstraint(0, 0, 2, 3, dpdx, surface_x, surface_X, barrier::d_hat, globals.kappa, globals.dt, 1.0);
                 }
                 else if (ee_type == ipc::EdgeEdgeDistanceType::EA1_EB) {
-                    friction_constraint = new AIPC::IpcPEFConstraint(0, 1, 2, 3, dpdx, surface_x, surface_X, barrier::d_hat, barrier::kappa, globals.mu, globals.dt, evh, 1.0, 1.0);
-                    constraint = new AIPC::IpcPEConstraint(0, 1, 2, 3, dpdx, surface_x, surface_X, barrier::d_hat, barrier::kappa, globals.dt, 1.0);
+                    friction_constraint = new AIPC::IpcPEFConstraint(0, 1, 2, 3, dpdx, surface_x, surface_X, barrier::d_hat, globals.kappa, globals.mu, globals.dt, evh, 1.0, 1.0);
+                    constraint = new AIPC::IpcPEConstraint(0, 1, 2, 3, dpdx, surface_x, surface_X, barrier::d_hat, globals.kappa, globals.dt, 1.0);
                 }
                 else {
-                    friction_constraint = new AIPC::IpcEEFConstraint(0, 0, 1, 2, 3, dpdx, surface_x, surface_X, barrier::d_hat, barrier::kappa, globals.mu, globals.dt, evh, 1.0, 1.0);
-                    constraint = new AIPC::IpcEEConstraint(0, 0, 1, 2, 3, dpdx, surface_x, surface_X, barrier::d_hat, barrier::kappa, globals.dt, 1.0);
+                    friction_constraint = new AIPC::IpcEEFConstraint(0, 0, 1, 2, 3, dpdx, surface_x, surface_X, barrier::d_hat, globals.kappa, globals.mu, globals.dt, evh, 1.0, 1.0);
+                    constraint = new AIPC::IpcEEConstraint(0, 0, 1, 2, 3, dpdx, surface_x, surface_X, barrier::d_hat, globals.kappa, globals.dt, 1.0);
                 }
                 //if (false) {
                 if (ee_type == ipc::EdgeEdgeDistanceType::EA_EB0 || ee_type == ipc::EdgeEdgeDistanceType::EA_EB1) {
@@ -671,10 +671,14 @@ void implicit_euler(vector<unique_ptr<AffineBody>>& cubes, double dt)
                 output_hessian_gradient(
                     lut, sparse_hess,
                     i, j, ci.mass > 0.0, cj.mass > 0.0,
-                    ci.grad, cj.grad, 
-                    // grad_0, grad_1, hess_0, hess_1, off_diag, off_diag.transpose()
+                    ci.grad, cj.grad,
+#define LANS_DIRECT
+#ifdef LANS_DIRECT
                     ga, gb, ha, hb, hab, hab.transpose()
-                    );
+#else
+                    grad_0, grad_1, hess_0, hess_1, off_diag, off_diag.transpose()
+#endif
+                );
 
                 bool b0 = ::fd::compare_gradient(ga, grad_0);
                 bool b1 = ::fd::compare_gradient(gb, grad_1);
@@ -711,6 +715,7 @@ void implicit_euler(vector<unique_ptr<AffineBody>>& cubes, double dt)
                         return 8;
                     }
                 };
+#ifndef LANS_DIRECT
                 if (!b0) {
                     spdlog::error("ee gradient p error, {}", to_int(ee_type));
                 }
@@ -726,6 +731,7 @@ void implicit_euler(vector<unique_ptr<AffineBody>>& cubes, double dt)
                 if (!b4) {
                     spdlog::error("ee hessian off_diag error, {}", to_int(ee_type));
                 }
+#endif
 #endif
             }
         }

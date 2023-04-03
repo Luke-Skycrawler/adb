@@ -1,11 +1,14 @@
 #include "barrier.h"
 using namespace std;
 
+double barrier::d_hat = 1e-4, barrier::kappa = 1e-3;
+double barrier::d_sqrt = 1e-2;
 namespace barrier
 {
-    double barrier_function(double d){
-        if (d >= d_hat) return 0.0;
-        return kappa * -(d - d_hat) * (d - d_hat) * log(d / d_hat) / (d_hat * d_hat);
+double barrier_function(double d)
+{
+    if (d >= d_hat) return 0.0;
+    return kappa * -(d - d_hat) * (d - d_hat) * log(d / d_hat) / (d_hat * d_hat);
     }
     double barrier_second_derivative(double d)
     {
