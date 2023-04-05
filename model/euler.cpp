@@ -531,6 +531,9 @@ void implicit_euler(vector<unique_ptr<AffineBody>>& cubes, double dt)
             if (d < barrier::d_hat) {
                 mat12 hess_0, hess_1, off_diag;
                 vec12 grad_0, grad_1;
+                double eps_x = globals.eps_x * (ee[0] - ee[1]).squaredNorm() * (ee[2] - ee[3]).squaredNorm();
+
+                double mollifier = ipc::edge_edge_mollifier(ee[0], ee[1], ee[2], ee[3], eps_x);
                 ipc_term_ee(
                     ee, ij, ee_type, d,
 #ifdef _SM_OUT_
@@ -576,7 +579,6 @@ void implicit_euler(vector<unique_ptr<AffineBody>>& cubes, double dt)
 
                 vector<vec3> surface_x{ ee[0], ee[1], ee[2], ee[3] }, surface_xhat{ ei00, ei10, ej00, ej10 }, surface_X{ ei0r, ei1r, ej0r, ej1r };
                 vector<pair<Vector4i, Vector4d>> dpdx{ { cid_ei0, w_ei0 }, { cid_ei1, w_ei1 }, { cid_ej0, w_ej0 }, { cid_ej1, w_ej1 } };
-
                 vec12 ga, gb;
                 ga.setZero(12);
                 gb.setZero(12);
@@ -603,38 +605,55 @@ void implicit_euler(vector<unique_ptr<AffineBody>>& cubes, double dt)
                 if (ee_type == ipc::EdgeEdgeDistanceType::EA0_EB0) {
                     friction_constraint = new AIPC::IpcPPFConstraint(0, 0, 2, dpdx, surface_x, surface_X, barrier::d_hat, globals.kappa, globals.mu, globals.dt, evh, 1.0, 1.0);
                     constraint = new AIPC::IpcPPConstraint(0, 0, 2, dpdx, surface_x, surface_X, barrier::d_hat, globals.kappa, globals.dt, 1.0);
+                    // constraint = new AIPC::IpcPPMConstraint(0, 0, 1, 2, 3, dpdx, surface_x, surface_X, barrier::d_hat, globals.kappa, globals.dt, 1.0, mollifier, eps_x);
                 }
                 else if (ee_type == ipc::EdgeEdgeDistanceType::EA0_EB1) {
                     friction_constraint = new AIPC::IpcPPFConstraint(0, 0, 3, dpdx, surface_x, surface_X, barrier::d_hat, globals.kappa, globals.mu, globals.dt, evh, 1.0, 1.0);
                     constraint = new AIPC::IpcPPConstraint(0, 0, 3, dpdx, surface_x, surface_X, barrier::d_hat, globals.kappa, globals.dt, 1.0);
+                    // constraint = new AIPC::IpcPPMConstraint(0, 0, 1, 2, 3, dpdx, surface_x, surface_X, barrier::d_hat, globals.kappa, globals.dt, 1.0, mollifier, eps_x);
+
                 }
                 else if (ee_type == ipc::EdgeEdgeDistanceType::EA1_EB0) {
                     friction_constraint = new AIPC::IpcPPFConstraint(0, 1, 2, dpdx, surface_x, surface_X, barrier::d_hat, globals.kappa, globals.mu, globals.dt, evh, 1.0, 1.0);
                     constraint = new AIPC::IpcPPConstraint(0, 1, 2, dpdx, surface_x, surface_X, barrier::d_hat, globals.kappa, globals.dt, 1.0);
+                    // constraint = new AIPC::IpcPPMConstraint(0, 0, 1, 2, 3, dpdx, surface_x, surface_X, barrier::d_hat, globals.kappa, globals.dt, 1.0, mollifier, eps_x);
+
                 }
                 else if (ee_type == ipc::EdgeEdgeDistanceType::EA1_EB1) {
                     friction_constraint = new AIPC::IpcPPFConstraint(0, 1, 3, dpdx, surface_x, surface_X, barrier::d_hat, globals.kappa, globals.mu, globals.dt, evh, 1.0, 1.0);
                     constraint = new AIPC::IpcPPConstraint(0, 1, 3, dpdx, surface_x, surface_X, barrier::d_hat, globals.kappa, globals.dt, 1.0);
+                    // constraint = new AIPC::IpcPPMConstraint(0, 0, 1, 2, 3, dpdx, surface_x, surface_X, barrier::d_hat, globals.kappa, globals.dt, 1.0, mollifier, eps_x);
+
                 }
                 else if (ee_type == ipc::EdgeEdgeDistanceType::EA_EB0) {
                     friction_constraint = new AIPC::IpcPEFConstraint(0, 2, 0, 1, dpdx, surface_x, surface_X, barrier::d_hat, globals.kappa, globals.mu, globals.dt, evh, 1.0, 1.0);
                     constraint = new AIPC::IpcPEConstraint(0, 2, 0, 1, dpdx, surface_x, surface_X, barrier::d_hat, globals.kappa, globals.dt, 1.0);
+                    // constraint = new AIPC::IpcPEMConstraint(0, 0, 1, 2, 3, dpdx, surface_x, surface_X, barrier::d_hat, globals.kappa, globals.dt, 1.0, mollifier, eps_x);
+
                 }
                 else if (ee_type == ipc::EdgeEdgeDistanceType::EA_EB1) {
                     friction_constraint = new AIPC::IpcPEFConstraint(0, 3, 0, 1, dpdx, surface_x, surface_X, barrier::d_hat, globals.kappa, globals.mu, globals.dt, evh, 1.0, 1.0);
                     constraint = new AIPC::IpcPEConstraint(0, 3, 0, 1, dpdx, surface_x, surface_X, barrier::d_hat, globals.kappa, globals.dt, 1.0);
+                    // constraint = new AIPC::IpcPEMConstraint(0, 0, 1, 2, 3, dpdx, surface_x, surface_X, barrier::d_hat, globals.kappa, globals.dt, 1.0, mollifier, eps_x);
+
                 }
                 else if (ee_type == ipc::EdgeEdgeDistanceType::EA0_EB) {
                     friction_constraint = new AIPC::IpcPEFConstraint(0, 0, 2, 3, dpdx, surface_x, surface_X, barrier::d_hat, globals.kappa, globals.mu, globals.dt, evh, 1.0, 1.0);
                     constraint = new AIPC::IpcPEConstraint(0, 0, 2, 3, dpdx, surface_x, surface_X, barrier::d_hat, globals.kappa, globals.dt, 1.0);
+                    // constraint = new AIPC::IpcPEMConstraint(0, 0, 1, 2, 3, dpdx, surface_x, surface_X, barrier::d_hat, globals.kappa, globals.dt, 1.0, mollifier, eps_x);
+
                 }
                 else if (ee_type == ipc::EdgeEdgeDistanceType::EA1_EB) {
                     friction_constraint = new AIPC::IpcPEFConstraint(0, 1, 2, 3, dpdx, surface_x, surface_X, barrier::d_hat, globals.kappa, globals.mu, globals.dt, evh, 1.0, 1.0);
                     constraint = new AIPC::IpcPEConstraint(0, 1, 2, 3, dpdx, surface_x, surface_X, barrier::d_hat, globals.kappa, globals.dt, 1.0);
+                    // constraint = new AIPC::IpcPEMConstraint(0, 0, 1, 2, 3, dpdx, surface_x, surface_X, barrier::d_hat, globals.kappa, globals.dt, 1.0, mollifier, eps_x);
+
                 }
                 else {
                     friction_constraint = new AIPC::IpcEEFConstraint(0, 0, 1, 2, 3, dpdx, surface_x, surface_X, barrier::d_hat, globals.kappa, globals.mu, globals.dt, evh, 1.0, 1.0);
-                    constraint = new AIPC::IpcEEConstraint(0, 0, 1, 2, 3, dpdx, surface_x, surface_X, barrier::d_hat, globals.kappa, globals.dt, 1.0);
+                    // constraint = new AIPC::IpcEEConstraint(0, 0, 1, 2, 3, dpdx, surface_x, surface_X, barrier::d_hat, globals.kappa, globals.dt, 1.0);
+                    constraint = new AIPC::IpcEEMConstraint(0, 0, 1, 2, 3, dpdx, surface_x, surface_X, barrier::d_hat, globals.kappa, globals.dt, 1.0, mollifier, eps_x);
+
                 }
                 //if (false) {
                 if (ee_type == ipc::EdgeEdgeDistanceType::EA_EB0 || ee_type == ipc::EdgeEdgeDistanceType::EA_EB1) {
@@ -672,7 +691,7 @@ void implicit_euler(vector<unique_ptr<AffineBody>>& cubes, double dt)
                     lut, sparse_hess,
                     i, j, ci.mass > 0.0, cj.mass > 0.0,
                     ci.grad, cj.grad,
-#define LANS_DIRECT
+// #define LANS_DIRECT
 #ifdef LANS_DIRECT
                     ga, gb, ha, hb, hab, hab.transpose()
 #else
@@ -717,19 +736,19 @@ void implicit_euler(vector<unique_ptr<AffineBody>>& cubes, double dt)
                 };
 #ifndef LANS_DIRECT
                 if (!b0) {
-                    spdlog::error("ee gradient p error, {}", to_int(ee_type));
+                    spdlog::error("ee gradient p error, {}, molli = {}", to_int(ee_type), mollifier);
                 }
                 if (!b1) {
-                    spdlog::error("ee gradient t error, {}", to_int(ee_type));
+                    spdlog::error("ee gradient t error, {}, molli = {}", to_int(ee_type), mollifier);
                 }
                 if (!b2) {
-                    spdlog::error("ee hessian p error, {}", to_int(ee_type));
+                    spdlog::error("ee hessian p error, {}, molli = {}", to_int(ee_type), mollifier);
                 }
                 if (!b3) {
-                    spdlog::error("ee hessian t error, {}", to_int(ee_type));
+                    spdlog::error("ee hessian t error, {}, molli = {}", to_int(ee_type), mollifier);
                 }
                 if (!b4) {
-                    spdlog::error("ee hessian off_diag error, {}", to_int(ee_type));
+                    spdlog::error("ee hessian off_diag error, {}, molli = {}", to_int(ee_type), mollifier);
                 }
 #endif
 #endif

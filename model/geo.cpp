@@ -420,6 +420,9 @@ void ipc_term_ee(
 
     Vector2d _uk;
     contact_lambda = utils::ee_uktk(ci, cj, ee, ij, ee_type, Tk, _uk, dist, globals.dt, p);
+    if (p != 1.0) {
+        contact_lambda = contact_lambda * p;
+    }
 
 #ifdef _FRICTION_
     bool ee_parallel = ee_type == ::ipc::EdgeEdgeDistanceType::EA_EB && p != 1.0;
