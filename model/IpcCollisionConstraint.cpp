@@ -481,5 +481,387 @@ void IpcEEConstraint::hessian(const Field<Vector<T, dim>>& dof_x, const Field<Ve
         }
     }
 }
+double IpcPPMConstraint::energy(const Field<Vector<T, dim>>& dof_x, const Field<Vector<T, dim>>& surface_x, const Field<Vector<T, dim>>& surface_X, const Field<Vector<T, dim>>& surface_xhat, const std::map<int, T>& snode_area)
+{
+    return scale * mollifier * barrier_dist2;
+}
 
+void IpcPPMConstraint::gradient(const Field<Vector<T, dim>>& dof_x, const Field<Vector<T, dim>>& surface_x, const Field<Vector<T, dim>>& surface_X, const Field<Vector<T, dim>>& surface_xhat, const std::map<int, T>& snode_area, VectorXd& ga, VectorXd& gb)
+{
+    ::ipc::point_point_distance_gradient(surface_x[c_nodes[0]], surface_x[c_nodes[2]], PP_grad);
+    mollifier_gradient(c_nodes[0], c_nodes[1], c_nodes[2], c_nodes[3], surface_x, surface_X, eps_x, mollifier_grad);
+
+    for (int i = 0; i < 4; i++) {
+        for (int j = 0; j < 3; j++) {
+            ga.data()[3 * i + j] = scale * (w[i] * (barrier_dist2 * mollifier_grad.data()[j] + mollifier * barrier_gradient * PP_grad.data()[j]) + w[4 + i] * (barrier_dist2 * mollifier_grad.data()[3 + j]));
+            gb.data()[3 * i + j] = scale * (w[8 + i] * (barrier_dist2 * mollifier_grad.data()[6 + j] + mollifier * barrier_gradient * PP_grad.data()[3 + j]) + w[12 + i] * (barrier_dist2 * mollifier_grad.data()[9 + j]));
+        }
+    }
+}
+
+void IpcPPMConstraint::hessian(const Field<Vector<T, dim>>& dof_x, const Field<Vector<T, dim>>& surface_x, const Field<Vector<T, dim>>& surface_X, const Field<Vector<T, dim>>& surface_xhat, const std::map<int, T>& snode_area, MatrixXd& aa_hess, MatrixXd& bb_hess, MatrixXd& ab_hess, const bool project_pd)
+{
+    Matrix<T, 6, 6> barrier_dist2_hess;
+    T barrier_hessian = _barrier_hessian(dist2, dHat2, kappa);
+    ::ipc::point_point_distance_hessian(surface_x[c_nodes[0]], surface_x[c_nodes[2]], barrier_dist2_hess);
+    for (int r = 0; r < 6; r++) {
+        for (int c = r; c < 6; c++) {
+            T val = barrier_gradient * barrier_dist2_hess.data()[6 * c + r] + barrier_hessian * PP_grad.data()[r] * PP_grad.data()[c];
+            barrier_dist2_hess.data()[6 * c + r] = val;
+            barrier_dist2_hess.data()[6 * r + c] = val;
+        }
+    }
+
+    Matrix<T, 12, 12> PPM_hess;
+    mollifier_hessian(c_nodes[0], c_nodes[1], c_nodes[2], c_nodes[3], surface_x, surface_X, eps_x, PPM_hess);
+
+    Vector<T, 12> barrier_dist2_grad_extended;
+    barrier_dist2_grad_extended.setZero();
+    barrier_dist2_grad_extended.template segment<dim>(0) = barrier_gradient * PP_grad.template segment<dim>(0);
+    barrier_dist2_grad_extended.template segment<dim>(6) = barrier_gradient * PP_grad.template segment<dim>(3);
+
+    for (int r = 0; r < 12; r++) {
+        for (int c = r; c < 12; c++) {
+            T val = barrier_dist2 * PPM_hess.data()[12 * c + r] + mollifier_grad.data()[r] * barrier_dist2_grad_extended.data()[c] + barrier_dist2_grad_extended.data()[r] * mollifier_grad.data()[c];
+            PPM_hess.data()[12 * c + r] = val;
+            PPM_hess.data()[12 * r + c] = val;
+        }
+    }
+
+    PPM_hess.template block<dim, dim>(0, 0) += mollifier * barrier_dist2_hess.template block<dim, dim>(0, 0);
+    PPM_hess.template block<dim, dim>(0, 6) += mollifier * barrier_dist2_hess.template block<dim, dim>(0, 3);
+    PPM_hess.template block<dim, dim>(6, 0) += mollifier * barrier_dist2_hess.template block<dim, dim>(3, 0);
+    PPM_hess.template block<dim, dim>(6, 6) += mollifier * barrier_dist2_hess.template block<dim, dim>(3, 3);
+    PPM_hess = scale * PPM_hess;
+
+    if (project_pd)
+        make_pd(PPM_hess);
+
+    T aa_wr0, aa_wr1, bb_wr0, bb_wr1, ab_wr0, ab_wr1;
+    T aa_wc0, aa_wc1, bb_wc0, bb_wc1, ab_wc0, ab_wc1;
+    T aa_val, bb_val, ab_val;
+    int rowId, colId;
+
+    for (int r = 0; r < 4; r++) {
+        aa_wr0 = w[r];
+        aa_wr1 = w[4 + r];
+        bb_wr0 = w[8 + r];
+        bb_wr1 = w[12 + r];
+        for (int c = r; c < 4; c++) {
+            aa_wc0 = w[c];
+            aa_wc1 = w[4 + c];
+            bb_wc0 = w[8 + c];
+            bb_wc1 = w[12 + c];
+            for (int rr = 0; rr < 3; rr++)
+                for (int cc = (r == c ? rr : 0); cc < 3; cc++) {
+                    rowId = 3 * r + rr;
+                    colId = 3 * c + cc;
+
+                    aa_val = aa_wc0 * (aa_wr0 * PPM_hess.data()[12 * cc + rr] + aa_wr1 * PPM_hess.data()[12 * cc + 3 + rr]) + aa_wc1 * (aa_wr0 * PPM_hess.data()[12 * (3 + cc) + rr] + aa_wr1 * PPM_hess.data()[12 * (3 + cc) + 3 + rr]);
+                    bb_val = bb_wc0 * (bb_wr0 * PPM_hess.data()[12 * (6 + cc) + 6 + rr] + bb_wr1 * PPM_hess.data()[12 * (6 + cc) + 9 + rr]) + bb_wc1 * (bb_wr0 * PPM_hess.data()[12 * (9 + cc) + 6 + rr] + bb_wr1 * PPM_hess.data()[12 * (9 + cc) + 9 + rr]);
+
+                    int i = 12 * colId + rowId;
+                    aa_hess.data()[i] = aa_val;
+                    bb_hess.data()[i] = bb_val;
+
+                    if (rowId != colId) {
+                        i = 12 * rowId + colId;
+                        aa_hess.data()[i] = aa_val;
+                        bb_hess.data()[i] = bb_val;
+                    }
+                }
+        }
+    }
+
+    if (obj_Id[0] < obj_Id[1]) {
+        for (int r = 0; r < 4; r++) {
+            ab_wr0 = w[r];
+            ab_wr1 = w[4 + r];
+            for (int c = 0; c < 4; c++) {
+                ab_wc0 = w[8 + c];
+                ab_wc1 = w[12 + c];
+                for (int rr = 0; rr < 3; rr++)
+                    for (int cc = 0; cc < 3; cc++) {
+                        rowId = 3 * r + rr;
+                        colId = 3 * c + cc;
+                        ab_val = ab_wc0 * (ab_wr0 * PPM_hess.data()[12 * (6 + cc) + rr] + ab_wr1 * PPM_hess.data()[12 * (6 + cc) + 3 + rr]) + ab_wc1 * (ab_wr0 * PPM_hess.data()[12 * (9 + cc) + rr] + ab_wr1 * PPM_hess.data()[12 * (9 + cc) + 3 + rr]);
+
+                        int i = 12 * colId + rowId;
+                        ab_hess.data()[i] = ab_val;
+                    }
+            }
+        }
+    }
+    else {
+        for (int r = 0; r < 4; r++) {
+            ab_wr0 = w[r];
+            ab_wr1 = w[4 + r];
+            for (int c = 0; c < 4; c++) {
+                ab_wc0 = w[8 + c];
+                ab_wc1 = w[12 + c];
+                for (int rr = 0; rr < 3; rr++)
+                    for (int cc = 0; cc < 3; cc++) {
+                        rowId = 3 * r + rr;
+                        colId = 3 * c + cc;
+                        ab_val = ab_wc0 * (ab_wr0 * PPM_hess.data()[12 * (6 + cc) + rr] + ab_wr1 * PPM_hess.data()[12 * (6 + cc) + 3 + rr]) + ab_wc1 * (ab_wr0 * PPM_hess.data()[12 * (9 + cc) + rr] + ab_wr1 * PPM_hess.data()[12 * (9 + cc) + 3 + rr]);
+
+                        int i = 12 * rowId + colId;
+                        ab_hess.data()[i] = ab_val;
+                    }
+            }
+        }
+    }
+}
+
+T IpcPEMConstraint::energy(const Field<Vector<T, dim>>& dof_x, const Field<Vector<T, dim>>& surface_x, const Field<Vector<T, dim>>& surface_X, const Field<Vector<T, dim>>& surface_xhat, const std::map<int, T>& snode_area)
+{
+    return scale * mollifier * barrier_dist2;
+}
+
+void IpcPEMConstraint::gradient(const Field<Vector<T, dim>>& dof_x, const Field<Vector<T, dim>>& surface_x, const Field<Vector<T, dim>>& surface_X, const Field<Vector<T, dim>>& surface_xhat, const std::map<int, T>& snode_area, VectorXd& ga, VectorXd& gb)
+{
+    ::ipc::point_edge_distance_gradient(surface_x[c_nodes[0]], surface_x[c_nodes[2]], surface_x[c_nodes[3]], PE_grad);
+    mollifier_gradient(c_nodes[0], c_nodes[1], c_nodes[2], c_nodes[3], surface_x, surface_X, eps_x, mollifier_grad);
+
+    for (int i = 0; i < 4; i++) {
+        for (int j = 0; j < 3; j++) {
+            ga.data()[3 * i + j] = scale * (w[i] * (barrier_dist2 * mollifier_grad.data()[j] + mollifier * barrier_gradient * PE_grad.data()[j]) + w[4 + i] * (barrier_dist2 * mollifier_grad.data()[3 + j]));
+            gb.data()[3 * i + j] = scale * (w[8 + i] * (barrier_dist2 * mollifier_grad.data()[6 + j] + mollifier * barrier_gradient * PE_grad.data()[3 + j]) + w[12 + i] * (barrier_dist2 * mollifier_grad.data()[9 + j] + mollifier * barrier_gradient * PE_grad.data()[6 + j]));
+        }
+    }
+}
+
+void IpcPEMConstraint::hessian(const Field<Vector<T, dim>>& dof_x, const Field<Vector<T, dim>>& surface_x, const Field<Vector<T, dim>>& surface_X, const Field<Vector<T, dim>>& surface_xhat, const std::map<int, T>& snode_area, MatrixXd& aa_hess, MatrixXd& bb_hess, MatrixXd& ab_hess, const bool project_pd)
+{
+    Matrix<T, 12, 12> PEM_hess;
+    Matrix<T, 9, 9> barrier_dist2_hess;
+    T barrier_hessian = _barrier_hessian(dist2, dHat2, kappa);
+    ::ipc::point_edge_distance_hessian(surface_x[c_nodes[0]], surface_x[c_nodes[2]], surface_x[c_nodes[3]], barrier_dist2_hess);
+    for (int r = 0; r < 9; r++) {
+        for (int c = r; c < 9; c++) {
+            T val = barrier_gradient * barrier_dist2_hess.data()[9 * c + r] + barrier_hessian * PE_grad.data()[r] * PE_grad.data()[c];
+            barrier_dist2_hess.data()[9 * c + r] = val;
+            barrier_dist2_hess.data()[9 * r + c] = val;
+        }
+    }
+    mollifier_hessian(c_nodes[0], c_nodes[1], c_nodes[2], c_nodes[3], surface_x, surface_X, eps_x, PEM_hess);
+
+    Vector<T, 12> barrier_dist2_grad_extended;
+    barrier_dist2_grad_extended.setZero();
+    barrier_dist2_grad_extended.template segment<dim>(0) = barrier_gradient * PE_grad.template segment<dim>(0);
+    barrier_dist2_grad_extended.template segment<2 * dim>(6) = barrier_gradient * PE_grad.template segment<2 * dim>(3);
+
+    for (int r = 0; r < 12; r++) {
+        for (int c = r; c < 12; c++) {
+            T val = barrier_dist2 * PEM_hess.data()[12 * c + r] + mollifier_grad.data()[r] * barrier_dist2_grad_extended.data()[c] + barrier_dist2_grad_extended.data()[r] * mollifier_grad.data()[c];
+            PEM_hess.data()[12 * c + r] = val;
+            PEM_hess.data()[12 * r + c] = val;
+        }
+    }
+
+    PEM_hess.template block<dim, dim>(0, 0) += mollifier * barrier_dist2_hess.template block<dim, dim>(0, 0);
+    PEM_hess.template block<dim, 2 * dim>(0, 6) += mollifier * barrier_dist2_hess.template block<dim, 2 * dim>(0, 3);
+    PEM_hess.template block<2 * dim, dim>(6, 0) += mollifier * barrier_dist2_hess.template block<2 * dim, dim>(3, 0);
+    PEM_hess.template block<2 * dim, 2 * dim>(6, 6) += mollifier * barrier_dist2_hess.template block<2 * dim, 2 * dim>(3, 3);
+    PEM_hess *= scale;
+
+    if (project_pd)
+        make_pd(PEM_hess);
+
+    T aa_wr0, aa_wr1, bb_wr0, bb_wr1, ab_wr0, ab_wr1;
+    T aa_wc0, aa_wc1, bb_wc0, bb_wc1, ab_wc0, ab_wc1;
+    T aa_val, bb_val, ab_val;
+    int rowId, colId;
+
+    for (int r = 0; r < 4; r++) {
+        aa_wr0 = w[r];
+        aa_wr1 = w[4 + r];
+        bb_wr0 = w[8 + r];
+        bb_wr1 = w[12 + r];
+        for (int c = r; c < 4; c++) {
+            aa_wc0 = w[c];
+            aa_wc1 = w[4 + c];
+            bb_wc0 = w[8 + c];
+            bb_wc1 = w[12 + c];
+            for (int rr = 0; rr < 3; rr++)
+                for (int cc = (r == c ? rr : 0); cc < 3; cc++) {
+                    rowId = 3 * r + rr;
+                    colId = 3 * c + cc;
+
+                    aa_val = aa_wc0 * (aa_wr0 * PEM_hess.data()[12 * cc + rr] + aa_wr1 * PEM_hess.data()[12 * cc + 3 + rr]) + aa_wc1 * (aa_wr0 * PEM_hess.data()[12 * (3 + cc) + rr] + aa_wr1 * PEM_hess.data()[12 * (3 + cc) + 3 + rr]);
+                    bb_val = bb_wc0 * (bb_wr0 * PEM_hess.data()[12 * (6 + cc) + 6 + rr] + bb_wr1 * PEM_hess.data()[12 * (6 + cc) + 9 + rr]) + bb_wc1 * (bb_wr0 * PEM_hess.data()[12 * (9 + cc) + 6 + rr] + bb_wr1 * PEM_hess.data()[12 * (9 + cc) + 9 + rr]);
+
+                    int i = 12 * colId + rowId;
+                    aa_hess.data()[i] = aa_val;
+                    bb_hess.data()[i] = bb_val;
+
+                    if (rowId != colId) {
+                        i = 12 * rowId + colId;
+                        aa_hess.data()[i] = aa_val;
+                        bb_hess.data()[i] = bb_val;
+                    }
+                }
+        }
+    }
+
+    if (obj_Id[0] < obj_Id[1]) {
+        for (int r = 0; r < 4; r++) {
+            ab_wr0 = w[r];
+            ab_wr1 = w[4 + r];
+            for (int c = 0; c < 4; c++) {
+                ab_wc0 = w[8 + c];
+                ab_wc1 = w[12 + c];
+                for (int rr = 0; rr < 3; rr++)
+                    for (int cc = 0; cc < 3; cc++) {
+                        rowId = 3 * r + rr;
+                        colId = 3 * c + cc;
+                        ab_val = ab_wc0 * (ab_wr0 * PEM_hess.data()[12 * (6 + cc) + rr] + ab_wr1 * PEM_hess.data()[12 * (6 + cc) + 3 + rr]) + ab_wc1 * (ab_wr0 * PEM_hess.data()[12 * (9 + cc) + rr] + ab_wr1 * PEM_hess.data()[12 * (9 + cc) + 3 + rr]);
+
+                        int i = 12 * colId + rowId;
+                        ab_hess.data()[i] = ab_val;
+                    }
+            }
+        }
+    }
+    else {
+        for (int r = 0; r < 4; r++) {
+            ab_wr0 = w[r];
+            ab_wr1 = w[4 + r];
+            for (int c = 0; c < 4; c++) {
+                ab_wc0 = w[8 + c];
+                ab_wc1 = w[12 + c];
+                for (int rr = 0; rr < 3; rr++)
+                    for (int cc = 0; cc < 3; cc++) {
+                        rowId = 3 * r + rr;
+                        colId = 3 * c + cc;
+                        ab_val = ab_wc0 * (ab_wr0 * PEM_hess.data()[12 * (6 + cc) + rr] + ab_wr1 * PEM_hess.data()[12 * (6 + cc) + 3 + rr]) + ab_wc1 * (ab_wr0 * PEM_hess.data()[12 * (9 + cc) + rr] + ab_wr1 * PEM_hess.data()[12 * (9 + cc) + 3 + rr]);
+
+                        int i = 12 * rowId + colId;
+                        ab_hess.data()[i] = ab_val;
+                    }
+            }
+        }
+    }
+}
+
+T IpcEEMConstraint::energy(const Field<Vector<T, dim>>& dof_x, const Field<Vector<T, dim>>& surface_x, const Field<Vector<T, dim>>& surface_X, const Field<Vector<T, dim>>& surface_xhat, const std::map<int, T>& snode_area)
+{
+    return scale * mollifier * barrier_dist2;
+}
+
+void IpcEEMConstraint::gradient(const Field<Vector<T, dim>>& dof_x, const Field<Vector<T, dim>>& surface_x, const Field<Vector<T, dim>>& surface_X, const Field<Vector<T, dim>>& surface_xhat, const std::map<int, T>& snode_area, VectorXd& ga, VectorXd& gb)
+{
+    ::ipc::edge_edge_distance_gradient(surface_x[c_nodes[0]], surface_x[c_nodes[1]], surface_x[c_nodes[2]], surface_x[c_nodes[3]], EE_grad);
+    mollifier_gradient(c_nodes[0], c_nodes[1], c_nodes[2], c_nodes[3], surface_x, surface_X, eps_x, mollifier_grad);
+
+    for (int i = 0; i < 4; i++) {
+        for (int j = 0; j < 3; j++) {
+            ga.data()[3 * i + j] = scale * (w[i] * (barrier_dist2 * mollifier_grad.data()[j] + mollifier * barrier_gradient * EE_grad.data()[j]) + w[4 + i] * (barrier_dist2 * mollifier_grad.data()[3 + j] + mollifier * barrier_gradient * EE_grad.data()[3 + j]));
+            gb.data()[3 * i + j] = scale * (w[8 + i] * (barrier_dist2 * mollifier_grad.data()[6 + j] + mollifier * barrier_gradient * EE_grad.data()[6 + j]) + w[12 + i] * (barrier_dist2 * mollifier_grad.data()[9 + j] + mollifier * barrier_gradient * EE_grad.data()[9 + j]));
+        }
+    }
+}
+
+void IpcEEMConstraint::hessian(const Field<Vector<T, dim>>& dof_x, const Field<Vector<T, dim>>& surface_x, const Field<Vector<T, dim>>& surface_X, const Field<Vector<T, dim>>& surface_xhat, const std::map<int, T>& snode_area, MatrixXd& aa_hess, MatrixXd& bb_hess, MatrixXd& ab_hess, const bool project_pd)
+{
+    Matrix<T, 12, 12> barrier_dist2_hess;
+    T barrier_hessian = _barrier_hessian(dist2, dHat2, kappa);
+    ::ipc::edge_edge_distance_hessian(surface_x[c_nodes[0]], surface_x[c_nodes[1]], surface_x[c_nodes[2]], surface_x[c_nodes[3]], barrier_dist2_hess);
+    for (int r = 0; r < 12; r++) {
+        for (int c = r; c < 12; c++) {
+            T val = barrier_gradient * barrier_dist2_hess.data()[12 * c + r] + barrier_hessian * EE_grad.data()[r] * EE_grad.data()[c];
+            barrier_dist2_hess.data()[12 * c + r] = val;
+            barrier_dist2_hess.data()[12 * r + c] = val;
+        }
+    }
+
+    Matrix<T, 12, 12> EEM_hess;
+    mollifier_hessian(c_nodes[0], c_nodes[1], c_nodes[2], c_nodes[3], surface_x, surface_X, eps_x, EEM_hess);
+    for (int r = 0; r < 12; r++) {
+        for (int c = r; c < 12; c++) {
+            T val = barrier_dist2 * EEM_hess.data()[12 * c + r] + barrier_gradient * (mollifier_grad.data()[r] * EE_grad.data()[c] + EE_grad.data()[r] * mollifier_grad.data()[c]) + mollifier * barrier_dist2_hess.data()[12 * c + r];
+            EEM_hess.data()[12 * c + r] = val;
+            EEM_hess.data()[12 * r + c] = val;
+        }
+    }
+    EEM_hess *= scale;
+
+    if (project_pd)
+        make_pd(EEM_hess);
+
+    T aa_wr0, aa_wr1, bb_wr0, bb_wr1, ab_wr0, ab_wr1;
+    T aa_wc0, aa_wc1, bb_wc0, bb_wc1, ab_wc0, ab_wc1;
+    T aa_val, bb_val, ab_val;
+    int rowId, colId;
+
+    for (int r = 0; r < 4; r++) {
+        aa_wr0 = w[r];
+        aa_wr1 = w[4 + r];
+        bb_wr0 = w[8 + r];
+        bb_wr1 = w[12 + r];
+        for (int c = r; c < 4; c++) {
+            aa_wc0 = w[c];
+            aa_wc1 = w[4 + c];
+            bb_wc0 = w[8 + c];
+            bb_wc1 = w[12 + c];
+            for (int rr = 0; rr < 3; rr++)
+                for (int cc = (r == c ? rr : 0); cc < 3; cc++) {
+                    rowId = 3 * r + rr;
+                    colId = 3 * c + cc;
+
+                    aa_val = aa_wc0 * (aa_wr0 * EEM_hess.data()[12 * cc + rr] + aa_wr1 * EEM_hess.data()[12 * cc + 3 + rr]) + aa_wc1 * (aa_wr0 * EEM_hess.data()[12 * (3 + cc) + rr] + aa_wr1 * EEM_hess.data()[12 * (3 + cc) + 3 + rr]);
+                    bb_val = bb_wc0 * (bb_wr0 * EEM_hess.data()[12 * (6 + cc) + 6 + rr] + bb_wr1 * EEM_hess.data()[12 * (6 + cc) + 9 + rr]) + bb_wc1 * (bb_wr0 * EEM_hess.data()[12 * (9 + cc) + 6 + rr] + bb_wr1 * EEM_hess.data()[12 * (9 + cc) + 9 + rr]);
+
+                    int i = 12 * colId + rowId;
+                    aa_hess.data()[i] = aa_val;
+                    bb_hess.data()[i] = bb_val;
+
+                    if (rowId != colId) {
+                        i = 12 * rowId + colId;
+                        aa_hess.data()[i] = aa_val;
+                        bb_hess.data()[i] = bb_val;
+                    }
+                }
+        }
+    }
+
+    if (obj_Id[0] < obj_Id[1]) {
+        for (int r = 0; r < 4; r++) {
+            ab_wr0 = w[r];
+            ab_wr1 = w[4 + r];
+            for (int c = 0; c < 4; c++) {
+                ab_wc0 = w[8 + c];
+                ab_wc1 = w[12 + c];
+                for (int rr = 0; rr < 3; rr++)
+                    for (int cc = 0; cc < 3; cc++) {
+                        rowId = 3 * r + rr;
+                        colId = 3 * c + cc;
+                        ab_val = ab_wc0 * (ab_wr0 * EEM_hess.data()[12 * (6 + cc) + rr] + ab_wr1 * EEM_hess.data()[12 * (6 + cc) + 3 + rr]) + ab_wc1 * (ab_wr0 * EEM_hess.data()[12 * (9 + cc) + rr] + ab_wr1 * EEM_hess.data()[12 * (9 + cc) + 3 + rr]);
+
+                        int i = 12 * colId + rowId;
+                        ab_hess.data()[i] = ab_val;
+                    }
+            }
+        }
+    }
+    else {
+        for (int r = 0; r < 4; r++) {
+            ab_wr0 = w[r];
+            ab_wr1 = w[4 + r];
+            for (int c = 0; c < 4; c++) {
+                ab_wc0 = w[8 + c];
+                ab_wc1 = w[12 + c];
+                for (int rr = 0; rr < 3; rr++)
+                    for (int cc = 0; cc < 3; cc++) {
+                        rowId = 3 * r + rr;
+                        colId = 3 * c + cc;
+                        ab_val = ab_wc0 * (ab_wr0 * EEM_hess.data()[12 * (6 + cc) + rr] + ab_wr1 * EEM_hess.data()[12 * (6 + cc) + 3 + rr]) + ab_wc1 * (ab_wr0 * EEM_hess.data()[12 * (9 + cc) + rr] + ab_wr1 * EEM_hess.data()[12 * (9 + cc) + 3 + rr]);
+
+                        int i = 12 * rowId + colId;
+                        ab_hess.data()[i] = ab_val;
+                    }
+            }
+        }
+    }
+}
 }

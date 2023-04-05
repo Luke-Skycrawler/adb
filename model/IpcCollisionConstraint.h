@@ -203,5 +203,119 @@ public:
     Vector<T, 12> EE_grad;
 };
 
+class IpcPPMConstraint : public IpcConstraintOp3D
+	{
+	public:
+		IpcPPMConstraint(const int index, const int ei0, const int ei1, const int ej0, const int ej1, const Field<std::pair<Vector<int, dim + 1>, Vector<T, dim + 1>>>& dpdx, const Field<Vector<T, dim>>& surface_x, const Field<Vector<T, dim>>& surface_X, const T& dHat, const T& kappa, const T& dt, const T area, const T m, const T eps, const T es = 1.0) :
+			IpcConstraintOp3D(index, surface_x, surface_X, dHat, kappa, dt, area, es)
+		{
+			c_nodes = { ei0, ei1, ej0, ej1 };
+			for (int n = 0; n < 4; n++)
+				for (int j = 0; j < 4; j++)
+				{
+					cId[4 * n + j] = dpdx[c_nodes[n]].first.data()[j];
+					w[4 * n + j] = dpdx[c_nodes[n]].second.data()[j];
+				}
+			obj_Id[0] = cId[0] / 4;
+			obj_Id[1] = cId[8] / 4;
+
+			dist2 = ::ipc::point_point_distance(surface_x[c_nodes[0]], surface_x[c_nodes[2]]);
+			mollifier = m;
+			eps_x = eps;
+
+			scale = this->energy_scale * area * dHat;
+			barrier_dist2 = barrier(dist2, dHat2, kappa);
+			barrier_gradient = _barrier_gradient(dist2, dHat2, kappa);
+		}
+
+		virtual T energy(const Field<Vector<T, dim>>& dof_x, const Field<Vector<T, dim>>& surface_x, const Field<Vector<T, dim>>& surface_X, const Field<Vector<T, dim>>& surface_xhat, const std::map<int, T>& snode_area);
+
+		virtual void gradient(const Field<Vector<T, dim>>& dof_x, const Field<Vector<T, dim>>& surface_x, const Field<Vector<T, dim>>& surface_X, const Field<Vector<T, dim>>& surface_xhat, const std::map<int, T>& snode_area, VectorXd& ga, VectorXd& gb);
+
+		virtual void hessian(const Field<Vector<T, dim>>& dof_x, const Field<Vector<T, dim>>& surface_x, const Field<Vector<T, dim>>& surface_X, const Field<Vector<T, dim>>& surface_xhat, const std::map<int, T>& snode_area, MatrixXd& aa_hess, MatrixXd& bb_hess, MatrixXd& ab_hess, const bool project_pd = true);
+
+		int cId[16];
+		T w[16];
+		T mollifier, eps_x;
+		Vector<T, 6> PP_grad;
+		Vector<T, 12> mollifier_grad;
+	};
+
+	class IpcPEMConstraint : public IpcConstraintOp3D
+	{
+	public:
+		IpcPEMConstraint(const int index, const int ei0, const int ei1, const int ej0, const int ej1, const Field<std::pair<Vector<int, dim + 1>, Vector<T, dim + 1>>>& dpdx, const Field<Vector<T, dim>>& surface_x, const Field<Vector<T, dim>>& surface_X, const T& dHat, const T& kappa, const T& dt, const T area, const T m, const T eps, const T es = 1.0) :
+			IpcConstraintOp3D(index, surface_x, surface_X, dHat, kappa, dt, area, es)
+		{
+			c_nodes = { ei0, ei1, ej0, ej1 };
+			for (int n = 0; n < 4; n++)
+				for (int j = 0; j < 4; j++)
+				{
+					cId[4 * n + j] = dpdx[c_nodes[n]].first.data()[j];
+					w[4 * n + j] = dpdx[c_nodes[n]].second.data()[j];
+				}
+			obj_Id[0] = cId[0] / 4;
+			obj_Id[1] = cId[8] / 4;
+
+			dist2 = ::ipc::point_edge_distance(surface_x[c_nodes[0]], surface_x[c_nodes[2]], surface_x[c_nodes[3]]);
+			mollifier = m;
+			eps_x = eps;
+
+			scale = this->energy_scale * area * dHat;
+			barrier_dist2 = barrier(dist2, dHat2, kappa);
+			barrier_gradient = _barrier_gradient(dist2, dHat2, kappa);
+		}
+
+		virtual T energy(const Field<Vector<T, dim>>& dof_x, const Field<Vector<T, dim>>& surface_x, const Field<Vector<T, dim>>& surface_X, const Field<Vector<T, dim>>& surface_xhat, const std::map<int, T>& snode_area);
+
+		virtual void gradient(const Field<Vector<T, dim>>& dof_x, const Field<Vector<T, dim>>& surface_x, const Field<Vector<T, dim>>& surface_X, const Field<Vector<T, dim>>& surface_xhat, const std::map<int, T>& snode_area, VectorXd& ga, VectorXd& gb);
+
+		virtual void hessian(const Field<Vector<T, dim>>& dof_x, const Field<Vector<T, dim>>& surface_x, const Field<Vector<T, dim>>& surface_X, const Field<Vector<T, dim>>& surface_xhat, const std::map<int, T>& snode_area, MatrixXd& aa_hess, MatrixXd& bb_hess, MatrixXd& ab_hess, const bool project_pd = true);
+
+		int cId[16];
+		T w[16];
+		T mollifier, eps_x;
+		Vector<T, 9> PE_grad;
+		Vector<T, 12> mollifier_grad;
+	};
+
+	class IpcEEMConstraint : public IpcConstraintOp3D
+	{
+	public:
+		IpcEEMConstraint(const int index, const int ei0, const int ei1, const int ej0, const int ej1, const Field<std::pair<Vector<int, dim + 1>, Vector<T, dim + 1>>>& dpdx, const Field<Vector<T, dim>>& surface_x, const Field<Vector<T, dim>>& surface_X, const T& dHat, const T& kappa, const T& dt, const T area, const T m, const T eps, const T es = 1.0) :
+			IpcConstraintOp3D(index, surface_x, surface_X, dHat, kappa, dt, area, es)
+		{
+			c_nodes = { ei0, ei1, ej0, ej1 };
+			for (int n = 0; n < 4; n++)
+				for (int j = 0; j < 4; j++)
+				{
+					cId[4 * n + j] = dpdx[c_nodes[n]].first.data()[j];
+					w[4 * n + j] = dpdx[c_nodes[n]].second.data()[j];
+				}
+			obj_Id[0] = cId[0] / 4;
+			obj_Id[1] = cId[8] / 4;
+
+			dist2 = ::ipc::edge_edge_distance(surface_x[c_nodes[0]], surface_x[c_nodes[1]], surface_x[c_nodes[2]], surface_x[c_nodes[3]]);
+
+			mollifier = m;
+			eps_x = eps;
+			
+			scale = this->energy_scale * area * dHat;
+			barrier_dist2 = barrier(dist2, dHat2, kappa);
+			barrier_gradient = _barrier_gradient(dist2, dHat2, kappa);
+		}
+
+		virtual T energy(const Field<Vector<T, dim>>& dof_x, const Field<Vector<T, dim>>& surface_x, const Field<Vector<T, dim>>& surface_X, const Field<Vector<T, dim>>& surface_xhat, const std::map<int, T>& snode_area);
+
+		virtual void gradient(const Field<Vector<T, dim>>& dof_x, const Field<Vector<T, dim>>& surface_x, const Field<Vector<T, dim>>& surface_X, const Field<Vector<T, dim>>& surface_xhat, const std::map<int, T>& snode_area, VectorXd& ga, VectorXd& gb);
+
+		virtual void hessian(const Field<Vector<T, dim>>& dof_x, const Field<Vector<T, dim>>& surface_x, const Field<Vector<T, dim>>& surface_X, const Field<Vector<T, dim>>& surface_xhat, const std::map<int, T>& snode_area, MatrixXd& aa_hess, MatrixXd& bb_hess, MatrixXd& ab_hess, const bool project_pd = true);
+
+		int cId[16];
+		T w[16];
+		T mollifier, eps_x;
+		Vector<T, 12> EE_grad;
+		Vector<T, 12> mollifier_grad;
+	};
 }
 #endif
