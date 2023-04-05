@@ -956,6 +956,10 @@ void implicit_euler(vector<unique_ptr<AffineBody>>& cubes, double dt)
         times[__LINE_SEARCH__], times[__LINE_SEARCH__] / frame_duration);
     globals.tot_iter += iter;
     globals.aggregate_time += times;
+    if (globals.params_int.find("worst case iter") == globals.params_int.end())
+        globals.params_int["worst case iter"] = iter;
+    else
+        globals.params_int["worst case iter"] = max(iter, globals.params_int["worst case iter"]);
 #pragma omp parallel for schedule(static)
     for (int k = 0; k < n_cubes; k++) {
         auto& c(*cubes[k]);

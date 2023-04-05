@@ -149,26 +149,7 @@ void processInput(GLFWwindow* window)
             globals.camera.ProcessKeyboard(RIGHT, globals.deltaTime);
     }
     if (glfwGetKey(window, GLFW_KEY_ESCAPE) == GLFW_PRESS) {
-        double t = glfwGetTime();
-        spdlog::default_logger()->flush();
-        spdlog::error("running time = {}, ts = {}, #iters = {}, fps = {}", t, globals.ts, globals.tot_iter, globals.ts / t);
-        auto& times{ globals.aggregate_time };
-        double frame_duration = 0.0;
-        times /= globals.ts;
-        frame_duration = times.sum() / 100.0;
-        spdlog::error("average per-frame time breakdown ------------\n\\
-    \tipc: {:.3f} ms, percentage = {:.3f}% \n\\
-    \tsolver: {:.3f}, percentage = {:.3f}%\n\\
-    \tccd: {:.3f}, percentage = {:.3f}%\n\\
-    \tline search: {:.3f}, percentage = {:.3f}%\n\n\n",
-
-            times[__IPC__],
-            times[__IPC__] / frame_duration,
-            times[__SOLVER__], times[__SOLVER__] / frame_duration,
-            times[__CCD__], times[__CCD__] / frame_duration,
-            times[__LINE_SEARCH__], times[__LINE_SEARCH__] / frame_duration);
-        glfwSetWindowShouldClose(window, true);
-        exit(0);
+        exit_callback(window);
     }
 
     // if (glfwGetKey(window, GLFW_KEY_R) == GLFW_PRESS)
@@ -266,4 +247,28 @@ void scroll_callback(GLFWwindow* window, double xoffset, double yoffset)
         else
             globals.objectType = 0;
     }
+}
+
+void exit_callback(GLFWwindow* window)
+{
+    double t = glfwGetTime();
+    spdlog::default_logger()->flush();
+    spdlog::error("running time = {}, ts = {}, #iters = {}, fps = {}, worst case = {}", t, globals.ts, globals.tot_iter, globals.ts / t, globals.params_int["worst case iter"]);
+    auto& times{ globals.aggregate_time };
+    double frame_duration = 0.0;
+    times /= globals.ts;
+    frame_duration = times.sum() / 100.0;
+    spdlog::error("average per-frame time breakdown ------------\n\\
+    \tipc: {:.3f} ms, percentage = {:.3f}% \n\\
+    \tsolver: {:.3f}, percentage = {:.3f}%\n\\
+    \tccd: {:.3f}, percentage = {:.3f}%\n\\
+    \tline search: {:.3f}, percentage = {:.3f}%\n\n\n",
+
+        times[__IPC__],
+        times[__IPC__] / frame_duration,
+        times[__SOLVER__], times[__SOLVER__] / frame_duration,
+        times[__CCD__], times[__CCD__] / frame_duration,
+        times[__LINE_SEARCH__], times[__LINE_SEARCH__] / frame_duration);
+    glfwSetWindowShouldClose(window, true);
+    exit(0);
 }
