@@ -269,6 +269,8 @@ void exit_callback(GLFWwindow* window)
         times[__SOLVER__], times[__SOLVER__] / frame_duration,
         times[__CCD__], times[__CCD__] / frame_duration,
         times[__LINE_SEARCH__], times[__LINE_SEARCH__] / frame_duration);
+
+    spdlog::error("ee error types, 0 = {}, 1 = {}, 2= {}, 3= {}, 4 = {}, 5 = {}, 6 = {}, 7 = {}, 8 = {}", globals.params_int["ee error 0"], globals.params_int["ee error 1"], globals.params_int["ee error 2"], globals.params_int["ee error 3"], globals.params_int["ee error 4"], globals.params_int["ee error 5"], globals.params_int["ee error 6"], globals.params_int["ee error 7"], globals.params_int["ee error 8"]);
     glfwSetWindowShouldClose(window, true);
     exit(0);
 }

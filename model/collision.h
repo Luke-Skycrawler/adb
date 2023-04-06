@@ -11,7 +11,7 @@
 #endif
 // #define NO_MOLLIFIER
 // #define _TRIPLETS_
-//#define _PLUG_IN_LAN_
+#define _PLUG_IN_LAN_
 #ifdef _PLUG_IN_LAN_
 #define _DIRECT_OUT_
 #undef _SM_OUT_

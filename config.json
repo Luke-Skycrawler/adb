@@ -1,5 +1,5 @@
 {
-    "player": true,
+    "player": false,
     "starting_ts": -1,
     "ending_ts": 500,
     "dt": 1e-2,
