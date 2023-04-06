@@ -679,32 +679,6 @@ void implicit_euler(vector<unique_ptr<AffineBody>>& cubes, double dt)
                     constraint->gradient({}, surface_x, surface_X, surface_xhat, {}, gac, gbc);
                     constraint->hessian({}, surface_x, surface_X, surface_xhat, {}, hac, hbc, habc);
                 }
-                // const auto permute = [](VectorXd& ga, VectorXd& gb, MatrixXd& ha, MatrixXd& hb, MatrixXd& hab, const Vector4i& perm) {
-
-                //     // permute the perm vector back to ascending order, change ga, gb, ha, hb, hab accordingly
-                //     Matrix4d P;
-                //     P.setZero(4, 4);
-                //     for (int i = 0; i < 4; i++) {
-                //         P(i, perm[i]) = 1.0;
-                //     }
-                //     mat12 P12;
-                //     P12.setZero(12, 12);
-                //     for (int i = 0; i < 4; i++) {
-                //         P12.block<3, 3>(3 * i, 3 * perm[i]) = Matrix3d::Identity();
-                //     }
-                //     vec12 g;
-                //     mat12 h;
-                //     g << ga, gb;
-                //     h << ha, hab, hab.transpose(), hb;
-                //     g = P12 * g;
-                //     h = P12 * h * P12.transpose();
-                //     ga = g.head(6);
-                //     gb = g.tail(6);
-                //     ha = h.block<6, 6>(0, 0);
-                //     hb = h.block<6, 6>(6, 6);
-                //     hab = h.block<6, 6>(0, 6);
-                // };
-                // permute(gac, gbc, hac, hbc, habc, perm);
 
                 ga = gaf + gac;
                 gb = gbf + gbc;
@@ -736,7 +710,7 @@ void implicit_euler(vector<unique_ptr<AffineBody>>& cubes, double dt)
                 bool b2 = fd::compare_hessian(ha, hess_0);
                 bool b3 = fd::compare_hessian(hb, hess_1);
                 bool b4 = fd::compare_hessian(hab, off_diag);
-                const auto to_int = [](const ipc::EdgeEdgeDistanceType& type) {
+                const auto to_int = [](const ipc::EdgeEdgeDistanceType& type) -> int{
                     if (type == ipc::EdgeEdgeDistanceType::EA0_EB) {
                         return 0;
                     }
@@ -766,11 +740,11 @@ void implicit_euler(vector<unique_ptr<AffineBody>>& cubes, double dt)
                     }
                 };
 #ifndef LANS_DIRECT
-                b4 = b4 || mollifier != 1.0;
-                b3 = b3 || mollifier != 1.0;
-                b2 = b2 || mollifier != 1.0;
-                b1 = b1 || mollifier != 1.0;
-                b0 = b0 || mollifier != 1.0;
+                // b4 = b4 || mollifier != 1.0;
+                // b3 = b3 || mollifier != 1.0;
+                // b2 = b2 || mollifier != 1.0;
+                // b1 = b1 || mollifier != 1.0;
+                // b0 = b0 || mollifier != 1.0;
                 for (int i = 0; i < 9; i ++ )
                 if (globals.params_int.find("ee error " + to_string(i)) == globals.params_int.end()) {
                     globals.params_int["ee error " + to_string(i)] = 0;

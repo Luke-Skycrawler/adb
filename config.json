@@ -18,7 +18,7 @@
     "ground": true,
     "safe_factor": 1.0,
     "uppper_bound": true, 
-    "mu": 0.25,
+    "mu": 0.0,
     "log": 1,
     "backoff": 0.8,
     "damping": {

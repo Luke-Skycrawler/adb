@@ -420,16 +420,16 @@ void ipc_term_ee(
 
     Vector2d _uk;
     contact_lambda = utils::ee_uktk(ci, cj, ee, ij, ee_type, Tk, _uk, dist, globals.dt, p);
-    if (p != 1.0) {
-        contact_lambda = contact_lambda * p;
-    }
+    // if (p != 1.0) {
+    //     // contact_lambda = contact_lambda * p;
+    // }
 
 #ifdef _FRICTION_
     bool ee_parallel = ee_type == ::ipc::EdgeEdgeDistanceType::EA_EB && p != 1.0;
 
     if (globals.ee_fric && !ee_parallel)
         friction(_uk, contact_lambda, Tk.transpose(), ee_grad, ipc_hess);
-    if (p != 1.0)
+    if (ee_parallel)
         contact_lambda = 0.0;
 #endif
     auto ei0_tile = ci.vertices(eidxi[2 * _ei]), ei1_tile = ci.vertices(eidxi[2 * _ei + 1]),
