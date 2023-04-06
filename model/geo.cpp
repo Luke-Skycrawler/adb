@@ -427,10 +427,12 @@ void ipc_term_ee(
 #ifdef _FRICTION_
     bool ee_parallel = ee_type == ::ipc::EdgeEdgeDistanceType::EA_EB && p != 1.0;
 
-    if (globals.ee_fric && !ee_parallel)
-        friction(_uk, contact_lambda, Tk.transpose(), ee_grad, ipc_hess);
-    if (ee_parallel)
-        contact_lambda = 0.0;
+    // if (globals.ee_fric && !ee_parallel)
+    //     friction(_uk, contact_lambda, Tk.transpose(), ee_grad, ipc_hess);
+    // if (ee_parallel)
+    //     contact_lambda = 0.0;
+    if (globals.ee_fric) friction(_uk, contact_lambda, Tk.transpose(), ee_grad, ipc_hess);
+    
 #endif
     auto ei0_tile = ci.vertices(eidxi[2 * _ei]), ei1_tile = ci.vertices(eidxi[2 * _ei + 1]),
          ej0_tile = cj.vertices(eidxj[2 * _ej]), ej1_tile = cj.vertices(eidxj[2 * _ej + 1]);

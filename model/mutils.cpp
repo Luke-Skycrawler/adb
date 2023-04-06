@@ -340,7 +340,8 @@ double ee_uktk(
     degeneracy.col(0) = rei.normalized();
     degeneracy.col(1) = (ej0 - ei0).cross(rei).normalized();
     // bool par = sin2 < 1e-8;
-    bool par = ee_type == ::ipc::EdgeEdgeDistanceType::EA_EB && mollifier != 1.0;
+    // bool par = ee_type == ::ipc::EdgeEdgeDistanceType::EA_EB && mollifier != 1.0;
+    bool par = false;
 
     auto lams = ::ipc::edge_edge_closest_point(ei0, ei1, ej0, ej1);
     auto Pk = par ? degeneracy : ::ipc::edge_edge_tangent_basis(ei0, ei1, ej0, ej1);
@@ -390,11 +391,11 @@ double ee_uktk(
     clip(lams(0), 0.0, 1.0);
     clip(lams(1), 0.0, 1.0);
     array<double, 4> lambdas = { 1 - lams(0), lams(0), 1 - lams(1), lams(1) };
-    if (par) {
-        // ignore this friction, already handled in point-triangle pair
-        lambdas = { 0.0, 0.0, 0.0, 0.0 };
-        // uk will be set to zero
-    }
+    // if (par) {
+    //     // ignore this friction, already handled in point-triangle pair
+    //     lambdas = { 0.0, 0.0, 0.0, 0.0 };
+    //     // uk will be set to zero
+    // }
     auto pei = ei0 * lambdas[0] + ei1 * lambdas[1];
     auto pej = ej0 * lambdas[2] + ej1 * lambdas[3];
     auto closest = (pei - pej).squaredNorm();
