@@ -17,6 +17,8 @@ Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "ccd", "Sample-Test1\Sample-
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "iAABB", "iAABB\iAABB.vcxproj", "{CEC1E425-5CC3-4692-8E80-6078466EEB81}"
 EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "cudabd", "view\cudabd.vcxproj", "{8229AD64-56D9-4A07-B60D-86C2994A14A8}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|x64 = Debug|x64
@@ -81,6 +83,14 @@ Global
 		{CEC1E425-5CC3-4692-8E80-6078466EEB81}.Release|x64.Build.0 = Release|x64
 		{CEC1E425-5CC3-4692-8E80-6078466EEB81}.Release|x86.ActiveCfg = Release|Win32
 		{CEC1E425-5CC3-4692-8E80-6078466EEB81}.Release|x86.Build.0 = Release|Win32
+		{8229AD64-56D9-4A07-B60D-86C2994A14A8}.Debug|x64.ActiveCfg = Debug|x64
+		{8229AD64-56D9-4A07-B60D-86C2994A14A8}.Debug|x64.Build.0 = Debug|x64
+		{8229AD64-56D9-4A07-B60D-86C2994A14A8}.Debug|x86.ActiveCfg = Debug|x64
+		{8229AD64-56D9-4A07-B60D-86C2994A14A8}.Debug|x86.Build.0 = Debug|x64
+		{8229AD64-56D9-4A07-B60D-86C2994A14A8}.Release|x64.ActiveCfg = Release|x64
+		{8229AD64-56D9-4A07-B60D-86C2994A14A8}.Release|x64.Build.0 = Release|x64
+		{8229AD64-56D9-4A07-B60D-86C2994A14A8}.Release|x86.ActiveCfg = Release|x64
+		{8229AD64-56D9-4A07-B60D-86C2994A14A8}.Release|x86.Build.0 = Release|x64
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
