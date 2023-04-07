@@ -81,6 +81,7 @@
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
     <IncludePath>D:\third_party_libs\Tight-Inclusion\src;D:\ref_repos\ipc-toolkit\src;$(IncludePath)</IncludePath>
     <LibraryPath>D:\third_party_libs\Tight-Inclusion\release\Release;D:\ref_repos\ipc-toolkit\build\temp.win-amd64-cpython-38\Release\ipctk\Release;D:\ref_repos\ipc-toolkit\build\temp.win-amd64-3.8\Release\ipctk\Release;$(LibraryPath)</LibraryPath>
+    <LinkIncremental>true</LinkIncremental>
   </PropertyGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
     <ClCompile>
@@ -138,6 +139,7 @@
       <OpenMPSupport>true</OpenMPSupport>
       <AdditionalOptions>/openmp:experimental %(AdditionalOptions)</AdditionalOptions>
       <LanguageStandard>stdcpp17</LanguageStandard>
+      <EnableParallelCodeGeneration>true</EnableParallelCodeGeneration>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
@@ -158,7 +160,6 @@
     <ClCompile Include="..\model\IpcFrictionConstraint.cpp" />
     <ClCompile Include="..\model\othogonal_energy.cpp" />
     <ClCompile Include="..\model\barrier.cpp" />
-    <!-- <ClCompile Include="..\model\time_integrator.cpp" /> -->
     <ClCompile Include="..\model\euler.cpp" />
     <ClCompile Include="..\model\collision.cpp" />
     <ClCompile Include="..\model\sparse.cpp" />
@@ -171,7 +172,7 @@
     <ClCompile Include="..\view\control.cpp" />
     <ClCompile Include="..\view\light.cpp" />
     <ClCompile Include="..\view\model_view.cpp" />
-    <ClCompile Include="utils.cpp" />
+    <ClCompile Include="..\view\utils.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\cyCodeBase\cyCore.h" />

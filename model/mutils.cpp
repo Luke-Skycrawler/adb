@@ -240,6 +240,13 @@ vector<array<unsigned, 2>> gen_triangle_list(
     return ret;
 }
 #endif
+tuple<double, Vector2d, Matrix<double, 2, 12>> pt_uktk(AffineBody& ci, AffineBody& cj, array<vec3, 4>& pt, array<int, 4>& ij, const ::ipc::PointTriangleDistanceType& pt_type, double d, double dt)
+{
+    Vector2d uk;
+    Matrix<double, 2, 12> Tk;
+    double lam = pt_uktk(ci, cj, pt, ij, pt_type, Tk, uk, d, dt);
+    return { lam, uk, Tk };
+}
 double pt_uktk(
     AffineBody& ci, AffineBody& cj,
     array<vec3, 4>& pt, array<int, 4>& ij, const ::ipc::PointTriangleDistanceType& pt_type,
@@ -255,21 +262,21 @@ double pt_uktk(
 
     if (pt_type == ::ipc::PointTriangleDistanceType::P_T)
         ; // do nothing
-    else if (pt_type == ::ipc::PointTriangleDistanceType::P_T0){
+    else if (pt_type == ::ipc::PointTriangleDistanceType::P_T0) {
         Pk = ::ipc::point_point_tangent_basis(pt[0], pt[1]);
         tlams = { 1.0, 0.0, 0.0 };
     }
-    else if (pt_type == ::ipc::PointTriangleDistanceType::P_T1){
+    else if (pt_type == ::ipc::PointTriangleDistanceType::P_T1) {
         Pk = ::ipc::point_point_tangent_basis(pt[0], pt[2]);
         tlams = { 0.0, 1.0, 0.0 };
     }
-    else if (pt_type == ::ipc::PointTriangleDistanceType::P_T2){
+    else if (pt_type == ::ipc::PointTriangleDistanceType::P_T2) {
         Pk = ::ipc::point_point_tangent_basis(pt[0], pt[3]);
         tlams = { 0.0, 0.0, 1.0 };
     }
     else if (pt_type == ::ipc::PointTriangleDistanceType::P_E0) {
         auto elam = ::ipc::point_edge_closest_point(pt[0], pt[1], pt[2]);
-        tlams = {1.0 - elam, elam, 0.0 };
+        tlams = { 1.0 - elam, elam, 0.0 };
         Pk = ::ipc::point_edge_tangent_basis(pt[0], pt[1], pt[2]);
     }
     else if (pt_type == ::ipc::PointTriangleDistanceType::P_E1) {
@@ -325,9 +332,17 @@ double pt_uktk(
     double contact_force = -barrier::barrier_derivative_d(d) * 2 * sqrt(d);
     return contact_force;
 }
+tuple<double, Vector2d, Matrix<double, 2, 12>> ee_uktk(AffineBody& ci, AffineBody& cj, array<vec3, 4>& ee, array<int, 4>& ij, const ::ipc::EdgeEdgeDistanceType& ee_type, double d, double dt, double mollifier)
+{
+    Vector2d uk;
+    Matrix<double, 2, 12> Tk;
+    double lam = ee_uktk(ci, cj, ee, ij, ee_type, Tk, uk, d, dt, mollifier);
+    return { lam, uk, Tk };
+}
+
 double ee_uktk(
     AffineBody& ci, AffineBody& cj,
-    array<vec3, 4>& ee, array<int, 4>& ij, ::ipc::EdgeEdgeDistanceType& ee_type,
+    array<vec3, 4>& ee, array<int, 4>& ij, const ::ipc::EdgeEdgeDistanceType& ee_type,
     Matrix<double, 2, 12>& Tk_T_ret, Vector2d& uk_ret, double d, double dt,
     double mollifier)
 {
@@ -340,7 +355,8 @@ double ee_uktk(
     degeneracy.col(0) = rei.normalized();
     degeneracy.col(1) = (ej0 - ei0).cross(rei).normalized();
     // bool par = sin2 < 1e-8;
-    bool par = ee_type == ::ipc::EdgeEdgeDistanceType::EA_EB && mollifier != 1.0;
+    // bool par = ee_type == ::ipc::EdgeEdgeDistanceType::EA_EB && mollifier != 1.0;
+    bool par = false;
 
     auto lams = ::ipc::edge_edge_closest_point(ei0, ei1, ej0, ej1);
     auto Pk = par ? degeneracy : ::ipc::edge_edge_tangent_basis(ei0, ei1, ej0, ej1);
@@ -390,11 +406,11 @@ double ee_uktk(
     clip(lams(0), 0.0, 1.0);
     clip(lams(1), 0.0, 1.0);
     array<double, 4> lambdas = { 1 - lams(0), lams(0), 1 - lams(1), lams(1) };
-    if (par) {
-        // ignore this friction, already handled in point-triangle pair
-        lambdas = { 0.0, 0.0, 0.0, 0.0 };
-        // uk will be set to zero
-    }
+    // if (par) {
+    //     // ignore this friction, already handled in point-triangle pair
+    //     lambdas = { 0.0, 0.0, 0.0, 0.0 };
+    //     // uk will be set to zero
+    // }
     auto pei = ei0 * lambdas[0] + ei1 * lambdas[1];
     auto pej = ej0 * lambdas[2] + ej1 * lambdas[3];
     auto closest = (pei - pej).squaredNorm();
