@@ -250,7 +250,7 @@ void ipc_term(
     int _i = ij[0], v = ij[1], _j = ij[2], f = ij[3];
     int ii = _i, jj = _j;
     auto &ci{ *globals.cubes[_i] }, &cj{ *globals.cubes[_j] };
-    auto* tidx = cj.indices;
+    const auto& tidx{ cj.indices };
     Vector2d _uk;
     contact_lambda = utils::pt_uktk(ci, cj, pt, ij, pt_type, Tk, _uk, dist, globals.dt);
 
@@ -354,7 +354,7 @@ tuple<mat12, vec12, double> ipc_hess_ee_12x12(
     int _i = ij[0], _ei = ij[1], _j = ij[2], _ej = ij[3];
     auto &ci(*globals.cubes[_i]), &cj(*globals.cubes[_j]);
 
-    auto *eidxi = ci.edges, *eidxj = cj.edges;
+    const auto &eidxi = ci.edges, &eidxj = cj.edges;
 
     auto ei0 = ee[0], ei1 = ee[1],
          ej0 = ee[2], ej1 = ee[3];
@@ -409,7 +409,7 @@ void ipc_term_ee(
     int _i = ij[0], _ei = ij[1], _j = ij[2], _ej = ij[3];
     auto &ci(*globals.cubes[_i]), &cj(*globals.cubes[_j]);
 
-    auto *eidxi = ci.edges, *eidxj = cj.edges;
+    const auto &eidxi = ci.edges, &eidxj = cj.edges;
 
     auto ei0 = ee[0], ei1 = ee[1],
          ej0 = ee[2], ej1 = ee[3];

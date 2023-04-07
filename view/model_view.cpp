@@ -20,7 +20,7 @@ using namespace std;
 // #define FEATURE_POSTRENDER
 //-----------------------------------------------------------------
 
-unsigned *Cube::_edges = nullptr, *Cube::_indices = nullptr;
+vector<unsigned> Cube::_edges {}, Cube::_indices {};
 void render_cubes(Shader shader, vector<unique_ptr<AffineBody>> &cubes)
 {
     for (int i = 0; i < cubes.size(); i++)

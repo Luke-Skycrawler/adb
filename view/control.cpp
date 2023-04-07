@@ -123,6 +123,9 @@ void reset(bool init)
         globals.params_int[p.key()] = p.value();
     }
     barrier::kappa = globals.kappa;
+    for (int i = 0; i < 9; i++) {
+        globals.params_int["ee error " + to_string(i)] = 0;
+    }
 }
 // process all input: query GLFW whether relevant keys are pressed/released this frame and react accordingly
 // ---------------------------------------------------------------------------------------------------------

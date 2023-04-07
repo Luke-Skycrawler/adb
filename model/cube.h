@@ -38,11 +38,11 @@ struct Cube: AffineBody {
         Ic = mass * scale * scale / 12;
     }
 
-    static unsigned * _indices, *_edges;
+    static std::vector<unsigned> _indices, _edges;
     static void gen_indices()
     {
-        _indices = new unsigned[n_faces * 3];
-        _edges = new unsigned[n_edges * 2];
+        _indices.resize(n_faces * 3);
+        _edges.resize(n_edges * 2);
         for (int i = 0; i < 6; i++) {
             const int * f = faces();
             _indices[i * 6 + 0] = f[i * 4 + 0];
