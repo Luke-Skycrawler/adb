@@ -3,7 +3,8 @@
 #include <array>
 using namespace std;
 void AffineObject::extract_edges() {
-    set<array<unsigned,2>> e;
+    static set<array<unsigned,2>> e;
+    e.clear();
     static const auto insert = [&](unsigned a, unsigned b){
         e.insert({min(a, b), max(a, b)});
     };
@@ -13,13 +14,12 @@ void AffineObject::extract_edges() {
         insert(t1, t2);
         insert(t0, t2);
     }
-    _edges.reserve(e.size() * 2);
+    edges.reserve(e.size() * 2);
     for (auto &ei: e) {
-        _edges.push_back(ei[0]);
-        _edges.push_back(ei[1]);
+        edges.push_back(ei[0]);
+        edges.push_back(ei[1]);
     }
-    n_edges = _edges.size() / 2; 
-    edges = _edges.data();
+    n_edges = edges.size() / 2; 
 }
 
 const vec3 AffineObject::vertices(int i) const{

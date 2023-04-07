@@ -250,7 +250,7 @@ void ipc_term(
     int _i = ij[0], v = ij[1], _j = ij[2], f = ij[3];
     int ii = _i, jj = _j;
     auto &ci{ *globals.cubes[_i] }, &cj{ *globals.cubes[_j] };
-    auto* tidx = cj.indices;
+    const auto& tidx{ cj.indices };
     Vector2d _uk;
     contact_lambda = utils::pt_uktk(ci, cj, pt, ij, pt_type, Tk, _uk, dist, globals.dt);
 
@@ -354,7 +354,7 @@ tuple<mat12, vec12, double> ipc_hess_ee_12x12(
     int _i = ij[0], _ei = ij[1], _j = ij[2], _ej = ij[3];
     auto &ci(*globals.cubes[_i]), &cj(*globals.cubes[_j]);
 
-    auto *eidxi = ci.edges, *eidxj = cj.edges;
+    const auto &eidxi = ci.edges, &eidxj = cj.edges;
 
     auto ei0 = ee[0], ei1 = ee[1],
          ej0 = ee[2], ej1 = ee[3];
@@ -409,7 +409,7 @@ void ipc_term_ee(
     int _i = ij[0], _ei = ij[1], _j = ij[2], _ej = ij[3];
     auto &ci(*globals.cubes[_i]), &cj(*globals.cubes[_j]);
 
-    auto *eidxi = ci.edges, *eidxj = cj.edges;
+    const auto &eidxi = ci.edges, &eidxj = cj.edges;
 
     auto ei0 = ee[0], ei1 = ee[1],
          ej0 = ee[2], ej1 = ee[3];
@@ -420,17 +420,19 @@ void ipc_term_ee(
 
     Vector2d _uk;
     contact_lambda = utils::ee_uktk(ci, cj, ee, ij, ee_type, Tk, _uk, dist, globals.dt, p);
-    if (p != 1.0) {
-        contact_lambda = contact_lambda * p;
-    }
+    // if (p != 1.0) {
+    //     // contact_lambda = contact_lambda * p;
+    // }
 
 #ifdef _FRICTION_
     bool ee_parallel = ee_type == ::ipc::EdgeEdgeDistanceType::EA_EB && p != 1.0;
 
-    if (globals.ee_fric && !ee_parallel)
-        friction(_uk, contact_lambda, Tk.transpose(), ee_grad, ipc_hess);
-    if (p != 1.0)
-        contact_lambda = 0.0;
+    // if (globals.ee_fric && !ee_parallel)
+    //     friction(_uk, contact_lambda, Tk.transpose(), ee_grad, ipc_hess);
+    // if (ee_parallel)
+    //     contact_lambda = 0.0;
+    if (globals.ee_fric) friction(_uk, contact_lambda, Tk.transpose(), ee_grad, ipc_hess);
+    
 #endif
     auto ei0_tile = ci.vertices(eidxi[2 * _ei]), ei1_tile = ci.vertices(eidxi[2 * _ei + 1]),
          ej0_tile = cj.vertices(eidxj[2 * _ej]), ej1_tile = cj.vertices(eidxj[2 * _ej + 1]);

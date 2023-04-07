@@ -5,7 +5,7 @@ struct AffineObject: AffineBody {
     Mesh &mesh;
     AffineObject(Mesh &mesh):
     mesh(mesh), 
-    AffineBody(mesh.vertices.size(), mesh.indices.size() / 3, 0, mesh.indices.data(), nullptr) {
+    AffineBody(mesh.vertices.size(), mesh.indices.size() / 3, 0, mesh.indices, {}) {
         extract_edges();
         Ic = mass / 12;
     }

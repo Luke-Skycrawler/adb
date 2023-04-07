@@ -23,3 +23,5 @@ unsigned int loadCubemap(std::vector<std::string> faces);
 unsigned int loadTexture(char const *path);
 #endif
 void reset(bool init = false);
+void exit_callback(GLFWwindow* window);
+

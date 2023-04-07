@@ -167,16 +167,16 @@ void intersect_sort(
 
     */
     static vector<BoundingBox> bounds[3];
-    static vector<int>*ilists[3] = {
+    static vector<int>*intersected_body_per_dim[3] = {
         new vector<int>[n_cubes],
         new vector<int>[n_cubes],
         new vector<int>[n_cubes]
     },
-           *tmp = new vector<int>[n_cubes];
+           *intersected_body_joint = new vector<int>[n_cubes];
     static vector<Intersection>* ret_tmp = new vector<Intersection>[n_cubes];
 
     static vector<lu> affine_bb;
-    // static vector<Intersection> tmp;
+    // static vector<Intersection> intersected_body_joint;
     ret.resize(0);
     
     affine_bb.resize(n_cubes);
@@ -185,10 +185,10 @@ void intersect_sort(
     for (int i = 0; i < n_cubes; i++) {
         auto t{ affine(aabbs[i], *cubes[i], vtn) };
         affine_bb[i] = t;
-        tmp[i].resize(0);
+        intersected_body_joint[i].resize(0);
         ret_tmp[i].resize(0);
         for (int dim = 0; dim < 3; dim ++)
-        ilists[dim][i].resize(0);
+        intersected_body_per_dim[dim][i].resize(0);
     }
     #pragma omp parallel for schedule(static, 1)
     for (int dim = 0; dim < 3; dim++) {
@@ -209,38 +209,41 @@ void intersect_sort(
             else {
                 auto it = find(active.begin(), active.end(), body);
                 active.erase(it);
-                ilists[dim][body].insert(ilists[dim][body].end(), active.begin(), active.end());
+                intersected_body_per_dim[dim][body].insert(intersected_body_per_dim[dim][body].end(), active.begin(), active.end());
                 for (auto c : active) {
-                    ilists[dim][c].push_back(body);
+                    intersected_body_per_dim[dim][c].push_back(body);
                 }
             }
         }
     }
+    static vector<unsigned> buckets;
+    buckets.resize(omp_get_max_threads() * n_cubes);
 
 #pragma omp parallel
     {
-        unsigned char* bucket = new unsigned char[n_cubes];
+        // unsigned char* bucket = new unsigned char[n_cubes];
+        auto tid = omp_get_thread_num();
 #pragma omp for schedule(guided)
         for (int i = 0; i < n_cubes; i++) {
+            auto bucket{ buckets.data() + tid * n_cubes };
             fill(bucket, bucket + n_cubes, 0);
             for (int dim = 0; dim < 3; dim++) {
-                auto& l{ ilists[dim][i] };
+                auto& l{ intersected_body_per_dim[dim][i] };
                 for (auto j : l) {
                     if (dim < 2)
                         bucket[j] += 1;
                     else if (bucket[j] == 2) {
-                        tmp[i].push_back(j);
+                        intersected_body_joint[i].push_back(j);
                     }
                 }
             }
-            sort(tmp[i].begin(), tmp[i].end());
+            sort(intersected_body_joint[i].begin(), intersected_body_joint[i].end());
         }
-        delete[] bucket;
     }
 
 #pragma omp parallel for schedule(guided)
     for (int i = 0; i < n_cubes; i ++) {
-        auto& l{ tmp[i] };
+        auto& l{ intersected_body_joint[i] };
         auto& bi = affine_bb[i];
         for (int j: l) {
             auto& bj = affine_bb[j];

@@ -20,7 +20,7 @@ using namespace std;
 // #define FEATURE_POSTRENDER
 //-----------------------------------------------------------------
 
-unsigned *Cube::_edges = nullptr, *Cube::_indices = nullptr;
+vector<unsigned> Cube::_edges {}, Cube::_indices {};
 void render_cubes(Shader shader, vector<unique_ptr<AffineBody>> &cubes)
 {
     for (int i = 0; i < cubes.size(); i++)
@@ -280,7 +280,9 @@ int main()
             for (int i = 0; i < 1; i++)
                 implicit_euler(globals.cubes, globals.dt);
             player_save(trace_folder, globals.ts, globals.cubes, init);
-            if (globals.ending_ts > 0 && globals.ts >= globals.ending_ts) glfwSetWindowShouldClose(window, true);
+            if (globals.ending_ts > 0 && globals.ts >= globals.ending_ts) 
+                exit_callback(window);
+                // glfwSetWindowShouldClose(window, true);
         }
         else{
             spdlog::info("timestep = {}", globals.ts);

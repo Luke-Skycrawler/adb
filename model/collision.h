@@ -11,8 +11,11 @@
 #endif
 // #define NO_MOLLIFIER
 // #define _TRIPLETS_
-#define _PLUG_IN_LAN_
+// #define _PLUG_IN_LAN_
+
 #ifdef _PLUG_IN_LAN_
+#include "IpcFrictionConstraint.h"
+#include "IpcCollisionConstraint.h"
 #define _DIRECT_OUT_
 #undef _SM_OUT_
 #undef _TRIPLETS_

@@ -18,12 +18,11 @@ struct AffineBody {
     mat3 A;
     vec3 p;
     double mass, Ic;
-    unsigned *indices, *edges;
+    std::vector<unsigned> indices, edges;
     virtual const vec3 vertices(int i) const = 0;
     virtual void draw(Shader& shader) const = 0;
-    const int n_vertices, n_faces;
-    vec3* v_transformed, *vt0_transformed;
-    int n_edges;
+    std::vector<vec3> v_transformed;
+    int n_edges, n_vertices, n_faces;
     vec12 dq, grad;
     mat12 hess;
     q4 q, q0, dqdt;
@@ -53,7 +52,7 @@ struct AffineBody {
         return a * vertices(i) + b;
     }
 
-    inline void project_vt1() const
+    inline void project_vt1()
     {
         mat3 a;
         vec3 b = q[0];
@@ -62,7 +61,7 @@ struct AffineBody {
             v_transformed[i] = a * vertices(i) + b;
         }
     }
-    inline void project_vt2() const
+    inline void project_vt2()
     {
         mat3 a;
         vec3 b = q[0];
@@ -75,7 +74,7 @@ struct AffineBody {
             v_transformed[i] = a * vertices(i) + b;
         }
     }
-    inline void project_vt0() const
+    inline void project_vt0()
     {
         mat3 a;
         vec3 b = q0[0];
@@ -84,10 +83,10 @@ struct AffineBody {
             v_transformed[i] = a * vertices(i) + b;
         }
     }
-    AffineBody(int n_vertices, int n_faces, int n_edges, unsigned* indices = nullptr, unsigned* edges = nullptr)
-        : mass(1000.0), Ic(1000.0), p(0.0f, 0.0f, 0.0f), indices(indices), edges(edges), n_vertices(n_vertices), n_edges(n_edges), n_faces(n_faces), 
-        v_transformed(new vec3[n_vertices])
+    AffineBody(int n_vertices, int n_faces, int n_edges, std::vector<unsigned> indices = {}, std::vector<unsigned> edges = {})
+        : mass(1000.0), Ic(1000.0), p(0.0f, 0.0f, 0.0f), indices(indices), edges(edges), n_vertices(n_vertices), n_edges(n_edges), n_faces(n_faces)
     {
+        v_transformed.resize(n_vertices);
         A.setIdentity(3, 3);
         q = {
             p, 
@@ -99,7 +98,6 @@ struct AffineBody {
         for (int i= 0; i < 4; i++)
             dqdt[i].setZero(3);
     }
-    ~AffineBody() { delete[] v_transformed; }
 };
 
 struct Face {
