@@ -7,7 +7,7 @@
     "predefined_case" : {
         "enable": false,
         "id" : 2,
-        "custom": "../test_cases/cards.json"
+        "custom": "../test_cases/empty.json"
     },
     "solver": "sparse",
     "gravity": true, 
@@ -54,7 +54,7 @@
     "ee_friction": true,
     "kappa": 1e-4,
     "params_double": {
-        "tol": 1e-2,
+        "tol": 1e-4,
         "dhat_sqr": 1e-2,
         "kappa": 1e-1,
         "c1": 1e-4,
