@@ -46,4 +46,8 @@
 #define CUDA_QEAL_MIN(a, b) fminf(a, b)
 #define CUDA_QEAL_MAX3(a, b, c) fmaxf(fmaxf(a, b), c)
 #define CUDA_QEAL_MIN3(a, b, c) fminf(fminf(a, b), c)
+
+static const int n_cuda_threads_per_block = 1024;
+
 #endif
+

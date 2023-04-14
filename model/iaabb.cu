@@ -4,7 +4,66 @@
 #include "timer.h"
 
 using namespace std;
-using namespace Eigen;
+// using namespace cuda::std;
+// using namespace Eigen;
+using luf = cuda::std::array<float, 6>;
+static const int max_pairs_per_thread = 512, max_aabb_list_size = 256;
+
+inline bool intersects_gpu(const luf& a, const luf& b)
+{
+    return a[0] <= b[3] && a[3] >= b[0] && a[1] <= b[4] && a[4] >= b[1] && a[2] <= b[5] && a[5] >= b[2];
+}
+
+inline luf to_luf(const lu& a)
+{
+    return {
+        a[0][0],
+        a[0][1],
+        a[0][2],
+        a[1][0],
+        a[1][1],
+        a[1][2],
+    };
+}
+__global__ void aabb_intersection_kernel(luf* dev_vi, int nvi, int nfj, thrust::device_vector<int>& dev_ij, thrust::device_vector<int>& dev_cnt)
+{
+
+    __shared__ luf aabbs[max_aabb_list_size];
+    const int tid = threadIdx.x + blockIdx.x * blockDim.x;
+    int n_task_per_thread = (nvi * nfj + blockDim.x - 1) / blockDim.x;
+    int n_copies_per_thread = (nvi + nfj + blockDim.x - 1) / blockDim.x;
+    for (int i = 0; i < n_copies_per_thread; i++) {
+        int idx = tid * n_copies_per_thread + i;
+        if (idx < nvi + nfj)
+            aabbs[i] = dev_vi[idx];
+    }
+    __syncthreads();
+    // copys the bounding boxes to shared memory
+
+    for (int _i = 0; _i < n_task_per_thread; _i++) {
+        int I = tid * n_task_per_thread + _i;
+        if (I < nvi * nfj) {
+            int i = I / nfj;
+            int j = I % nfj;
+            if (intersects(aabbs[i], aabbs[nvi + j])) {
+                auto put = dev_cnt[tid]++ * 2;
+                dev_ij[put] = i;
+                dev_ij[put + 1] = j;
+            }
+        }
+    }
+}
+
+__global__ void squeeze_kernel(int * ij, int * cnt)
+{
+    // squeeze the ij list according to a prefix sum array cnt
+    int tid = threadIdx.x + blockIdx.x * blockDim.x;
+    int start = tid == 0 ?0: cnt[tid - 1];     
+    int copy_size = cnt[tid] - start;
+    for (int i = 0; i < copy_size; i ++ ) {
+        ij[i + start] = ij[tid * max_pairs_per_thread + i];
+    }
+}
 
 double primitive_brute_force_thrust(
     int n_cubes,
@@ -279,42 +338,73 @@ double primitive_brute_force_thrust(
         }
     }
 
-    const auto vf_col_set = [&](vector<int>& vilist, vector<int>& fjlist,
-                                const std::vector<std::unique_ptr<AffineBody>>& cubes,
-                                int I, int J,
-                                vector<array<vec3, 4>>& pts,
-                                vector<array<int, 4>>& idx) {
+    int n_proc = omp_get_max_threads();
+    cudaStream_t cuda_streams[n_proc];
+    for (int i = 0; i < n_proc; i++) {
+        cudaStreamCreate(&cuda_streams[i]);
+    }
+
+    const auto vf_col_set_cuda = [&](vector<int>& vilist, vector<int>& fjlist,
+                                     const std::vector<std::unique_ptr<AffineBody>>& cubes,
+                                     int I, int J,
+                                     vector<array<vec3, 4>>& pts,
+                                     vector<array<int, 4>>& idx) {
         auto &ci{ *cubes[I] }, &cj{ *cubes[J] };
-        vector<lu> viaabbs, fjaabbs;
+        thrust::host_vector<luf> aabbs;
         vector<vec3> vis;
         vector<Face> fjs;
-        for (auto& vi : vilist) {
+        int nvi = vis.size(), nfj = fjs.size();
+        // for (auto& vi : vilist) {
+        for (int k = 0; k < nvi; k++) {
+            auto vi{ vilist[k] };
             vec3 v{ ci.v_transformed[vi] };
             vis.push_back(v);
-            viaabbs.push_back({ v.array() - barrier::d_sqrt, v.array() + barrier::d_sqrt });
+            lu lud{ v.array() - barrier::d_sqrt, v.array() + barrier::d_sqrt };
+            aabbs[k] = to_luf(lud);
         }
-        for (auto& fj : fjlist) {
+        // for (auto& fj : fjlist) {
+        for (int k = 0; k < nfj; k++) {
+            auto fj{ fjlist[k] };
             Face f{ cj, unsigned(fj), true, true };
             fjs.push_back(f);
-            fjaabbs.push_back(compute_aabb(f));
+            lu lud{ compute_aabb(f) };
+            aabbs[k + nvi] = to_luf(lud);
         }
-        for (int i = 0; i < vilist.size(); i ++)
-            for (int j = 0; j < fjlist.size(); j ++){
-                int vi = vilist[i], fj = fjlist[j];
-                bool pt_intersects = intersects(viaabbs[i], fjaabbs[j]);
-                if (!pt_intersects) continue;
-                auto& v{ vis[i] };
-                auto& f{ fjs[j] };
-                auto [d, pt_type] = vf_distance(v, f);
-                if (d < barrier::d_hat) {
-                    array<vec3, 4> pt = { v, f.t0, f.t1, f.t2 };
-                    array<int, 4> ij = { I, vi, J, fj };
-                    {
-                        pts.push_back(pt);
-                        idx.push_back(ij);
-                    }
-                }
-            }
+        auto tid = omp_get_thread_num();
+
+        // auto cuda_mem_size = vis.size() * sizeof(vec3) + fjs.size() * sizeof(Face) + .size() * sizeof(lu) + fjaabbs.size() * sizeof(lu);
+
+        auto n_tasks = nvi * nfj;
+
+        thrust::device_vector<int> cnt, ij(n_cuda_threads_per_bloc* 2 * max_pairs_per_thread, 0);
+
+        thrust::device_vector<luf> dev_aabbs(nvi + nfj);
+        dev_aabbs = aabbs;
+
+        aabb_intersection_kernel<<<1, n_cuda_threads_per_block, max_aabb_list_size * sizeof(luf), cuda_streams[tid]>>>(thrust::raw_pointer_cast(dev_aabbs.data()), nvi, nfj, ij, dev_cnt);
+        cudaDeviceSynchronize();
+        thrust::inclusive_scan(dev_cnt.begin(), dev_cnt.end(), dev_cnt.begin());
+        
+        squeeze_kernel<<<1, n_cuda_threads_per_block, 0, cuda_streams[tid]>>>(thrust::raw_pointer_cast(ij.data()), thrust::raw_pointer_cast (dev_cnt.data()), nvi, nfj);
+        int n_culled = dev_cnt.back();
+        for (int i)
+        // for (int i = 0; i < vilist.size(); i ++)
+        //     for (int j = 0; j < fjlist.size(); j ++){
+        //         int vi = vilist[i], fj = fjlist[j];
+        //         bool pt_intersects = intersects(viaabbs[i], fjaabbs[j]);
+        //         if (!pt_intersects) continue;
+        //         auto& v{ vis[i] };
+        //         auto& f{ fjs[j] };
+        //         auto [d, pt_type] = vf_distance(v, f);
+        //         if (d < barrier::d_hat) {
+        //             array<vec3, 4> pt = { v, f.t0, f.t1, f.t2 };
+        //             array<int, 4> ij = { I, vi, J, fj };
+        //             {
+        //                 pts.push_back(pt);
+        //                 idx.push_back(ij);
+        //             }
+        //         }
+        //     }
     };
 
     const auto ee_col_set = [&](vector<int>& eilist, vector<int>& ejlist,
@@ -458,153 +548,6 @@ double primitive_brute_force_thrust(
                              *eidx_private = new vector<array<int, 4>>[omp_get_max_threads()];
     static vector<array<vec3, 4>>*pts_private = new vector<array<vec3, 4>>[omp_get_max_threads()], *ees_private = new vector<array<vec3, 4>>[omp_get_max_threads()];
 
-#ifdef _FULL_PARALLEL_
-    static vector<int> inner_presum;
-    auto n_lists = n_overlap / 2;
-    inner_presum.resize(n_lists + 1);
-
-    const auto compute_thread_starting = [&](int pt_ee_tp, vector<array<int, 2>>& ret) -> int {
-        int inner, outer;
-        int n_threads = omp_get_num_procs();
-        ret.resize(n_threads);
-        inner_presum[0] = 0;
-        for (int _i = 0; _i < n_lists; _i++) {
-            int i = _i * 2;
-            auto& p{ *overlaps[i].plist };
-            auto& pi{
-                pt_ee_tp == 0 ? p.vi : pt_ee_tp == 1 ? p.ei
-                                                     : p.fi
-            };
-            auto& pj{
-                pt_ee_tp == 0 ? p.fj : pt_ee_tp == 1 ? p.ej
-                                                     : p.vj
-            };
-            auto ni = pi.size(), nj = pj.size();
-            inner_presum[_i + 1] = inner_presum[_i] + ni * nj;
-            // presum
-        }
-        int n_task = inner_presum[n_lists];
-        int k_threads = (n_task + n_threads - 1) / n_threads;
-        for (int j = 0; j < n_threads; j++) {
-            int kj = j * k_threads;
-            int i0 = lower_bound(inner_presum.begin(), inner_presum.end(), kj, [](int a, int b) -> bool {
-                return a <= b;
-            }) - inner_presum.begin() - 1;
-
-            ret[j] = { i0 * 2, kj - inner_presum[i0] };
-        }
-        return k_threads;
-    };
-
-    static vector<array<int, 2>> thread_starting_index;
-    if (!cull_trajectory) {
-        // point-triangle
-        int k_threads = compute_thread_starting(0, thread_starting_index);
-#pragma omp parallel
-        {
-            int k_tasks_done = 0;
-            auto tid = omp_get_thread_num();
-            idx_private[tid].resize(0);
-            pts_private[tid].resize(0);
-
-            auto& a = thread_starting_index[tid];
-            int outer = a[0], inner = a[1];
-            do {
-                int I{ overlaps[outer].i }, J{ overlaps[outer].j };
-                auto &ci{ *cubes[I] }, &cj{ *cubes[J] };
-                auto& p{ *overlaps[outer].plist };
-                auto& vilist{ p.vi };
-                auto& fjlist{ p.fj };
-                int nv = vilist.size(), nf = fjlist.size();
-                int n_pt = nv * nf;
-                for (int i = inner; i < n_pt; i++) {
-                    int vi{ i / nf }, fj{ i % nf };
-                    pt_col_set_task(vi, fj, I, J, ci, cj, pts_private[tid], idx_private[tid]);
-                    k_tasks_done++;
-                    if (k_tasks_done >= k_threads) break;
-                }
-                if (outer >= n_overlap || k_tasks_done >= k_threads) break;
-                outer += 2;
-                inner = 0;
-            } while (1);
-#pragma omp critical
-            {
-                pts.insert(pts.end(), pts_private[tid].begin(), pts_private[tid].end());
-                idx.insert(idx.end(), idx_private[tid].begin(), idx_private[tid].end());
-            }
-        }
-        // triangle-point
-        k_threads = compute_thread_starting(2, thread_starting_index);
-#pragma omp parallel
-        {
-            int k_tasks_done = 0;
-            auto tid = omp_get_thread_num();
-            idx_private[tid].resize(0);
-            pts_private[tid].resize(0);
-
-            auto& a = thread_starting_index[tid];
-            int outer = a[0], inner = a[1];
-            do {
-                int I{ overlaps[outer].i }, J{ overlaps[outer].j };
-                auto &ci{ *cubes[I] }, &cj{ *cubes[J] };
-                auto& p{ *overlaps[outer].plist };
-                auto& vjlist{ p.vj };
-                auto& filist{ p.fi };
-                int nv = vjlist.size(), nf = filist.size();
-                int n_pt = nv * nf;
-                for (int i = inner; i < n_pt; i++) {
-                    int vj{ i / nf }, fi{ i % nf };
-                    pt_col_set_task(vj, fi, I, J, ci, cj, pts_private[tid], idx_private[tid]);
-                    k_tasks_done++;
-                    if (k_tasks_done >= k_threads) break;
-                }
-                if (outer >= n_overlap || k_tasks_done >= k_threads) break;
-                outer += 2;
-                inner = 0;
-            } while (1);
-#pragma omp critical
-            {
-                pts.insert(pts.end(), pts_private[tid].begin(), pts_private[tid].end());
-                idx.insert(idx.end(), idx_private[tid].begin(), idx_private[tid].end());
-            }
-        }
-        // edge-edge
-        k_threads = compute_thread_starting(1, thread_starting_index);
-#pragma omp parallel
-        {
-            int k_tasks_done = 0;
-            auto tid = omp_get_thread_num();
-            ees_private[tid].resize(0);
-            eidx_private[tid].resize(0);
-
-            auto& a = thread_starting_index[tid];
-            int outer = a[0], inner = a[1];
-            do {
-                int I{ overlaps[outer].i }, J{ overlaps[outer].j };
-                auto &ci{ *cubes[I] }, &cj{ *cubes[J] };
-                auto& p{ *overlaps[outer].plist };
-                auto& eilist{ p.ei };
-                auto& ejlist{ p.ej };
-                int nei = eilist.size(), nej = ejlist.size();
-                int n_ee = nei * nej;
-                for (int i = inner; i < n_ee; i++) {
-                    int ei{ i / nej }, ej{ i % nej };
-                    ee_col_set_task(ei, ej, I, J, ci, cj, ees_private[tid], eidx_private[tid]);
-                    k_tasks_done++;
-                    if (k_tasks_done >= k_threads) break;
-                }
-                if (outer >= n_overlap || k_tasks_done >= k_threads) break;
-                outer += 2;
-                inner = 0;
-            } while (1);
-#pragma omp critical
-            {
-                ees.insert(ees.end(), ees_private[tid].begin(), ees_private[tid].end());
-                eidx.insert(eidx.end(), eidx_private[tid].begin(), eidx_private[tid].end());
-            }
-        }
-    }
-    #else
     if (!cull_trajectory)
 #pragma omp parallel
     {
@@ -637,7 +580,6 @@ double primitive_brute_force_thrust(
             eidx.insert(eidx.end(), eidx_private[tid].begin(), eidx_private[tid].end());
         }
     }
-    #endif
     else
 #pragma omp parallel
     {

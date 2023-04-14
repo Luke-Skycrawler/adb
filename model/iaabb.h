@@ -121,3 +121,12 @@ double iaabb_brute_force(
     std::vector<std::array<int, 4>>& eidx,
     std::vector<std::array<int, 2>>& vidx
 );
+
+inline bool intersects(const lu& a, const lu& b)
+{
+    const auto overlaps = [&](int i) -> bool {
+        return a[0][i] <= b[1][i] && a[1][i] >= b[0][i];
+    };
+    return overlaps(0) && overlaps(1) && overlaps(2);
+}
+

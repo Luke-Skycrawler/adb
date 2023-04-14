@@ -106,13 +106,6 @@ inline bool intersection(const lu& a, const lu& b, lu& ret)
     return intersects;
 }
 
-inline bool intersects(const lu& a, const lu& b)
-{
-    const auto overlaps = [&](int i) -> bool {
-        return a[0][i] <= b[1][i] && a[1][i] >= b[0][i];
-    };
-    return overlaps(0) && overlaps(1) && overlaps(2);
-}
 
 lu affine(lu aabb, AffineBody& c, int vtn)
 {
@@ -150,6 +143,86 @@ void intersect_brute_force(
         }
 }
 
+void aabb_culling_sort(
+    const vector<lu>& aabbsi, const vector<lu>& aabbsj,
+    vector<array<int, 2>>& ret)
+{
+    vector<lu> affine_bb;
+    float sep = aabbsi.size() - 0.5;
+    affine_bb.reserve(aabbsi.size() + aabbsj.size());
+    affine_bb.insert(affine_bb.end(), aabbsi.begin(), aabbsi.end());
+    affine_bb.insert(affine_bb.end(), aabbsj.begin(), aabbsj.end());
+    int n_bodies = affine_bb.size();
+    vector<BoundingBox> bounds[3];
+
+    vector<vector<int>> intersected_body_per_dim[3], intersected_body_joint;
+    auto* ret_tmp = new vector<array<int, 2>>[n_bodies];
+    intersected_body_joint.resize(n_bodies);
+    intersected_body_per_dim[0].resize(n_bodies);
+    intersected_body_per_dim[1].resize(n_bodies);
+    intersected_body_per_dim[2].resize(n_bodies);
+    ret.resize(0);
+
+    for (int dim = 0; dim < 3; dim++) {
+        bounds[dim].resize(n_bodies * 2);
+        for (int i = 0; i < n_bodies; i++) {
+            auto& t{ affine_bb[i] };
+            auto &l{ t[0] }, &u{ t[1] };
+            bounds[dim][i * 2] = { i, l(dim), true };
+            bounds[dim][i * 2 + 1] = { i, u(dim), false };
+        }
+        sort(bounds[dim].begin(), bounds[dim].end(), [](const BoundingBox& a, const BoundingBox& b) { return a.p < b.p; });
+        vector<int> active;
+        for (int i = 0; i < n_bodies * 2; i++) {
+            auto& b{ bounds[dim][i] };
+            auto body = b.body;
+            if (b.true_for_l_false_for_u)
+                active.push_back(body);
+            else {
+                auto it = find(active.begin(), active.end(), body);
+                active.erase(it);
+                // intersected_body_per_dim[dim][body].insert(intersected_body_per_dim[dim][body].end(), active.begin(), active.end());
+                for (auto c : active)
+                    if ((c - sep) * (body - sep) < 0) {
+                        intersected_body_per_dim[dim][body].push_back(c);
+                        intersected_body_per_dim[dim][c].push_back(body);
+                    }
+            }
+        }
+    }
+    vector<unsigned> bucket;
+    bucket.resize(n_bodies);
+    // #pragma omp parallel
+    {
+        //         auto tid = omp_get_thread_num();
+        // #pragma omp for schedule(guided)
+        for (int i = 0; i < n_bodies; i++) {
+            fill(bucket.begin(), bucket.end(), 0);
+            for (int dim = 0; dim < 3; dim++) {
+                auto& l{ intersected_body_per_dim[dim][i] };
+                for (auto j : l) {
+                    if (dim < 2)
+                        bucket[j] += 1;
+                    else if (bucket[j] == 2) {
+                        intersected_body_joint[i].push_back(j);
+                    }
+                }
+            }
+            sort(intersected_body_joint[i].begin(), intersected_body_joint[i].end());
+        }
+    }
+#pragma omp parallel for schedule(guided)
+    for (int i = 0; i < n_bodies; i++) {
+        auto& l{ intersected_body_joint[i] };
+        for (int j : l) {
+            ret_tmp[i].push_back({ i, j });
+        }
+    }
+
+    for (int i = 0; i < n_bodies; i++) {
+        ret.insert(ret.end(), ret_tmp[i].begin(), ret_tmp[i].end());
+    }
+}
 void intersect_sort(
     int n_cubes,
     const std::vector<std::unique_ptr<AffineBody>>& cubes,
@@ -185,12 +258,16 @@ void intersect_sort(
     for (int i = 0; i < n_cubes; i++) {
         auto t{ affine(aabbs[i], *cubes[i], vtn) };
         affine_bb[i] = t;
+    }
+
+#pragma omp parallel for schedule(static)
+    for (int i = 0; i < n_cubes; i++) {
         intersected_body_joint[i].resize(0);
         ret_tmp[i].resize(0);
         for (int dim = 0; dim < 3; dim ++)
         intersected_body_per_dim[dim][i].resize(0);
     }
-    #pragma omp parallel for schedule(static, 1)
+#pragma omp parallel for schedule(static, 1)
     for (int dim = 0; dim < 3; dim++) {
         bounds[dim].resize(n_cubes * 2);
         for (int i = 0; i < n_cubes; i++) {
@@ -655,8 +732,10 @@ double primitive_brute_force(
             fjs.push_back(f);
             fjaabbs.push_back(compute_aabb(f));
         }
-        for (int i = 0; i < vilist.size(); i ++)
-            for (int j = 0; j < fjlist.size(); j ++){
+#define BRUTE_FORCE
+#ifdef BRUTE_FORCE
+        for (int i = 0; i < vilist.size(); i++)
+            for (int j = 0; j < fjlist.size(); j++) {
                 int vi = vilist[i], fj = fjlist[j];
                 bool pt_intersects = intersects(viaabbs[i], fjaabbs[j]);
                 if (!pt_intersects) continue;
@@ -672,6 +751,26 @@ double primitive_brute_force(
                     }
                 }
             }
+#else
+        vector<array<int, 2>> vfpairs;
+        aabb_culling_sort(viaabbs, fjaabbs, vfpairs);
+        for (auto vf : vfpairs) {
+            int i = vf[0], j = vf[1];
+            int vi = vilist[i], fj = fjlist[j];
+            auto& v{ vis[i] };
+            auto& f{ fjs[j] };
+            auto [d, pt_type] = vf_distance(v, f);
+            if (d < barrier::d_hat) {
+                array<vec3, 4> pt = { v, f.t0, f.t1, f.t2 };
+                array<int, 4> ij = { I, vi, J, fj };
+                {
+                    pts.push_back(pt);
+                    idx.push_back(ij);
+                }
+            }
+        }
+#endif
+        
     };
 
     const auto ee_col_set = [&](vector<int>& eilist, vector<int>& ejlist,
