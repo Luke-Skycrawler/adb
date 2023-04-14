@@ -30,10 +30,10 @@
 #define CUDA_LOG(d) log(d)
 #define IS_CUDA_ZERO(d) (fabs(d) < CUDA_ZERO)
 #define Check_CUDA_ZERO(d) (fabs(d) > CUDA_ZERO ? d : 0)
-#define CUDA_QEAL_MAX(a, b) fmax(a, b)
-#define CUDA_QEAL_MIN(a, b) fmin(a, b)
-#define CUDA_QEAL_MAX3(a, b, c) fmax(fmax(a, b), c)
-#define CUDA_QEAL_MIN3(a, b, c) fmin(fmin(a, b), c)
+#define CUDA_MAX(a, b) fmax(a, b)
+#define CUDA_MIN(a, b) fmin(a, b)
+#define CUDA_MAX3(a, b, c) fmax(fmax(a, b), c)
+#define CUDA_MIN3(a, b, c) fmin(fmin(a, b), c)
 #else
 #define CUDA_ZERO 1e-6
 #define IS_Numerical_ZERO(d) (CUDA_ABS(d) < CUDA_ZERO)
@@ -42,10 +42,10 @@
 #define CUDA_LOG(d) logf(d)
 #define IS_CUDA_ZERO(d) (fabsf(d) < CUDA_ZERO)
 #define Check_CUDA_ZERO(d) (fabsf(d) > CUDA_ZERO ? d : 0)
-#define CUDA_QEAL_MAX(a, b) fmaxf(a, b)
-#define CUDA_QEAL_MIN(a, b) fminf(a, b)
-#define CUDA_QEAL_MAX3(a, b, c) fmaxf(fmaxf(a, b), c)
-#define CUDA_QEAL_MIN3(a, b, c) fminf(fminf(a, b), c)
+#define CUDA_MAX(a, b) fmaxf(a, b)
+#define CUDA_MIN(a, b) fminf(a, b)
+#define CUDA_MAX3(a, b, c) fmaxf(fmaxf(a, b), c)
+#define CUDA_MIN3(a, b, c) fminf(fminf(a, b), c)
 
 static const int n_cuda_threads_per_block = 1024;
 

@@ -5,8 +5,6 @@
 #include <memory>
 #include <array>
 #include <algorithm>
-#include <ipc/distance/point_triangle.hpp>
-#include <ipc/distance/edge_edge.hpp>
 #include "barrier.h"
 #include "time_integrator.h"
 #include <omp.h>
@@ -47,34 +45,6 @@ lu compute_aabb(const AffineBody& c)
     l.array() -= barrier::d_sqrt;
     u.array() += barrier::d_sqrt;
     return { l, u };
-}
-inline lu merge(const lu& a, const lu& b)
-{
-    vec3 l, u;
-    l = a[0].array().min(b[0].array());
-    u = a[1].array().max(b[1].array());
-    return { l, u };
-}
-inline lu compute_aabb(const vec3& p0, const vec3& p1)
-{
-    vec3 l, u;
-    auto e0{ p0.array() }, e1{ p1.array() };
-    l = e0.min(e1);
-    u = e0.max(e1);
-    return { l, u };
-}
-inline lu compute_aabb(const Edge& e1, const Edge& e2)
-{
-    vec3 l, u;
-    auto e10{ e1.e0.array() }, e11{ e1.e1.array() };
-    auto e20{ e2.e0.array() }, e21{ e2.e1.array() };
-    l = e10.min(e11).min(e20).min(e21);
-    u = e10.max(e11).max(e20).max(e21);
-    return { l, u };
-}
-inline lu compute_aabb(const Face& f1, const Face& f2)
-{
-    return merge(compute_aabb(f1), compute_aabb(f2));
 }
 lu affine(const lu& aabb, q4& q)
 {

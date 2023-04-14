@@ -1,5 +1,7 @@
 #pragma once
 #include "affine_body.h"
+#include "geometry.h"
+#include "barrier.h"
 #ifdef TESTING
 #include "../iAABB/pch.h"
 
@@ -28,8 +30,14 @@ struct BoundingBox {
     bool true_for_l_false_for_u;
 };
 
+inline lu merge(const lu& a, const lu& b)
+{
+    vec3 l, u;
+    l = a[0].array().min(b[0].array());
+    u = a[1].array().max(b[1].array());
+    return { l, u };
+}
 lu compute_aabb(const AffineBody& c);
-
 inline lu compute_aabb(const Edge& e)
 {
     vec3 l, u;
@@ -38,8 +46,6 @@ inline lu compute_aabb(const Edge& e)
     u = e0.max(e1);
     return { l, u };
 }
-
-
 inline lu compute_aabb(const Edge& e, double d_hat_sqrt)
 {
     vec3 l, u;
@@ -48,7 +54,6 @@ inline lu compute_aabb(const Edge& e, double d_hat_sqrt)
     u = e0.max(e1) + d_hat_sqrt;
     return { l, u };
 }
-
 inline lu compute_aabb(const Face& f)
 {
     vec3 l, u;
@@ -58,6 +63,27 @@ inline lu compute_aabb(const Face& f)
     l = t0.min(t1).min(t2);
     u = t0.max(t1).max(t2);
     return { l, u };
+}
+inline lu compute_aabb(const vec3& p0, const vec3& p1)
+{
+    vec3 l, u;
+    auto e0{ p0.array() }, e1{ p1.array() };
+    l = e0.min(e1);
+    u = e0.max(e1);
+    return { l, u };
+}
+inline lu compute_aabb(const Edge& e1, const Edge& e2)
+{
+    vec3 l, u;
+    auto e10{ e1.e0.array() }, e11{ e1.e1.array() };
+    auto e20{ e2.e0.array() }, e21{ e2.e1.array() };
+    l = e10.min(e11).min(e20).min(e21);
+    u = e10.max(e11).max(e20).max(e21);
+    return { l, u };
+}
+inline lu compute_aabb(const Face& f1, const Face& f2)
+{
+    return merge(compute_aabb(f1), compute_aabb(f2));
 }
 
 lu affine(const lu& aabb, q4& q);
