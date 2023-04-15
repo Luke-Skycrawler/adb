@@ -169,10 +169,10 @@ __global__ void squeeze_kernel(int* ij, int* cnt, int* tmp, int* vilist, int* fj
 {
     // squeeze the ij list according to a prefix sum array cnt
     int tid = threadIdx.x + blockIdx.x * blockDim.x;
-    int start = tid == 0 ?0: cnt[tid - 1];     
+    int start = tid == 0 ? 0 : cnt[tid - 1];
     int n_tasks = cnt[blockDim.x - 1];
     int copy_size = cnt[tid] - start;
-    for (int i = 0; i < copy_size; i ++ ) {
+    for (int i = 0; i < copy_size; i++) {
         int dst = i + start;
         int src = tid * max_pairs_per_thread + i;
 
@@ -217,7 +217,7 @@ __global__ void squeeze_ij_kernel(int* ij, int* cnt, int* tmp)
 
         tmp[dst * 2] = ij[src * 2];
         tmp[dst * 2 + 1] = ij[src * 2 + 1];
-        // tmp is now dense 
+        // tmp is now dense
     }
 }
 
@@ -226,13 +226,12 @@ void vf_col_set_cuda(
     // const std::vector<std::unique_ptr<AffineBody>>& cubes,
     // int I, int J,
     int nvi, int nfj,
-    const thrust::host_vector<luf> &aabbs,
-    const thrust::host_vector<vec3f> &vis,
-    const thrust::host_vector<Facef> &fjs,
-    const std::vector<int> &vilist, const std::vector<int> &fjlist, 
+    const thrust::host_vector<luf>& aabbs,
+    const thrust::host_vector<vec3f>& vis,
+    const thrust::host_vector<Facef>& fjs,
+    const std::vector<int>& vilist, const std::vector<int>& fjlist,
     vector<array<int, 4>>& idx,
-    int I, int J
-    )
+    int I, int J)
 {
     // auto &ci{ *cubes[I] }, &cj{ *cubes[J] };
     // int nvi = vilist.size(), nfj = fjlist.size();

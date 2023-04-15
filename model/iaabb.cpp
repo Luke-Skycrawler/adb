@@ -33,7 +33,8 @@ void glue_vf_col_set(
     int I, int J,
     vector<array<vec3, 4>>& pts,
     vector<array<int, 4>>& idx);
-inline bool les(const Intersection& a, const Intersection& b){
+inline bool les(const Intersection& a, const Intersection& b)
+{
     return a.i < b.i || (a.i == b.i && a.j < b.j);
 };
 lu compute_aabb(const AffineBody& c)
@@ -82,7 +83,6 @@ inline bool intersection(const lu& a, const lu& b, lu& ret)
     ret = { l, u };
     return intersects;
 }
-
 
 lu affine(lu aabb, AffineBody& c, int vtn)
 {
@@ -228,10 +228,10 @@ void intersect_sort(
     static vector<lu> affine_bb;
     // static vector<Intersection> intersected_body_joint;
     ret.resize(0);
-    
+
     affine_bb.resize(n_cubes);
 
-    #pragma omp parallel for schedule(static)
+#pragma omp parallel for schedule(static)
     for (int i = 0; i < n_cubes; i++) {
         auto t{ affine(aabbs[i], *cubes[i], vtn) };
         affine_bb[i] = t;
@@ -241,8 +241,8 @@ void intersect_sort(
     for (int i = 0; i < n_cubes; i++) {
         intersected_body_joint[i].resize(0);
         ret_tmp[i].resize(0);
-        for (int dim = 0; dim < 3; dim ++)
-        intersected_body_per_dim[dim][i].resize(0);
+        for (int dim = 0; dim < 3; dim++)
+            intersected_body_per_dim[dim][i].resize(0);
     }
 #pragma omp parallel for schedule(static, 1)
     for (int dim = 0; dim < 3; dim++) {
@@ -296,10 +296,10 @@ void intersect_sort(
     }
 
 #pragma omp parallel for schedule(guided)
-    for (int i = 0; i < n_cubes; i ++) {
+    for (int i = 0; i < n_cubes; i++) {
         auto& l{ intersected_body_joint[i] };
         auto& bi = affine_bb[i];
-        for (int j: l) {
+        for (int j : l) {
             auto& bj = affine_bb[j];
             lu cull;
             intersection(bi, bj, cull);
@@ -386,7 +386,7 @@ double primitive_brute_force(
     static PList* lists = new PList[n_overlap];
     static int allocated = n_overlap;
     if (n_overlap > allocated) {
-        delete []lists;
+        delete[] lists;
         lists = new PList[n_overlap];
         allocated = n_overlap;
     }
@@ -433,7 +433,7 @@ double primitive_brute_force(
         double toi_thread_local = 1.0;
         auto tid = omp_get_thread_num();
         vidx_thread_local[tid].resize(0);
-// #pragma omp for schedule(static)
+        // #pragma omp for schedule(static)
         for (int I = 0; I < n_cubes; I++) {
             auto& c{ *cubes[I] };
             for (int v = 0; v < c.n_vertices; v++) {
@@ -462,7 +462,7 @@ double primitive_brute_force(
         }
     }
 
-// debugging code
+    // debugging code
     if (cull_trajectory) {
         if (toi_global < 1e-6) {
             spdlog::error("vertex ground toi_global = {}", toi_global);
@@ -482,16 +482,16 @@ double primitive_brute_force(
         for (int v = 0; v < c.n_vertices; v++) {
             auto& p{ c.v_transformed[v] };
             for (int o = starting[I]; o < starting[I + 1]; o++) {
-            lu& cull = overlaps[o].cull;
-            overlaps[o].plist = lists + o;
-            if (filter_if_inside(cull, p, cull_trajectory, c, v)) {
+                lu& cull = overlaps[o].cull;
+                overlaps[o].plist = lists + o;
+                if (filter_if_inside(cull, p, cull_trajectory, c, v)) {
                     auto& t{ overlaps[o] };
                     assert(t.i == I);
                     if (t.i < t.j)
                         lists[o].vi.push_back(v);
                     else
                         lists[o].vj.push_back(v);
-            }
+                }
             }
         }
 
@@ -503,7 +503,7 @@ double primitive_brute_force(
                 lu& cull = overlaps[o].cull;
 
                 if (filter_if_inside(cull, ei, cull_trajectory, c, e)) {
-                    auto &t{ overlaps[o] };
+                    auto& t{ overlaps[o] };
                     if (t.i < t.j)
                         lists[o].ei.push_back(e);
                     else
@@ -547,7 +547,7 @@ double primitive_brute_force(
             omp_init_lock(locks + i);
     }
 
-    for (int i = 0; i < n_overlap; i ++) overlaps[i].plist = lists + i;
+    for (int i = 0; i < n_overlap; i++) overlaps[i].plist = lists + i;
 
 #pragma omp parallel for schedule(static)
     for (int i = 0; i < n_points; i++) {
@@ -558,7 +558,7 @@ double primitive_brute_force(
         vec3 p{ c.v_transformed[v] };
         vec3 p0{ c.vt1(v) };
 
-        lu aabb = cull_trajectory ? compute_aabb(p, p0) : lu{p, p};
+        lu aabb = cull_trajectory ? compute_aabb(p, p0) : lu{ p, p };
         for (int o = starting[I]; o < starting[I + 1]; o++) {
             lu cull = overlaps[o].cull;
             if (intersects(cull, aabb)) {
@@ -605,12 +605,12 @@ double primitive_brute_force(
         auto fi{ idx[1] };
         auto& c{ *cubes[I] };
         Face f{ c, fi, true, true };
-        Face f0 {c, fi};
+        Face f0{ c, fi };
 
-        lu aabb= cull_trajectory ? compute_aabb(f, f0): compute_aabb(f);
+        lu aabb = cull_trajectory ? compute_aabb(f, f0) : compute_aabb(f);
         for (int o = starting[I]; o < starting[I + 1]; o++) {
             lu cull = overlaps[o].cull;
-            if (intersects(aabb, cull)){
+            if (intersects(aabb, cull)) {
                 auto& t{ overlaps[o] };
                 omp_set_lock(locks + o);
                 if (t.i < t.j)
@@ -622,7 +622,7 @@ double primitive_brute_force(
         }
     }
 #endif
-    tbb::parallel_sort(overlaps.begin(), overlaps.end(), [](const Intersection& a, const Intersection& b) -> bool{
+    tbb::parallel_sort(overlaps.begin(), overlaps.end(), [](const Intersection& a, const Intersection& b) -> bool {
         auto ad = a.i + a.j, am = abs(a.i - a.j);
         auto bd = b.i + b.j, bm = abs(b.i - b.j);
 
@@ -635,7 +635,7 @@ double primitive_brute_force(
         int i0 = overlaps[i * 2].i, j0 = overlaps[i * 2].j;
         int i1 = overlaps[i * 2 + 1].i, j1 = overlaps[i * 2 + 1].j;
         assert(i0 == j1 && j0 == i1);
-        
+
         auto &p0{ overlaps[i * 2].plist }, &p1{ overlaps[i * 2 + 1].plist };
         auto
             &vi0{ p0->vi },
@@ -652,7 +652,7 @@ double primitive_brute_force(
         vi0.reserve(vi0.size() + vi1.size());
         ei0.reserve(ei0.size() + ei1.size());
         fi0.reserve(fi0.size() + fi1.size());
-        
+
         vi0.insert(vi0.end(), vi1.begin(), vi1.end());
         ei0.insert(ei0.end(), ei1.begin(), ei1.end());
         fi0.insert(fi0.end(), fi1.begin(), fi1.end());
@@ -746,7 +746,6 @@ double primitive_brute_force(
             }
         }
 #endif
-        
     };
 
     const auto ee_col_set = [&](vector<int>& eilist, vector<int>& ejlist,
@@ -921,7 +920,8 @@ double primitive_brute_force(
             int kj = j * k_threads;
             int i0 = lower_bound(inner_presum.begin(), inner_presum.end(), kj, [](int a, int b) -> bool {
                 return a <= b;
-            }) - inner_presum.begin() - 1;
+            }) - inner_presum.begin()
+                - 1;
 
             ret[j] = { i0 * 2, kj - inner_presum[i0] };
         }
@@ -1036,7 +1036,7 @@ double primitive_brute_force(
             }
         }
     }
-    #else
+#else
     if (!cull_trajectory)
 #pragma omp parallel
     {
@@ -1058,14 +1058,14 @@ double primitive_brute_force(
             auto& fjlist{ p.fj };
 
             ee_col_set(eilist, ejlist, cubes, I, J, ees_private[tid], eidx_private[tid]);
-            if (globals.params_int["cuda"] ) {
-                glue_vf_col_set(vilist , fjlist, cubes, I, J, pts_private[tid], idx_private[tid]);
+            if (globals.params_int["cuda"]) {
+                glue_vf_col_set(vilist, fjlist, cubes, I, J, pts_private[tid], idx_private[tid]);
                 glue_vf_col_set(vjlist, filist, cubes, J, I, pts_private[tid], idx_private[tid]);
             }
             else {
 
-            vf_col_set(vilist, fjlist, cubes, I, J, pts_private[tid], idx_private[tid]);
-            vf_col_set(vjlist, filist, cubes, J, I, pts_private[tid], idx_private[tid]);
+                vf_col_set(vilist, fjlist, cubes, I, J, pts_private[tid], idx_private[tid]);
+                vf_col_set(vjlist, filist, cubes, J, I, pts_private[tid], idx_private[tid]);
             }
         }
 #pragma omp critical
@@ -1076,7 +1076,7 @@ double primitive_brute_force(
             eidx.insert(eidx.end(), eidx_private[tid].begin(), eidx_private[tid].end());
         }
     }
-    #endif
+#endif
     else
 #pragma omp parallel
     {
@@ -1096,7 +1096,7 @@ double primitive_brute_force(
             double t2 = vf_col_time(vjlist, filist, cubes, J, I);
             double t3 = ee_col_time(eilist, ejlist, cubes, I, J);
 
-            toi = min(toi, min({t1, t2, t3}));
+            toi = min(toi, min({ t1, t2, t3 }));
         }
 #pragma omp critical
         {
@@ -1116,10 +1116,8 @@ double primitive_brute_force(
             globals.params_int["p_cnt"] = 0;
     }
     toi_global = min(toi_global, toi_ee_pt);
-    return cull_trajectory? toi_global: 1.0;
+    return cull_trajectory ? toi_global : 1.0;
 }
-
-
 
 #include <cuda/std/array>
 #include <thrust/host_vector.h>
@@ -1133,15 +1131,12 @@ void vf_col_set_cuda(
     // const std::vector<std::unique_ptr<AffineBody>>& cubes,
     // int I, int J,
     int nvi, int nfj,
-    const thrust::host_vector<luf> &aabbs,
-    const thrust::host_vector<vec3f> &vis,
-    const thrust::host_vector<Facef> &fjs,
-    const std::vector<int> &vilist, const std::vector<int> &fjlist, 
+    const thrust::host_vector<luf>& aabbs,
+    const thrust::host_vector<vec3f>& vis,
+    const thrust::host_vector<Facef>& fjs,
+    const std::vector<int>& vilist, const std::vector<int>& fjlist,
     std::vector<std::array<int, 4>>& idx,
-    int I, int J
-    );
-
-
+    int I, int J);
 
 inline luf to_luf(const lu& a)
 {
@@ -1171,7 +1166,6 @@ inline Facef to_facef(const Face& f)
     };
 }
 
-
 void glue_vf_col_set(
     vector<int>& vilist, vector<int>& fjlist,
     const std::vector<std::unique_ptr<AffineBody>>& cubes,
@@ -1187,23 +1181,21 @@ void glue_vf_col_set(
     thrust::host_vector<Facef> fjs(nfj);
 
     for (int k = 0; k < nvi; k++) {
-    auto vi{ vilist[k] };
-    vec3 v{ ci.v_transformed[vi] };
-    vis[k] = to_vec3f(v);
-    lu lud{ v.array() - barrier::d_sqrt, v.array() + barrier::d_sqrt };
-    aabbs[k] = to_luf(lud);
+        auto vi{ vilist[k] };
+        vec3 v{ ci.v_transformed[vi] };
+        vis[k] = to_vec3f(v);
+        lu lud{ v.array() - barrier::d_sqrt, v.array() + barrier::d_sqrt };
+        aabbs[k] = to_luf(lud);
     }
     for (int k = 0; k < nfj; k++) {
-    auto fj{ fjlist[k] };
-    Face f{ cj, unsigned(fj), true, true };
-    fjs[k] = to_facef(f);
-    lu lud{ compute_aabb(f) };
-    aabbs[k + nvi] = to_luf(lud);
+        auto fj{ fjlist[k] };
+        Face f{ cj, unsigned(fj), true, true };
+        fjs[k] = to_facef(f);
+        lu lud{ compute_aabb(f) };
+        aabbs[k + nvi] = to_luf(lud);
     }
     vf_col_set_cuda(nvi, nfj, aabbs, vis, fjs, vilist, fjlist, idx, I, J);
 }
-
-
 
 double iaabb_brute_force(
     int n_cubes,
@@ -1226,13 +1218,13 @@ double iaabb_brute_force(
     vector<Intersection> ret;
     intersect_sort(n_cubes, cubes, aabbs, ret, vtn);
     double toi;
-    
+
     toi = primitive_brute_force(n_cubes, ret, cubes, vtn,
 #ifdef TESTING
         pt_tois, ee_tois,
 #ifndef _BODY_WISE_
         globals,
-        #endif
+#endif
 #endif
         pts,
         idx,
@@ -1240,6 +1232,6 @@ double iaabb_brute_force(
         eidx,
         vidx);
     auto t = DURATION_TO_DOUBLE(start);
-    spdlog::info("time: {} = {:0.6f} ms", vtn == 3 ? "iaabb upper bound": "iAABB", t * 1000);
+    spdlog::info("time: {} = {:0.6f} ms", vtn == 3 ? "iaabb upper bound" : "iAABB", t * 1000);
     return toi;
 }
