@@ -156,3 +156,18 @@ inline bool intersects(const lu& a, const lu& b)
     return overlaps(0) && overlaps(1) && overlaps(2);
 }
 
+double primitive_brute_force_thrust(
+    int n_cubes,
+    std::vector<Intersection>& overlaps, // assert sorted
+    const std::vector<std::unique_ptr<AffineBody>>& cubes,
+    int vtn,
+    std::vector<std::array<vec3, 4>>& pts,
+    std::vector<std::array<int, 4>>& idx,
+    std::vector<std::array<vec3, 4>>& ees,
+    std::vector<std::array<int, 4>>& eidx,
+    std::vector<std::array<int, 2>>& vidx);
+
+
+
+
+

@@ -26,6 +26,13 @@ using namespace utils;
 using namespace std::chrono;
 using lu = std::array<vec3, 2>;
 #define DURATION_TO_DOUBLE(X) duration_cast<duration<double>>(high_resolution_clock::now() - (X)).count()
+
+void glue_vf_col_set(
+    vector<int>& vilist, vector<int>& fjlist,
+    const std::vector<std::unique_ptr<AffineBody>>& cubes,
+    int I, int J,
+    vector<array<vec3, 4>>& pts,
+    vector<array<int, 4>>& idx);
 inline bool les(const Intersection& a, const Intersection& b){
     return a.i < b.i || (a.i == b.i && a.j < b.j);
 };
@@ -305,7 +312,6 @@ void intersect_sort(
     }
     // TODO: O(n) insertion sort
 }
-
 inline void pt_col_set_task(
     int vi, int fj, int I, int J,
     // const AffineBody& ci, const AffineBody& cj,
@@ -1052,8 +1058,15 @@ double primitive_brute_force(
             auto& fjlist{ p.fj };
 
             ee_col_set(eilist, ejlist, cubes, I, J, ees_private[tid], eidx_private[tid]);
+            if (globals.params_int["cuda"] ) {
+                glue_vf_col_set(vilist , fjlist, cubes, I, J, pts_private[tid], idx_private[tid]);
+                glue_vf_col_set(vjlist, filist, cubes, J, I, pts_private[tid], idx_private[tid]);
+            }
+            else {
+
             vf_col_set(vilist, fjlist, cubes, I, J, pts_private[tid], idx_private[tid]);
             vf_col_set(vjlist, filist, cubes, J, I, pts_private[tid], idx_private[tid]);
+            }
         }
 #pragma omp critical
         {
@@ -1106,6 +1119,92 @@ double primitive_brute_force(
     return cull_trajectory? toi_global: 1.0;
 }
 
+
+
+#include <cuda/std/array>
+#include <thrust/host_vector.h>
+
+using luf = cuda::std::array<float, 6>;
+using vec3f = cuda::std::array<float, 3>;
+using Facef = cuda::std::array<vec3f, 3>;
+
+void vf_col_set_cuda(
+    // vector<int>& vilist, vector<int>& fjlist,
+    // const std::vector<std::unique_ptr<AffineBody>>& cubes,
+    // int I, int J,
+    int nvi, int nfj,
+    const thrust::host_vector<luf> &aabbs,
+    const thrust::host_vector<vec3f> &vis,
+    const thrust::host_vector<Facef> &fjs,
+    const std::vector<int> &vilist, const std::vector<int> &fjlist, 
+    std::vector<std::array<int, 4>>& idx,
+    int I, int J
+    );
+
+
+
+inline luf to_luf(const lu& a)
+{
+    return {
+        float(a[0][0]),
+        float(a[0][1]),
+        float(a[0][2]),
+        float(a[1][0]),
+        float(a[1][1]),
+        float(a[1][2])
+    };
+}
+inline vec3f to_vec3f(const vec3& a)
+{
+    return {
+        float(a[0]),
+        float(a[1]),
+        float(a[2])
+    };
+}
+inline Facef to_facef(const Face& f)
+{
+    return {
+        to_vec3f(f.t0),
+        to_vec3f(f.t1),
+        to_vec3f(f.t2)
+    };
+}
+
+
+void glue_vf_col_set(
+    vector<int>& vilist, vector<int>& fjlist,
+    const std::vector<std::unique_ptr<AffineBody>>& cubes,
+    int I, int J,
+    vector<array<vec3, 4>>& pts,
+    vector<array<int, 4>>& idx)
+{
+    auto &ci{ *cubes[I] }, &cj{ *cubes[J] };
+    int nvi = vilist.size(), nfj = fjlist.size();
+
+    thrust::host_vector<luf> aabbs(nvi + nfj);
+    thrust::host_vector<vec3f> vis(nvi);
+    thrust::host_vector<Facef> fjs(nfj);
+
+    for (int k = 0; k < nvi; k++) {
+    auto vi{ vilist[k] };
+    vec3 v{ ci.v_transformed[vi] };
+    vis[k] = to_vec3f(v);
+    lu lud{ v.array() - barrier::d_sqrt, v.array() + barrier::d_sqrt };
+    aabbs[k] = to_luf(lud);
+    }
+    for (int k = 0; k < nfj; k++) {
+    auto fj{ fjlist[k] };
+    Face f{ cj, unsigned(fj), true, true };
+    fjs[k] = to_facef(f);
+    lu lud{ compute_aabb(f) };
+    aabbs[k + nvi] = to_luf(lud);
+    }
+    vf_col_set_cuda(nvi, nfj, aabbs, vis, fjs, vilist, fjlist, idx, I, J);
+}
+
+
+
 double iaabb_brute_force(
     int n_cubes,
     const std::vector<std::unique_ptr<AffineBody>>& cubes,
@@ -1126,7 +1225,9 @@ double iaabb_brute_force(
     auto start = high_resolution_clock::now();
     vector<Intersection> ret;
     intersect_sort(n_cubes, cubes, aabbs, ret, vtn);
-    double toi = primitive_brute_force(n_cubes, ret, cubes, vtn,
+    double toi;
+    
+    toi = primitive_brute_force(n_cubes, ret, cubes, vtn,
 #ifdef TESTING
         pt_tois, ee_tois,
 #ifndef _BODY_WISE_

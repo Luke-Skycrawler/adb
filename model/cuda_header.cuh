@@ -3,7 +3,8 @@
 #include <thrust/device_vector.h>
 #include <thrust/host_vector.h>
 #include <thrust/sort.h>
-
+#include <thrust/scan.h>
+#include <thrust/execution_policy.h>
 
 #define CUDA_CALL(x) { const cudaError_t a = (x); if(a != cudaSuccess){ printf("\nCUDA Error: %s (err_num = %d) \n", cudaGetErrorString(a), a); cudaDeviceReset(); assert(0);}}
 
@@ -47,7 +48,7 @@
 #define CUDA_MAX3(a, b, c) fmaxf(fmaxf(a, b), c)
 #define CUDA_MIN3(a, b, c) fminf(fminf(a, b), c)
 
-static const int n_cuda_threads_per_block = 1024;
+static const int n_cuda_threads_per_block = 256;
 
 #endif
 
