@@ -2,7 +2,6 @@
 // #include "iaabb.h"
 #include "cuda_header.cuh"
 #include "timer.h"
-#include <cuda/std/array>
 #include <omp.h>
 #include <ipc/distance/edge_edge.hpp>
 #include <ipc/distance/point_triangle.hpp>
@@ -11,87 +10,9 @@ using namespace std;
 using namespace ipc;
 // using namespace cuda::std;
 // using namespace Eigen;
-using luf = cuda::std::array<float, 6>;
-using vec3f = cuda::std::array<float, 3>;
-using Facef = cuda::std::array<vec3f, 3>;
-
-static const int max_pairs_per_thread = 512, max_aabb_list_size = 256;
-__host__ __device__ vec3f operator+(const vec3f& a, const vec3f& b)
-{
-    return { a[0] + b[0], a[1] + b[1], a[2] + b[2] };
-}
-__host__ __device__ vec3f operator-(const vec3f& a, const vec3f& b)
-{
-    return { a[0] - b[0], a[1] - b[1], a[2] - b[2] };
-}
-__host__ __device__ vec3f operator/(const vec3f& a, float k)
-{
-    return { a[0] / k, a[1] / k, a[2] / k };
-}
-__host__ __device__ vec3f operator*(const vec3f& a, float k)
-{
-    return { a[0] * k, a[1] * k, a[2] * k };
-}
-
-__host__ __device__ float dot(const vec3f& a, const vec3f& b)
-{
-    return a[0] * b[0] + a[1] * b[1] + a[2] * b[2];
-}
-
-__host__ __device__ float norm(const vec3f& a)
-{
-    return CUDA_SQRT(dot(a, a));
-}
-__host__ __device__ vec3f normalize(const vec3f& a)
-{
-    return a / norm(a);
-}
-
-__host__ __device__ bool intersects(const luf& a, const luf& b)
-{
-    return a[0] <= b[3] && a[3] >= b[0] && a[1] <= b[4] && a[4] >= b[1] && a[2] <= b[5] && a[5] >= b[2];
-}
-
-__host__ __device__ vec3f cross(const vec3f& a, const vec3f& b)
-{
-    return {
-        a[1] * b[2] - a[2] * b[1],
-        a[2] * b[0] - a[0] * b[2],
-        a[0] * b[1] - a[1] * b[0]
-    };
-}
-__host__ __device__ vec3f unit_normal(const Facef& f)
-{
-    return normalize(cross(f[1] - f[0], f[2] - f[0]));
-}
-__host__ __device__ float area(const vec3f& a, const vec3f& b, const vec3f& c)
-{
-    return norm(cross(c - a, b - a)) / 2.0f;
-}
-
-__host__ __device__ float ab(const vec3f& a, const vec3f& b)
-{
-    return norm(b - a);
-}
-
-__host__ __device__ float h(const vec3f& e0, const vec3f& e1, const vec3f& p)
-{
-    return area(e0, e1, p) / ab(e0, e1);
-}
-__host__ __device__ float ab_sqr(const vec3f& a, const vec3f& b)
-{
-    return dot(b - a, b - a);
-}
-
-__host__ __device__ bool is_obtuse_triangle(const vec3f& e0, const vec3f& e1, const vec3f& p)
-{
-    auto ab = ab_sqr(e0, e1);
-    auto bc = ab_sqr(e1, p);
-    auto ca = ab_sqr(e0, p);
-    return CUDA_ABS(ca - bc) > ab;
-}
-
-__device__ float vf_distance(const vec3f& _v, const Facef& f, PointTriangleDistanceType& pt_type)
+static const int max_pairs_per_thread = 512, max_aabb_list_size = 512;
+// FIXME: tid probably not in 1 block
+__device__ float vf_distance(const vec3f& _v, const Facef& f, PointTriangleDistanceType* pt_type)
 {
     auto n = unit_normal(f);
     auto d = dot(n, _v - f[0]);
@@ -119,24 +40,24 @@ __device__ float vf_distance(const vec3f& _v, const Facef& f, PointTriangleDista
         d += d_projected * d_projected;
 
         if (d_projected == d_ab)
-            pt_type = PointTriangleDistanceType::P_E0;
+            *pt_type = PointTriangleDistanceType::P_E0;
         else if (d_projected == d_bc)
-            pt_type = PointTriangleDistanceType::P_E1;
+            *pt_type = PointTriangleDistanceType::P_E1;
         else if (d_projected == d_ac)
-            pt_type = PointTriangleDistanceType::P_E2;
+            *pt_type = PointTriangleDistanceType::P_E2;
         else if (d_projected == d_a)
-            pt_type = PointTriangleDistanceType::P_T0;
+            *pt_type = PointTriangleDistanceType::P_T0;
         else if (d_projected == d_b)
-            pt_type = PointTriangleDistanceType::P_T1;
+            *pt_type = PointTriangleDistanceType::P_T1;
         else
-            pt_type = PointTriangleDistanceType::P_T2;
+            *pt_type = PointTriangleDistanceType::P_T2;
     }
     else
-        pt_type = PointTriangleDistanceType::P_T;
+        *pt_type = PointTriangleDistanceType::P_T;
     return d;
 }
 
-__global__ void aabb_intersection_kernel(luf* dev_aabbs, int nvi, int nfj, int* ij, int* cnt)
+__global__ void aabb_intersection_test_kernel(luf* dev_aabbs, int nvi, int nfj, int* ij, int* cnt)
 {
 
     __shared__ luf aabbs[max_aabb_list_size];
@@ -165,9 +86,18 @@ __global__ void aabb_intersection_kernel(luf* dev_aabbs, int nvi, int nfj, int* 
     }
 }
 
-__global__ void squeeze_kernel(int* ij, int* cnt, int* tmp, int* vilist, int* fjlist, vec3f* vis, Facef* fjs, float dhat = 1e-4)
+struct PtStub {
+    int vi, fj;
+    PointTriangleDistanceType pt_type;
+};
+
+__global__ void squeeze_kernel(int* ij, int* cnt, int* tmp, int* vilist, int* fjlist, vec3f* vis, Facef* fjs,
+    PointTriangleDistanceType* pt_types,
+    PointTriangleDistanceType* tmp_pt_types,
+    float dhat = 1e-4)
 {
     // squeeze the ij list according to a prefix sum array cnt
+    // FIXME: asserting blockDim.x == n_cuda_threads_per_block
     int tid = threadIdx.x + blockIdx.x * blockDim.x;
     int start = tid == 0 ? 0 : cnt[tid - 1];
     int n_tasks = cnt[blockDim.x - 1];
@@ -196,16 +126,17 @@ __global__ void squeeze_kernel(int* ij, int* cnt, int* tmp, int* vilist, int* fj
             auto& v{ vis[i] };
             auto& f{ fjs[j] };
             PointTriangleDistanceType pt_type;
-            auto d = vf_distance(v, f, pt_type);
+            auto d = vf_distance(v, f, &pt_type);
             if (d < dhat) {
                 auto put = cnt[tid]++ + tid * max_pairs_per_thread;
                 ij[put * 2] = vi;
                 ij[put * 2 + 1] = fj;
+                pt_types[put] = pt_type;
             }
         }
     }
 }
-__global__ void squeeze_ij_kernel(int* ij, int* cnt, int* tmp)
+__global__ void squeeze_ij_kernel(int* ij, int* cnt, int* tmp, PointTriangleDistanceType* pt_types, PointTriangleDistanceType* tmp_pt_types)
 {
     // squeeze again and copy back to ij matrix
     auto tid = threadIdx.x + blockIdx.x * blockDim.x;
@@ -217,6 +148,7 @@ __global__ void squeeze_ij_kernel(int* ij, int* cnt, int* tmp)
 
         tmp[dst * 2] = ij[src * 2];
         tmp[dst * 2 + 1] = ij[src * 2 + 1];
+        tmp_pt_types[dst] = pt_types[src];
         // tmp is now dense
     }
 }
@@ -268,6 +200,8 @@ void vf_col_set_cuda(
         ij(n_cuda_threads_per_block * 2 * max_pairs_per_thread, 0),
         tmp(n_cuda_threads_per_block * 2 * max_pairs_per_thread, 0);
 
+    thrust::device_vector<PointTriangleDistanceType> pt_types(n_cuda_threads_per_block * max_pairs_per_thread), pt_types_buffer(n_cuda_threads_per_block * max_pairs_per_thread);
+
     auto ij_ptr = thrust::raw_pointer_cast(ij.data());
     auto cnt_ptr = thrust::raw_pointer_cast(dev_cnt.data());
     auto tmp_ptr = thrust::raw_pointer_cast(tmp.data());
@@ -276,7 +210,8 @@ void vf_col_set_cuda(
     auto vis_ptr = thrust::raw_pointer_cast(dev_vis.data());
     auto fjs_ptr = thrust::raw_pointer_cast(dev_fjs.data());
     auto aabbs_ptr = thrust::raw_pointer_cast(dev_aabbs.data());
-
+    auto pt_types_ptr = thrust::raw_pointer_cast(pt_types.data());
+    auto tmp_pt_types_ptr = thrust::raw_pointer_cast(pt_types_buffer.data());
     // {
     //     // copying
     //     dev_aabbs = aabbs;
@@ -286,23 +221,23 @@ void vf_col_set_cuda(
 
     {
         // cuda kernels
-        aabb_intersection_kernel<<<1, n_cuda_threads_per_block, max_aabb_list_size * sizeof(luf)>>>(aabbs_ptr, nvi, nfj, ij_ptr, cnt_ptr);
+        aabb_intersection_test_kernel<<<1, n_cuda_threads_per_block>>>(aabbs_ptr, nvi, nfj, ij_ptr, cnt_ptr);
         CUDA_CALL(cudaGetLastError());
-        thrust::inclusive_scan(dev_cnt.begin(), dev_cnt.end(), dev_cnt.begin());
+        thrust::inclusive_scan(thrust::device, dev_cnt.begin(), dev_cnt.end(), dev_cnt.begin());
         CUDA_CALL(cudaGetLastError());
-        squeeze_kernel<<<1, n_cuda_threads_per_block>>>(ij_ptr, cnt_ptr, tmp_ptr, vilist_ptr, fjlist_ptr, vis_ptr, fjs_ptr);
+        squeeze_kernel<<<1, n_cuda_threads_per_block>>>(ij_ptr, cnt_ptr, tmp_ptr, vilist_ptr, fjlist_ptr, vis_ptr, fjs_ptr, pt_types_ptr, tmp_pt_types_ptr);
         CUDA_CALL(cudaGetLastError());
 
-        // thrust::inclusive_scan(dev_cnt.begin(), dev_cnt.end(), dev_cnt.begin());
+        thrust::inclusive_scan(thrust::device, dev_cnt.begin(), dev_cnt.end(), dev_cnt.begin());
         CUDA_CALL(cudaDeviceSynchronize());
+        // thrust::host_vector<int> host_cnt(n_cuda_threads_per_block);
+        // host_cnt = dev_cnt;
+        // for (int i = 1; i < n_cuda_threads_per_block; i++) {
+        //     host_cnt[i] = host_cnt[i - 1] + host_cnt[i];
+        // }
+        // dev_cnt = host_cnt;
 
-        thrust::host_vector<int> host_cnt(n_cuda_threads_per_block);
-        host_cnt = dev_cnt;
-        for (int i = 1; i < n_cuda_threads_per_block; i++) {
-            host_cnt[i] = host_cnt[i - 1] + host_cnt[i];
-        }
-        dev_cnt = host_cnt;
-        squeeze_ij_kernel<<<1, n_cuda_threads_per_block>>>(ij_ptr, cnt_ptr, tmp_ptr);
+        squeeze_ij_kernel<<<1, n_cuda_threads_per_block>>>(ij_ptr, cnt_ptr, tmp_ptr, pt_types_ptr, tmp_pt_types_ptr);
         CUDA_CALL(cudaGetLastError());
     }
 
@@ -317,5 +252,55 @@ void vf_col_set_cuda(
             auto vi = host_idx[i * 2], fj = host_idx[i * 2 + 1];
             idx.push_back({ I, vi, J, fj });
         }
+    }
+}
+
+#include "cuda_globals.cuh"
+#include <assert.h>
+#include <thrust/iterator/discard_iterator.h>
+#include <thrust/iterator/zip_iterator.h>
+#include <cuda/std/tuple>
+#include <cuda/std/type_traits>
+#include <thrust/set_operations.h>
+void stencil_categorize(
+    thrust::device_vector<i2>& pt_idx,
+    thrust::device_vector<i2>& pt_body_idx,
+    thrust::device_vector<PointTriangleDistanceType>& pt_types)
+{
+    static const PointTriangleDistanceType types[] = {
+        PointTriangleDistanceType::P_T0, // 0
+        PointTriangleDistanceType::P_T1, // 1
+        PointTriangleDistanceType::P_T2, // 2
+        PointTriangleDistanceType::P_E0, // 3
+        PointTriangleDistanceType::P_E1, // 4
+        PointTriangleDistanceType::P_E2, // 5
+        PointTriangleDistanceType::P_T // 6
+    };
+    // static const EdgeEdgeDistanceType edge_types[] = {
+    // };
+    assert(pt_idx.size() == pt_types.size() && pt_idx.size() == pt_body_idx.size());
+    for (int i = 0; i < 7; i++) {
+        auto &cset{ cuda_globals.collision_sets.pt_set[i] }, &bset{ cuda_globals.collision_sets.pt_set_body_index[i] };
+        // cset.clear();
+        // bset.clear();
+        thrust::copy_if(
+            thrust::make_zip_iterator(thrust::make_tuple(pt_idx.begin(), pt_body_idx.begin(), pt_types.begin())),
+            thrust::make_zip_iterator(thrust::make_tuple(pt_idx.end(), pt_body_idx.end(), pt_types.end())),
+            thrust::make_zip_iterator(thrust::make_tuple(cset.end(), bset.end(), thrust::make_discard_iterator())),
+            [=] __device__(const thrust::tuple<i2, i2, PointTriangleDistanceType>& tup) {
+                return static_cast<cuda::std::underlying_type_t<PointTriangleDistanceType>>(thrust::get<2>(tup)) == i;
+            });
+    }
+    // FIXME: make sure i < j before merging into lut? 
+    {
+    // static thrust::device_vector<i2> merged_lut;
+        // // generate look up table for spare hess 
+        // merged_lut .resize(0);
+        // thrust::set_union(thrust::device, pt_body_idx.begin(), pt_body_idx.end(), cuda_globals.lut.begin(), cuda_globals.lut.end(), merged_lut.begin());
+        // cuda_globals.lut = merged_lut;
+
+        // should be sorted, just not worth it
+
+        thrust::copy(pt_body_idx.begin(), pt_body_idx.end(), cuda_globals.lut.end());
     }
 }

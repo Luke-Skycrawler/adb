@@ -1,0 +1,185 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup>
+    <CudaCompile Include="..\model\constraint_set.cu">
+      <Filter>cuda</Filter>
+    </CudaCompile>
+    <CudaCompile Include="..\model\iaabb.cu">
+      <Filter>cuda</Filter>
+    </CudaCompile>
+    <CudaCompile Include="kernel.cu">
+      <Filter>cuda</Filter>
+    </CudaCompile>
+  </ItemGroup>
+  <ItemGroup>
+    <ClCompile Include="..\view\light.cpp">
+      <Filter>view</Filter>
+    </ClCompile>
+    <ClCompile Include="..\view\utils.cpp">
+      <Filter>view</Filter>
+    </ClCompile>
+    <ClCompile Include="..\model\affine_obj.cpp">
+      <Filter>model</Filter>
+    </ClCompile>
+    <ClCompile Include="..\model\barrier.cpp">
+      <Filter>model</Filter>
+    </ClCompile>
+    <ClCompile Include="..\model\col_set.cpp">
+      <Filter>model</Filter>
+    </ClCompile>
+    <ClCompile Include="..\model\collision.cpp">
+      <Filter>model</Filter>
+    </ClCompile>
+    <ClCompile Include="..\view\control.cpp">
+      <Filter>model</Filter>
+    </ClCompile>
+    <ClCompile Include="..\model\energy.cpp">
+      <Filter>model</Filter>
+    </ClCompile>
+    <ClCompile Include="..\model\euler.cpp">
+      <Filter>model</Filter>
+    </ClCompile>
+    <ClCompile Include="..\iAABB\finitediff.cpp">
+      <Filter>model</Filter>
+    </ClCompile>
+    <ClCompile Include="..\model\geo.cpp">
+      <Filter>model</Filter>
+    </ClCompile>
+    <ClCompile Include="..\model\geometry.cpp">
+      <Filter>model</Filter>
+    </ClCompile>
+    <ClCompile Include="..\model\iaabb.cpp">
+      <Filter>model</Filter>
+    </ClCompile>
+    <ClCompile Include="..\view\model_view.cpp">
+      <Filter>model</Filter>
+    </ClCompile>
+    <ClCompile Include="..\model\mutils.cpp">
+      <Filter>model</Filter>
+    </ClCompile>
+    <ClCompile Include="..\model\othogonal_energy.cpp">
+      <Filter>model</Filter>
+    </ClCompile>
+    <ClCompile Include="..\model\sparse.cpp">
+      <Filter>model</Filter>
+    </ClCompile>
+    <ClCompile Include="..\model\spatial_hashing.cpp">
+      <Filter>model</Filter>
+    </ClCompile>
+    <ClCompile Include="..\test_cases\spinning_cube.cpp">
+      <Filter>model</Filter>
+    </ClCompile>
+    <ClCompile Include="..\model\upper_bound.cpp">
+      <Filter>model</Filter>
+    </ClCompile>
+    <ClCompile Include="..\model\autogen\edge_edge_mollifier.cu">
+      <Filter>cuda\autogen</Filter>
+    </ClCompile>
+    <ClCompile Include="..\model\autogen\line_line.cu">
+      <Filter>cuda\autogen</Filter>
+    </ClCompile>
+    <ClCompile Include="..\model\autogen\point_line.cu">
+      <Filter>cuda\autogen</Filter>
+    </ClCompile>
+    <ClCompile Include="..\model\autogen\point_plane.cu">
+      <Filter>cuda\autogen</Filter>
+    </ClCompile>
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="..\model\cuda_globals.cuh">
+      <Filter>cuda</Filter>
+    </ClInclude>
+    <ClInclude Include="..\model\cuda_header.cuh">
+      <Filter>cuda</Filter>
+    </ClInclude>
+    <ClInclude Include="..\view\camera.h">
+      <Filter>view</Filter>
+    </ClInclude>
+    <ClInclude Include="..\view\env.h">
+      <Filter>view</Filter>
+    </ClInclude>
+    <ClInclude Include="..\view\light.h">
+      <Filter>view</Filter>
+    </ClInclude>
+    <ClInclude Include="..\view\mesh.h">
+      <Filter>view</Filter>
+    </ClInclude>
+    <ClInclude Include="..\view\model.h">
+      <Filter>view</Filter>
+    </ClInclude>
+    <ClInclude Include="..\view\stb_image.h">
+      <Filter>view</Filter>
+    </ClInclude>
+    <ClInclude Include="..\view\shader.h">
+      <Filter>view</Filter>
+    </ClInclude>
+    <ClInclude Include="..\model\affine_body.h">
+      <Filter>model</Filter>
+    </ClInclude>
+    <ClInclude Include="..\model\affine_obj.h">
+      <Filter>model</Filter>
+    </ClInclude>
+    <ClInclude Include="..\model\barrier.h">
+      <Filter>model</Filter>
+    </ClInclude>
+    <ClInclude Include="..\model\collision.h">
+      <Filter>model</Filter>
+    </ClInclude>
+    <ClInclude Include="..\model\cube.h">
+      <Filter>model</Filter>
+    </ClInclude>
+    <ClInclude Include="..\cyCodeBase\cyCore.h">
+      <Filter>model</Filter>
+    </ClInclude>
+    <ClInclude Include="..\cyCodeBase\cyPolynomial.h">
+      <Filter>model</Filter>
+    </ClInclude>
+    <ClInclude Include="..\iAABB\finitediff.hpp">
+      <Filter>model</Filter>
+    </ClInclude>
+    <ClInclude Include="..\model\geometry.h">
+      <Filter>model</Filter>
+    </ClInclude>
+    <ClInclude Include="..\view\global_variables.h">
+      <Filter>model</Filter>
+    </ClInclude>
+    <ClInclude Include="..\model\glue.h">
+      <Filter>model</Filter>
+    </ClInclude>
+    <ClInclude Include="..\model\iaabb.h">
+      <Filter>model</Filter>
+    </ClInclude>
+    <ClInclude Include="..\model\math.h">
+      <Filter>model</Filter>
+    </ClInclude>
+    <ClInclude Include="..\model\othogonal_energy.h">
+      <Filter>model</Filter>
+    </ClInclude>
+    <ClInclude Include="..\model\spatial_hashing.h">
+      <Filter>model</Filter>
+    </ClInclude>
+    <ClInclude Include="..\test_cases\tests.h">
+      <Filter>model</Filter>
+    </ClInclude>
+    <ClInclude Include="..\model\time_integrator.h">
+      <Filter>model</Filter>
+    </ClInclude>
+    <ClInclude Include="..\model\autogen\autogen.cuh">
+      <Filter>cuda\autogen</Filter>
+    </ClInclude>
+  </ItemGroup>
+  <ItemGroup>
+    <Filter Include="cuda">
+      <UniqueIdentifier>{8e7e14c0-a770-4388-81ce-55b7e3d6dcc5}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="view">
+      <UniqueIdentifier>{3a30c23f-0895-4ddb-9015-1d5aec7bf0a1}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="model">
+      <UniqueIdentifier>{c5a1e91c-23ac-475c-a0de-79a0596d3483}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="cuda\autogen">
+      <UniqueIdentifier>{2f41729e-37d5-49a4-987e-556187462283}</UniqueIdentifier>
+    </Filter>
+  </ItemGroup>
+</Project>
