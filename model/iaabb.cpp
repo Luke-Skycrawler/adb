@@ -33,6 +33,87 @@ void glue_vf_col_set(
     int I, int J,
     vector<array<vec3, 4>>& pts,
     vector<array<int, 4>>& idx);
+
+#include <cuda/std/array>
+#include <thrust/host_vector.h>
+#include <type_traits>
+using luf = cuda::std::array<float, 6>;
+using vec3f = cuda::std::array<float, 3>;
+using Facef = cuda::std::array<vec3f, 3>;
+float vf_distance(const vec3f& _v, const Facef& f, ipc::PointTriangleDistanceType* pt_type);
+tuple<float, ipc::PointTriangleDistanceType> vf_distance(const vec3f& vf, const Facef& ff); 
+
+void vf_col_set_cuda(
+    // vector<int>& vilist, vector<int>& fjlist,
+    // const std::vector<std::unique_ptr<AffineBody>>& cubes,
+    // int I, int J,
+    int nvi, int nfj,
+    const thrust::host_vector<luf>& aabbs,
+    const thrust::host_vector<vec3f>& vis,
+    const thrust::host_vector<Facef>& fjs,
+    const std::vector<int>& vilist, const std::vector<int>& fjlist,
+    std::vector<std::array<int, 4>>& idx,
+    int I, int J);
+
+inline luf to_luf(const lu& a)
+{
+    return {
+        float(a[0][0]),
+        float(a[0][1]),
+        float(a[0][2]),
+        float(a[1][0]),
+        float(a[1][1]),
+        float(a[1][2])
+    };
+}
+inline vec3f to_vec3f(const vec3& a)
+{
+    return {
+        float(a[0]),
+        float(a[1]),
+        float(a[2])
+    };
+}
+inline Facef to_facef(const Face& f)
+{
+    return {
+        to_vec3f(f.t0),
+        to_vec3f(f.t1),
+        to_vec3f(f.t2)
+    };
+}
+
+void glue_vf_col_set(
+    vector<int>& vilist, vector<int>& fjlist,
+    const std::vector<std::unique_ptr<AffineBody>>& cubes,
+    int I, int J,
+    vector<array<vec3, 4>>& pts,
+    vector<array<int, 4>>& idx)
+{
+    auto &ci{ *cubes[I] }, &cj{ *cubes[J] };
+    int nvi = vilist.size(), nfj = fjlist.size();
+
+    thrust::host_vector<luf> aabbs(nvi + nfj);
+    thrust::host_vector<vec3f> vis(nvi);
+    thrust::host_vector<Facef> fjs(nfj);
+
+    for (int k = 0; k < nvi; k++) {
+        auto vi{ vilist[k] };
+        vec3 v{ ci.v_transformed[vi] };
+        vis[k] = to_vec3f(v);
+        lu lud{ v.array() - barrier::d_sqrt, v.array() + barrier::d_sqrt };
+        aabbs[k] = to_luf(lud);
+    }
+    for (int k = 0; k < nfj; k++) {
+        auto fj{ fjlist[k] };
+        Face f{ cj, unsigned(fj), true, true };
+        fjs[k] = to_facef(f);
+        lu lud{ compute_aabb(f) };
+        aabbs[k + nvi] = to_luf(lud);
+    }
+    vf_col_set_cuda(nvi, nfj, aabbs, vis, fjs, vilist, fjlist, idx, I, J);
+    pts.resize(idx.size());
+}
 inline bool les(const Intersection& a, const Intersection& b)
 {
     return a.i < b.i || (a.i == b.i && a.j < b.j);
@@ -1038,14 +1119,14 @@ double primitive_brute_force(
     }
 #else
     if (!cull_trajectory)
-#pragma omp parallel
+    // #pragma omp parallel
     {
         auto tid = omp_get_thread_num();
         idx_private[tid].resize(0);
         eidx_private[tid].resize(0);
         pts_private[tid].resize(0);
         ees_private[tid].resize(0);
-#pragma omp for schedule(guided) nowait
+        // #pragma omp for schedule(guided) nowait
         for (int _i = 0; _i < n_overlap / 2; _i++) {
             int i = _i * 2;
             int I{ overlaps[i].i }, J{ overlaps[i].j };
@@ -1058,17 +1139,65 @@ double primitive_brute_force(
             auto& fjlist{ p.fj };
 
             ee_col_set(eilist, ejlist, cubes, I, J, ees_private[tid], eidx_private[tid]);
-            if (globals.params_int["cuda"]) {
-                glue_vf_col_set(vilist, fjlist, cubes, I, J, pts_private[tid], idx_private[tid]);
-                glue_vf_col_set(vjlist, filist, cubes, J, I, pts_private[tid], idx_private[tid]);
-            }
-            else {
+            // else
+            {
 
                 vf_col_set(vilist, fjlist, cubes, I, J, pts_private[tid], idx_private[tid]);
                 vf_col_set(vjlist, filist, cubes, J, I, pts_private[tid], idx_private[tid]);
             }
+            if (globals.params_int["cuda"]) {
+                vector<array<int, 4>>&idx_ref{ idx_private[tid] }, idx_cuda{}, diff{}, cuda_ref{};
+                // glue_vf_col_set(vilist, fjlist, cubes, I, J, pts_private[tid], idx_private[tid]);
+                // glue_vf_col_set(vjlist, filist, cubes, J, I, pts_private[tid], idx_private[tid]);
+                glue_vf_col_set(vilist, fjlist, cubes, I, J, pts_private[tid], idx_cuda);
+                glue_vf_col_set(vjlist, filist, cubes, J, I, pts_private[tid], idx_cuda);
+                sort(idx_cuda.begin(), idx_cuda.end());
+                sort(idx_ref.begin(), idx_ref.end());
+
+                set_difference(idx_ref.begin(), idx_ref.end(), idx_cuda.begin(), idx_cuda.end(), back_inserter(diff));
+                set_difference(idx_cuda.begin(), idx_cuda.end(), idx_ref.begin(), idx_ref.end(), back_inserter(cuda_ref));
+                if (globals.params_int["strict"]) {
+                    assert(idx_cuda.size() == idx_ref.size());
+                    assert(diff.size() == 0);
+                }
+                else if (diff.size() > 0 || idx_cuda.size() != idx_ref.size()) {
+                    spdlog::error("diff size = {}, cuda size = {}, ref size = {}", diff.size(), idx_cuda.size(), idx_ref.size());
+                    for (auto a : diff) {
+                        Face f{ *cubes[a[2]], unsigned(a[3]), true, true };
+                        Facef ff{ to_facef(f) };
+                        vec3 p{
+                            cubes[a[0]]->v_transformed[a[1]]
+                        };
+                        vec3f pf{ to_vec3f(
+                            cubes[a[0]]->v_transformed[a[1]]) };
+                        ipc::PointTriangleDistanceType ptt;
+                        auto d = vf_distance(pf, ff, &ptt);
+                        auto [d_ref, type_ref] = vf_distance(p, f);
+                        auto [d_ref2, type_ref2] = vf_distance(pf, ff);
+                        spdlog::error("in diff set: pt distance = {}, ref = {}, ref2 = {}", d, d_ref, d_ref2);
+
+                        spdlog::error ("type, cuda = {}, ref = {}", static_cast<underlying_type_t<ipc::PointTriangleDistanceType>>(ptt), static_cast<underlying_type_t<ipc::PointTriangleDistanceType>>(type_ref));
+                    }
+                    for (auto a: cuda_ref) {
+                        Face f{ *cubes[a[2]], unsigned(a[3]), true, true };
+                        Facef ff{ to_facef(f) };
+                        vec3 p{
+                            cubes[a[0]]->v_transformed[a[1]]
+                        };
+                        vec3f pf{ to_vec3f(
+                            cubes[a[0]]->v_transformed[a[1]]) };
+                        ipc::PointTriangleDistanceType ptt;
+                        auto d = vf_distance(pf, ff, &ptt);
+                        auto [d_ref, type_ref] = vf_distance(p, f);
+                        auto [d_ref2, type_ref2] = vf_distance(pf, ff);
+                        spdlog::error("in diff (cuda - ref): pt distance = {}, ref = {}, ref2 = {}", d, d_ref, d_ref2);
+                        spdlog::error ("type, cuda = {}, ref = {}", static_cast<underlying_type_t<ipc::PointTriangleDistanceType>>(ptt), static_cast<underlying_type_t<ipc::PointTriangleDistanceType>>(type_ref));
+
+                    }
+                }
+            }
         }
-#pragma omp critical
+        // #pragma omp critical
         {
             pts.insert(pts.end(), pts_private[tid].begin(), pts_private[tid].end());
             idx.insert(idx.end(), idx_private[tid].begin(), idx_private[tid].end());
@@ -1119,84 +1248,6 @@ double primitive_brute_force(
     return cull_trajectory ? toi_global : 1.0;
 }
 
-#include <cuda/std/array>
-#include <thrust/host_vector.h>
-
-using luf = cuda::std::array<float, 6>;
-using vec3f = cuda::std::array<float, 3>;
-using Facef = cuda::std::array<vec3f, 3>;
-
-void vf_col_set_cuda(
-    // vector<int>& vilist, vector<int>& fjlist,
-    // const std::vector<std::unique_ptr<AffineBody>>& cubes,
-    // int I, int J,
-    int nvi, int nfj,
-    const thrust::host_vector<luf>& aabbs,
-    const thrust::host_vector<vec3f>& vis,
-    const thrust::host_vector<Facef>& fjs,
-    const std::vector<int>& vilist, const std::vector<int>& fjlist,
-    std::vector<std::array<int, 4>>& idx,
-    int I, int J);
-
-inline luf to_luf(const lu& a)
-{
-    return {
-        float(a[0][0]),
-        float(a[0][1]),
-        float(a[0][2]),
-        float(a[1][0]),
-        float(a[1][1]),
-        float(a[1][2])
-    };
-}
-inline vec3f to_vec3f(const vec3& a)
-{
-    return {
-        float(a[0]),
-        float(a[1]),
-        float(a[2])
-    };
-}
-inline Facef to_facef(const Face& f)
-{
-    return {
-        to_vec3f(f.t0),
-        to_vec3f(f.t1),
-        to_vec3f(f.t2)
-    };
-}
-
-void glue_vf_col_set(
-    vector<int>& vilist, vector<int>& fjlist,
-    const std::vector<std::unique_ptr<AffineBody>>& cubes,
-    int I, int J,
-    vector<array<vec3, 4>>& pts,
-    vector<array<int, 4>>& idx)
-{
-    auto &ci{ *cubes[I] }, &cj{ *cubes[J] };
-    int nvi = vilist.size(), nfj = fjlist.size();
-
-    thrust::host_vector<luf> aabbs(nvi + nfj);
-    thrust::host_vector<vec3f> vis(nvi);
-    thrust::host_vector<Facef> fjs(nfj);
-
-    for (int k = 0; k < nvi; k++) {
-        auto vi{ vilist[k] };
-        vec3 v{ ci.v_transformed[vi] };
-        vis[k] = to_vec3f(v);
-        lu lud{ v.array() - barrier::d_sqrt, v.array() + barrier::d_sqrt };
-        aabbs[k] = to_luf(lud);
-    }
-    for (int k = 0; k < nfj; k++) {
-        auto fj{ fjlist[k] };
-        Face f{ cj, unsigned(fj), true, true };
-        fjs[k] = to_facef(f);
-        lu lud{ compute_aabb(f) };
-        aabbs[k + nvi] = to_luf(lud);
-    }
-    vf_col_set_cuda(nvi, nfj, aabbs, vis, fjs, vilist, fjlist, idx, I, J);
-}
-
 double iaabb_brute_force(
     int n_cubes,
     const std::vector<std::unique_ptr<AffineBody>>& cubes,
@@ -1234,4 +1285,12 @@ double iaabb_brute_force(
     auto t = DURATION_TO_DOUBLE(start);
     spdlog::info("time: {} = {:0.6f} ms", vtn == 3 ? "iaabb upper bound" : "iAABB", t * 1000);
     return toi;
+}
+
+tuple<float, ipc::PointTriangleDistanceType> vf_distance(const vec3f& vf, const Facef& ff){
+    Eigen::Vector3f v {vf[0], vf[1], vf[2]};
+    Eigen::Vector3f f[3] {{ff[0][0], ff[0][1], ff[0][2]}, {ff[1][0], ff[1][1], ff[1][2]}, {ff[2][0], ff[2][1], ff[2][2]}};
+    auto pt_type = ipc::point_triangle_distance_type(v, f[0], f[1], f[2]);
+    float d = ipc::point_triangle_distance(v, f[0], f[1], f[2], pt_type);
+    return {d, pt_type};
 }

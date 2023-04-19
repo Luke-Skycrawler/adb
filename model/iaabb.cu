@@ -6,13 +6,18 @@
 #include <ipc/distance/edge_edge.hpp>
 #include <ipc/distance/point_triangle.hpp>
 
+
+#include <tuple>
 using namespace std;
 using namespace ipc;
 // using namespace cuda::std;
 // using namespace Eigen;
 static const int max_pairs_per_thread = 512, max_aabb_list_size = 512;
 // FIXME: tid probably not in 1 block
-__device__ float vf_distance(const vec3f& _v, const Facef& f, PointTriangleDistanceType* pt_type)
+
+tuple<float, PointTriangleDistanceType> vf_distance(const vec3f& vf, const Facef& ff);
+
+__device__ __host__ float vf_distance(const vec3f& _v, const Facef& f, PointTriangleDistanceType* pt_type)
 {
     auto n = unit_normal(f);
     auto d = dot(n, _v - f[0]);
@@ -20,8 +25,13 @@ __device__ float vf_distance(const vec3f& _v, const Facef& f, PointTriangleDista
     auto v = _v - n * d;
     d = d * d;
     // float a2 = ((f[0] - v).cross(f[1] - v).norm() + (f[1] - v).cross(f[2] - v).norm() + (f[2] - v).cross(f[0] - v).norm());
-    auto a2 = area(f[0], f[1], v) + area(f[1], f[2], v) + area(f[2], f[0], v);
-    if (a2 > a1 + 1e-8) {
+    // auto a2 = area(f[0], f[1], v) + area(f[1], f[2], v) + area(f[2], f[0], v);
+    auto _a1 = dot(cross(f[0] - v, f[1] - v), n);
+    auto _a2 = dot(cross(f[1] - v, f[2] - v), n);
+    auto _a3 = dot(cross(f[2] - v, f[0] - v), n);
+    bool inside = _a1 * _a2 > 0.0f && _a2 * _a3 > 0.0f;
+    // if (a2 > a1 + 1e-8) {
+    if (!inside) {
         // projection outside of triangle
 
         auto d_ab = h(f[0], f[1], v);
@@ -66,7 +76,7 @@ __global__ void aabb_intersection_test_kernel(luf* dev_aabbs, int nvi, int nfj, 
     int n_copies_per_thread = (nvi + nfj + blockDim.x - 1) / blockDim.x;
     for (int i = 0; i < n_copies_per_thread; i++) {
         int idx = tid * n_copies_per_thread + i;
-        if (idx < nvi + nfj)
+        if (idx < nvi + nfj && idx < max_aabb_list_size)
             aabbs[idx] = dev_aabbs[idx];
     }
     __syncthreads();
@@ -222,14 +232,54 @@ void vf_col_set_cuda(
     {
         // cuda kernels
         aabb_intersection_test_kernel<<<1, n_cuda_threads_per_block>>>(aabbs_ptr, nvi, nfj, ij_ptr, cnt_ptr);
+
         CUDA_CALL(cudaGetLastError());
+
         thrust::inclusive_scan(thrust::device, dev_cnt.begin(), dev_cnt.end(), dev_cnt.begin());
         CUDA_CALL(cudaGetLastError());
+#define TEST_INTERN
+#ifdef TEST_INTERN
+        squeeze_ij_kernel<<<1, n_cuda_threads_per_block>>>(ij_ptr, cnt_ptr, tmp_ptr, pt_types_ptr, tmp_pt_types_ptr);
+
+        CUDA_CALL(cudaDeviceSynchronize());
+        int cnt_gpu = dev_cnt[n_cuda_threads_per_block - 1];
+        spdlog::warn("n pairs = {}", cnt_gpu);
+        thrust::host_vector<int> ij_cpu;
+        int cnt_cpu = 0;
+        for (int i = 0; i < nvi; i++)
+            for (int j = 0; j < nfj; j++) {
+                if (intersects(aabbs[i], aabbs[j + nvi])) {
+                    cnt_cpu++;
+                    PointTriangleDistanceType ptt;
+                    auto d = vf_distance(vis[i], fjs[j], &ptt);
+                    auto tup = vf_distance(vis[i], fjs[j]);
+                    auto d2 = std::get<0>(tup);
+                    auto type_ref = std::get<1>(tup);
+                    if (d < 1e-4f) {
+                       ij_cpu.push_back(i);
+                       ij_cpu.push_back(j);
+                    }
+                    if (fabs(d - d2) > 1e-6f) {
+                        spdlog::error("d1 = {}, d2 = {}", d, d2);
+                        spdlog::error ("type, cuda = {}, ref = {}", static_cast<cuda::std::underlying_type_t<ipc::PointTriangleDistanceType>>(ptt), static_cast<cuda::std::underlying_type_t<ipc::PointTriangleDistanceType>>(type_ref));
+                    }
+                }
+            }
+        if (cnt_cpu != cnt_gpu) {
+            spdlog::error("cnt_cpu = {}, cnt_gpu = {}", cnt_cpu, cnt_gpu);
+            // exit(1);
+        }
+        for (int i = 0; i < ij_cpu.size() / 2; i++) {
+            auto vi = ij_cpu[i * 2], fj = ij_cpu[i * 2 + 1];
+            idx.push_back({ I, vilist[vi], J, fjlist[fj] });
+        }
+    }
+#else
         squeeze_kernel<<<1, n_cuda_threads_per_block>>>(ij_ptr, cnt_ptr, tmp_ptr, vilist_ptr, fjlist_ptr, vis_ptr, fjs_ptr, pt_types_ptr, tmp_pt_types_ptr);
         CUDA_CALL(cudaGetLastError());
 
         thrust::inclusive_scan(thrust::device, dev_cnt.begin(), dev_cnt.end(), dev_cnt.begin());
-        CUDA_CALL(cudaDeviceSynchronize());
+        //CUDA_CALL(cudaDeviceSynchronize());
         // thrust::host_vector<int> host_cnt(n_cuda_threads_per_block);
         // host_cnt = dev_cnt;
         // for (int i = 1; i < n_cuda_threads_per_block; i++) {
@@ -244,15 +294,14 @@ void vf_col_set_cuda(
     cudaDeviceSynchronize();
 
     {
-        // generate collision set in the same syntax as the CPU version
         int n_collision_set = dev_cnt.back();
         thrust::host_vector<int> host_idx(n_collision_set * 2);
-        thrust::copy_n(tmp.begin(), n_collision_set * 2, host_idx.begin());
         for (int i = 0; i < n_collision_set; i++) {
             auto vi = host_idx[i * 2], fj = host_idx[i * 2 + 1];
             idx.push_back({ I, vi, J, fj });
         }
     }
+#endif
 }
 
 #include "cuda_globals.cuh"

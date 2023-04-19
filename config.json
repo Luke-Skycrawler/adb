@@ -65,6 +65,7 @@
         "clip": 0,
         "gfk": 1,
         "hdk": 1,
-        "cuda": 1
+        "cuda": 1,
+        "strict": 1
     }
 }

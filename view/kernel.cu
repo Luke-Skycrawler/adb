@@ -1,6 +1,6 @@
 ﻿
 #include <stdio.h>
-#include "../model/cuda_header.h"
+#include "../model/cuda_header.cuh"
 
 
 
