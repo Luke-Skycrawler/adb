@@ -115,9 +115,9 @@ void make_placeholder_sparse_matrix(int n_cubes, CsrSparseMatrix &sparse_matrix)
 
 __device__ void pt_grad_hess12x12(vec3f p, Facef t, float *pt_grad, float * pt_hess, bool psd = true) {
 
-    auto dist = point_triangle_distance(p, t[0], t[1], t[2]);
-    point_triangle_distance_gradient(p, t[0], t[1], t[2], pt_grad);
-    point_triangle_distance_hessian(p, t[0], t[1], t[2], pt_hess);
+    auto dist = point_triangle_distance(p, t.t0, t.t1, t.t2);
+    point_triangle_distance_gradient(p, t.t0, t.t1, t.t2, pt_grad);
+    point_triangle_distance_hessian(p, t.t0, t.t1, t.t2, pt_hess);
 
     auto B_ = dev_barrier_derivative_d(dist);
     auto B__ = dev_barrier_second_derivative(dist);

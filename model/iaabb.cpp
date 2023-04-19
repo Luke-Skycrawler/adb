@@ -37,11 +37,10 @@ void glue_vf_col_set(
 #include <cuda/std/array>
 #include <thrust/host_vector.h>
 #include <type_traits>
-using luf = cuda::std::array<float, 6>;
-using vec3f = cuda::std::array<float, 3>;
-using Facef = cuda::std::array<vec3f, 3>;
-float vf_distance(const vec3f& _v, const Facef& f, ipc::PointTriangleDistanceType* pt_type);
-tuple<float, ipc::PointTriangleDistanceType> vf_distance(const vec3f& vf, const Facef& ff); 
+#include "cuda_header.cuh"
+
+float vf_distance(vec3f _v, Facef f, ipc::PointTriangleDistanceType* pt_type);
+tuple<float, ipc::PointTriangleDistanceType> vf_distance(vec3f vf, Facef ff); 
 
 void vf_col_set_cuda(
     // vector<int>& vilist, vector<int>& fjlist,
@@ -1287,9 +1286,9 @@ double iaabb_brute_force(
     return toi;
 }
 
-tuple<float, ipc::PointTriangleDistanceType> vf_distance(const vec3f& vf, const Facef& ff){
-    Eigen::Vector3f v {vf[0], vf[1], vf[2]};
-    Eigen::Vector3f f[3] {{ff[0][0], ff[0][1], ff[0][2]}, {ff[1][0], ff[1][1], ff[1][2]}, {ff[2][0], ff[2][1], ff[2][2]}};
+tuple<float, ipc::PointTriangleDistanceType> vf_distance(vec3f vf, Facef ff){
+    Eigen::Vector3f v {vf.x, vf.y, vf.z};
+    Eigen::Vector3f f[3] {{ff.t0.x, ff.t0.y, ff.t0.z}, {ff.t1.x, ff.t1.y, ff.t1.z}, {ff.t2.x, ff.t2.y, ff.t2.z}};
     auto pt_type = ipc::point_triangle_distance_type(v, f[0], f[1], f[2]);
     float d = ipc::point_triangle_distance(v, f[0], f[1], f[2], pt_type);
     return {d, pt_type};

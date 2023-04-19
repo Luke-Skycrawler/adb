@@ -101,6 +101,7 @@
         "any": "cpp",
         "*.ipp": "cpp",
         "filesystem": "cpp",
-        "codecvt": "cpp"
+        "codecvt": "cpp",
+        "barrier": "cpp"
     }
 }

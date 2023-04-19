@@ -15,36 +15,36 @@ using namespace ipc;
 static const int max_pairs_per_thread = 512, max_aabb_list_size = 512;
 // FIXME: tid probably not in 1 block
 
-tuple<float, PointTriangleDistanceType> vf_distance(const vec3f& vf, const Facef& ff);
+tuple<float, PointTriangleDistanceType> vf_distance(vec3f vf, Facef ff);
 
-__device__ __host__ float vf_distance(const vec3f& _v, const Facef& f, PointTriangleDistanceType* pt_type)
+__device__ __host__ float vf_distance(vec3f _v, Facef f, PointTriangleDistanceType* pt_type)
 {
     auto n = unit_normal(f);
-    auto d = dot(n, _v - f[0]);
-    auto a1 = area(f[1], f[0], f[2]);
+    auto d = dot(n, _v - f.t0);
+    auto a1 = area_x2(f.t1, f.t0, f.t2);
     auto v = _v - n * d;
     d = d * d;
     // float a2 = ((f[0] - v).cross(f[1] - v).norm() + (f[1] - v).cross(f[2] - v).norm() + (f[2] - v).cross(f[0] - v).norm());
-    // auto a2 = area(f[0], f[1], v) + area(f[1], f[2], v) + area(f[2], f[0], v);
-    auto _a1 = dot(cross(f[0] - v, f[1] - v), n);
-    auto _a2 = dot(cross(f[1] - v, f[2] - v), n);
-    auto _a3 = dot(cross(f[2] - v, f[0] - v), n);
+    // auto a2 = area_x2(f[0], f[1], v) + area_x2(f[1], f[2], v) + area_x2(f[2], f[0], v);
+    auto _a1 = dot(cross(f.t0 - v, f.t1 - v), n);
+    auto _a2 = dot(cross(f.t1 - v, f.t2 - v), n);
+    auto _a3 = dot(cross(f.t2 - v, f.t0 - v), n);
     bool inside = _a1 * _a2 > 0.0f && _a2 * _a3 > 0.0f;
     // if (a2 > a1 + 1e-8) {
     if (!inside) {
         // projection outside of triangle
 
-        auto d_ab = h(f[0], f[1], v);
-        auto d_bc = h(f[1], f[2], v);
-        auto d_ac = h(f[0], f[2], v);
+        auto d_ab = h(f.t0, f.t1, v);
+        auto d_bc = h(f.t1, f.t2, v);
+        auto d_ac = h(f.t0, f.t2, v);
 
-        auto d_a = ab(v, f[0]);
-        auto d_b = ab(v, f[1]);
-        auto d_c = ab(v, f[2]);
+        auto d_a = ab(v, f.t0);
+        auto d_b = ab(v, f.t1);
+        auto d_c = ab(v, f.t2);
 
-        auto dab = is_obtuse_triangle(f[0], f[1], v) ? CUDA_MIN(d_a, d_b) : d_ab;
-        auto dbc = is_obtuse_triangle(f[2], f[1], v) ? CUDA_MIN(d_c, d_b) : d_bc;
-        auto dac = is_obtuse_triangle(f[0], f[2], v) ? CUDA_MIN(d_a, d_c) : d_ac;
+        auto dab = is_obtuse_triangle(f.t0, f.t1, v) ? CUDA_MIN(d_a, d_b) : d_ab;
+        auto dbc = is_obtuse_triangle(f.t2, f.t1, v) ? CUDA_MIN(d_c, d_b) : d_bc;
+        auto dac = is_obtuse_triangle(f.t0, f.t2, v) ? CUDA_MIN(d_a, d_c) : d_ac;
 
         auto d_projected = CUDA_MIN3(dab, dbc, dac);
         d += d_projected * d_projected;
