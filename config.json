@@ -7,7 +7,7 @@
     "predefined_case" : {
         "enable": false,
         "id" : 2,
-        "custom": "../test_cases/case.json"
+        "custom": "../test_cases/blocks.json"
     },
     "solver": "sparse",
     "gravity": true, 
@@ -65,7 +65,7 @@
         "clip": 0,
         "gfk": 1,
         "hdk": 1,
-        "cuda": 1,
+        "cuda": 0,
         "strict": 1
     }
 }

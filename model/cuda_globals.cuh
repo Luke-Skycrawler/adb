@@ -1,3 +1,4 @@
+#pragma once
 #include <cuda/std/array>
 #include <thrust/device_vector.h>
 

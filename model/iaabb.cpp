@@ -39,7 +39,7 @@ void glue_vf_col_set(
 #include <type_traits>
 #include "cuda_header.cuh"
 
-float vf_distance(vec3f _v, Facef f, ipc::PointTriangleDistanceType* pt_type);
+float vf_distance(vec3f _v, Facef f, ipc::PointTriangleDistanceType &pt_type);
 tuple<float, ipc::PointTriangleDistanceType> vf_distance(vec3f vf, Facef ff); 
 
 void vf_col_set_cuda(
@@ -57,21 +57,13 @@ void vf_col_set_cuda(
 inline luf to_luf(const lu& a)
 {
     return {
-        float(a[0][0]),
-        float(a[0][1]),
-        float(a[0][2]),
-        float(a[1][0]),
-        float(a[1][1]),
-        float(a[1][2])
+        make_float3(a[0][0], a[0][1], a[0][2]),
+        make_float3(a[1][0], a[1][1], a[1][2])
     };
 }
 inline vec3f to_vec3f(const vec3& a)
 {
-    return {
-        float(a[0]),
-        float(a[1]),
-        float(a[2])
-    };
+    return make_float3(a[0], a[1], a[2]);
 }
 inline Facef to_facef(const Face& f)
 {
@@ -1170,7 +1162,7 @@ double primitive_brute_force(
                         vec3f pf{ to_vec3f(
                             cubes[a[0]]->v_transformed[a[1]]) };
                         ipc::PointTriangleDistanceType ptt;
-                        auto d = vf_distance(pf, ff, &ptt);
+                        auto d = vf_distance(pf, ff, ptt);
                         auto [d_ref, type_ref] = vf_distance(p, f);
                         auto [d_ref2, type_ref2] = vf_distance(pf, ff);
                         spdlog::error("in diff set: pt distance = {}, ref = {}, ref2 = {}", d, d_ref, d_ref2);
@@ -1186,7 +1178,7 @@ double primitive_brute_force(
                         vec3f pf{ to_vec3f(
                             cubes[a[0]]->v_transformed[a[1]]) };
                         ipc::PointTriangleDistanceType ptt;
-                        auto d = vf_distance(pf, ff, &ptt);
+                        auto d = vf_distance(pf, ff, ptt);
                         auto [d_ref, type_ref] = vf_distance(p, f);
                         auto [d_ref2, type_ref2] = vf_distance(pf, ff);
                         spdlog::error("in diff (cuda - ref): pt distance = {}, ref = {}, ref2 = {}", d, d_ref, d_ref2);
