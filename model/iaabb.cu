@@ -163,7 +163,8 @@ void vf_col_set_cuda(
     const thrust::host_vector<Facef>& fjs,
     const std::vector<int>& vilist, const std::vector<int>& fjlist,
     vector<array<int, 4>>& idx,
-    int I, int J)
+    int I, int J,
+    int tid)
 {
     if (nvi && nfj)
         ;
@@ -197,7 +198,7 @@ void vf_col_set_cuda(
     auto pt_types_ptr = thrust::raw_pointer_cast(pt_types.data());
     auto tmp_pt_types_ptr = thrust::raw_pointer_cast(pt_types_buffer.data());
 #else
-    auto chunk_int = (int*)(cuda_globals.buffer_chunk);
+    auto chunk_int = (int*)((char*)cuda_globals.buffer_chunk + tid * cuda_globals.per_stream_buffer_size);
     auto ij_size = n_cuda_threads_per_block * max_pairs_per_thread * 2;
     i2* ij_ptr = (i2*)(chunk_int);
     i2* tmp_ptr = (i2*)(chunk_int + ij_size);
@@ -218,31 +219,32 @@ void vf_col_set_cuda(
     // CUDA_CALL(cudaMemset(cnt_ptr, 0, n_cuda_threads_per_block));
 
     
-    size_t cuda_allocated_size_total = (char*)(pt_types_ptr + ij_size) - (char*)cuda_globals.buffer_chunk; 
-    //cudaMemPrefetchAsync((void*)cuda_globals.buffer_chunk, cuda_allocated_size_total, cuda_globals.device_id);
-    // CUDA_CALL(cudaGetLastError());
-
     
+    auto &stream {cuda_globals.streams[tid]};
+    CUDA_CALL(cudaMemcpyAsync((void*)vis_ptr, vis.data(), vis.size() * sizeof(vec3f), cudaMemcpyHostToDevice), stream);
+    CUDA_CALL(cudaMemcpyAsync((void*)fjs_ptr, fjs.data(), fjs.size() * sizeof(Facef), cudaMemcpyHostToDevice), stream);
     
-    CUDA_CALL(cudaMemcpy((void*)vis_ptr, vis.data(), vis.size() * sizeof(vec3f), cudaMemcpyHostToDevice));
-    CUDA_CALL(cudaMemcpy((void*)fjs_ptr, fjs.data(), fjs.size() * sizeof(Facef), cudaMemcpyHostToDevice));
+    CUDA_CALL(cudaMemcpyAsync((void*)aabbs_ptr, aabbs.data(), aabbs.size() * sizeof(luf), cudaMemcpyHostToDevice), stream);
     
-    CUDA_CALL(cudaMemcpy((void*)aabbs_ptr, aabbs.data(), aabbs.size() * sizeof(luf), cudaMemcpyHostToDevice));
+    // CUDA_CALL(cudaMemcpy((void*)vis_ptr, vis.data(), vis.size() * sizeof(vec3f), cudaMemcpyHostToDevice));
+    // CUDA_CALL(cudaMemcpy((void*)fjs_ptr, fjs.data(), fjs.size() * sizeof(Facef), cudaMemcpyHostToDevice));
+    
+    // CUDA_CALL(cudaMemcpy((void*)aabbs_ptr, aabbs.data(), aabbs.size() * sizeof(luf), cudaMemcpyHostToDevice));
     
     // spdlog::warn("copy complete");
 #endif
     {
         // cuda kernels
-        aabb_intersection_test_kernel<<<1, n_cuda_threads_per_block>>>(aabbs_ptr, nvi, nfj, ij_ptr, cnt_ptr);
+        aabb_intersection_test_kernel<<<1, n_cuda_threads_per_block, 0, stream>>>(aabbs_ptr, nvi, nfj, ij_ptr, cnt_ptr);
 
         CUDA_CALL(cudaGetLastError());
 
         // thrust::inclusive_scan(thrust::cuda::par_nosync, dev_cnt.begin(), dev_cnt.end(), dev_cnt.begin());
         // thrust::inclusive_scan(thrust::cuda::par_nosync, cnt_ptr, cnt_ptr + n_cuda_threads_per_block, cnt_ptr);
-        inclusive_scan_kernel<<<1, 1>>>(cnt_ptr);
+        inclusive_scan_kernel<<<1, 1, 0, stream>>>(cnt_ptr);
         CUDA_CALL(cudaGetLastError());
 
-        squeeze_ij_kernel<<<1, n_cuda_threads_per_block>>>(ij_ptr, cnt_ptr, tmp_ptr, pt_types_ptr, tmp_pt_types_ptr);
+        squeeze_ij_kernel<<<1, n_cuda_threads_per_block, 0, stream>>>(ij_ptr, cnt_ptr, tmp_ptr, pt_types_ptr, tmp_pt_types_ptr);
 
         // now culled pairs are gathered in the front of tmp
         // dev_cnt.back() has the length of the culled pairs
@@ -251,19 +253,19 @@ void vf_col_set_cuda(
         if (run_on_gpu) {
             if (run_kernel) {
                 // pass
-                filter_distance_kernel<<<1, n_cuda_threads_per_block>>>(ij_ptr, cnt_ptr, tmp_ptr,
+                filter_distance_kernel<<<1, n_cuda_threads_per_block, 0, stream>>>(ij_ptr, cnt_ptr, tmp_ptr,
                     // vilist_ptr, fjlist_ptr,
                     vis_ptr, fjs_ptr, pt_types_ptr, tmp_pt_types_ptr);
 
                 CUDA_CALL(cudaGetLastError());
-                inclusive_scan_kernel<<<1, 1>>>(cnt_ptr);
+                inclusive_scan_kernel<<<1, 1, 0, stream>>>(cnt_ptr);
                 // thrust::inclusive_scan(thrust::cuda::par_nosync, cnt_ptr, cnt_ptr + n_cuda_threads_per_block, cnt_ptr);
 
                 // thrust::inclusive_scan(thrust::cuda::par_nosync, dev_cnt.begin(), dev_cnt.end(), dev_cnt.begin());
 
-                squeeze_ij_kernel<<<1, n_cuda_threads_per_block>>>(ij_ptr, cnt_ptr, tmp_ptr, pt_types_ptr, tmp_pt_types_ptr);
-                CUDA_CALL(cudaGetLastError());
-                cudaDeviceSynchronize();
+                squeeze_ij_kernel<<<1, n_cuda_threads_per_block, 0, stream>>>(ij_ptr, cnt_ptr, tmp_ptr, pt_types_ptr, tmp_pt_types_ptr);
+                CUDA_CALL(cudaStreamSynchronize(stream));
+                
             }
             else {
 #ifdef THRUST_DEV_VECTOR
@@ -336,10 +338,6 @@ void vf_col_set_cuda(
     // and dev_cnt.back has the information of the length of the set
 
     {
-        // int n_collision_set = dev_cnt.back();
-        // thrust::host_vector<i2> host_ij(tmp.begin(), tmp.begin() + n_collision_set);
-        // int n_collision_set;
-        // cudaMemcpy(&n_collision_set, cnt_ptr + n_cuda_threads_per_block - 1, sizeof(int), cudaMemcpyDeviceToHost);
         int n_collision_set = cnt_ptr[n_cuda_threads_per_block - 1];
         thrust::host_vector<i2> host_ij(tmp_ptr, tmp_ptr + n_collision_set);
         for (int i = 0; i < n_collision_set; i++) {
@@ -403,10 +401,21 @@ void stencil_classifier(
 CudaGlobals::CudaGlobals()
 {
     cudaGetDevice(&device_id);
-    cudaMallocManaged(&buffer_chunk, n_cuda_threads_per_block * max_pairs_per_thread * sizeof(i2) * 4);
+    int n_proc = omp_get_num_procs();
+    per_stream_buffer_size = n_cuda_threads_per_block * max_pairs_per_thread * sizeof(i2) * 4;
+    cudaMallocManaged(&buffer_chunk, per_stream_buffer_size * n_proc);
+    streams = new cudaStream_t[n_proc];
+    for (int i = 0; i < n_proc; i++) {
+        cudaStreamCreate(&streams[i]);
+    }
+    
 }
 
 CudaGlobals::~CudaGlobals()
 {
     cudaFree(buffer_chunk);
+    for (int i = 0 ; i < omp_get_num_procs(); i++) {
+        cudaStreamDestroy(streams[i]);
+    }
+    delete[] streams;
 }

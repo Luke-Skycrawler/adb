@@ -32,7 +32,8 @@ void glue_vf_col_set(
     const std::vector<std::unique_ptr<AffineBody>>& cubes,
     int I, int J,
     vector<array<vec3, 4>>& pts,
-    vector<array<int, 4>>& idx);
+    vector<array<int, 4>>& idx,
+    int tid = 0);
 
 #include <cuda/std/array>
 #include <thrust/host_vector.h>
@@ -52,7 +53,8 @@ void vf_col_set_cuda(
     const thrust::host_vector<Facef>& fjs,
     const std::vector<int>& vilist, const std::vector<int>& fjlist,
     std::vector<std::array<int, 4>>& idx,
-    int I, int J);
+    int I, int J,
+    int tid = 0);
 
 inline luf to_luf(const lu& a)
 {
@@ -79,7 +81,8 @@ void glue_vf_col_set(
     const std::vector<std::unique_ptr<AffineBody>>& cubes,
     int I, int J,
     vector<array<vec3, 4>>& pts,
-    vector<array<int, 4>>& idx)
+    vector<array<int, 4>>& idx,
+    int tid)
 {
     auto &ci{ *cubes[I] }, &cj{ *cubes[J] };
     int nvi = vilist.size(), nfj = fjlist.size();
@@ -102,7 +105,7 @@ void glue_vf_col_set(
         lu lud{ compute_aabb(f) };
         aabbs[k + nvi] = to_luf(lud);
     }
-    vf_col_set_cuda(nvi, nfj, aabbs, vis, fjs, vilist, fjlist, idx, I, J);
+    vf_col_set_cuda(nvi, nfj, aabbs, vis, fjs, vilist, fjlist, idx, I, J, tid);
     pts.resize(idx.size());
 }
 inline bool les(const Intersection& a, const Intersection& b)
@@ -960,7 +963,7 @@ double primitive_brute_force(
     static vector<array<int, 4>>*idx_private = new vector<array<int, 4>>[omp_get_max_threads()],
                              *eidx_private = new vector<array<int, 4>>[omp_get_max_threads()];
     static vector<array<vec3, 4>>*pts_private = new vector<array<vec3, 4>>[omp_get_max_threads()], *ees_private = new vector<array<vec3, 4>>[omp_get_max_threads()];
-
+    
 #ifdef _FULL_PARALLEL_
     static vector<int> inner_presum;
     auto n_lists = n_overlap / 2;
@@ -1110,14 +1113,14 @@ double primitive_brute_force(
     }
 #else
     if (!cull_trajectory)
-    // #pragma omp parallel
+    #pragma omp parallel
     {
         auto tid = omp_get_thread_num();
         idx_private[tid].resize(0);
         eidx_private[tid].resize(0);
         pts_private[tid].resize(0);
         ees_private[tid].resize(0);
-        // #pragma omp for schedule(guided) nowait
+        #pragma omp for schedule(guided) nowait
         for (int _i = 0; _i < n_overlap / 2; _i++) {
             int i = _i * 2;
             int I{ overlaps[i].i }, J{ overlaps[i].j };
@@ -1138,15 +1141,15 @@ double primitive_brute_force(
                 vf_col_set(vjlist, filist, cubes, J, I, pts_private[tid], idx_private[tid]);
             }
             else {
-                glue_vf_col_set(vilist, fjlist, cubes, I, J, pts_private[tid], idx_private[tid]);
-                glue_vf_col_set(vjlist, filist, cubes, J, I, pts_private[tid], idx_private[tid]);
+                glue_vf_col_set(vilist, fjlist, cubes, I, J, pts_private[tid], idx_private[tid], tid);
+                glue_vf_col_set(vjlist, filist, cubes, J, I, pts_private[tid], idx_private[tid], tid);
             }
             if (globals.params_int["cuda_supervised"]) {
                 vector<array<int, 4>>&idx_ref{ idx_private[tid] }, idx_cuda{}, diff{}, cuda_ref{};
                 // glue_vf_col_set(vilist, fjlist, cubes, I, J, pts_private[tid], idx_private[tid]);
                 // glue_vf_col_set(vjlist, filist, cubes, J, I, pts_private[tid], idx_private[tid]);
-                glue_vf_col_set(vilist, fjlist, cubes, I, J, pts_private[tid], idx_cuda);
-                glue_vf_col_set(vjlist, filist, cubes, J, I, pts_private[tid], idx_cuda);
+                glue_vf_col_set(vilist, fjlist, cubes, I, J, pts_private[tid], idx_cuda, tid);
+                glue_vf_col_set(vjlist, filist, cubes, J, I, pts_private[tid], idx_cuda, tid);
                 sort(idx_cuda.begin(), idx_cuda.end());
                 sort(idx_ref.begin(), idx_ref.end());
 
@@ -1193,7 +1196,7 @@ double primitive_brute_force(
                 }
             }
         }
-        // #pragma omp critical
+        #pragma omp critical
         {
             pts.insert(pts.end(), pts_private[tid].begin(), pts_private[tid].end());
             idx.insert(idx.end(), idx_private[tid].begin(), idx_private[tid].end());

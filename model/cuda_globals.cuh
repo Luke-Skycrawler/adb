@@ -63,7 +63,8 @@ struct CudaGlobals {
     thrust::device_vector<float> b;
     thrust::device_vector<i2> lut;
     void *buffer_chunk;
-    int device_id;
+    int device_id, per_stream_buffer_size;
+    cudaStream_t* streams;
     CudaGlobals();
     ~CudaGlobals();
 };    
