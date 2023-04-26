@@ -43,7 +43,21 @@ struct CsrSparseMatrix
 	thrust::device_vector<float> values;
 };
 
+
+struct cudaAffineBody {
+    float4 q[3], q0[3], dqdt[3];
+    float mass, Ic;
+    int is_static;
+    
+};
+struct FrictionInfo {
+    float lambda;
+    float basis[24];
+};
+
 struct CudaGlobals {
+    thrust::device_vector<FrictionInfo> friction_info;
+    cudaAffineBody *cubes;
     CollisionSets collision_sets;
     CsrSparseMatrix hess;
     thrust::device_vector<float> b;

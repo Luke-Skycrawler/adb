@@ -185,12 +185,6 @@ void vf_col_set_cuda(
     auto aabbs_ptr = thrust::raw_pointer_cast(dev_aabbs.data());
     auto pt_types_ptr = thrust::raw_pointer_cast(pt_types.data());
     auto tmp_pt_types_ptr = thrust::raw_pointer_cast(pt_types_buffer.data());
-    // {
-    //     // copying
-    //     dev_aabbs = aabbs;
-    //     dev_vis = vis;
-    //     dev_fjs = fjs;
-    // }
 
     {
         // cuda kernels
@@ -198,7 +192,7 @@ void vf_col_set_cuda(
 
         CUDA_CALL(cudaGetLastError());
 
-        thrust::inclusive_scan(thrust::device, dev_cnt.begin(), dev_cnt.end(), dev_cnt.begin());
+        thrust::inclusive_scan(thrust::cuda::par_nosync, dev_cnt.begin(), dev_cnt.end(), dev_cnt.begin());
         CUDA_CALL(cudaGetLastError());
 
         squeeze_ij_kernel<<<1, n_cuda_threads_per_block>>>(ij_ptr, cnt_ptr, tmp_ptr, pt_types_ptr, tmp_pt_types_ptr);
@@ -213,7 +207,7 @@ void vf_col_set_cuda(
                 filter_distance_kernel<<<1, n_cuda_threads_per_block>>>(ij_ptr, cnt_ptr, tmp_ptr, vilist_ptr, fjlist_ptr, vis_ptr, fjs_ptr, pt_types_ptr, tmp_pt_types_ptr);
 
                 CUDA_CALL(cudaGetLastError());
-                thrust::inclusive_scan(thrust::device, dev_cnt.begin(), dev_cnt.end(), dev_cnt.begin());
+                thrust::inclusive_scan(thrust::cuda::par_nosync, dev_cnt.begin(), dev_cnt.end(), dev_cnt.begin());
 
                 squeeze_ij_kernel<<<1, n_cuda_threads_per_block>>>(ij_ptr, cnt_ptr, tmp_ptr, pt_types_ptr, tmp_pt_types_ptr);
                 CUDA_CALL(cudaGetLastError());
@@ -303,7 +297,7 @@ void vf_col_set_cuda(
 #include <cuda/std/tuple>
 #include <cuda/std/type_traits>
 #include <thrust/set_operations.h>
-void stencil_categorize(
+void stencil_classifier(
     thrust::device_vector<i2>& pt_idx,
     thrust::device_vector<i2>& pt_body_idx,
     thrust::device_vector<PointTriangleDistanceType>& pt_types)

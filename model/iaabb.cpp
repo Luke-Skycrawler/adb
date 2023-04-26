@@ -1131,12 +1131,17 @@ double primitive_brute_force(
 
             ee_col_set(eilist, ejlist, cubes, I, J, ees_private[tid], eidx_private[tid]);
             // else
+            if (!globals.params_int["cuda_direct"])
             {
 
                 vf_col_set(vilist, fjlist, cubes, I, J, pts_private[tid], idx_private[tid]);
                 vf_col_set(vjlist, filist, cubes, J, I, pts_private[tid], idx_private[tid]);
             }
-            if (globals.params_int["cuda"]) {
+            else {
+                glue_vf_col_set(vilist, fjlist, cubes, I, J, pts_private[tid], idx_private[tid]);
+                glue_vf_col_set(vjlist, filist, cubes, J, I, pts_private[tid], idx_private[tid]);
+            }
+            if (globals.params_int["cuda_supervised"]) {
                 vector<array<int, 4>>&idx_ref{ idx_private[tid] }, idx_cuda{}, diff{}, cuda_ref{};
                 // glue_vf_col_set(vilist, fjlist, cubes, I, J, pts_private[tid], idx_private[tid]);
                 // glue_vf_col_set(vjlist, filist, cubes, J, I, pts_private[tid], idx_private[tid]);

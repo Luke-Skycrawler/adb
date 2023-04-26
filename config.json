@@ -54,7 +54,7 @@
     "ee_friction": true,
     "kappa": 1e-4,
     "params_double": {
-        "tol": 1e-4,
+        "tol": 1e-2,
         "dhat_sqr": 1e-2,
         "kappa": 1e-1,
         "c1": 1e-4,
@@ -65,7 +65,8 @@
         "clip": 0,
         "gfk": 1,
         "hdk": 1,
-        "cuda": 0,
+        "cuda_supervised": 0,
+        "cuda_direct": 1,
         "strict": 1
     }
 }
