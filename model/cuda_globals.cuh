@@ -62,6 +62,10 @@ struct CudaGlobals {
     CsrSparseMatrix hess;
     thrust::device_vector<float> b;
     thrust::device_vector<i2> lut;
+    void *buffer_chunk;
+    int device_id;
+    CudaGlobals();
+    ~CudaGlobals();
 };    
 
 extern CudaGlobals cuda_globals;

@@ -79,6 +79,7 @@ __global__ void aabb_intersection_test_kernel(luf* dev_aabbs, int nvi, int nfj, 
         if (idx < nvi + nfj && idx < max_aabb_list_size)
             aabbs[idx] = dev_aabbs[idx];
     }
+    cnt[tid] = 0;
     __syncthreads();
     // copys the bounding boxes to shared memory
 
@@ -95,7 +96,14 @@ __global__ void aabb_intersection_test_kernel(luf* dev_aabbs, int nvi, int nfj, 
     }
 }
 
-__global__ void filter_distance_kernel(i2* ij, int* cnt, i2* tmp, int* vilist, int* fjlist, vec3f* vis, Facef* fjs,
+__global__ void inclusive_scan_kernel(int * cnt) {
+    for (int i = 1; i < n_cuda_threads_per_block; i ++) {
+        cnt[i] = cnt[i - 1] + cnt[i];
+    }
+}
+__global__ void filter_distance_kernel(i2* ij, int* cnt, i2* tmp,
+    // int* vilist, int* fjlist,
+    vec3f* vis, Facef* fjs,
     PointTriangleDistanceType* pt_types,
     PointTriangleDistanceType* tmp_pt_types,
     float dhat = 1e-4)
@@ -114,8 +122,9 @@ __global__ void filter_distance_kernel(i2* ij, int* cnt, i2* tmp, int* vilist, i
             auto _ij = tmp[idx];
             int i = _ij[0];
             int j = _ij[1];
-            int vi = vilist[i];
-            int fj = fjlist[j];
+            // int vi = vilist[i];
+            // int fj = fjlist[j];
+
             // compute the distance and type
             auto v{ vis[i] };
             auto f{ fjs[j] };
@@ -160,6 +169,8 @@ void vf_col_set_cuda(
         ;
     else
         return;
+
+#ifdef THRUST_DEV_VECTOR
     thrust::device_vector<luf> dev_aabbs(aabbs.begin(), aabbs.end());
     thrust::device_vector<vec3f> dev_vis(vis.begin(), vis.end());
     thrust::device_vector<Facef> dev_fjs(fjs.begin(), fjs.end());
@@ -185,14 +196,50 @@ void vf_col_set_cuda(
     auto aabbs_ptr = thrust::raw_pointer_cast(dev_aabbs.data());
     auto pt_types_ptr = thrust::raw_pointer_cast(pt_types.data());
     auto tmp_pt_types_ptr = thrust::raw_pointer_cast(pt_types_buffer.data());
+#else
+    auto chunk_int = (int*)(cuda_globals.buffer_chunk);
+    auto ij_size = n_cuda_threads_per_block * max_pairs_per_thread * 2;
+    i2* ij_ptr = (i2*)(chunk_int);
+    i2* tmp_ptr = (i2*)(chunk_int + ij_size);
+    PointTriangleDistanceType* pt_types_ptr = (PointTriangleDistanceType*)(chunk_int + ij_size * 2);
+    PointTriangleDistanceType* tmp_pt_types_ptr = (PointTriangleDistanceType*)(pt_types_ptr + ij_size / 2);
+    int* cnt_ptr = (int*)(chunk_int + ij_size * 3);
+    int *tmp_cnt = cnt_ptr + n_cuda_threads_per_block * 2;
+    vec3f* vis_ptr = (vec3f*)(cnt_ptr + n_cuda_threads_per_block * 3);
+    Facef* fjs_ptr = (Facef*)(vis_ptr + max_aabb_list_size);
+    luf* aabbs_ptr = (luf*)(fjs_ptr + max_aabb_list_size);
+    // vec3f* vis_ptr;
+    // Facef* fjs_ptr;
+    // luf* aabbs_ptr;
+    // cudaMallocManaged(&vis_ptr, vis.size() * sizeof(vec3f));
+    // cudaMallocManaged(&fjs_ptr, fjs.size() * sizeof(Facef));
+    // cudaMallocManaged(&aabbs_ptr, aabbs.size() * sizeof(luf));
+    // CUDA_CALL(cudaGetLastError());
+    // CUDA_CALL(cudaMemset(cnt_ptr, 0, n_cuda_threads_per_block));
 
+    
+    size_t cuda_allocated_size_total = (char*)(pt_types_ptr + ij_size) - (char*)cuda_globals.buffer_chunk; 
+    //cudaMemPrefetchAsync((void*)cuda_globals.buffer_chunk, cuda_allocated_size_total, cuda_globals.device_id);
+    // CUDA_CALL(cudaGetLastError());
+
+    
+    
+    CUDA_CALL(cudaMemcpy((void*)vis_ptr, vis.data(), vis.size() * sizeof(vec3f), cudaMemcpyHostToDevice));
+    CUDA_CALL(cudaMemcpy((void*)fjs_ptr, fjs.data(), fjs.size() * sizeof(Facef), cudaMemcpyHostToDevice));
+    
+    CUDA_CALL(cudaMemcpy((void*)aabbs_ptr, aabbs.data(), aabbs.size() * sizeof(luf), cudaMemcpyHostToDevice));
+    
+    // spdlog::warn("copy complete");
+#endif
     {
         // cuda kernels
         aabb_intersection_test_kernel<<<1, n_cuda_threads_per_block>>>(aabbs_ptr, nvi, nfj, ij_ptr, cnt_ptr);
 
         CUDA_CALL(cudaGetLastError());
 
-        thrust::inclusive_scan(thrust::cuda::par_nosync, dev_cnt.begin(), dev_cnt.end(), dev_cnt.begin());
+        // thrust::inclusive_scan(thrust::cuda::par_nosync, dev_cnt.begin(), dev_cnt.end(), dev_cnt.begin());
+        // thrust::inclusive_scan(thrust::cuda::par_nosync, cnt_ptr, cnt_ptr + n_cuda_threads_per_block, cnt_ptr);
+        inclusive_scan_kernel<<<1, 1>>>(cnt_ptr);
         CUDA_CALL(cudaGetLastError());
 
         squeeze_ij_kernel<<<1, n_cuda_threads_per_block>>>(ij_ptr, cnt_ptr, tmp_ptr, pt_types_ptr, tmp_pt_types_ptr);
@@ -204,16 +251,22 @@ void vf_col_set_cuda(
         if (run_on_gpu) {
             if (run_kernel) {
                 // pass
-                filter_distance_kernel<<<1, n_cuda_threads_per_block>>>(ij_ptr, cnt_ptr, tmp_ptr, vilist_ptr, fjlist_ptr, vis_ptr, fjs_ptr, pt_types_ptr, tmp_pt_types_ptr);
+                filter_distance_kernel<<<1, n_cuda_threads_per_block>>>(ij_ptr, cnt_ptr, tmp_ptr,
+                    // vilist_ptr, fjlist_ptr,
+                    vis_ptr, fjs_ptr, pt_types_ptr, tmp_pt_types_ptr);
 
                 CUDA_CALL(cudaGetLastError());
-                thrust::inclusive_scan(thrust::cuda::par_nosync, dev_cnt.begin(), dev_cnt.end(), dev_cnt.begin());
+                inclusive_scan_kernel<<<1, 1>>>(cnt_ptr);
+                // thrust::inclusive_scan(thrust::cuda::par_nosync, cnt_ptr, cnt_ptr + n_cuda_threads_per_block, cnt_ptr);
+
+                // thrust::inclusive_scan(thrust::cuda::par_nosync, dev_cnt.begin(), dev_cnt.end(), dev_cnt.begin());
 
                 squeeze_ij_kernel<<<1, n_cuda_threads_per_block>>>(ij_ptr, cnt_ptr, tmp_ptr, pt_types_ptr, tmp_pt_types_ptr);
                 CUDA_CALL(cudaGetLastError());
                 cudaDeviceSynchronize();
             }
             else {
+#ifdef THRUST_DEV_VECTOR
                 // pass
                 int cnt_gpu = dev_cnt.back();
                 auto ij_end = thrust::copy_if(thrust::device, tmp.begin(), tmp.begin() + cnt_gpu, ij.begin(), [=] __device__(i2 I) -> bool {
@@ -227,9 +280,11 @@ void vf_col_set_cuda(
                 });
                 thrust::copy(thrust::device, ij.begin(), ij_end, tmp.begin());
                 dev_cnt.back() = ij_end - ij.begin();
+#endif
             }
         }
         else {
+#ifdef THRUST_DEV_VECTOR
             // run_on_gpu = false, pass
             // NOTE: copy_if does not relocate the space. should allocate storage manually
             if (run_thrust) {
@@ -274,14 +329,19 @@ void vf_col_set_cuda(
                 thrust::copy(host_ij.begin(), host_ij.end(), tmp.begin());
                 dev_cnt.back() = host_ij.size();
             }
+#endif
         }
     }
     // now tmp has the exact collsion set with d < dhat,
     // and dev_cnt.back has the information of the length of the set
 
     {
-        int n_collision_set = dev_cnt.back();
-        thrust::host_vector<i2> host_ij(tmp.begin(), tmp.begin() + n_collision_set);
+        // int n_collision_set = dev_cnt.back();
+        // thrust::host_vector<i2> host_ij(tmp.begin(), tmp.begin() + n_collision_set);
+        // int n_collision_set;
+        // cudaMemcpy(&n_collision_set, cnt_ptr + n_cuda_threads_per_block - 1, sizeof(int), cudaMemcpyDeviceToHost);
+        int n_collision_set = cnt_ptr[n_cuda_threads_per_block - 1];
+        thrust::host_vector<i2> host_ij(tmp_ptr, tmp_ptr + n_collision_set);
         for (int i = 0; i < n_collision_set; i++) {
             auto vi = host_ij[i][0], fj = host_ij[i][1];
             
@@ -338,4 +398,15 @@ void stencil_classifier(
 
         thrust::copy(pt_body_idx.begin(), pt_body_idx.end(), cuda_globals.lut.end());
     }
+}
+
+CudaGlobals::CudaGlobals()
+{
+    cudaGetDevice(&device_id);
+    cudaMallocManaged(&buffer_chunk, n_cuda_threads_per_block * max_pairs_per_thread * sizeof(i2) * 4);
+}
+
+CudaGlobals::~CudaGlobals()
+{
+    cudaFree(buffer_chunk);
 }
