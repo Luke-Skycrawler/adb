@@ -152,6 +152,14 @@ __global__ void squeeze_ij_kernel(i2* ij, int* cnt, i2* tmp, PointTriangleDistan
         // tmp is now dense
     }
 }
+__global__ void fetch_cnt_last_kernel(int& n, int *cnt) {
+    n = cnt[n_cuda_threads_per_block - 1];
+}
+
+__global__ void fetch_tmp_kernel(int n, i2 *tmp, i2* dst) 
+{
+    for (int i = 0; i < n; i++) dst[i] = tmp[i];
+}
 
 void vf_col_set_cuda(
     // vector<int>& vilist, vector<int>& fjlist,
@@ -170,7 +178,9 @@ void vf_col_set_cuda(
         ;
     else
         return;
+    auto& stream{ cuda_globals.streams[tid] };
 
+#define THRUST_DEV_VECTOR
 #ifdef THRUST_DEV_VECTOR
     thrust::device_vector<luf> dev_aabbs(aabbs.begin(), aabbs.end());
     thrust::device_vector<vec3f> dev_vis(vis.begin(), vis.end());
@@ -220,7 +230,6 @@ void vf_col_set_cuda(
 
     
     
-    auto &stream {cuda_globals.streams[tid]};
     CUDA_CALL(cudaMemcpyAsync((void*)vis_ptr, vis.data(), vis.size() * sizeof(vec3f), cudaMemcpyHostToDevice), stream);
     CUDA_CALL(cudaMemcpyAsync((void*)fjs_ptr, fjs.data(), fjs.size() * sizeof(Facef), cudaMemcpyHostToDevice), stream);
     
@@ -338,8 +347,21 @@ void vf_col_set_cuda(
     // and dev_cnt.back has the information of the length of the set
 
     {
-        int n_collision_set = cnt_ptr[n_cuda_threads_per_block - 1];
-        thrust::host_vector<i2> host_ij(tmp_ptr, tmp_ptr + n_collision_set);
+#ifdef THRUST_DEV_VECTOR
+        int n_collision_set = dev_cnt.back();
+        thrust::host_vector<i2> host_ij(tmp.begin(), tmp.begin()+ n_collision_set);
+        
+        #else 
+    //int n_collision_set = cnt_ptr[n_cuda_threads_per_block - 1];
+        int n_collision_set;
+        fetch_cnt_last_kernel<<<1, 1, 0, stream>>>(n_collision_set, cnt_ptr);
+        cudaStreamSynchronize(stream);
+        vector<i2> host_ij;
+        host_ij.resize(n_collision_set);
+        fetch_tmp_kernel<<<1, 1, 0, stream>>>(n_collision_set, tmp_ptr, host_ij.data());
+        cudaStreamSynchronize(stream);
+
+    #endif
         for (int i = 0; i < n_collision_set; i++) {
             auto vi = host_ij[i][0], fj = host_ij[i][1];
             
