@@ -7,7 +7,7 @@
     "predefined_case" : {
         "enable": false,
         "id" : 2,
-        "custom": "../test_cases/links.json"
+        "custom": "../test_cases/blocks.json"
     },
     "solver": "sparse",
     "gravity": true, 
@@ -15,7 +15,7 @@
     "col_set": true,
     "ee": true,
     "pt": true,
-    "ground": true,
+    "ground": false,
     "safe_factor": 1.0,
     "uppper_bound": true, 
     "mu": 0.0,

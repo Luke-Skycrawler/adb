@@ -24,7 +24,6 @@
 
 #define MAX_CELLS_NUM 10000
 #define MAX_CELLS_CONTSTRAINT_TRIANGLE_NUM 500
-static const int n_cuda_threads_per_block = 256;
 
 #ifdef USE_DOUBLE_PRECISION
 #define CUDA_ZERO 5e-13
@@ -143,5 +142,7 @@ __forceinline__ __host__ __device__ bool is_obtuse_triangle(vec3f e0, vec3f e1, 
     return CUDA_ABS(ca - bc) > ab;
 }
 
+static const int n_cuda_threads_per_block = 256;
+#define PTR(x) thrust::raw_pointer_cast((x).data())
 #endif
 

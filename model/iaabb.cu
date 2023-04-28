@@ -1,21 +1,59 @@
 
 // #include "iaabb.h"
 #include "cuda_header.cuh"
+#include "cuda_globals.cuh"
 #include "timer.h"
 #include <omp.h>
 #include <ipc/distance/edge_edge.hpp>
 #include <ipc/distance/point_triangle.hpp>
-#include "cuda_globals.cuh"
 #include <spdlog/spdlog.h>
 #include <tuple>
+
+#include <assert.h>
+#include <thrust/iterator/discard_iterator.h>
+#include <thrust/iterator/zip_iterator.h>
+#include <cuda/std/tuple>
+#include <cuda/std/type_traits>
+#include <thrust/set_operations.h>
+
 using namespace std;
 using namespace ipc;
 // using namespace cuda::std;
 // using namespace Eigen;
-static const int max_pairs_per_thread = 512, max_aabb_list_size = 512;
 // FIXME: tid probably not in 1 block
 
 tuple<float, PointTriangleDistanceType> vf_distance(vec3f vf, Facef ff);
+
+__device__ luf affine(luf aabb, cudaAffineBody &c, int vtn)
+{
+    vec3f cull[8];
+    vec3f l, u;
+    auto q {vtn == 2 ? c.q_update: c.q};
+    for (int i = 0; i < 2; i++)
+        for (int j = 0; j < 2; j++)
+            for (int k = 0; k < 2; k++) {
+                auto I = (i << 2) | (j << 1) | k;
+                cull[I] = make_float3(
+                    i ? aabb.u.x : aabb.l.x,
+                    j ? aabb.u.y: aabb.l.y,
+                    k ? aabb.u.z: aabb.l.z);
+                cull[I] = matmul(q, cull[I]);
+            }
+    for (int i = 0; i < 8; i ++ ){
+        if (i ==0) {
+            l = u = cull[i];
+        }
+        else {
+            if (cull[i].x < l.x) l.x = cull[i].x;
+            else if (cull[i].x > l.x) u.x = cull[i].x;
+            if (cull[i].y < l.y) l.y = cull[i].y;
+            else if (cull[i].y > l.y) u.y = cull[i].y;
+            if (cull[i].z < l.z) l.z = cull[i].z;
+            else if (cull[i].z > l.z) u.z = cull[i].z;
+        }
+    }
+    return { l, u};
+}
 
 __device__ __host__ float vf_distance(vec3f _v, Facef f, PointTriangleDistanceType& pt_type)
 {
@@ -96,8 +134,9 @@ __global__ void aabb_intersection_test_kernel(luf* dev_aabbs, int nvi, int nfj, 
     }
 }
 
-__global__ void inclusive_scan_kernel(int * cnt) {
-    for (int i = 1; i < n_cuda_threads_per_block; i ++) {
+__global__ void inclusive_scan_kernel(int* cnt)
+{
+    for (int i = 1; i < n_cuda_threads_per_block; i++) {
         cnt[i] = cnt[i - 1] + cnt[i];
     }
 }
@@ -153,6 +192,45 @@ __global__ void squeeze_ij_kernel(i2* ij, int* cnt, i2* tmp, PointTriangleDistan
     }
 }
 
+__global__ void copy_kernel(i2* ij, PointTriangleDistanceType* pt_types, int* cnt, i2** dst_prim, i2** dst_body, int I, int J, int* cset_cnt)
+{
+    auto tid = threadIdx.x + blockIdx.x * blockDim.x;
+
+    __shared__ int put[7], type_cnt[7 * n_cuda_threads_per_block];
+
+    int n_tasks = cnt[n_cuda_threads_per_block - 1];
+    int n_task_per_thread = (n_tasks + blockDim.x - 1) / blockDim.x;
+    for (int i = 0; i < 7; i++)
+        type_cnt[i * n_cuda_threads_per_block + tid] = 0;
+    for (int _i = 0; _i < n_task_per_thread; _i++) {
+        auto i = tid * n_task_per_thread + _i;
+        if (i < n_tasks) {
+            auto t = static_cast<underlying_type_t<PointTriangleDistanceType>>(pt_types[i]);
+            type_cnt[t * n_cuda_threads_per_block + i]++;
+        }
+    }
+
+    __syncthreads();
+
+    if (tid < 7) {
+        auto sum = 0;
+        for (int i = 0; i < n_cuda_threads_per_block; i++) {
+            sum += type_cnt[tid * n_cuda_threads_per_block + i];
+        }
+        put[tid] = atomicAdd(cset_cnt + tid, sum);
+    }
+    __syncthreads();
+
+    for (int _i = 0; _i < n_task_per_thread; _i++) {
+        auto i = tid * n_task_per_thread + _i;
+        if (i < n_tasks) {
+            auto t = static_cast<underlying_type_t<PointTriangleDistanceType>>(pt_types[i]);
+
+            dst_prim[t][i + put[t]] = ij[i];
+            dst_body[t][i + put[t]] = { I, J };
+        }
+    }
+}
 void vf_col_set_cuda(
     // vector<int>& vilist, vector<int>& fjlist,
     // const std::vector<std::unique_ptr<AffineBody>>& cubes,
@@ -170,7 +248,9 @@ void vf_col_set_cuda(
         ;
     else
         return;
+    auto& stream{ host_cuda_globals.streams[tid] };
 
+// #define THRUST_DEV_VECTOR
 #ifdef THRUST_DEV_VECTOR
     thrust::device_vector<luf> dev_aabbs(aabbs.begin(), aabbs.end());
     thrust::device_vector<vec3f> dev_vis(vis.begin(), vis.end());
@@ -198,14 +278,14 @@ void vf_col_set_cuda(
     auto pt_types_ptr = thrust::raw_pointer_cast(pt_types.data());
     auto tmp_pt_types_ptr = thrust::raw_pointer_cast(pt_types_buffer.data());
 #else
-    auto chunk_int = (int*)((char*)cuda_globals.buffer_chunk + tid * cuda_globals.per_stream_buffer_size);
+    auto chunk_int = (int*)((char*)host_cuda_globals.buffer_chunk + tid * host_cuda_globals.per_stream_buffer_size);
     auto ij_size = n_cuda_threads_per_block * max_pairs_per_thread * 2;
     i2* ij_ptr = (i2*)(chunk_int);
     i2* tmp_ptr = (i2*)(chunk_int + ij_size);
     PointTriangleDistanceType* pt_types_ptr = (PointTriangleDistanceType*)(chunk_int + ij_size * 2);
     PointTriangleDistanceType* tmp_pt_types_ptr = (PointTriangleDistanceType*)(pt_types_ptr + ij_size / 2);
     int* cnt_ptr = (int*)(chunk_int + ij_size * 3);
-    int *tmp_cnt = cnt_ptr + n_cuda_threads_per_block * 2;
+    int* tmp_cnt = cnt_ptr + n_cuda_threads_per_block * 2;
     vec3f* vis_ptr = (vec3f*)(cnt_ptr + n_cuda_threads_per_block * 3);
     Facef* fjs_ptr = (Facef*)(vis_ptr + max_aabb_list_size);
     luf* aabbs_ptr = (luf*)(fjs_ptr + max_aabb_list_size);
@@ -218,19 +298,18 @@ void vf_col_set_cuda(
     // CUDA_CALL(cudaGetLastError());
     // CUDA_CALL(cudaMemset(cnt_ptr, 0, n_cuda_threads_per_block));
 
-    
-    
-    auto &stream {cuda_globals.streams[tid]};
     CUDA_CALL(cudaMemcpyAsync((void*)vis_ptr, vis.data(), vis.size() * sizeof(vec3f), cudaMemcpyHostToDevice), stream);
     CUDA_CALL(cudaMemcpyAsync((void*)fjs_ptr, fjs.data(), fjs.size() * sizeof(Facef), cudaMemcpyHostToDevice), stream);
-    
+
     CUDA_CALL(cudaMemcpyAsync((void*)aabbs_ptr, aabbs.data(), aabbs.size() * sizeof(luf), cudaMemcpyHostToDevice), stream);
-    
+
+    CUDA_CALL(cudaMemPrefetchAsync(chunk_int, host_cuda_globals.per_stream_buffer_size, host_cuda_globals.device_id, stream));
+
     // CUDA_CALL(cudaMemcpy((void*)vis_ptr, vis.data(), vis.size() * sizeof(vec3f), cudaMemcpyHostToDevice));
     // CUDA_CALL(cudaMemcpy((void*)fjs_ptr, fjs.data(), fjs.size() * sizeof(Facef), cudaMemcpyHostToDevice));
-    
+
     // CUDA_CALL(cudaMemcpy((void*)aabbs_ptr, aabbs.data(), aabbs.size() * sizeof(luf), cudaMemcpyHostToDevice));
-    
+
     // spdlog::warn("copy complete");
 #endif
     {
@@ -265,7 +344,6 @@ void vf_col_set_cuda(
 
                 squeeze_ij_kernel<<<1, n_cuda_threads_per_block, 0, stream>>>(ij_ptr, cnt_ptr, tmp_ptr, pt_types_ptr, tmp_pt_types_ptr);
                 CUDA_CALL(cudaStreamSynchronize(stream));
-                
             }
             else {
 #ifdef THRUST_DEV_VECTOR
@@ -342,19 +420,20 @@ void vf_col_set_cuda(
         thrust::host_vector<i2> host_ij(tmp_ptr, tmp_ptr + n_collision_set);
         for (int i = 0; i < n_collision_set; i++) {
             auto vi = host_ij[i][0], fj = host_ij[i][1];
-            
+
             idx.push_back({ I, vilist[vi], J, fjlist[fj] });
         }
     }
+
+    // TODO: put the tmp_ij array into global storage
+    // FIXME: resize it to zero first
+    //copy_kernel<<<1, n_cuda_threads_per_block, 0, stream>>>(
+    //    tmp_ptr, tmp_pt_types_ptr, cnt_ptr,
+    //    host_cuda_globals.collision_sets.pt_set,
+    //    host_cuda_globals.collision_sets.pt_set_body_index,
+    //    I, J, nullptr);
 }
 
-#include "cuda_globals.cuh"
-#include <assert.h>
-#include <thrust/iterator/discard_iterator.h>
-#include <thrust/iterator/zip_iterator.h>
-#include <cuda/std/tuple>
-#include <cuda/std/type_traits>
-#include <thrust/set_operations.h>
 void stencil_classifier(
     thrust::device_vector<i2>& pt_idx,
     thrust::device_vector<i2>& pt_body_idx,
@@ -373,13 +452,13 @@ void stencil_classifier(
     // };
     assert(pt_idx.size() == pt_types.size() && pt_idx.size() == pt_body_idx.size());
     for (int i = 0; i < 7; i++) {
-        auto &cset{ cuda_globals.collision_sets.pt_set[i] }, &bset{ cuda_globals.collision_sets.pt_set_body_index[i] };
+        auto &cset{ host_cuda_globals.collision_sets.pt_set[i] }, &bset{ host_cuda_globals.collision_sets.pt_set_body_index[i] };
         // cset.clear();
         // bset.clear();
         thrust::copy_if(
             thrust::make_zip_iterator(thrust::make_tuple(pt_idx.begin(), pt_body_idx.begin(), pt_types.begin())),
             thrust::make_zip_iterator(thrust::make_tuple(pt_idx.end(), pt_body_idx.end(), pt_types.end())),
-            thrust::make_zip_iterator(thrust::make_tuple(cset.end(), bset.end(), thrust::make_discard_iterator())),
+            thrust::make_zip_iterator(thrust::make_tuple(cset, bset, thrust::make_discard_iterator())),
             [=] __device__(const thrust::tuple<i2, i2, PointTriangleDistanceType>& tup) {
                 return static_cast<cuda::std::underlying_type_t<PointTriangleDistanceType>>(thrust::get<2>(tup)) == i;
             });
@@ -389,33 +468,50 @@ void stencil_classifier(
     // static thrust::device_vector<i2> merged_lut;
         // // generate look up table for spare hess 
         // merged_lut .resize(0);
-        // thrust::set_union(thrust::device, pt_body_idx.begin(), pt_body_idx.end(), cuda_globals.lut.begin(), cuda_globals.lut.end(), merged_lut.begin());
-        // cuda_globals.lut = merged_lut;
+        // thrust::set_union(thrust::device, pt_body_idx.begin(), pt_body_idx.end(), host_cuda_globals.lut.begin(), host_cuda_globals.lut.end(), merged_lut.begin());
+        // host_cuda_globals.lut = merged_lut;
 
         // should be sorted, just not worth it
 
-        thrust::copy(pt_body_idx.begin(), pt_body_idx.end(), cuda_globals.lut.end());
+        thrust::copy(pt_body_idx.begin(), pt_body_idx.end(), host_cuda_globals.lut.end());
     }
 }
 
-CudaGlobals::CudaGlobals()
+__global__ void iaabb_culling_kernel(
+    int n_cubes, cudaAffineBody* cubes,
+    luf* aabbs, int vtn,
+    int& lut_size, i2* lut,
+    luf* culls_ret,
+    float* dq)
 {
-    cudaGetDevice(&device_id);
-    int n_proc = omp_get_num_procs();
-    per_stream_buffer_size = n_cuda_threads_per_block * max_pairs_per_thread * sizeof(i2) * 4;
-    cudaMallocManaged(&buffer_chunk, per_stream_buffer_size * n_proc);
-    streams = new cudaStream_t[n_proc];
-    for (int i = 0; i < n_proc; i++) {
-        cudaStreamCreate(&streams[i]);
-    }
-    
-}
+    __shared__ luf affine_aabb[n_cuda_threads_per_block];
+    __shared__ int cnt[n_cuda_threads_per_block];
 
-CudaGlobals::~CudaGlobals()
-{
-    cudaFree(buffer_chunk);
-    for (int i = 0 ; i < omp_get_num_procs(); i++) {
-        cudaStreamDestroy(streams[i]);
+    int tid = blockIdx.x * blockDim.x + threadIdx.x;
+    int n_tasks_per_thread = (n_cubes + n_cuda_threads_per_block - 1) / n_cuda_threads_per_block;
+    for (int _i = 0; _i < n_tasks_per_thread; _i++) {
+        int I = tid + _i * n_cuda_threads_per_block;
+        if (I < n_cubes) {
+            auto& c{ cubes[I] };
+            affine_aabb[tid] = affine(aabbs[I], c, vtn);
+        }
     }
-    delete[] streams;
+    __syncthreads();
+    int n_tasks = n_cubes * n_cubes;
+    n_tasks_per_thread = (n_tasks + n_cuda_threads_per_block - 1) / n_cuda_threads_per_block;
+    for (int _i = 0; _i < n_tasks_per_thread; _i++) {
+        int I = tid * n_tasks_per_thread + _i;
+        int i = I / n_cubes;
+        int j = I % n_cubes;
+        if (I < n_cubes * n_cubes && i < j) {
+            if (intersects(affine_aabb[i], affine_aabb[j])) {
+                // TODO: generate lut entry
+
+                // TODO: generate overlap cull
+
+                // auto put = cnt[tid]++ + tid * max_pairs_per_thread;
+                // ij[put] = { i, j };
+            }
+        }
+    }
 }

@@ -99,7 +99,10 @@
   </ItemDefinitionGroup>
   <ItemGroup>
     <CudaCompile Include="..\model\constraint_set.cu" />
+    <CudaCompile Include="..\model\euler.cu" />
     <CudaCompile Include="..\model\iaabb.cu" />
+    <CudaCompile Include="..\model\solver.cu" />
+    <CudaCompile Include="..\model\utils.cu" />
     <CudaCompile Include="kernel.cu" />
     <ClCompile Include="..\iAABB\finitediff.cpp" />
     <ClCompile Include="..\model\affine_obj.cpp" />
