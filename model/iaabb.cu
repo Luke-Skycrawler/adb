@@ -180,7 +180,7 @@ void vf_col_set_cuda(
         return;
     auto& stream{ cuda_globals.streams[tid] };
 
-#define THRUST_DEV_VECTOR
+ //#define THRUST_DEV_VECTOR
 #ifdef THRUST_DEV_VECTOR
     thrust::device_vector<luf> dev_aabbs(aabbs.begin(), aabbs.end());
     thrust::device_vector<vec3f> dev_vis(vis.begin(), vis.end());
@@ -352,17 +352,16 @@ void vf_col_set_cuda(
         thrust::host_vector<i2> host_ij(tmp.begin(), tmp.begin()+ n_collision_set);
         
         #else 
-    //int n_collision_set = cnt_ptr[n_cuda_threads_per_block - 1];
         int n_collision_set;
-        fetch_cnt_last_kernel<<<1, 1, 0, stream>>>(n_collision_set, cnt_ptr);
-        cudaStreamSynchronize(stream);
+        cudaMemcpyAsync(&n_collision_set, cnt_ptr + n_cuda_threads_per_block - 1, sizeof(int), cudaMemcpyDeviceToHost, stream);
         vector<i2> host_ij;
         host_ij.resize(n_collision_set);
-        fetch_tmp_kernel<<<1, 1, 0, stream>>>(n_collision_set, tmp_ptr, host_ij.data());
+        cudaMemcpyAsync(host_ij.data(), tmp_ptr, sizeof(i2) * n_collision_set, cudaMemcpyDeviceToHost, stream);
+
         cudaStreamSynchronize(stream);
 
     #endif
-        for (int i = 0; i < n_collision_set; i++) {
+        for (int i = 0; i < n_collision_set; i++) {  
             auto vi = host_ij[i][0], fj = host_ij[i][1];
             
             idx.push_back({ I, vilist[vi], J, fjlist[fj] });
