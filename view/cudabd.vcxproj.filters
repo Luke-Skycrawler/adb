@@ -10,6 +10,15 @@
     <CudaCompile Include="kernel.cu">
       <Filter>cuda</Filter>
     </CudaCompile>
+    <CudaCompile Include="..\model\euler.cu">
+      <Filter>cuda</Filter>
+    </CudaCompile>
+    <CudaCompile Include="..\model\solver.cu">
+      <Filter>cuda</Filter>
+    </CudaCompile>
+    <CudaCompile Include="..\model\utils.cu">
+      <Filter>cuda</Filter>
+    </CudaCompile>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="..\view\light.cpp">

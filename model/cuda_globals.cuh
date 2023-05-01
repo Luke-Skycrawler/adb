@@ -1,13 +1,14 @@
 #pragma once
 #include <cuda/std/array>
 #include <thrust/device_vector.h>
-
+#include "cuda_header.cuh"
 
 using i2 = cuda::std::array<int, 2>;
 using i4 = cuda::std::array<int, 4>;
 struct CollisionSets {
-    thrust::device_vector<i2> pt_set[7];
-    thrust::device_vector<i2> pt_set_body_index[7];
+    int pt_cnt[7], ee_cnt[9];
+    i2* pt_set[7];
+    i2* pt_set_body_index[7];
     /* corresponds to enum class PointTriangleDistanceType {
         P_T0, 
         P_T1, 
@@ -17,8 +18,8 @@ struct CollisionSets {
         P_E2, 
         P_T
     };*/
-    thrust::device_vector<i2> ee_set[9];
-    thrust::device_vector<i2> ee_set_body_index[9];
+    i2* ee_set[9];
+    i2* ee_set_body_index[9];
     /* corresponds to enum class EdgeEdgeDistanceType {
         EA0_EB0, 
         EA0_EB1, 
@@ -45,10 +46,13 @@ struct CsrSparseMatrix
 
 
 struct cudaAffineBody {
-    float4 q[3], q0[3], dqdt[3];
-    float mass, Ic;
-    int is_static;
-    
+        float3 q[4], q0[4], dqdt[4], q_update[4];
+        float mass, Ic;
+        int n_vertices, n_faces, n_edges;
+        int *faces, *edges;
+        float3* vertices;
+        int global_vertices_offset;
+        __device__ __host__ void q_minus_qtiled(float3 dq[4]);
 };
 struct FrictionInfo {
     float lambda;
@@ -58,15 +62,51 @@ struct FrictionInfo {
 struct CudaGlobals {
     thrust::device_vector<FrictionInfo> friction_info;
     cudaAffineBody *cubes;
+    luf* aabbs;
+    thrust::device_vector<i2> prim_idx, body_idx;
+    thrust::device_vector<i2> prim_idx_update, body_idx_update;
+    thrust::device_vector<int> pt_types, pt_types_update;
+    int npt, nee;
+    int n_cubes, lut_size;
     CollisionSets collision_sets;
     CsrSparseMatrix hess;
-    thrust::device_vector<float> b;
+    // FIXME: __device__ refer lan's imple
+    // thrust::device_vector<float> b;
+    float *b, *hess_diag, *dq, * float_buffer;
+    float dt;
+    float3 *projected_vertices, *float3_buffer;
     thrust::device_vector<i2> lut;
+    // i2 * lut;
     void *buffer_chunk;
     int device_id, per_stream_buffer_size;
     cudaStream_t* streams;
-    CudaGlobals();
+    float3 gravity;
+    CudaGlobals(int n_cubes = 0);
     ~CudaGlobals();
-};    
+    __device__ __host__ CudaGlobals(CudaGlobals &CudaGlobals);
+};
 
-extern CudaGlobals cuda_globals;
+static const int max_pairs_per_thread = 512, max_aabb_list_size = 512;
+static const int max_n_vertices = 1024 * 1024;
+
+// __constant__ CudaGlobals *cuda_globals;
+extern CudaGlobals host_cuda_globals;
+namespace dev {
+__device__ __constant__ float kappa = 1e-1f, d_hat = 1e-4f, d_hat_sqr = 1e-2f;
+
+__device__ float bararier_function(float d);
+__device__ float barrier_derivative_d(float x);
+__device__ float barrier_second_derivative(float d);
+
+
+}
+
+__forceinline__ __device__ float3 matmul(float3 _q[4], float3 x)
+{
+    float3* q = _q + 1;
+    float3 ret = make_float3(
+        x.x * q[0].x + x.y * q[1].x + x.z * q[2].x,
+        x.x * q[0].y + x.y * q[1].y + x.z * q[2].y,
+        x.x * q[0].z + x.y * q[1].z + x.z * q[2].z);
+    return ret + _q[0];
+}

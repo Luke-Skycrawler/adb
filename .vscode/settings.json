@@ -102,6 +102,8 @@
         "*.ipp": "cpp",
         "filesystem": "cpp",
         "codecvt": "cpp",
-        "barrier": "cpp"
+        "barrier": "cpp",
+        "__config": "cpp",
+        "__tuple": "cpp"
     }
 }
