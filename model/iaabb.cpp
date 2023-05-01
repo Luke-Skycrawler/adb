@@ -117,7 +117,7 @@ void glue_vf_col_set(
         aabbs[k + nvi] = to_luf(lud);
     }
     vf_col_set_cuda(nvi, nfj, aabbs, vis, fjs, vilist, fjlist, idx, I, J, tid);
-    pts.resize(idx.size());
+    pts.resize(idx.size()); 
 }
 inline bool les(const Intersection& a, const Intersection& b)
 {

@@ -530,7 +530,7 @@ __global__ void precise_cd_kernel(
 //     float* dq)
 
 
-__device__ __constant__ const int max_overlap_size = 1024 * 16;
+__device__ __constant__ const int max_overlap_size = 1024;
 __global__ void iaabb_culling_kernel(
     int n_cubes, cudaAffineBody *cubes, 
     luf * aabbs, int vtn, 
