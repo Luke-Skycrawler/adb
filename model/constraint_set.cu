@@ -2,25 +2,20 @@
 #include "cuda_globals.cuh"
 #include <thrust/sort.h>
 #include <thrust/unique.h>
-#include <vector>
 // #include "autogen/autogen.cuh"
 using namespace std;
+CudaGlobals cuda_globals;
 
 namespace dev {
-// __device__ __constant__ float kappa = 1e-1f, d_hat = 1e-4f, d_hat_sqr = 1e-2f;
+//__device__ __constant__ float kappa = 1e-1f, d_hat = 1e-4f, d_hat_sqr = 1e-2f;
 
-__device__ float bararier_function(float d)
-{
-    if (d >= d_hat) return 0.0;
-    return kappa * -(d - d_hat) * (d - d_hat) * log(d / d_hat) / (d_hat * d_hat);
-}
-__device__ float barrier_derivative_d(float x)
+__host__ __device__ float barrier_derivative_d(float x)
 {
     if (x >= d_hat)
         return 0.0f;
     return -(x - d_hat) * kappa * (2 * log(x / d_hat) + (x - d_hat) / x) / (d_hat * d_hat);
 }
-__device__ float barrier_second_derivative(float d)
+__host__ __device__ float barrier_second_derivative(float d)
 {
     if (d >= d_hat)
         return 0.0f;
@@ -136,21 +131,6 @@ void build_csr(int n_cubes, const thrust::device_vector<i2> &lut, CsrSparseMatri
 
 void make_placeholder_sparse_matrix(int n_cubes, CsrSparseMatrix &sparse_matrix) {
     auto& lut{ host_cuda_globals.lut}; 
-    {
-        thrust::host_vector<i2> diagonals(n_cubes);
-        thrust::device_vector<i2> dev_diagonals(n_cubes);
-        for (int i = 0; i < n_cubes; i++) diagonals[i] = { i, i };
-        dev_diagonals = diagonals;
-        lut.insert(lut.end(), dev_diagonals.begin(), dev_diagonals.end());
-    }
- 
-    
-    thrust::sort(lut.begin(), lut.end());
-    auto new_end = thrust::unique(lut.begin(), lut.end());
-
-    auto lut_size = new_end - lut.begin();
-    lut.resize(lut_size);
-    lut.shrink_to_fit();
     build_csr(n_cubes, lut, sparse_matrix);
 }
 
@@ -350,3 +330,31 @@ __global__ void ipc_pt(
     }
 }
 
+
+void make_lut(int lut_size, i2* _lut) {
+    int n_cubes = host_cuda_globals.n_cubes;
+    
+    auto& lut{ host_cuda_globals.lut}; 
+    {
+        thrust::host_vector<i2> diagonals(n_cubes);
+        thrust::device_vector<i2> dev_diagonals(n_cubes);
+        for (int i = 0; i < n_cubes; i++) diagonals[i] = { i, i };
+        dev_diagonals = diagonals;
+        lut.insert(lut.end(), dev_diagonals.begin(), dev_diagonals.end());
+    }
+ 
+    
+    thrust::sort(lut.begin(), lut.end());
+    auto new_end = thrust::unique(lut.begin(), lut.end());
+
+    lut_size = new_end - lut.begin();
+    lut.resize(lut_size);
+    lut.shrink_to_fit();
+
+}
+
+__global__ void ipc_pt_kernel(
+    int n_cubes, int npt,
+    i2* prims, i2* body,
+    CsrSparseMatrix& hess,
+    int lut_size, i2* lut){}

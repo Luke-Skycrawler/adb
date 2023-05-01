@@ -24,6 +24,21 @@ using namespace ipc;
 
 tuple<float, PointTriangleDistanceType> vf_distance(vec3f vf, Facef ff);
 
+
+__device__ luf intersection(const luf &a, const luf &b) {
+    vec3f l, u;
+    l = make_float3(
+        CUDA_MAX(a.l.x, b.l.x),
+        CUDA_MAX(a.l.y, b.l.y),
+        CUDA_MAX(a.l.z, b.l.z)
+    );
+    u = make_float3(
+        CUDA_MIN(a.u.x, b.u.x),
+        CUDA_MIN(a.u.y, b.u.y),
+        CUDA_MIN(a.u.z, b.u.z)
+    );
+    return {l, u};
+}
 __device__ luf affine(luf aabb, cudaAffineBody &c, int vtn)
 {
     vec3f cull[8];
@@ -313,7 +328,7 @@ void vf_col_set_cuda(
 
     CUDA_CALL(cudaMemcpyAsync((void*)aabbs_ptr, aabbs.data(), aabbs.size() * sizeof(luf), cudaMemcpyHostToDevice), stream);
 
-    CUDA_CALL(cudaMemPrefetchAsync(chunk_int, host_cuda_globals.per_stream_buffer_size, host_cuda_globals.device_id, stream));
+    // CUDA_CALL(cudaMemPrefetchAsync(chunk_int, host_cuda_globals.per_stream_buffer_size, host_cuda_globals.device_id, stream));
 
     // CUDA_CALL(cudaMemcpy((void*)vis_ptr, vis.data(), vis.size() * sizeof(vec3f), cudaMemcpyHostToDevice));
     // CUDA_CALL(cudaMemcpy((void*)fjs_ptr, fjs.data(), fjs.size() * sizeof(Facef), cudaMemcpyHostToDevice));
@@ -502,7 +517,8 @@ void stencil_classifier(
 
 __global__ void precise_cd_kernel(
     int * toi = nullptr,
-    int *
+    i2 *body_idx = nullptr,
+    i2 *prims_idx = nullptr
 ) {
     
 }
@@ -514,7 +530,7 @@ __global__ void precise_cd_kernel(
 //     float* dq)
 
 
-__constant__ max_overlap_size = 1024 * 16;
+__device__ __constant__ const int max_overlap_size = 1024 * 16;
 __global__ void iaabb_culling_kernel(
     int n_cubes, cudaAffineBody *cubes, 
     luf * aabbs, int vtn, 
@@ -541,7 +557,8 @@ __global__ void iaabb_culling_kernel(
         }
     }
     __syncthreads();
-    int n_tasks = n_cubes * n_cubes, n_tasks_per_thread = (n_tasks + n_cuda_threads_per_block - 1) / n_cuda_threads_per_block;
+    int n_tasks = n_cubes * n_cubes;
+    n_tasks_per_thread = (n_tasks + n_cuda_threads_per_block - 1) / n_cuda_threads_per_block;
     cnt[tid] = 0;
     for (int _i = 0; _i < n_tasks_per_thread; _i++) {
         int I = tid * n_tasks_per_thread + _i;
@@ -569,7 +586,7 @@ __global__ void iaabb_culling_kernel(
     int end = cnt[tid];
     for (int i = start; i < end; i ++) {
         int get = i - start + tid * max_pairs_per_thread;
-        overlaps[i] = tmp_buffer[get];
+        overlaps_ret[i] = tmp_buffer[get];
     }
     __syncthreads();
     
@@ -578,8 +595,8 @@ __global__ void iaabb_culling_kernel(
     for (int _i = 0; _i < n_tasks_per_thread; _i++) {
         int I = tid * n_tasks_per_thread + _i;
         if (I < n_tasks) {
-            int i = overlaps[I][0], j = overlaps[I][1];
-            culls[I] = intersection(affine_aabb[i], affien_aabb[j]);
+            int i = overlaps_ret[I][0], j = overlaps_ret[I][1];
+            culls[I] = intersection(affine_aabb[i], affine_aabb[j]);
         }
     }
     n_overlaps = n_tasks;
@@ -590,14 +607,14 @@ __global__ void precise_cd_kernel(){
     
 }
 
-void iaabb_brute_force_cuda(){
-    int n_cubes,
-    cudaAffineBody *cubes,
-    int vtn
-}{
-    int n_overlaps;
-    i2 *overlaps;
-
-    iaabb_culling_kernel<<<1, n_cuda_threads_per_block>>>(n_cubes, cubes, aabbs, vtn, n_overlaps, overlaps, culls, prims_list_start_ptrs);
-}
+//void iaabb_brute_force_cuda(){
+//    int n_cubes,
+//    cudaAffineBody *cubes,
+//    int vtn
+//}{
+//    int n_overlaps;
+//    i2 *overlaps;
+//
+//    iaabb_culling_kernel<<<1, n_cuda_threads_per_block>>>(n_cubes, cubes, aabbs, vtn, n_overlaps, overlaps, culls, prims_list_start_ptrs);
+//}
 

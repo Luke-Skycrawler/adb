@@ -67,6 +67,7 @@
         "hdk": 1,
         "cuda_supervised": 0,
         "cuda_direct": 1,
-        "strict": 0
+        "strict": 0,
+        "make_lut": 0
     }
 }

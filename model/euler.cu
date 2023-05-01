@@ -1,6 +1,7 @@
 #include "cuda_header.cuh"
 #include "cuda_globals.cuh"
 
+
 __constant__ float kappa = 1e9f, dt = 1e-2f;
 
 CudaGlobals host_cuda_globals;
@@ -61,6 +62,11 @@ __global__ void update_line_search_kernel(int n_cubes, cudaAffineBody *cubes, fl
     }
 }
 
+__host__ __device__ float dev::barrier_function(float d)
+{
+    if (d >= dev::d_hat) return 0.0;
+    return dev::kappa * -(d - dev::d_hat) * (d - dev::d_hat) * log(d / dev::d_hat) / (dev::d_hat * dev::d_hat);
+}
 __global__ void barrier_kernel(float& E, int n_col, float* distance)
 {
     auto tid = threadIdx.x + blockIdx.x * blockDim.x;
@@ -70,7 +76,7 @@ __global__ void barrier_kernel(float& E, int n_col, float* distance)
         auto i = tid * n_tasks_per_thread + _i;
         e[tid] = 0.0f;
         if (i < n_col) {
-            e[tid] += dev::bararier_function(distance[i]);
+             e[tid] += dev::barrier_function(distance[i]);
         }
     }
     __syncthreads();
@@ -159,9 +165,9 @@ float line_search_cuda(int n_cubes, float* dq, float toi, i2* prims_ret, i2* bod
         alpha /= 2.0f;
         if (wolfe) break;
     } while (true);
+    return alpha;
 }
 
-void make_lut(int lut_size, i2* lut) {}
 void make_placeholder_sparse_matrix(int lut_size, i2* lut, CsrSparseMatrix& hess)
 {
 }

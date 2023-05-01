@@ -9,6 +9,11 @@
 #include "time_integrator.h"
 #include <omp.h>
 #include <tbb/parallel_sort.h>
+
+#include <cuda/std/array>
+#include <thrust/host_vector.h>
+#include <type_traits>
+#include "cuda_globals.cuh"
 // #define _FULL_PARALLEL_
 
 #ifndef TESTING
@@ -35,10 +40,6 @@ void glue_vf_col_set(
     vector<array<int, 4>>& idx,
     int tid = 0);
 
-#include <cuda/std/array>
-#include <thrust/host_vector.h>
-#include <type_traits>
-#include "cuda_header.cuh"
 
 void make_lut_glue(vector<Intersection> &os) {
     int ni = os.size();
@@ -48,7 +49,7 @@ void make_lut_glue(vector<Intersection> &os) {
     for (int i = 0; i < ni; i++) {
         host_lut[i] = { os[i].i, os[i].j };
     }
-    make_lut(host_lut);
+    make_lut(host_lut.size(), host_lut.data());
 }
 float vf_distance(vec3f _v, Facef f, ipc::PointTriangleDistanceType &pt_type);
 tuple<float, ipc::PointTriangleDistanceType> vf_distance(vec3f vf, Facef ff); 
@@ -708,7 +709,7 @@ double primitive_brute_force(
     }
 #endif
 
-    if (globals.params_int["cuda_direct"]) {
+    if (globals.params_int["cuda_direct"] && globals.params_int["make_lut"]) {
         make_lut_glue(overlaps);
     }
     tbb::parallel_sort(overlaps.begin(), overlaps.end(), [](const Intersection& a, const Intersection& b) -> bool {
@@ -1127,14 +1128,14 @@ double primitive_brute_force(
     }
 #else
     if (!cull_trajectory)
-    // #pragma omp parallel
+    #pragma omp parallel
     {
         auto tid = omp_get_thread_num();
         idx_private[tid].resize(0);
         eidx_private[tid].resize(0);
         pts_private[tid].resize(0);
         ees_private[tid].resize(0);
-        // #pragma omp for schedule(guided) nowait
+        #pragma omp for schedule(guided) nowait
         for (int _i = 0; _i < n_overlap / 2; _i++) {
             int i = _i * 2;
             int I{ overlaps[i].i }, J{ overlaps[i].j };
@@ -1210,7 +1211,7 @@ double primitive_brute_force(
                 }
             }
         }
-        // #pragma omp critical
+        #pragma omp critical
         {
             pts.insert(pts.end(), pts_private[tid].begin(), pts_private[tid].end());
             idx.insert(idx.end(), idx_private[tid].begin(), idx_private[tid].end());

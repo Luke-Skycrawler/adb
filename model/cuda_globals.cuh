@@ -94,9 +94,9 @@ extern CudaGlobals host_cuda_globals;
 namespace dev {
 __device__ __constant__ float kappa = 1e-1f, d_hat = 1e-4f, d_hat_sqr = 1e-2f;
 
-__device__ float bararier_function(float d);
-__device__ float barrier_derivative_d(float x);
-__device__ float barrier_second_derivative(float d);
+__host__ __device__ float barrier_function(float d);
+__host__ __device__ float barrier_derivative_d(float x);
+__host__ __device__ float barrier_second_derivative(float d);
 
 
 }
@@ -110,3 +110,5 @@ __forceinline__ __device__ float3 matmul(float3 _q[4], float3 x)
         x.x * q[0].z + x.y * q[1].z + x.z * q[2].z);
     return ret + _q[0];
 }
+
+void make_lut(int lut_size, i2* lut);
