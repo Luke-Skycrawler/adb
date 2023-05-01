@@ -477,15 +477,37 @@ void stencil_classifier(
     }
 }
 
+
+__global__ void precise_cd_kernel(
+    int * toi = nullptr,
+    int *
+) {
+    
+}
+// __global__ void iaabb_culling_kernel(
+//     int n_cubes, cudaAffineBody* cubes,
+//     luf* aabbs, int vtn,
+//     int& lut_size, i2* lut,
+//     luf* culls_ret,
+//     float* dq)
+
+
+__constant__ max_overlap_size = 1024 * 16;
 __global__ void iaabb_culling_kernel(
-    int n_cubes, cudaAffineBody* cubes,
-    luf* aabbs, int vtn,
-    int& lut_size, i2* lut,
-    luf* culls_ret,
-    float* dq)
+    int n_cubes, cudaAffineBody *cubes, 
+    luf * aabbs, int vtn, 
+    int &n_overlaps, 
+    i2 *overlaps_ret,  // n_overlaps, but pre-allocates n_cuda_threads_per_block * max_pairs_per_thread
+    i2 * tmp_buffer,
+    luf *culls_ret, // n_overlaps
+    int **prims_list_start_ptrs // n_overlaps x 3
+    // no need for dq input; (just put it in q_update)
+)
 {
     __shared__ luf affine_aabb[n_cuda_threads_per_block];
     __shared__ int cnt[n_cuda_threads_per_block];
+    __shared__ luf culls[max_overlap_size];
+
 
     int tid = blockIdx.x * blockDim.x + threadIdx.x;
     int n_tasks_per_thread = (n_cubes + n_cuda_threads_per_block - 1) / n_cuda_threads_per_block;
@@ -497,8 +519,8 @@ __global__ void iaabb_culling_kernel(
         }
     }
     __syncthreads();
-    int n_tasks = n_cubes * n_cubes;
-    n_tasks_per_thread = (n_tasks + n_cuda_threads_per_block - 1) / n_cuda_threads_per_block;
+    int n_tasks = n_cubes * n_cubes, n_tasks_per_thread = (n_tasks + n_cuda_threads_per_block - 1) / n_cuda_threads_per_block;
+    cnt[tid] = 0;
     for (int _i = 0; _i < n_tasks_per_thread; _i++) {
         int I = tid * n_tasks_per_thread + _i;
         int i = I / n_cubes;
@@ -506,12 +528,54 @@ __global__ void iaabb_culling_kernel(
         if (I < n_cubes * n_cubes && i < j) {
             if (intersects(affine_aabb[i], affine_aabb[j])) {
                 // TODO: generate lut entry
-
+                int put = (cnt[tid] ++) + tid * max_pairs_per_thread;
+                tmp_buffer[put]= {i,j};
                 // TODO: generate overlap cull
-
+                
                 // auto put = cnt[tid]++ + tid * max_pairs_per_thread;
                 // ij[put] = { i, j };
             }
         }
     }
+    
+    __syncthreads();
+    if (tid == 0)
+    for (int i = 1; i < n_cuda_threads_per_block; i ++) {
+        cnt[i] = cnt[i-1] + cnt[i];
+    }
+    int start = tid == 0 ? 0 : cnt[tid - 1];
+    int end = cnt[tid];
+    for (int i = start; i < end; i ++) {
+        int get = i - start + tid * max_pairs_per_thread;
+        overlaps[i] = tmp_buffer[get];
+    }
+    __syncthreads();
+    
+    n_tasks = cnt[n_cuda_threads_per_block - 1];
+    n_tasks_per_thread = (n_tasks + n_cuda_threads_per_block - 1) / n_cuda_threads_per_block;
+    for (int _i = 0; _i < n_tasks_per_thread; _i++) {
+        int I = tid * n_tasks_per_thread + _i;
+        if (I < n_tasks) {
+            int i = overlaps[I][0], j = overlaps[I][1];
+            culls[I] = intersection(affine_aabb[i], affien_aabb[j]);
+        }
+    }
+    n_overlaps = n_tasks;
+    __syncthreads();
 }
+
+__global__ void precise_cd_kernel(){
+    
+}
+
+void iaabb_brute_force_cuda(){
+    int n_cubes,
+    cudaAffineBody *cubes,
+    int vtn
+}{
+    int n_overlaps;
+    i2 *overlaps;
+
+    iaabb_culling_kernel<<<1, n_cuda_threads_per_block>>>(n_cubes, cubes, aabbs, vtn, n_overlaps, overlaps, culls, prims_list_start_ptrs);
+}
+
