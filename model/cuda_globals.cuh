@@ -92,7 +92,7 @@ static const int max_n_vertices = 1024 * 1024;
 // __constant__ CudaGlobals *cuda_globals;
 extern CudaGlobals host_cuda_globals;
 namespace dev {
-__device__ __constant__ float kappa = 1e-1f, d_hat = 1e-4f, d_hat_sqr = 1e-2f;
+__device__ __constant__ static const float kappa = 1e-1f, d_hat = 1e-4f, d_hat_sqr = 1e-2f;
 
 __host__ __device__ float barrier_function(float d);
 __host__ __device__ float barrier_derivative_d(float x);

@@ -42,6 +42,7 @@ __device__ void dev_project_to_psd(int dim, float* A){
 
 __device__ i2 offset_and_stride(int I, const i2* lut, int* outers)
 {
+    // TEST COVERED
     int i = lut[I][0];
     int j = lut[I][1];
     int col_start = outers[i * 12] / (12 * 12);
@@ -53,15 +54,15 @@ __device__ i2 offset_and_stride(int I, const i2* lut, int* outers)
 }
 
 __global__ void fill_inner_outers_kernel(int n_cubes, int lut_size, const i2 * lut, int *inners, int *outers) {
+    // TESTED
     auto tid = threadIdx.x;
-    int nnz = lut_size * 12 * 12;
-    auto n_task_per_thread = (nnz + blockDim.x - 1)/ blockDim.x;  
+    auto n_task_per_thread = (lut_size+ blockDim.x - 1)/ blockDim.x;  
     // precondition: lut contains all the symmetric pairs (i, j) and (j, i), sorted in ascending order
 
     for (int _i = 0; _i < n_task_per_thread; _i ++) {
         // detect stairs, fill outers
         auto I = _i + n_task_per_thread * tid;
-        if (I < nnz) {
+        if (I < lut_size) {
             int i = lut[I][0];
             int last = I == 0 ? -1: lut[I - 1][0];
             
@@ -87,11 +88,11 @@ __global__ void fill_inner_outers_kernel(int n_cubes, int lut_size, const i2 * l
     }
     __syncthreads(); // wait until finish, then break inners array
 
-
-    for (int _i = 0; _i < n_task_per_thread; _i ++) {
+    int n_block_per_thread = (lut_size + blockDim.x - 1) / blockDim.x;
+    for (int _i = 0; _i < n_block_per_thread; _i ++) {
         // fiil inners
-        auto I = _i + n_task_per_thread * tid;
-        if (I < nnz) {
+        auto I = _i + n_block_per_thread * tid;
+        if (I < lut_size) {
 
             i2 os = offset_and_stride(I, lut, outers);
             // int i = lut[I][0];
@@ -102,9 +103,10 @@ __global__ void fill_inner_outers_kernel(int n_cubes, int lut_size, const i2 * l
             // int stride = outers[i * 12 + 1] - outers[i * 12];
             int sub_mat_start = os[0];
             int stride = os[1];
+            int j = lut[I][1];
             for (int c = 0; c < 12; c++) {
                 for (int r = 0; r < 12; r++) {
-                    inners[sub_mat_start + stride * c + r] = c * 12 + r;
+                    inners[sub_mat_start + stride * c + r] = j * 12 + r;
                 }
             }
         }
@@ -112,13 +114,17 @@ __global__ void fill_inner_outers_kernel(int n_cubes, int lut_size, const i2 * l
 
 }
 void build_csr(int n_cubes, const thrust::device_vector<i2> &lut, CsrSparseMatrix & sparse_matrix) {
+    // TESTED
     int lut_size = lut.size();
     int nnz = lut_size * 12 * 12;
     sparse_matrix.rows = n_cubes * 12;
     sparse_matrix.cols = n_cubes * 12;
     sparse_matrix.nnz = nnz;
-    sparse_matrix.outer_start.resize(n_cubes);
+
+    sparse_matrix.outer_start.resize(n_cubes * 12);
+    sparse_matrix.inner.resize(nnz);
     sparse_matrix.values.resize(nnz);
+    
     thrust::fill(sparse_matrix.values.begin(), sparse_matrix.values.end(), 0.0f);
     
     auto lut_ptr = thrust::raw_pointer_cast(lut.data());
@@ -126,6 +132,7 @@ void build_csr(int n_cubes, const thrust::device_vector<i2> &lut, CsrSparseMatri
     auto outer_ptr = thrust::raw_pointer_cast(sparse_matrix.outer_start.data());
 
     fill_inner_outers_kernel<<<1, n_cuda_threads_per_block>>>(n_cubes, lut_size, lut_ptr, inner_ptr, outer_ptr);
+    CUDA_CALL(cudaGetLastError());
 }
 
 

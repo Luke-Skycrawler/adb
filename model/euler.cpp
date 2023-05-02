@@ -287,7 +287,6 @@ void implicit_euler(vector<unique_ptr<AffineBody>>& cubes, double dt)
     map<array<int, 2>, int> lut;
     // look-up table
     SparseMatrix<double> sparse_hess(hess_dim, hess_dim);
-    // gen_empty_sm(n_cubes, idx, eidx, sparse_hess, lut);
 #endif
 #ifdef _TRIPLETS_
     globals.hess_triplets.reserve(((n_pt + n_ee) * 2 + n_cubes) * 12);
@@ -311,7 +310,11 @@ void implicit_euler(vector<unique_ptr<AffineBody>>& cubes, double dt)
         {
             lut.clear();
             sparse_hess.setZero();
-            gen_empty_sm(n_cubes, idx, eidx, sparse_hess, lut);
+            if (globals.params_int["gen_sm_test"])
+                gen_empty_sm_glue(n_cubes, idx, eidx, sparse_hess, lut);
+            else
+                gen_empty_sm(n_cubes, idx, eidx, sparse_hess, lut);
+
             n_pt = idx.size();
             n_ee = eidx.size();
             n_g = vidx.size();
