@@ -48,15 +48,6 @@ struct CsrSparseMatrix
 };
 
 
-struct cudaAffineBody {
-        float3 q[4], q0[4], dqdt[4], q_update[4];
-        float mass, Ic;
-        int n_vertices, n_faces, n_edges;
-        int *faces, *edges;
-        float3* vertices;
-        int global_vertices_offset;
-        __device__ __host__ void q_minus_qtiled(float3 dq[4]);
-};
 struct FrictionInfo {
     float lambda;
     float basis[24];
@@ -117,3 +108,5 @@ __forceinline__ __device__ float3 matmul(float3 _q[4], float3 x)
 }
 
 void make_lut(int lut_size, i2* lut);
+
+

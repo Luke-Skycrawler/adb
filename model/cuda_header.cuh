@@ -55,32 +55,65 @@
 // using vec3f = cuda::std::array<float, 3>;
 // using Facef = cuda::std::array<vec3f, 3>;
 using vec3f = float3;
+
 struct luf {
     vec3f l, u;
 };
 struct Facef {
     vec3f t0, t1, t2;
 };
+struct Edgef {
+    vec3f e0, e1;
+};
+
+struct cudaAffineBody {
+    float3 q[4], q0[4], dqdt[4], q_update[4];
+    float mass, Ic;
+    int n_vertices, n_faces, n_edges;
+    int *faces, *edges;
+    float3* vertices;
+    int global_vertices_offset;
+    __device__ __host__ void q_minus_qtiled(float3 dq[4]);
+    inline __device__ __host__ Facef triangle(int i)
+    {
+        return Facef{
+            vertices[faces[i * 3]],
+            vertices[faces[i * 3 + 1]],
+            vertices[faces[i * 3 + 2]]
+        };
+    }
+    inline __device__ __host__ Edgef edge(int i)
+    {
+        return Edgef{
+            vertices[edges[i * 2]],
+            vertices[edges[i * 2 + 1]]
+        };
+    }
+};
 
 __forceinline__ __host__ __device__ vec3f operator+(vec3f a, vec3f b)
 {
-    // return { a[0] + b[0], a[1] + b[1], a[2] + b[2] };
     return make_float3(a.x + b.x, a.y + b.y, a.z + b.z);
 }
 __forceinline__ __host__ __device__ vec3f operator-(vec3f a, vec3f b)
 {
-    // return { a[0] - b[0], a[1] - b[1], a[2] - b[2] };
     return make_float3(a.x - b.x, a.y - b.y, a.z - b.z);
 }
 __forceinline__ __host__ __device__ vec3f operator/(vec3f a, float k)
 {
-    // return { a[0] / k, a[1] / k, a[2] / k };
-    return k == 0.0? make_float3(0.0f, 0.0f, 0.0f): make_float3(a.x / k, a.y / k, a.z / k);
+        return k == 0.0 ? make_float3(0.0f, 0.0f, 0.0f) : make_float3(a.x / k, a.y / k, a.z / k);
 }
 __forceinline__ __host__ __device__ vec3f operator*(vec3f a, float k)
 {
-    // return { a[0] * k, a[1] * k, a[2] * k };
-    return make_float3(a.x * k, a.y * k, a.z * k);
+        return make_float3(a.x * k, a.y * k, a.z * k);
+}
+__forceinline__ __host__ __device__ vec3f operator+(vec3f a, float k)
+{
+        return make_float3(a.x + k, a.y + k, a.z + k);
+}
+__forceinline__ __host__ __device__ vec3f operator-(vec3f a, float k)
+{
+        return make_float3(a.x - k, a.y - k, a.z - k);
 }
 
 __forceinline__ __host__ __device__ float dot(vec3f a, vec3f b)

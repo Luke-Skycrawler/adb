@@ -22,105 +22,24 @@ using namespace ipc;
 // using namespace Eigen;
 // FIXME: tid probably not in 1 block
 
+
+
+__device__ __host__ float vf_distance(vec3f _v, Facef f, PointTriangleDistanceType& pt_type);
+__device__ luf intersection(const luf &a, const luf &b);
+__device__ luf affine(luf aabb, cudaAffineBody &c, int vtn);
+__device__ luf compute_aabb(const Facef& f, float d_hat_sqrt);
+__device__ luf compute_aabb(const Edgef& e, float d_hat_sqrt);
+
 tuple<float, PointTriangleDistanceType> vf_distance(vec3f vf, Facef ff);
 
 
-__device__ luf intersection(const luf &a, const luf &b) {
-    vec3f l, u;
-    l = make_float3(
-        CUDA_MAX(a.l.x, b.l.x),
-        CUDA_MAX(a.l.y, b.l.y),
-        CUDA_MAX(a.l.z, b.l.z)
-    );
-    u = make_float3(
-        CUDA_MIN(a.u.x, b.u.x),
-        CUDA_MIN(a.u.y, b.u.y),
-        CUDA_MIN(a.u.z, b.u.z)
-    );
-    return {l, u};
-}
-__device__ luf affine(luf aabb, cudaAffineBody &c, int vtn)
-{
-    vec3f cull[8];
-    vec3f l, u;
-    auto q {vtn == 2 ? c.q_update: c.q};
-    for (int i = 0; i < 2; i++)
-        for (int j = 0; j < 2; j++)
-            for (int k = 0; k < 2; k++) {
-                auto I = (i << 2) | (j << 1) | k;
-                cull[I] = make_float3(
-                    i ? aabb.u.x : aabb.l.x,
-                    j ? aabb.u.y: aabb.l.y,
-                    k ? aabb.u.z: aabb.l.z);
-                cull[I] = matmul(q, cull[I]);
-            }
-    for (int i = 0; i < 8; i ++ ){
-        if (i ==0) {
-            l = u = cull[i];
-        }
-        else {
-            if (cull[i].x < l.x) l.x = cull[i].x;
-            else if (cull[i].x > l.x) u.x = cull[i].x;
-            if (cull[i].y < l.y) l.y = cull[i].y;
-            else if (cull[i].y > l.y) u.y = cull[i].y;
-            if (cull[i].z < l.z) l.z = cull[i].z;
-            else if (cull[i].z > l.z) u.z = cull[i].z;
-        }
-    }
-    return { l, u};
-}
-
-__device__ __host__ float vf_distance(vec3f _v, Facef f, PointTriangleDistanceType& pt_type)
-{
-    auto n = unit_normal(f);
-    auto d = dot(n, _v - f.t0);
-    auto a1 = area_x2(f.t1, f.t0, f.t2);
-    auto v = _v - n * d;
-    d = d * d;
-    // float a2 = ((f[0] - v).cross(f[1] - v).norm() + (f[1] - v).cross(f[2] - v).norm() + (f[2] - v).cross(f[0] - v).norm());
-    // auto a2 = area_x2(f[0], f[1], v) + area_x2(f[1], f[2], v) + area_x2(f[2], f[0], v);
-    auto _a1 = dot(cross(f.t0 - v, f.t1 - v), n);
-    auto _a2 = dot(cross(f.t1 - v, f.t2 - v), n);
-    auto _a3 = dot(cross(f.t2 - v, f.t0 - v), n);
-    bool inside = _a1 * _a2 > 0.0f && _a2 * _a3 > 0.0f;
-    // if (a2 > a1 + 1e-8) {
-    if (!inside) {
-        // projection outside of triangle
-
-        auto d_ab = h(f.t0, f.t1, v);
-        auto d_bc = h(f.t1, f.t2, v);
-        auto d_ac = h(f.t0, f.t2, v);
-
-        auto d_a = ab(v, f.t0);
-        auto d_b = ab(v, f.t1);
-        auto d_c = ab(v, f.t2);
-
-        auto dab = is_obtuse_triangle(f.t0, f.t1, v) ? CUDA_MIN(d_a, d_b) : d_ab;
-        auto dbc = is_obtuse_triangle(f.t2, f.t1, v) ? CUDA_MIN(d_c, d_b) : d_bc;
-        auto dac = is_obtuse_triangle(f.t0, f.t2, v) ? CUDA_MIN(d_a, d_c) : d_ac;
-
-        auto d_projected = CUDA_MIN3(dab, dbc, dac);
-        d += d_projected * d_projected;
-
-        if (d_projected == d_ab)
-            pt_type = PointTriangleDistanceType::P_E0;
-        else if (d_projected == d_bc)
-            pt_type = PointTriangleDistanceType::P_E1;
-        else if (d_projected == d_ac)
-            pt_type = PointTriangleDistanceType::P_E2;
-        else if (d_projected == d_a)
-            pt_type = PointTriangleDistanceType::P_T0;
-        else if (d_projected == d_b)
-            pt_type = PointTriangleDistanceType::P_T1;
-        else
-            pt_type = PointTriangleDistanceType::P_T2;
-    }
-    else
-        pt_type = PointTriangleDistanceType::P_T;
-    return d;
-}
-
-__global__ void aabb_intersection_test_kernel(luf* dev_aabbs, int nvi, int nfj, i2* ij, int* cnt)
+/* NOTE: kernel argument convention: 
+    buf_: device buffer
+    ret_: return buffer
+    io_: input and output from the same buffer, i.e. in-place
+    : (none) inputs
+*/
+__global__ void aabb_intersection_test_kernel(luf* dev_aabbs, int nvi, int nfj, i2* ret_ij, int* ret_cnt)
 {
 
     __shared__ luf aabbs[max_aabb_list_size];
@@ -132,7 +51,7 @@ __global__ void aabb_intersection_test_kernel(luf* dev_aabbs, int nvi, int nfj, 
         if (idx < nvi + nfj && idx < max_aabb_list_size)
             aabbs[idx] = dev_aabbs[idx];
     }
-    cnt[tid] = 0;
+    ret_cnt[tid] = 0;
     __syncthreads();
     // copys the bounding boxes to shared memory
 
@@ -142,56 +61,60 @@ __global__ void aabb_intersection_test_kernel(luf* dev_aabbs, int nvi, int nfj, 
             int i = I / nfj;
             int j = I % nfj;
             if (intersects(aabbs[i], aabbs[nvi + j])) {
-                auto put = cnt[tid]++ + tid * max_pairs_per_thread;
-                ij[put] = { i, j };
+                auto put = ret_cnt[tid]++ + tid * max_pairs_per_thread;
+                ret_ij[put] = { i, j };
             }
         }
     }
 }
 
-__global__ void inclusive_scan_kernel(int* cnt)
+__global__ void inclusive_scan_kernel(int* io_cnt)
 {
     for (int i = 1; i < n_cuda_threads_per_block; i++) {
-        cnt[i] = cnt[i - 1] + cnt[i];
+        io_cnt[i] = io_cnt[i - 1] + io_cnt[i];
     }
 }
-__global__ void filter_distance_kernel(i2* ij, int* cnt, i2* tmp,
+__global__ void filter_distance_kernel(i2* ret_ij, int* ret_cnt, i2* tmp,
     // int* vilist, int* fjlist,
     vec3f* vis, Facef* fjs,
-    PointTriangleDistanceType* pt_types,
+    PointTriangleDistanceType* ret_pt_types,
     PointTriangleDistanceType* tmp_pt_types,
     float dhat = 1e-4)
 {
-    // // squeeze the ij list according to a prefix sum array cnt
+    // // squeeze the ret_ij list according to a prefix sum array ret_cnt
     // // FIXME: asserting blockDim.x == n_cuda_threads_per_block
     int tid = threadIdx.x + blockIdx.x * blockDim.x;
-    // int start = tid == 0 ? 0 : cnt[tid - 1];
-    int n_tasks = cnt[blockDim.x - 1];
+    // int start = tid == 0 ? 0 : ret_cnt[tid - 1];
+    int n_tasks = ret_cnt[blockDim.x - 1];
     // do the vf distance and type computation
-    cnt[tid] = 0;
+    ret_cnt[tid] = 0;
     int n_task_per_thread = (n_tasks + blockDim.x - 1) / blockDim.x;
     for (int _i = 0; _i < n_task_per_thread; _i++) {
         int idx = tid * n_task_per_thread + _i;
         if (idx < n_tasks) {
-            auto _ij = tmp[idx];
-            int i = _ij[0];
-            int j = _ij[1];
+            auto _ret_ij = tmp[idx];
+            int i = _ret_ij[0];
+            int j = _ret_ij[1];
             // int vi = vilist[i];
             // int fj = fjlist[j];
 
             // compute the distance and type
             auto v{ vis[i] };
             auto f{ fjs[j] };
-            auto put = cnt[tid] + tid * max_pairs_per_thread;
-            auto d = vf_distance(v, f, pt_types[put]);
+            auto put = ret_cnt[tid] + tid * max_pairs_per_thread;
+            auto d = vf_distance(v, f, ret_pt_types[put]);
             if (d < dhat) {
-                ij[put] = { i, j };
-                cnt[tid]++;
+                ret_ij[put] = { i, j };
+                ret_cnt[tid]++;
             }
         }
     }
 }
-__global__ void squeeze_ij_kernel(i2* ij, int* cnt, i2* tmp, PointTriangleDistanceType* pt_types, PointTriangleDistanceType* tmp_pt_types)
+__global__ void squeeze_ij_kernel(
+    i2* ij, int* cnt, 
+    i2* ret_tmp, 
+    PointTriangleDistanceType* pt_types, 
+    PointTriangleDistanceType* ret_tmp_pt_types)
 {
     // squeeze again and copy back to ij matrix
     auto tid = threadIdx.x + blockIdx.x * blockDim.x;
@@ -201,20 +124,13 @@ __global__ void squeeze_ij_kernel(i2* ij, int* cnt, i2* tmp, PointTriangleDistan
         int dst = i + start;
         int src = tid * max_pairs_per_thread + i;
 
-        tmp[dst] = ij[src];
-        tmp_pt_types[dst] = pt_types[src];
-        // tmp is now dense
+        ret_tmp[dst] = ij[src];
+        ret_tmp_pt_types[dst] = pt_types[src];
+        // ret_tmp is now dense
     }
 }
-__global__ void fetch_cnt_last_kernel(int& n, int *cnt) {
-    n = cnt[n_cuda_threads_per_block - 1];
-}
-
-__global__ void fetch_tmp_kernel(int n, i2 *tmp, i2* dst) 
-{
-    for (int i = 0; i < n; i++) dst[i] = tmp[i];
-}
-
+/*
+// coded but necessity undecided
 __global__ void copy_kernel(i2* ij, PointTriangleDistanceType* pt_types, int* cnt, i2** dst_prim, i2** dst_body, int I, int J, int* cset_cnt)
 {
     auto tid = threadIdx.x + blockIdx.x * blockDim.x;
@@ -254,10 +170,8 @@ __global__ void copy_kernel(i2* ij, PointTriangleDistanceType* pt_types, int* cn
         }
     }
 }
+*/
 void vf_col_set_cuda(
-    // vector<int>& vilist, vector<int>& fjlist,
-    // const std::vector<std::unique_ptr<AffineBody>>& cubes,
-    // int I, int J,
     int nvi, int nfj,
     const thrust::host_vector<luf>& aabbs,
     const thrust::host_vector<vec3f>& vis,
@@ -470,7 +384,8 @@ void vf_col_set_cuda(
     //    host_cuda_globals.collision_sets.pt_set_body_index,
     //    I, J, nullptr);
 }
-
+/*
+// deprecated
 void stencil_classifier(
     thrust::device_vector<i2>& pt_idx,
     thrust::device_vector<i2>& pt_body_idx,
@@ -513,7 +428,7 @@ void stencil_classifier(
         thrust::copy(pt_body_idx.begin(), pt_body_idx.end(), host_cuda_globals.lut.end());
     }
 }
-
+*/
 
 __global__ void precise_cd_kernel(
     int * toi = nullptr,
@@ -522,29 +437,22 @@ __global__ void precise_cd_kernel(
 ) {
     
 }
-// __global__ void iaabb_culling_kernel(
-//     int n_cubes, cudaAffineBody* cubes,
-//     luf* aabbs, int vtn,
-//     int& lut_size, i2* lut,
-//     luf* culls_ret,
-//     float* dq)
 
 
 __device__ __constant__ const int max_overlap_size = 1024;
 __global__ void iaabb_culling_kernel(
     int n_cubes, cudaAffineBody *cubes, 
     luf * aabbs, int vtn, 
-    int &n_overlaps, 
-    i2 *overlaps_ret,  // n_overlaps, but pre-allocates n_cuda_threads_per_block * max_pairs_per_thread
-    i2 * tmp_buffer,
-    luf *culls_ret, // n_overlaps
-    int **prims_list_start_ptrs // n_overlaps x 3
+
+    int *ret_n_overlaps, 
+    i2 *ret_overlaps,  // n_overlaps
+    i2 * buf_prim_id,   // pre-allocates n_cuda_threads_per_block * max_pairs_per_thread
+    luf *ret_culls // n_overlaps
     // no need for dq input; (just put it in q_update)
 )
 {
     __shared__ luf affine_aabb[n_cuda_threads_per_block];
     __shared__ int cnt[n_cuda_threads_per_block];
-    __shared__ luf culls[max_overlap_size];
 
 
     int tid = blockIdx.x * blockDim.x + threadIdx.x;
@@ -568,7 +476,7 @@ __global__ void iaabb_culling_kernel(
             if (intersects(affine_aabb[i], affine_aabb[j])) {
                 // TODO: generate lut entry
                 int put = (cnt[tid] ++) + tid * max_pairs_per_thread;
-                tmp_buffer[put]= {i,j};
+                buf_prim_id[put]= {i,j};
                 // TODO: generate overlap cull
                 
                 // auto put = cnt[tid]++ + tid * max_pairs_per_thread;
@@ -586,7 +494,7 @@ __global__ void iaabb_culling_kernel(
     int end = cnt[tid];
     for (int i = start; i < end; i ++) {
         int get = i - start + tid * max_pairs_per_thread;
-        overlaps_ret[i] = tmp_buffer[get];
+        ret_overlaps[i] = buf_prim_id[get];
     }
     __syncthreads();
     
@@ -595,28 +503,113 @@ __global__ void iaabb_culling_kernel(
     for (int _i = 0; _i < n_tasks_per_thread; _i++) {
         int I = tid * n_tasks_per_thread + _i;
         if (I < n_tasks) {
-            int i = overlaps_ret[I][0], j = overlaps_ret[I][1];
-            culls[I] = intersection(affine_aabb[i], affine_aabb[j]);
+            int i = ret_overlaps[I][0], j = ret_overlaps[I][1];
+            ret_culls[I] = intersection(affine_aabb[i], affine_aabb[j]);
         }
     }
-    n_overlaps = n_tasks;
+    *ret_n_overlaps = n_tasks;
     __syncthreads();
 }
 
-__global__ void precise_cd_kernel(){
-    
-}
+__global__ void primitive_intersection_test_kernel(
+    int type, // 0: vertex, 1: edge, 2: face
+    int n_overlaps, luf *culls, i2* body_index, 
+    cudaAffineBody* cubes, 
+    int *ret_prims, 
+    int *buf_prim_id,
+    int *ret_prims_list_start_offsets // n_overlaps x 3
+) {
+    __shared__ int cnt[n_cuda_threads_per_block * 2];
 
-//void iaabb_brute_force_cuda(){
-//    int n_cubes,
-//    cudaAffineBody *cubes,
-//    int vtn
-//}{
-//    int n_overlaps;
-//    i2 *overlaps;
-//
-//    iaabb_culling_kernel<<<1, n_cuda_threads_per_block>>>(n_cubes, cubes, aabbs, vtn, n_overlaps, overlaps, culls, prims_list_start_ptrs);
-//}
+    int tid = blockIdx.x * blockDim.x + threadIdx.x;
+    int n_tasks_per_thread = (n_overlaps + n_cuda_threads_per_block - 1) / n_cuda_threads_per_block;
+    cnt[tid] = 0;
+    for (int _i = 0; _i < n_tasks_per_thread; _i++) {
+        
+        int I = tid + _i * n_cuda_threads_per_block;
+        if (I < n_overlaps) {
+            ret_prims_list_start_offsets[I* 2] = 0;
+            ret_prims_list_start_offsets[I * 2 + 1] = 0;
+
+            
+            auto& cull{ culls[I] };
+            auto& body_idx{ body_index[I] };
+            int i = body_idx[0], j = body_idx[1];
+
+            if (type == 0) {
+                // vertex, gen vi, vj list
+                auto nv = cubes[i].n_vertices + cubes[j].n_vertices;
+                auto nvi = cubes[i].n_vertices;
+                for (int vi = 0; vi < nv; vi ++){
+                    auto b = vi < nvi ? i: j;
+                    int idx = vi < nvi ? vi : vi - nvi;
+                    int j = vi < nvi ? I * 2: I * 2 + 1;
+
+                    auto& v = cubes[b].vertices[idx];
+                    if (intersects(cull, luf{v - dev::d_hat_sqr, v + dev::d_hat_sqr})) {
+                        int put = (cnt[tid] ++) + tid * max_pairs_per_thread;
+                        buf_prim_id[put] = idx;
+                        ret_prims_list_start_offsets[j]++;
+                    }
+                }
+            }
+            if (type == 1) {
+                // edge, gen ei, ej list
+                int ne = cubes[i].n_edges + cubes[j].n_edges;
+                int nei = cubes[i].n_edges;
+
+                for (int ei = 0; ei < ne; ei ++) {
+                    auto b = ei < nei ? i : j;
+                    int idx = ei < nei ? ei : ei- nei;
+                    auto j = ei < nei ? I * 2 : I * 2 + 1;
+
+                    auto e = cubes[b].edge(idx);
+                    if (intersects(cull, compute_aabb(e, dev::d_hat_sqr))) {
+                        int put = (cnt[tid] ++) + tid * max_pairs_per_thread;
+                        buf_prim_id[put] = idx;
+                        ret_prims_list_start_offsets[j]++;
+                    }
+                }
+
+            }
+            if (type == 2) {
+                // face, gen fi, fj list
+
+                int nf = cubes[i].n_faces + cubes[j].n_faces;
+                int nfi = cubes[i].n_faces;
+
+                for (int fi = 0; fi < nf; fi ++) {
+                    auto b = fi < nfi ? i : j;
+                    int idx = fi < nfi ? fi : fi - nfi;
+                    int j = fi < nfi ? I * 2 : I * 2 + 1;
+
+                    auto f = cubes[b].triangle(idx);
+                    if (intersects(cull, compute_aabb(f, dev::d_hat_sqr))) {
+                        int put = (cnt[tid] ++) + tid * max_pairs_per_thread;
+                        buf_prim_id[put] = idx;
+                        ret_prims_list_start_offsets[j]++;
+                    }
+                }
+
+            }
+        }
+    }
+
+    __syncthreads();
+    if (tid == 0) {
+        for (int i = 1; i < n_overlaps * 2; i ++) {
+            ret_prims_list_start_offsets[i] += ret_prims_list_start_offsets[i -1];
+        }
+        for (int i = 1; i < n_cuda_threads_per_block; i ++) {
+            cnt[i] += cnt[i-1];
+        }
+    }
+    __syncthreads();
+    int start = tid == 0? 0 : cnt[tid - 1];
+    for (int i = start; i < cnt[tid]; i ++) {
+        ret_prims[i] = buf_prim_id[i - start + tid * max_pairs_per_thread];
+    }
+}
 double iaabb_brute_force_cuda(
     int n_cubes,
     const thrust::device_vector<cudaAffineBody>& cubes,
@@ -627,6 +620,136 @@ double iaabb_brute_force_cuda(
     std::vector<std::array<int, 2>>& vidx)
 
 {
-    //iaabb_culling_kernel<<<1, n_cuda_threads_per_block>>>(n_cubes, PTR(cubes), PTR(aabbs), vtn, n_overlaps, os, tmp, culls, prims_list_start_ptrs);
+    //iaabb_culling_kernel<<<1, n_cuda_threads_per_block>>>(n_cubes, PTR(cubes), PTR(aabbs), vtn, n_overlaps, os, tmp, culls, ret_prims_list_start_offsets);
     return 1.0;
+}
+
+
+
+__device__ luf intersection(const luf& a, const luf& b)
+{
+    vec3f l, u;
+    l = make_float3(
+        CUDA_MAX(a.l.x, b.l.x),
+        CUDA_MAX(a.l.y, b.l.y),
+        CUDA_MAX(a.l.z, b.l.z));
+    u = make_float3(
+        CUDA_MIN(a.u.x, b.u.x),
+        CUDA_MIN(a.u.y, b.u.y),
+        CUDA_MIN(a.u.z, b.u.z));
+    return { l, u };
+}
+__device__ luf affine(luf aabb, cudaAffineBody& c, int vtn)
+{
+    vec3f cull[8];
+    vec3f l, u;
+    auto q{ vtn == 2 ? c.q_update : c.q };
+    for (int i = 0; i < 2; i++)
+        for (int j = 0; j < 2; j++)
+            for (int k = 0; k < 2; k++) {
+                auto I = (i << 2) | (j << 1) | k;
+                cull[I] = make_float3(
+                    i ? aabb.u.x : aabb.l.x,
+                    j ? aabb.u.y : aabb.l.y,
+                    k ? aabb.u.z : aabb.l.z);
+                cull[I] = matmul(q, cull[I]);
+            }
+    for (int i = 0; i < 8; i++) {
+        if (i == 0) {
+            l = u = cull[i];
+        }
+        else {
+            if (cull[i].x < l.x)
+                l.x = cull[i].x;
+            else if (cull[i].x > l.x)
+                u.x = cull[i].x;
+            if (cull[i].y < l.y)
+                l.y = cull[i].y;
+            else if (cull[i].y > l.y)
+                u.y = cull[i].y;
+            if (cull[i].z < l.z)
+                l.z = cull[i].z;
+            else if (cull[i].z > l.z)
+                u.z = cull[i].z;
+        }
+    }
+    return { l, u };
+}
+
+__device__ __host__ float vf_distance(vec3f _v, Facef f, PointTriangleDistanceType& pt_type)
+{
+    auto n = unit_normal(f);
+    auto d = dot(n, _v - f.t0);
+    auto a1 = area_x2(f.t1, f.t0, f.t2);
+    auto v = _v - n * d;
+    d = d * d;
+    // float a2 = ((f[0] - v).cross(f[1] - v).norm() + (f[1] - v).cross(f[2] - v).norm() + (f[2] - v).cross(f[0] - v).norm());
+    // auto a2 = area_x2(f[0], f[1], v) + area_x2(f[1], f[2], v) + area_x2(f[2], f[0], v);
+    auto _a1 = dot(cross(f.t0 - v, f.t1 - v), n);
+    auto _a2 = dot(cross(f.t1 - v, f.t2 - v), n);
+    auto _a3 = dot(cross(f.t2 - v, f.t0 - v), n);
+    bool inside = _a1 * _a2 > 0.0f && _a2 * _a3 > 0.0f;
+    // if (a2 > a1 + 1e-8) {
+    if (!inside) {
+        // projection outside of triangle
+
+        auto d_ab = h(f.t0, f.t1, v);
+        auto d_bc = h(f.t1, f.t2, v);
+        auto d_ac = h(f.t0, f.t2, v);
+
+        auto d_a = ab(v, f.t0);
+        auto d_b = ab(v, f.t1);
+        auto d_c = ab(v, f.t2);
+
+        auto dab = is_obtuse_triangle(f.t0, f.t1, v) ? CUDA_MIN(d_a, d_b) : d_ab;
+        auto dbc = is_obtuse_triangle(f.t2, f.t1, v) ? CUDA_MIN(d_c, d_b) : d_bc;
+        auto dac = is_obtuse_triangle(f.t0, f.t2, v) ? CUDA_MIN(d_a, d_c) : d_ac;
+
+        auto d_projected = CUDA_MIN3(dab, dbc, dac);
+        d += d_projected * d_projected;
+
+        if (d_projected == d_ab)
+            pt_type = PointTriangleDistanceType::P_E0;
+        else if (d_projected == d_bc)
+            pt_type = PointTriangleDistanceType::P_E1;
+        else if (d_projected == d_ac)
+            pt_type = PointTriangleDistanceType::P_E2;
+        else if (d_projected == d_a)
+            pt_type = PointTriangleDistanceType::P_T0;
+        else if (d_projected == d_b)
+            pt_type = PointTriangleDistanceType::P_T1;
+        else
+            pt_type = PointTriangleDistanceType::P_T2;
+    }
+    else
+        pt_type = PointTriangleDistanceType::P_T;
+    return d;
+}
+
+__device__ luf compute_aabb(const Edgef& e, float d_hat_sqrt)
+{
+    vec3f l, u;
+    l = make_float3(
+        CUDA_MIN(e.e0.x, e.e1.x),
+        CUDA_MIN(e.e0.y, e.e1.y),
+        CUDA_MIN(e.e0.z, e.e1.z));
+    u = make_float3(
+        CUDA_MAX(e.e0.x, e.e1.x),
+        CUDA_MAX(e.e0.y, e.e1.y),
+        CUDA_MAX(e.e0.z, e.e1.z));
+    return { l, u };
+}
+
+__device__ luf compute_aabb(const Facef& f, float d_hat_sqrt)
+{
+    vec3f l, u;
+    l = make_float3 (
+        CUDA_MIN3(f.t0.x, f.t1.x, f.t2.x),
+        CUDA_MIN3(f.t0.y, f.t1.y, f.t2.y),
+        CUDA_MIN3(f.t0.z, f.t1.z, f.t2.z));
+    u = make_float3 (
+        CUDA_MAX3(f.t0.x, f.t1.x, f.t2.x),
+        CUDA_MAX3(f.t0.y, f.t1.y, f.t2.y),
+        CUDA_MAX3(f.t0.z, f.t1.z, f.t2.z));
+    return { l, u };
 }
