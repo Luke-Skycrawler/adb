@@ -4,7 +4,6 @@
 #include <thrust/unique.h>
 // #include "autogen/autogen.cuh"
 using namespace std;
-CudaGlobals cuda_globals;
 
 namespace dev {
 //__device__ __constant__ float kappa = 1e-1f, d_hat = 1e-4f, d_hat_sqr = 1e-2f;
@@ -125,13 +124,18 @@ void build_csr(int n_cubes, const thrust::device_vector<i2> &lut, CsrSparseMatri
     sparse_matrix.inner.resize(nnz);
     sparse_matrix.values.resize(nnz);
     
+    thrust::device_vector<int> dev_inner(nnz), dev_outer(n_cubes * 12);
+    
     thrust::fill(sparse_matrix.values.begin(), sparse_matrix.values.end(), 0.0f);
     
     auto lut_ptr = thrust::raw_pointer_cast(lut.data());
-    auto inner_ptr = thrust::raw_pointer_cast(sparse_matrix.inner.data());
-    auto outer_ptr = thrust::raw_pointer_cast(sparse_matrix.outer_start.data());
-
+    auto inner_ptr = thrust::raw_pointer_cast(dev_inner.data());
+    auto outer_ptr = thrust::raw_pointer_cast(dev_outer.data());
+    
     fill_inner_outers_kernel<<<1, n_cuda_threads_per_block>>>(n_cubes, lut_size, lut_ptr, inner_ptr, outer_ptr);
+    
+    sparse_matrix.inner = dev_inner;
+    sparse_matrix.outer_start = dev_outer;
     CUDA_CALL(cudaGetLastError());
 }
 

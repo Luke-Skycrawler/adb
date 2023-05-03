@@ -14,6 +14,8 @@ using namespace utils;
 
 static const bool strict = false;
 void build_csr(int n_cubes, const thrust::device_vector<i2>& lut, CsrSparseMatrix& sparse_matrix);
+void gpuCholSolver(CsrSparseMatrix& hess, float* x);
+
 void make_lut_test_glue(map<array<int, 2>, int>& lut, thrust::host_vector<i2>& host_lut)
 {
     host_lut.resize(lut.size());
@@ -22,6 +24,42 @@ void make_lut_test_glue(map<array<int, 2>, int>& lut, thrust::host_vector<i2>& h
         host_lut[i++] = { p.first[0], p.first[1] };
     }
 }
+
+void to_csr(Eigen::SparseMatrix<double>& hess, CsrSparseMatrix& ret)
+{
+    ret.rows = hess.rows();
+    int cols = ret.cols = hess.cols();
+    int nnz = ret.nnz = hess.nonZeros();
+
+    ret.outer_start = thrust::device_vector<int>{ hess.outerIndexPtr(), hess.outerIndexPtr() + cols };
+    ret.inner = thrust::device_vector<int>{ hess.innerIndexPtr(), hess.innerIndexPtr() + nnz };
+    vector<float> values;
+    values.resize(nnz);
+    for (int i = 0; i < nnz; i++) {
+        values[i] = hess.valuePtr()[i];
+    }
+    ret.values = thrust::device_vector<float>{ values.data(), values.data() + nnz };
+}
+
+void cuda_solve(Eigen::VectorXd &_dq, Eigen::SparseMatrix<double>& sparse_hess, Eigen::VectorXd &r)
+{
+    auto& hess{ host_cuda_globals.hess };
+    to_csr(sparse_hess, hess);
+    float* dq = new float[hess.cols];
+    vector<float> r_vec;
+    r_vec.resize(sparse_hess.cols());
+    for (int i = 0; i < sparse_hess.cols(); i++) {
+        r_vec[i] = r[i];
+    }
+    cudaMemcpy(host_cuda_globals.b, r_vec.data(), r_vec.size() * sizeof(float), cudaMemcpyHostToDevice);
+    gpuCholSolver(hess, dq);
+    for (int i = 0; i < hess.cols; i++) {
+        _dq[i] = -dq[i];
+    }
+    delete[] dq;
+    
+}
+
 void gen_empty_sm_glue(
 
     int n_cubes,
@@ -47,15 +85,15 @@ void gen_empty_sm_glue(
     // thrust::host_vector<float> host_values(hess.values.begin(), hess.values.end());
     // thrust::host_vector<int> host_inner(hess.inner.begin(), hess.inner.end()),
     //     host_outer_start(hess.outer_start.begin(), hess.outer_start.end());
-    const auto from_thrust = [](thrust::device_vector<int> &a) ->vector<int> {
-        thrust::host_vector<int> host(a.begin(), a.end());
-        vector<int > ret; 
-        ret.resize(host.size());
-        for (int i = 0; i < host.size(); i ++) {
-            ret[i] = host[i];
-        }
-        return ret;
-    } ;
+    // const auto from_thrust = [](thrust::device_vector<int> &a) ->vector<int> {
+    //     thrust::host_vector<int> host(a.begin(), a.end());
+    //     vector<int > ret;
+    //     ret.resize(host.size());
+    //     for (int i = 0; i < host.size(); i ++) {
+    //         ret[i] = host[i];
+    //     }
+    //     return ret;
+    // } ;
     vector<int> outer = from_thrust(hess.outer_start);
     vector<int> inner = from_thrust(hess.inner);
     for (int i = 0; i < sparse_hess.cols(); i++) {

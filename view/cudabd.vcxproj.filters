@@ -176,6 +176,7 @@
     <ClInclude Include="..\model\autogen\autogen.cuh">
       <Filter>cuda\autogen</Filter>
     </ClInclude>
+    <ClInclude Include="..\model\cuda_glue.h" />
   </ItemGroup>
   <ItemGroup>
     <Filter Include="cuda">

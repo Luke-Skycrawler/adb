@@ -2,7 +2,7 @@
 #include <cuda/std/array>
 #include <thrust/device_vector.h>
 #include "cuda_header.cuh"
-
+#include "cuda_glue.h"
 using i2 = cuda::std::array<int, 2>;
 using i4 = cuda::std::array<int, 4>;
 struct CollisionSets {
@@ -39,9 +39,12 @@ struct CsrSparseMatrix
 	int rows = 0;
 	int cols = 0;
 	int nnz = 0;
-	thrust::device_vector<int> outer_start;
-	thrust::device_vector<int> inner;
-	thrust::device_vector<float> values;
+	// thrust::device_vector<int> outer_start;
+	thrust::host_vector<int> outer_start;
+	// thrust::device_vector<int> inner;
+	thrust::host_vector<int> inner;
+	// thrust::device_vector<float> values;
+	thrust::host_vector<float> values;
 };
 
 
@@ -83,6 +86,8 @@ struct CudaGlobals {
     float3 gravity;
     CudaGlobals(int n_cubes = 0);
     ~CudaGlobals();
+    void allocate_buffers();
+    void free_buffers();
     __device__ __host__ CudaGlobals(CudaGlobals &CudaGlobals);
 };
 

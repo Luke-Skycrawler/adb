@@ -32,6 +32,8 @@ using namespace utils;
 #define __CCD__ 2
 #define __LINE_SEARCH__ 3
 
+void cuda_solve(Eigen::VectorXd& dq, Eigen::SparseMatrix<double>& sparse_hess, Eigen::VectorXd& r);
+
 double E_global(const VectorXd& q_plus_dq, const VectorXd& dq, int n_cubes, int n_pt, int n_ee, int n_g,
     const vector<array<int, 4>>& idx,
     const vector<array<int, 4>>& eidx,
@@ -811,24 +813,32 @@ void implicit_euler(vector<unique_ptr<AffineBody>>& cubes, double dt)
             if (globals.dense)
                 dq = -big_hess.ldlt().solve(r);
             else if (globals.sparse) {
-#ifdef EIGEN_USE_MKL_ALL
-                PardisoLLT<SparseMatrix<double>> ldlt_solver;
-#else
-                SimplicialLLT<SparseMatrix<double>> ldlt_solver;
-#endif
-                ldlt_solver.compute(sparse_hess);
-                dq = -ldlt_solver.solve(r);
-#ifdef _TRIPLET_
-                sparse_hess_trip.finalize();
-                double _dif = (sparse_hess - sparse_hess_trip).norm();
-                if (_dif > 1e-6) {
-                    cout << "error: dif = " << _dif << "\n\n";
-                    cout << sparse_hess_trip << "\n\n"
-                         << sparse_hess;
-                    exit(0);
+
+                if (globals.params_int["cuda_solver"]) {
+                    cuda_solve(dq, sparse_hess, r);
                 }
+                else {
+
+#ifdef EIGEN_USE_MKL_ALL
+                    PardisoLLT<SparseMatrix<double>> ldlt_solver;
+#else
+                    SimplicialLLT<SparseMatrix<double>> ldlt_solver;
 #endif
+                    ldlt_solver.compute(sparse_hess);
+                    dq = -ldlt_solver.solve(r);
+#ifdef _TRIPLET_
+                    sparse_hess_trip.finalize();
+                    double _dif = (sparse_hess - sparse_hess_trip).norm();
+                    if (_dif > 1e-6) {
+                        cout << "error: dif = " << _dif << "\n\n";
+                        cout << sparse_hess_trip << "\n\n"
+                             << sparse_hess;
+                        exit(0);
+                    }
+#endif
+                }
             }
+
             auto solver_duration = DURATION_TO_DOUBLE(solver_start);
             times[__SOLVER__] += solver_duration;
             spdlog::info("solver time = {:0.6f} ms", solver_duration);

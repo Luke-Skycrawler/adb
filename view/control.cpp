@@ -9,6 +9,8 @@
 #include "../model/time_integrator.h"
 #include "spdlog/sinks/basic_file_sink.h"
 #include "../model/barrier.h"
+#include "../model/cuda_globals.cuh"
+
 #define __IPC__ 0
 #define __SOLVER__ 1
 #define __CCD__ 2
@@ -126,6 +128,8 @@ void reset(bool init)
     for (int i = 0; i < 9; i++) {
         globals.params_int["ee error " + to_string(i)] = 0;
     }
+    host_cuda_globals.n_cubes = n_cubes;
+    host_cuda_globals.allocate_buffers();
 }
 // process all input: query GLFW whether relevant keys are pressed/released this frame and react accordingly
 // ---------------------------------------------------------------------------------------------------------

@@ -388,6 +388,8 @@ void implicit_euler_cuda()
 }
 
 #include <omp.h>
+void freeCublasAndCusparse();
+void setCublasAndCuSparse();
 
 CudaGlobals::CudaGlobals(int n_cubes)
 {
@@ -398,32 +400,45 @@ CudaGlobals::CudaGlobals(int n_cubes)
     for (int i = 0; i < n_proc; i++) {
         cudaStreamCreate(&streams[i]);
     }
-    cudaMallocManaged(&b, 12 * n_cubes * sizeof(float));
-    cudaMallocManaged(&dq, 12 * n_cubes * sizeof(float));
-    cudaMallocManaged(&buffer_chunk, per_stream_buffer_size * n_proc);
-    cudaMallocManaged(&projected_vertices, sizeof(float3) * max_n_vertices);
-    cudaMallocManaged(&float3_buffer, sizeof(float3) * n_cuda_threads_per_block * max_pairs_per_thread * 4);
-    cudaMallocManaged(&hess_diag, 144 * n_cubes * sizeof(float));
 
     gravity = make_float3(0.0f, -9.8f, 0.0f);
     // cudaMemcpyToSymbol("cuda_globals", this, sizeof(CudaGlobals), size_t(0), cudaMemcpyHostToDevice);
 }
 
-CudaGlobals::~CudaGlobals()
+void CudaGlobals::allocate_buffers()
 {
+    cudaMallocManaged(&b, 12 * n_cubes * sizeof(float));
+    cudaMallocManaged(&dq, 12 * n_cubes * sizeof(float));
+    int n_proc = omp_get_num_procs();
+    cudaMallocManaged(&buffer_chunk, per_stream_buffer_size * n_proc);
+    cudaMallocManaged(&projected_vertices, sizeof(float3) * max_n_vertices);
+    cudaMallocManaged(&float3_buffer, sizeof(float3) * n_cuda_threads_per_block * max_pairs_per_thread * 4);
+    cudaMallocManaged(&hess_diag, 144 * n_cubes * sizeof(float));
+
+    setCublasAndCuSparse();
+}
+void CudaGlobals::free_buffers()
+{
+
+    freeCublasAndCusparse();
+
     cudaFree(buffer_chunk);
     cudaFree(projected_vertices);
     cudaFree(float3_buffer);
     cudaFree(dq);
     cudaFree(hess_diag);
     cudaFree(b);
+
+
+}
+CudaGlobals::~CudaGlobals()
+{
+    free_buffers();
     for (int i = 0; i < omp_get_num_procs(); i++) {
         cudaStreamDestroy(streams[i]);
     }
     delete[] streams;
 }
-
-
 
 __host__ __device__ CudaGlobals::CudaGlobals(CudaGlobals & a) {
     cubes = a.cubes;

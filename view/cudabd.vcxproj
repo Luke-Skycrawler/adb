@@ -140,6 +140,7 @@
     <ClInclude Include="..\model\autogen\autogen.cuh" />
     <ClInclude Include="..\model\cube.h" />
     <ClInclude Include="..\model\cuda_globals.cuh" />
+    <ClInclude Include="..\model\cuda_glue.h" />
     <ClInclude Include="..\model\cuda_header.cuh" />
     <ClInclude Include="..\model\glue.h" />
     <ClInclude Include="..\model\iaabb.h" />

@@ -24,13 +24,46 @@
 #define DT 1e-2
 #endif
 #include <chrono>
+#include "cuda_glue.h"
 
 using namespace std;
 using namespace Eigen;
 using namespace utils;
 using namespace std::chrono;
-using lu = std::array<vec3, 2>;
 #define DURATION_TO_DOUBLE(X) duration_cast<duration<double>>(high_resolution_clock::now() - (X)).count()
+
+double iaabb_brute_force_cuda(
+    int n_cubes,
+    const thrust::device_vector<cudaAffineBody>& cubes,
+    const thrust::device_vector<luf>& aabbs,
+    int vtn,
+    std::vector<std::array<int, 4>>& idx,
+    std::vector<std::array<int, 4>>& eidx,
+    std::vector<std::array<int, 2>>& vidx);
+double iaabb_brute_force_glue(
+    int n_cubes,
+    const std::vector<std::unique_ptr<AffineBody>>& cubes,
+    const std::vector<lu>& aabbs,
+    int vtn,
+    std::vector<std::array<vec3, 4>>& pts,
+    std::vector<std::array<int, 4>>& idx,
+    std::vector<std::array<vec3, 4>>& ees,
+    std::vector<std::array<int, 4>>& eidx,
+    std::vector<std::array<int, 2>>& vidx)
+{
+    thrust::host_vector<luf> host_aabbs;
+    thrust::host_vector<cudaAffineBody> host_cubes;
+    host_aabbs.resize(n_cubes);
+    host_cubes.resize(n_cubes);
+    for (int i = 0; i < n_cubes; i++) {
+        host_aabbs[i] = to_luf(aabbs[i]);
+        // host_cubes[i] = to_cabd(*cubes[i]);
+    }
+    thrust::device_vector<luf> dev_aabbs = host_aabbs;
+    thrust::device_vector<cudaAffineBody> dev_cubes = host_cubes;
+
+    return iaabb_brute_force_cuda(n_cubes, dev_cubes, dev_aabbs, vtn, idx, eidx, vidx);
+}
 
 void glue_vf_col_set(
     vector<int>& vilist, vector<int>& fjlist,
@@ -66,26 +99,6 @@ void vf_col_set_cuda(
     std::vector<std::array<int, 4>>& idx,
     int I, int J,
     int tid = 0);
-
-inline luf to_luf(const lu& a)
-{
-    return {
-        make_float3(a[0][0], a[0][1], a[0][2]),
-        make_float3(a[1][0], a[1][1], a[1][2])
-    };
-}
-inline vec3f to_vec3f(const vec3& a)
-{
-    return make_float3(a[0], a[1], a[2]);
-}
-inline Facef to_facef(const Face& f)
-{
-    return {
-        to_vec3f(f.t0),
-        to_vec3f(f.t1),
-        to_vec3f(f.t2)
-    };
-}
 
 void glue_vf_col_set(
     vector<int>& vilist, vector<int>& fjlist,

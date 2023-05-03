@@ -617,4 +617,16 @@ __global__ void precise_cd_kernel(){
 //
 //    iaabb_culling_kernel<<<1, n_cuda_threads_per_block>>>(n_cubes, cubes, aabbs, vtn, n_overlaps, overlaps, culls, prims_list_start_ptrs);
 //}
+double iaabb_brute_force_cuda(
+    int n_cubes,
+    const thrust::device_vector<cudaAffineBody>& cubes,
+    const thrust::device_vector<luf>& aabbs,
+    int vtn,
+    std::vector<std::array<int, 4>>& idx,
+    std::vector<std::array<int, 4>>& eidx,
+    std::vector<std::array<int, 2>>& vidx)
 
+{
+    //iaabb_culling_kernel<<<1, n_cuda_threads_per_block>>>(n_cubes, PTR(cubes), PTR(aabbs), vtn, n_overlaps, os, tmp, culls, prims_list_start_ptrs);
+    return 1.0;
+}
