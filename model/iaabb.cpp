@@ -34,16 +34,16 @@ using namespace std::chrono;
 
 double iaabb_brute_force_cuda(
     int n_cubes,
-    const thrust::device_vector<cudaAffineBody>& cubes,
-    const thrust::device_vector<luf>& aabbs,
+    thrust::device_vector<cudaAffineBody>& cubes,
+    thrust::device_vector<luf>& aabbs,
     int vtn,
     std::vector<std::array<int, 4>>& idx,
     std::vector<std::array<int, 4>>& eidx,
     std::vector<std::array<int, 2>>& vidx);
 double iaabb_brute_force_glue(
     int n_cubes,
-    const std::vector<std::unique_ptr<AffineBody>>& cubes,
-    const std::vector<lu>& aabbs,
+    std::vector<std::unique_ptr<AffineBody>>& cubes,
+    std::vector<lu>& aabbs,
     int vtn,
     std::vector<std::array<vec3, 4>>& pts,
     std::vector<std::array<int, 4>>& idx,

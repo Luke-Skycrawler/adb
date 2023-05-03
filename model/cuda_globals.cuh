@@ -73,6 +73,7 @@ struct CudaGlobals {
     // i2 * lut;
     void *buffer_chunk;
     int device_id, per_stream_buffer_size;
+    int *cnt_ret;
     cudaStream_t* streams;
     float3 gravity;
     CudaGlobals(int n_cubes = 0);

@@ -414,6 +414,7 @@ void CudaGlobals::allocate_buffers()
     cudaMallocManaged(&projected_vertices, sizeof(float3) * max_n_vertices);
     cudaMallocManaged(&float3_buffer, sizeof(float3) * n_cuda_threads_per_block * max_pairs_per_thread * 4);
     cudaMallocManaged(&hess_diag, 144 * n_cubes * sizeof(float));
+    cudaMallocManaged(&cnt_ret, sizeof(int));
 
     setCublasAndCuSparse();
 }
@@ -421,7 +422,8 @@ void CudaGlobals::free_buffers()
 {
 
     freeCublasAndCusparse();
-
+    
+    cudaFree(cnt_ret);
     cudaFree(buffer_chunk);
     cudaFree(projected_vertices);
     cudaFree(float3_buffer);

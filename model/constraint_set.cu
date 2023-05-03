@@ -366,6 +366,6 @@ void make_lut(int lut_size, i2* _lut) {
 
 __global__ void ipc_pt_kernel(
     int n_cubes, int npt,
-    i2* prims, i2* body,
+    i2* prmts, i2* body,
     CsrSparseMatrix& hess,
     int lut_size, i2* lut){}
