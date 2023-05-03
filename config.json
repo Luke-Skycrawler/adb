@@ -70,6 +70,7 @@
         "strict": 0,
         "make_lut": 0,
         "gen_sm_test": 1,
-        "cuda_solver": 0
+        "cuda_solver": 0,
+        "cuda_hess": 1
     }
 }

@@ -387,6 +387,15 @@ void implicit_euler_cuda()
     update_timestep_kernel<<<1, n_cuda_threads_per_block>>>(n_cubes, host_cuda_globals.cubes);
 }
 
+void hess_cuda(int n_cubes, float dt, float *grads, float * hess) {
+    auto &cubes{ host_cuda_globals.cubes };
+    for (int i = 0; i < n_cubes; i ++ ){
+        project_vt1_kernel<<<1, n_cuda_threads_per_block>>>(n_cubes, host_cuda_globals.cubes, host_cuda_globals.projected_vertices);
+        inertia_grad_hess_kernel<<<1, n_cuda_threads_per_block>>>(n_cubes, host_cuda_globals.cubes, dt, host_cuda_globals.b, host_cuda_globals.hess_diag);
+    }
+    cudaMemcpy(grads, host_cuda_globals.b, n_cubes* 12 * sizeof(float), cudaMemcpyDeviceToHost);
+    cudaMemcpy(hess, host_cuda_globals.hess_diag, n_cubes* 144 * sizeof(float), cudaMemcpyDeviceToHost);
+}
 #include <omp.h>
 void freeCublasAndCusparse();
 void setCublasAndCuSparse();
@@ -422,7 +431,7 @@ void CudaGlobals::free_buffers()
 {
 
     freeCublasAndCusparse();
-    
+
     cudaFree(cnt_ret);
     cudaFree(buffer_chunk);
     cudaFree(projected_vertices);

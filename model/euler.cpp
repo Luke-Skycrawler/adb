@@ -31,7 +31,43 @@ using namespace utils;
 #define __SOLVER__ 1
 #define __CCD__ 2
 #define __LINE_SEARCH__ 3
-
+#include "cuda_glue.h"
+void hess_cuda(int n_cubes, float dt, float* grads, float* hess);
+static const bool strict = false;
+void cuda_hess_glue(
+    int n_cubes,
+    const vector<unique_ptr<AffineBody>>& cubes,
+    float dt)
+{
+    vector<cudaAffineBody> cabs(n_cubes);
+    float* grads = new float[n_cubes * 12];
+    float* hess = new float[n_cubes * 144];
+    for (int i = 0; i < n_cubes; i++) cabs[i] = to_cabd(*cubes[i]);
+    cudaMemcpy(host_cuda_globals.cubes, cabs.data(), sizeof(cudaAffineBody) * cabs.size(), cudaMemcpyHostToDevice);
+    hess_cuda(n_cubes, dt, grads, hess);
+#pragma omp parallel for schedule(static)
+    for (int k = 0; k < n_cubes; k++) {
+        auto& c(*cubes[k]);
+        c.grad = grad_residue_per_body(c, dt);
+        c.hess = hess_inertia_per_body(c, dt);
+        c.project_vt1();
+    }
+    
+    for (int k = 0; k < n_cubes; k++) {
+        auto& c{ *cubes[k] };
+        vec12 ref = c.grad, act = Map<Vector<float, 12>>(grads + k * 12).cast<double>();
+        auto norm = (ref - act).norm();
+        if (!strict) {
+            if (norm > 1e-2)
+                spdlog::warn("norm too large: {}", norm);
+        }
+        else {
+            assert(norm < 1e-2);
+        }
+    }
+    delete [] grads; 
+    delete[] hess;
+}
 void cuda_solve(Eigen::VectorXd& dq, Eigen::SparseMatrix<double>& sparse_hess, Eigen::VectorXd& r);
 
 double E_global(const VectorXd& q_plus_dq, const VectorXd& dq, int n_cubes, int n_pt, int n_ee, int n_g,
@@ -300,6 +336,11 @@ void implicit_euler(vector<unique_ptr<AffineBody>>& cubes, double dt)
         globals.hess_triplets.clear();
 #endif
         auto newton_iter_start = high_resolution_clock::now();
+
+        if (globals.params_int["cuda_hess"]) {
+            cuda_hess_glue(n_cubes, cubes, dt);
+        }
+        else
 #pragma omp parallel for schedule(static)
         for (int k = 0; k < n_cubes; k++) {
             auto& c(*cubes[k]);
@@ -327,7 +368,6 @@ void implicit_euler(vector<unique_ptr<AffineBody>>& cubes, double dt)
             g_contact_forces.resize(n_g);
             spdlog::info("constraint size = {}, {}", n_pt, n_ee);
         }
-        // clear(sparse_hess);
 #endif
         double evh = globals.evh;
         auto ipc_start = high_resolution_clock::now();
