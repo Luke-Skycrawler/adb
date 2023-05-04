@@ -74,6 +74,52 @@ __global__ void inclusive_scan_kernel(int* io_cnt)
         io_cnt[i] = io_cnt[i - 1] + io_cnt[i];
     }
 }
+
+__global__ void filter_distance_kernel_atomic(i2* buf_ij, i2* io_tmp,
+    int* cnt,
+    vec3f* vis, Facef* fjs,
+    PointTriangleDistanceType* buf_pt_types,
+    PointTriangleDistanceType* io_pt_types,
+    float dhat = 1e-4)
+{
+
+    int tid = threadIdx.x + blockIdx.x * blockDim.x;
+    int n_tasks = cnt[n_cuda_threads_per_block - 1];
+    int n_task_per_thread = (n_tasks + n_cuda_threads_per_block - 1) / n_cuda_threads_per_block;
+    __shared__ int n;
+    n = 0;
+    for (int _i = 0; _i < n_task_per_thread; _i++) {
+        int idx = tid * n_task_per_thread + _i;
+        if (idx < n_tasks) {
+            auto ij = io_tmp[idx];
+            int i = ij[0];
+            int j = ij[1];
+            // int vi = vilist[i];
+            // int fj = fjlist[j];
+
+            // compute the distance and type
+            auto v{ vis[i] };
+            auto f{ fjs[j] };
+            auto put = atomicAdd(&n, 1);
+
+            auto d = vf_distance(v, f, buf_pt_types[put]);
+            if (d < dhat) {
+                buf_ij[put] = { i, j };
+            }
+        }
+    }
+    __syncthreads();
+    n_tasks =  n;
+    n_task_per_thread = (n_tasks + blockDim.x - 1) / blockDim.x;
+    for (int _i = 0; _i  < n_task_per_thread; _i ++) {
+        int idx = tid * n_task_per_thread + _i;
+        if (idx < n_tasks) {
+            io_tmp[idx] = buf_ij[idx];
+            io_pt_types[idx] = buf_pt_types[idx];
+        }
+    }
+    cnt[n_cuda_threads_per_block - 1] = n;
+}
 __global__ void filter_distance_kernel(i2* ret_ij, int* ret_cnt, i2* tmp,
     // int* vilist, int* fjlist,
     vec3f* vis, Facef* fjs,
@@ -270,19 +316,28 @@ void vf_col_set_cuda(
         bool run_on_gpu = true, run_thrust = false, run_kernel = !run_thrust;
         if (run_on_gpu) {
             if (run_kernel) {
-                // pass
-                filter_distance_kernel<<<1, n_cuda_threads_per_block, 0, stream>>>(ij_ptr, cnt_ptr, tmp_ptr,
-                    // vilist_ptr, fjlist_ptr,
-                    vis_ptr, fjs_ptr, pt_types_ptr, tmp_pt_types_ptr);
+                bool non_atomic = true;
+                if (non_atomic) {
+                    // pass
+                    filter_distance_kernel<<<1, n_cuda_threads_per_block, 0, stream>>>(ij_ptr, cnt_ptr, tmp_ptr,
+                        // vilist_ptr, fjlist_ptr,
+                        vis_ptr, fjs_ptr, pt_types_ptr, tmp_pt_types_ptr);
 
-                CUDA_CALL(cudaGetLastError());
-                inclusive_scan_kernel<<<1, 1, 0, stream>>>(cnt_ptr);
-                // thrust::inclusive_scan(thrust::cuda::par_nosync, cnt_ptr, cnt_ptr + n_cuda_threads_per_block, cnt_ptr);
+                    CUDA_CALL(cudaGetLastError());
+                    inclusive_scan_kernel<<<1, 1, 0, stream>>>(cnt_ptr);
+                    // thrust::inclusive_scan(thrust::cuda::par_nosync, cnt_ptr, cnt_ptr + n_cuda_threads_per_block, cnt_ptr);
 
-                // thrust::inclusive_scan(thrust::cuda::par_nosync, dev_cnt.begin(), dev_cnt.end(), dev_cnt.begin());
+                    // thrust::inclusive_scan(thrust::cuda::par_nosync, dev_cnt.begin(), dev_cnt.end(), dev_cnt.begin());
 
-                squeeze_ij_kernel<<<1, n_cuda_threads_per_block, 0, stream>>>(ij_ptr, cnt_ptr, tmp_ptr, pt_types_ptr, tmp_pt_types_ptr);
+                    squeeze_ij_kernel<<<1, n_cuda_threads_per_block, 0, stream>>>(ij_ptr, cnt_ptr, tmp_ptr, pt_types_ptr, tmp_pt_types_ptr);
+                }
+
+                else {
+
+                    filter_distance_kernel_atomic<<<1, n_cuda_threads_per_block, 0, stream>>>(ij_ptr, tmp_ptr, cnt_ptr, vis_ptr, fjs_ptr, pt_types_ptr, tmp_pt_types_ptr);
+                }
                 CUDA_CALL(cudaStreamSynchronize(stream));
+                
             }
             else {
 #ifdef THRUST_DEV_VECTOR
@@ -692,18 +747,12 @@ __device__ luf affine(luf aabb, cudaAffineBody& c, int vtn)
             l = u = cull[i];
         }
         else {
-            if (cull[i].x < l.x)
-                l.x = cull[i].x;
-            else if (cull[i].x > l.x)
-                u.x = cull[i].x;
-            if (cull[i].y < l.y)
-                l.y = cull[i].y;
-            else if (cull[i].y > l.y)
-                u.y = cull[i].y;
-            if (cull[i].z < l.z)
-                l.z = cull[i].z;
-            else if (cull[i].z > l.z)
-                u.z = cull[i].z;
+            l.x = CUDA_MIN(l.x, cull[i].x);
+            l.y = CUDA_MIN(l.y, cull[i].y);
+            l.z = CUDA_MIN(l.z, cull[i].z);
+            u.x = CUDA_MAX(u.x, cull[i].x);
+            u.y = CUDA_MAX(u.y, cull[i].y);
+            u.z = CUDA_MAX(u.z, cull[i].z);
         }
     }
     return { l, u };
