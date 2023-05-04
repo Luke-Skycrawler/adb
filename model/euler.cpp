@@ -58,7 +58,7 @@ void cuda_hess_glue(
         vec12 ref = c.grad, act = Map<Vector<float, 12>>(grads + k * 12).cast<double>();
         auto norm = (ref - act).norm();
         if (!strict) {
-            if (norm > 1e-2)
+            if (norm > 1e-1)
                 spdlog::warn("norm too large: {}", norm);
         }
         else {

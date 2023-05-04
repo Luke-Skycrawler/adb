@@ -99,7 +99,8 @@ __host__ __device__ void cudaAffineBody::q_minus_qtiled(float3 dq[4])
     float h = dt;
     float h2 = h * h;
     for (int i = 0; i < 4; i++) {
-        dq[i] = q_update[i] - (q[i] + dqdt[i] * h + make_float3(0.0f, -9.8f, 0.0f) * h2);
+        dq[i] = q_update[i] - (q0[i] + dqdt[i] * h);
+        if (i == 0) dq[0] = dq[0] - make_float3(0.0f, -9.8f, 0.0f) * h2;
     }
 }
 __global__ void inertia_kernel(float& E, int n_cubes, cudaAffineBody* cubes)
@@ -274,9 +275,13 @@ __global__ void inertia_grad_hess_kernel(int n_cubes, cudaAffineBody *cubes, flo
         int i = tid * n_tasks_per_thread + _i;
         if (i < n_cubes) {
             auto& c{ cubes[i] };
+            for (int j = 0; j < 4; j++) {
+                c.q_update[j] = c.q[j];
+            }
             float g12[12]{ 0.0 };
             orthogonal_grad(c.q, dt, g12);
             inertia_grad(c, dt, g12);
+            for (int j = 0; j < 12; j++) b[j + 12 * i] = g12[j];
 
             orthogonal_hess(c.q, dt, diag + 144 * i);
             inertia_hess(c, diag + 144 * i);
@@ -390,10 +395,10 @@ void implicit_euler_cuda()
 
 void hess_cuda(int n_cubes, float dt, float *grads, float * hess) {
     auto &cubes{ host_cuda_globals.cubes };
-    for (int i = 0; i < n_cubes; i ++ ){
-        project_vt1_kernel<<<1, n_cuda_threads_per_block>>>(n_cubes, host_cuda_globals.cubes, host_cuda_globals.projected_vertices);
-        inertia_grad_hess_kernel<<<1, n_cuda_threads_per_block>>>(n_cubes, host_cuda_globals.cubes, dt, host_cuda_globals.b, host_cuda_globals.hess_diag);
-    }
+
+    //project_vt1_kernel<<<1, n_cuda_threads_per_block>>>(n_cubes, host_cuda_globals.cubes, host_cuda_globals.projected_vertices);
+    inertia_grad_hess_kernel<<<1, n_cuda_threads_per_block>>>(n_cubes, host_cuda_globals.cubes, dt, host_cuda_globals.b, host_cuda_globals.hess_diag);
+    CUDA_CALL(cudaDeviceSynchronize());
     cudaMemcpy(grads, host_cuda_globals.b, n_cubes* 12 * sizeof(float), cudaMemcpyDeviceToHost);
     cudaMemcpy(hess, host_cuda_globals.hess_diag, n_cubes* 144 * sizeof(float), cudaMemcpyDeviceToHost);
 }
@@ -417,6 +422,7 @@ CudaGlobals::CudaGlobals(int n_cubes)
 
 void CudaGlobals::allocate_buffers()
 {
+    cudaMallocManaged(&cubes, n_cubes * sizeof(cudaAffineBody));
     cudaMallocManaged(&b, 12 * n_cubes * sizeof(float));
     cudaMallocManaged(&dq, 12 * n_cubes * sizeof(float));
     int n_proc = omp_get_num_procs();
@@ -440,8 +446,7 @@ void CudaGlobals::free_buffers()
     cudaFree(dq);
     cudaFree(hess_diag);
     cudaFree(b);
-
-
+    cudaFree(cubes);
 }
 CudaGlobals::~CudaGlobals()
 {
