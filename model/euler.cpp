@@ -56,13 +56,18 @@ void cuda_hess_glue(
     for (int k = 0; k < n_cubes; k++) {
         auto& c{ *cubes[k] };
         vec12 ref = c.grad, act = Map<Vector<float, 12>>(grads + k * 12).cast<double>();
+        mat12 h_ref = c.hess, h_act = Map<Matrix<float, 12, 12>>(hess + k * 144).cast<double>();
         auto norm = (ref - act).norm();
+        auto h_norm = (h_ref - h_act).norm();
         if (!strict) {
             if (norm > 1e-1)
                 spdlog::warn("norm too large: {}", norm);
+            if (! h_act.isApprox(h_ref, 1e-3))
+                spdlog::warn("hess norm too large: {}", h_norm);
         }
         else {
             assert(norm < 1e-2);
+            assert(h_norm < 1e-2);
         }
     }
     delete [] grads; 
