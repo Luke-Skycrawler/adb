@@ -1,4 +1,17 @@
 #pragma once 
+#ifdef TESTING
+#define __host__ 
+#define __device__ 
+#define __forceinline__ inline 
+#define __global__
+struct float3 {
+    float x, y, z;
+};
+float3 make_float3(float x, float y, float z) {
+    return { x, y, z };
+}
+#define USE_DOUBLE_PRECISION
+#else 
 #include <cuda_runtime.h>
 #include "device_launch_parameters.h"
 #include <thrust/device_vector.h>
@@ -7,6 +20,7 @@
 #include <thrust/scan.h>
 #include <thrust/execution_policy.h>
 #include <cuda/std/array>
+#endif
 
 #define CUDA_CALL(x) { const cudaError_t a = (x); if(a != cudaSuccess){ printf("\nCUDA Error: %s (err_num = %d) \n", cudaGetErrorString(a), a); cudaDeviceReset(); assert(0);}}
 
@@ -49,6 +63,8 @@
 #define CUDA_MIN(a, b) fminf(a, b)
 #define CUDA_MAX3(a, b, c) fmaxf(fmaxf(a, b), c)
 #define CUDA_MIN3(a, b, c) fminf(fminf(a, b), c)
+
+#endif
 
 // using luf = cuda::std::array<float, 6>;
 
@@ -101,19 +117,19 @@ __forceinline__ __host__ __device__ vec3f operator-(vec3f a, vec3f b)
 }
 __forceinline__ __host__ __device__ vec3f operator/(vec3f a, float k)
 {
-        return k == 0.0 ? make_float3(0.0f, 0.0f, 0.0f) : make_float3(a.x / k, a.y / k, a.z / k);
+    return k == 0.0 ? make_float3(0.0f, 0.0f, 0.0f) : make_float3(a.x / k, a.y / k, a.z / k);
 }
 __forceinline__ __host__ __device__ vec3f operator*(vec3f a, float k)
 {
-        return make_float3(a.x * k, a.y * k, a.z * k);
+    return make_float3(a.x * k, a.y * k, a.z * k);
 }
 __forceinline__ __host__ __device__ vec3f operator+(vec3f a, float k)
 {
-        return make_float3(a.x + k, a.y + k, a.z + k);
+    return make_float3(a.x + k, a.y + k, a.z + k);
 }
 __forceinline__ __host__ __device__ vec3f operator-(vec3f a, float k)
 {
-        return make_float3(a.x - k, a.y - k, a.z - k);
+    return make_float3(a.x - k, a.y - k, a.z - k);
 }
 
 __forceinline__ __host__ __device__ float dot(vec3f a, vec3f b)
@@ -177,5 +193,4 @@ __forceinline__ __host__ __device__ bool is_obtuse_triangle(vec3f e0, vec3f e1, 
 
 static const int n_cuda_threads_per_block = 256;
 #define PTR(x) thrust::raw_pointer_cast((x).data())
-#endif
 

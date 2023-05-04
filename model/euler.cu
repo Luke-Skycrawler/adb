@@ -192,7 +192,7 @@ __global__ void project_vt1_kernel(int n_cubes, cudaAffineBody *cubes, float3* b
 __host__ __device__ void orthogonal_grad(float3 q[4], float dt, float ret[12])
 {
     auto h2 = dt * dt;
-
+    ret[0] = ret[1] = ret[2] = 0.0f;
     for (int i = 1; i < 4; i++) {
         float3 g = make_float3(0.0f, 0.0f, 0.0f);
         for (int j = 1; j < 4; j++) {
@@ -200,15 +200,16 @@ __host__ __device__ void orthogonal_grad(float3 q[4], float dt, float ret[12])
         }
 
         g = g * (4 * kappa * h2);
-        ret[i * 3 + 0] += g.x;
-        ret[i * 3 + 1] += g.y;
-        ret[i * 3 + 2] += g.z;
+        ret[i * 3 + 0] = g.x;
+        ret[i * 3 + 1] = g.y;
+        ret[i * 3 + 2] = g.z;
     }
 }
 
 __host__ __device__ void orthogonal_hess(float3 q[4], float dt, float ret[144])
 {
     auto h2 = dt * dt;
+    for (int i = 0; i < 144; i ++ ) ret[i]  = 0.0f;
     for (int i = 1; i < 4; i++)
         for (int j = 1; j < 4; j++) {
             float h[9]{ 0.0f };
@@ -220,11 +221,11 @@ __host__ __device__ void orthogonal_hess(float3 q[4], float dt, float ret[144])
                     for (int ii = 0; ii < 3; ii++)
                         for (int jj = 0; jj < 3; jj++) {
                             auto qii = _q[ii], qjj = _q[jj];
-                            h[ii + jj * 3] = w * qii * qjj;
+                            h[ii + jj * 3] += w * qii * qjj;
                         }
-                    for (int ii = 0; ii < 3; ii++) {
-                        h[ii * 4] += dot(q[i], q[i]) - 1.0f;
-                    }
+                }
+                for (int ii = 1; ii < 4; ii++) {
+                    h[ii * 4] += dot(q[i], q[i]) - 1.0f;
                 }
             }
             else {
