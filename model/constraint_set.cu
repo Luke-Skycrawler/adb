@@ -342,25 +342,24 @@ __global__ void ipc_pt(
 }
 
 
-void make_lut(int lut_size, i2* _lut) {
+void make_lut(int lut_size, thrust::device_vector<i2>& lut) {
     int n_cubes = host_cuda_globals.n_cubes;
     
-    auto& lut{ host_cuda_globals.lut}; 
     {
         thrust::host_vector<i2> diagonals(n_cubes);
         thrust::device_vector<i2> dev_diagonals(n_cubes);
         for (int i = 0; i < n_cubes; i++) diagonals[i] = { i, i };
         dev_diagonals = diagonals;
-        lut.insert(lut.end(), dev_diagonals.begin(), dev_diagonals.end());
+        lut.insert(lut.begin() + lut_size, dev_diagonals.begin(), dev_diagonals.end());
     }
  
     
     thrust::sort(lut.begin(), lut.end());
-    auto new_end = thrust::unique(lut.begin(), lut.end());
+    // auto new_end = thrust::unique(lut.begin(), lut.end());
 
-    lut_size = new_end - lut.begin();
-    lut.resize(lut_size);
-    lut.shrink_to_fit();
+    // lut.resize(lut_size);
+    lut.resize(lut_size + n_cubes);
+    // lut.shrink_to_fit();
 
 }
 

@@ -53,7 +53,11 @@ struct FrictionInfo {
     float basis[24];
 };
 
-struct CudaGlobals {
+struct CollisionSet {
+    i2* b; // body index
+    i2* p; // primitive index
+};
+ struct CudaGlobals {
     thrust::device_vector<FrictionInfo> friction_info;
     cudaAffineBody *cubes;
     luf* aabbs;
@@ -74,6 +78,11 @@ struct CudaGlobals {
     void *buffer_chunk;
     int device_id, per_stream_buffer_size;
     int *cnt_ret;
+
+    char **small_termporary_buffer, bulk_buffer;
+    char **small_termporary_buffer_back, bulk_buffer_back;
+    CollisionSet pt, ee;
+    
     cudaStream_t* streams;
     float3 gravity;
     CudaGlobals(int n_cubes = 0);
