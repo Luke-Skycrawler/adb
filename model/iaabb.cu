@@ -24,16 +24,16 @@ using namespace ipc;
 
 
 
-__device__ __host__ float vf_distance(vec3f _v, Facef f, PointTriangleDistanceType& pt_type);
+__device__ __host__ float vf_distance(vec3f _v, Facef f, int& pt_type);
 __device__ luf intersection(const luf &a, const luf &b);
 __device__ luf affine(luf aabb, cudaAffineBody &c, int vtn);
 __device__ luf compute_aabb(const Facef& f, float d_hat_sqrt);
 __device__ luf compute_aabb(const Edgef& e, float d_hat_sqrt);
 
 tuple<float, PointTriangleDistanceType> vf_distance(vec3f vf, Facef ff);
+void per_intersection_core(int n_overlaps, luf* culls, i2* overlaps);
 
-
-/* NOTE: kernel argument convention: 
+/* NOTE: kernel argument convention:
     buf_: device buffer
     ret_: return buffer
     io_: input and output from the same buffer, i.e. in-place
@@ -76,13 +76,13 @@ __global__ void inclusive_scan_kernel(int* io_cnt)
 }
 
 __global__ void filter_distance_kernel_atomic(i2* buf_ij, i2* io_tmp,
-    int* cnt,
+    int* cnt, 
     vec3f* vis, Facef* fjs,
 
-    int *vilist , int *fjlist,
-    PointTriangleDistanceType* buf_pt_types,
-    PointTriangleDistanceType* io_pt_types,
-    float dhat = 1e-4)
+    int* vilist, int* fjlist,
+    int* buf_pt_types,
+    int* io_pt_types,
+    float dhat = 1e-4, int* meta_vifj = nullptr)
 {
 
     int tid = threadIdx.x + blockIdx.x * blockDim.x;
@@ -90,6 +90,7 @@ __global__ void filter_distance_kernel_atomic(i2* buf_ij, i2* io_tmp,
     int n_task_per_thread = (n_tasks + n_cuda_threads_per_block - 1) / n_cuda_threads_per_block;
     __shared__ int n;
     n = 0;
+    auto nvi = meta_vifj? meta_vifj[0]: 0;
     for (int _i = 0; _i < n_task_per_thread; _i++) {
         int idx = tid * n_task_per_thread + _i;
         if (idx < n_tasks) {
@@ -101,12 +102,15 @@ __global__ void filter_distance_kernel_atomic(i2* buf_ij, i2* io_tmp,
 
             // compute the distance and type
             auto v{ vis[i] };
-            auto f{ fjs[j] };
+            Facef f{ fjs ? fjs[j] : Facef{ vis[j * 3 + nvi], vis[j * 3 + 1 + nvi], vis[j * 3 + 2 + nvi] } };
             auto put = atomicAdd(&n, 1);
 
             auto d = vf_distance(v, f, buf_pt_types[put]);
             if (d < dhat) {
-                buf_ij[put] = { vilist[i], fjlist[j] };
+                if (vilist && fjlist)
+                    buf_ij[put] = { vilist[i], fjlist[j] };
+                else
+                    buf_ij[put] = { i, j };
             }
         }
     }
@@ -125,8 +129,8 @@ __global__ void filter_distance_kernel_atomic(i2* buf_ij, i2* io_tmp,
 __global__ void filter_distance_kernel(i2* ret_ij, int* ret_cnt, i2* tmp,
     // int* vilist, int* fjlist,
     vec3f* vis, Facef* fjs,
-    PointTriangleDistanceType* ret_pt_types,
-    PointTriangleDistanceType* tmp_pt_types,
+    int* ret_pt_types,
+    int* tmp_pt_types,
     float dhat = 1e-4)
 {
     // // squeeze the ret_ij list according to a prefix sum array ret_cnt
@@ -161,8 +165,8 @@ __global__ void filter_distance_kernel(i2* ret_ij, int* ret_cnt, i2* tmp,
 __global__ void squeeze_ij_kernel(
     i2* ij, int* cnt, 
     i2* ret_tmp, 
-    PointTriangleDistanceType* pt_types, 
-    PointTriangleDistanceType* ret_tmp_pt_types)
+    int* pt_types, 
+    int* ret_tmp_pt_types)
 {
     // squeeze again and copy back to ij matrix
     auto tid = threadIdx.x + blockIdx.x * blockDim.x;
@@ -250,7 +254,7 @@ void vf_col_set_cuda(
         ij(n_cuda_threads_per_block * max_pairs_per_thread),
         tmp(n_cuda_threads_per_block * max_pairs_per_thread);
 
-    thrust::device_vector<PointTriangleDistanceType> pt_types(n_cuda_threads_per_block * max_pairs_per_thread, PointTriangleDistanceType::P_T), pt_types_buffer(n_cuda_threads_per_block * max_pairs_per_thread, PointTriangleDistanceType::P_T);
+    thrust::device_vector<int> pt_types(n_cuda_threads_per_block * max_pairs_per_thread), pt_types_buffer(n_cuda_threads_per_block * max_pairs_per_thread);
 
     auto ij_ptr = thrust::raw_pointer_cast(ij.data());
     auto cnt_ptr = thrust::raw_pointer_cast(dev_cnt.data());
@@ -267,8 +271,8 @@ void vf_col_set_cuda(
     auto ij_size = n_cuda_threads_per_block * max_pairs_per_thread * 2;
     i2* ij_ptr = (i2*)(chunk_int);
     i2* tmp_ptr = (i2*)(chunk_int + ij_size);
-    PointTriangleDistanceType* pt_types_ptr = (PointTriangleDistanceType*)(chunk_int + ij_size * 2);
-    PointTriangleDistanceType* tmp_pt_types_ptr = (PointTriangleDistanceType*)(pt_types_ptr + ij_size / 2);
+    int* pt_types_ptr = (int*)(chunk_int + ij_size * 2);
+    int* tmp_pt_types_ptr = (int*)(pt_types_ptr + ij_size / 2);
     int* cnt_ptr = (int*)(chunk_int + ij_size * 3);
     int* tmp_cnt = cnt_ptr + n_cuda_threads_per_block * 2;
     vec3f* vis_ptr = (vec3f*)(cnt_ptr + n_cuda_threads_per_block * 3);
@@ -336,7 +340,7 @@ void vf_col_set_cuda(
 
                 else {
 
-                    filter_distance_kernel_atomic<<<1, n_cuda_threads_per_block, 0, stream>>>(ij_ptr, tmp_ptr, cnt_ptr, vis_ptr, fjs_ptr, pt_types_ptr, tmp_pt_types_ptr);
+                    filter_distance_kernel_atomic<<<1, n_cuda_threads_per_block, 0, stream>>>(ij_ptr, tmp_ptr, cnt_ptr, vis_ptr, fjs_ptr, nullptr, nullptr, pt_types_ptr, tmp_pt_types_ptr);
                 }
                 CUDA_CALL(cudaStreamSynchronize(stream));
                 
@@ -524,7 +528,6 @@ __global__ void iaabb_culling_kernel_atomic(
     __syncthreads();
     int n_tasks = n_cubes * n_cubes;
     n_tasks_per_thread = (n_tasks + n_cuda_threads_per_block - 1) / n_cuda_threads_per_block;
-    cnt[tid] = 0;
     for (int _i = 0; _i < n_tasks_per_thread; _i++) {
         int I = tid * n_tasks_per_thread + _i;
         int i = I / n_cubes;
@@ -581,9 +584,6 @@ __global__ void primitive_intersection_test_kernel(
 
     int tid = threadIdx.x; // each block handles one overlap
 
-    ret_prmts_meta_start[i_overlap * 2] = 0;
-    ret_prmts_meta_start[i_overlap * 2 + 1] = 0;
-
     auto& cull{ culls[i_overlap] };
     auto& body_idx{ body_index[i_overlap] };
     int i = body_idx[0], j = body_idx[1];
@@ -602,7 +602,7 @@ __global__ void primitive_intersection_test_kernel(
         nv = cubes[i].n_faces + cubes[j].n_faces;
         break;
     }
-    n_tasks_per_thread = (nv + n_cuda_threads_per_block - 1) / n_cuda_threads_per_block;
+    int n_tasks_per_thread = (nv + n_cuda_threads_per_block - 1) / n_cuda_threads_per_block;
 
     for (int _j = 0; _j < n_tasks_per_thread; _j++) {
         int vi = tid * n_tasks_per_thread + _j;
@@ -616,7 +616,7 @@ __global__ void primitive_intersection_test_kernel(
             if (intersects(cull, t)) {
                 int put = atomicAdd(&n, 1);
                 ret_prmts[put] = b;
-                atomicAdd(ret_prmts_meta_size[j], 1);
+                atomicAdd(ret_prmts_meta_sizes + j, 1);
             }
         }
     }
@@ -683,23 +683,25 @@ double iaabb_brute_force_cuda(
     iaabb_culling_kernel_atomic<<<1, n_cuda_threads_per_block>>>(n_cubes, PTR(cubes), PTR(aabbs), vtn, dev_n_overlaps, PTR(host_cuda_globals.lut), culls);
 
     cudaMemcpy(&n_overlaps, dev_n_overlaps, sizeof(int), cudaMemcpyDeviceToHost);
-    make_lut(n_overlaps, host_cuda_globals.lut);
+    //make_lut(n_overlaps, PTR(host_cuda_globals.lut));
 
-    int* prmts_list = (int*)((char*)host_cuda_globals.buffer_chunk + host_cuda_globals.per_stream_buffer_size * 3 );
-    int* offsets = prmts_list + host_cuda_globals.per_stream_buffer_size / sizeof(int);
-    int n_prmts;
+    // int* prmts_list = (int*)((char*)host_cuda_globals.buffer_chunk + host_cuda_globals.per_stream_buffer_size * 3 );
+    // int* offsets = prmts_list + host_cuda_globals.per_stream_buffer_size / sizeof(int);
+    // int n_prmts;
 
-    for (int i = 0; i < 3; i++) {
-        int* cnt = prmts_list + host_cuda_globals.per_stream_buffer_size;
-        primitive_intersection_test_kernel<<<n_blocks, n_cuda_threads_per_block>>>(i, dev_n_overlaps, culls, overlaps, PTR(cubes), prmts_list, buf, offsets, cnt);
-        // copy list size to start
-        block_reduction_kernel<<<1, 1>>>(n_blocks, offsets, cnt, host_cuda_globals.cnt_ret, buf, prmts_list);
-        cudaMemcpy(&n_prmts, host_cuda_globals.cnt_ret, sizeof(int), cudaMemcpyDeviceToHost);
-        offsets += n_prmts;
-        prmts_list += n_prmts;
-    }
+    // for (int i = 0; i < 3; i++) {
+    //     int* cnt = prmts_list + host_cuda_globals.per_stream_buffer_size;
+    //     primitive_intersection_test_kernel<<<n_blocks, n_cuda_threads_per_block>>>(i, dev_n_overlaps, culls, overlaps, PTR(cubes), prmts_list, buf, offsets, cnt);
+    //     // copy list size to start
+    //     block_reduction_kernel<<<1, 1>>>(n_blocks, offsets, cnt, host_cuda_globals.cnt_ret, buf, prmts_list);
+    //     cudaMemcpy(&n_prmts, host_cuda_globals.cnt_ret, sizeof(int), cudaMemcpyDeviceToHost);
+    //     offsets += n_prmts;
+    //     prmts_list += n_prmts;
+    // }
 
     // vf_col_set_cuda(nvi, nfj, )
+
+    per_intersection_core(n_overlaps, culls, overlaps);
     return 1.0;
 }
 
@@ -747,7 +749,7 @@ __device__ luf affine(luf aabb, cudaAffineBody& c, int vtn)
     return { l, u };
 }
 
-__device__ __host__ float vf_distance(vec3f _v, Facef f, PointTriangleDistanceType& pt_type)
+__device__ __host__ float vf_distance(vec3f _v, Facef f, int& _pt_type)
 {
     auto n = unit_normal(f);
     auto d = dot(n, _v - f.t0);
@@ -760,6 +762,7 @@ __device__ __host__ float vf_distance(vec3f _v, Facef f, PointTriangleDistanceTy
     auto _a2 = dot(cross(f.t1 - v, f.t2 - v), n);
     auto _a3 = dot(cross(f.t2 - v, f.t0 - v), n);
     bool inside = _a1 * _a2 > 0.0f && _a2 * _a3 > 0.0f;
+    PointTriangleDistanceType pt_type;
     // if (a2 > a1 + 1e-8) {
     if (!inside) {
         // projection outside of triangle
@@ -794,6 +797,7 @@ __device__ __host__ float vf_distance(vec3f _v, Facef f, PointTriangleDistanceTy
     }
     else
         pt_type = PointTriangleDistanceType::P_T;
+    _pt_type = static_cast<underlying_type_t<PointTriangleDistanceType>>(pt_type);
     return d;
 }
 
@@ -825,14 +829,26 @@ __device__ luf compute_aabb(const Facef& f, float d_hat_sqrt)
     return { l, u };
 }
 
+__global__ void strided_memset_kernel(
+    i2* start, i2 value, int n)
+{
+    auto tid = threadIdx.x;
+    int n_tasks_per_thread = (n + blockDim.x - 1) / blockDim.x;
+    for (int _i = 0; _i < n_tasks_per_thread; _i++) {
+        int I = _i + tid * n_tasks_per_thread;
+        if (I < n) {
+            start[I] = value;
+        }
+    }
+}
 __global__ void prepare_aabb_vi_fj_kernel(
     int i_overlap, i2* overlaps,
     cudaAffineBody* cubes,
     int type, // vi fj; vj fi; ei ej (i < j)
 
     int* vi_meta_sizes, int* fj_meta_sizes, // i.e. nvi, nfj
-    int* vilst, int* fjlist,
-    vec3* vifjs, // not necessarily vi fj, just groups of 4 vec3f
+    int* vilist, int* fjlist,
+    vec3f* vifjs, // not necessarily vi fj, just groups of 4 vec3f
     luf* joint_aabbs)
 {
     auto tid = threadIdx.x;
@@ -850,14 +866,14 @@ __global__ void prepare_aabb_vi_fj_kernel(
             case 0: {
                 auto& p{ ci.vertices[i] };
                 vifjs[I] = p;
-                joint_aabbs[I] = compute_aabb(p, dev::d_hat_sqrt);
+                joint_aabbs[I] = { p - dev::d_hat_sqr, p + dev::d_hat_sqr };
                 break;
             }
             case 2: {
                 auto& e{ ci.edge(i) };
                 vifjs[I * 2] = e.e0;
                 vifjs[I * 2 + 1] = e.e1;
-                joint_aabbs[I] = compute_aabb(e, dev::d_hat_sqrt);
+                joint_aabbs[I] = compute_aabb(e, dev::d_hat_sqr);
                 break;
             }
             }
@@ -877,14 +893,14 @@ __global__ void prepare_aabb_vi_fj_kernel(
                 vifjs[vi_meta_sizes[0] + I * 3 + 1] = f.t1;
                 vifjs[vi_meta_sizes[0] + I * 3 + 2] = f.t2;
 
-                joint_aabbs[meta_sizes[0] + I] = compute_aabb(f, dev::d_hat_sqrt);
+                joint_aabbs[vi_meta_sizes[0] + I] = compute_aabb(f, dev::d_hat_sqr);
                 break;
             }
-            case 1: {
+            case 2: {
                 auto& e{ ci.edge(i + fj_meta_sizes[0]) };
                 vifjs[vi_meta_sizes[0] * 2 + I * 2] = e.e0;
                 vifjs[vi_meta_sizes[0] * 2 + I * 2 + 1] = e.e1;
-                joint_aabbs[I] = compute_aabb(e, dev::d_hat_sqrt);
+                joint_aabbs[I] = compute_aabb(e, dev::d_hat_sqr);
                 break;
             }
             }
@@ -898,18 +914,18 @@ void per_intersection_core(int n_overlaps, luf* culls, i2* overlaps)
 #pragma omp parallel for schedule(guided)
     for (int i = 0; i < n_overlaps; i++) {
         auto tid = omp_get_thread_num();
-        auto& stream = globals.steams[tid];
-        auto& cubes{ host_cuda_globals.cubes };
+        auto& stream{ host_cuda_globals.streams[tid] };
+        cudaAffineBody* cubes{ host_cuda_globals.cubes };
         // preparing pointers
 
         int *vlist, *elist, *flist;
         int *vlist_meta, *elist_meta, *flist_meta;
-        
-        auto st_back_stashed {host_cuda_globals.small_termporary_buffer_back[tid]}, bulk_back_stashed {host_cuda_globals.bulk_buffer_back[tid]};
+
+        char *st_back_stashed{ host_cuda_globals.small_temporary_buffer_back[tid] }, *bulk_back_stashed{ host_cuda_globals.bulk_buffer_back[tid] };
 
         for (int type = 0; type < 3; type++) {
             // designate buffers
-            auto& st{ host_cuda_globals.small_termporary_buffer_back[tid] };
+            auto& st{ host_cuda_globals.small_temporary_buffer_back[tid] };
 
             int* ret_meta_sizes = (int*)st;
             st += 2 * sizeof(int);
@@ -947,7 +963,7 @@ void per_intersection_core(int n_overlaps, luf* culls, i2* overlaps)
         i2 ji = { ij[1], ij[0] };
 
         host_cuda_globals.bulk_buffer_back[tid] = bulk_back_stashed;
-        host_cuda_globals.small_termporary_buffer_back[tid] = st_back_stashed;
+        host_cuda_globals.small_temporary_buffer_back[tid] = st_back_stashed;
 
         int nvifj, nvjfi, neiej;
         int *host_cnts[3], cnt[3];
@@ -956,7 +972,7 @@ void per_intersection_core(int n_overlaps, luf* culls, i2* overlaps)
             // vi fj, vj fi, ei ej (i < j)
 
             auto& bulk{ host_cuda_globals.bulk_buffer_back[tid] };
-            auto& st{ host_cuda_globals.small_termporary_buffer_back[tid] };
+            auto& st{ host_cuda_globals.small_temporary_buffer_back[tid] };
             float3* vifjs = (float3*)bulk;
             bulk += sizeof(float3) * 4 * max_prmts_per_block;
             luf* joint_aabbs = (luf*)bulk;
@@ -985,9 +1001,11 @@ void per_intersection_core(int n_overlaps, luf* culls, i2* overlaps)
 
             aabb_intersection_test_kernel<<<1, n_cuda_threads_per_block, 0, stream>>>(joint_aabbs, nvi, nfj, ret_ij, ret_cnt);
             filter_distance_kernel_atomic<<<1, n_cuda_threads_per_block, 0, stream>>>(
-                buf_ij, ret_ij, ret_cnt, vifjs, pt_types, 
-                vlist, flist, 
-                tmp_pt_types);
+                buf_ij, ret_ij, ret_cnt, vifjs, nullptr,
+                vlist, flist,
+                tmp_pt_types, pt_types, 
+                1e-4f, 
+                vlist_meta + type);
             // gather_kernel<<<1, n_cuda_threads_per_block, 0, stream>>>(ret_cnt, ret_ij, buf_ij, vlist, flist);
             host_cnts[type] = ret_cnt;
             switch (type) {
@@ -1016,9 +1034,32 @@ void per_intersection_core(int n_overlaps, luf* culls, i2* overlaps)
         cudaMemcpy(host_cuda_globals.pt.p + pt_put + nvifj, vjfi_ptr, nvjfi * sizeof(i2), cudaMemcpyDeviceToDevice);
         cudaMemcpy(host_cuda_globals.ee.p + ee_put, eiej_ptr, neiej * sizeof(i2), cudaMemcpyDeviceToDevice);
 
-
-        cudaMemset(host_cuda_globals.pt.b + pt_put, ij, sizeof(i2) * nvifj);
-        cudaMemset(host_cuda_globals.pt.b + pt_put + nvifj, ji, sizeof(i2) * nvjfi);
-        cudaMemset(host_cuda_globals.ee.b + ee_put, ij, sizeof(i2) * neiej);
+        // cudaMemset(host_cuda_globals.pt.b + pt_put, (long long)ij, nvifj);
+        // cudaMemset(host_cuda_globals.pt.b + pt_put + nvifj, ji, nvjfi);
+        // cudaMemset(host_cuda_globals.ee.b + ee_put, ij, sizeof(i2) * neiej);
+        strided_memset_kernel<<<1, n_cuda_threads_per_block, 0, stream>>>(host_cuda_globals.pt.b + pt_put, ij, nvifj);
+        strided_memset_kernel<<<1, n_cuda_threads_per_block, 0, stream>>>(host_cuda_globals.pt.b + pt_put + nvifj, ji, nvjfi);
+        strided_memset_kernel<<<1, n_cuda_threads_per_block, 0, stream>>>(host_cuda_globals.ee.b + ee_put, ij, neiej);
     }
+}
+
+void make_lut(int lut_size, thrust::device_vector<i2>& lut) {
+    int n_cubes = host_cuda_globals.n_cubes;
+    
+    {
+        thrust::host_vector<i2> diagonals(n_cubes);
+        thrust::device_vector<i2> dev_diagonals(n_cubes);
+        for (int i = 0; i < n_cubes; i++) diagonals[i] = { i, i };
+        dev_diagonals = diagonals;
+        lut.insert(lut.begin() + lut_size, dev_diagonals.begin(), dev_diagonals.end());
+    }
+ 
+    
+    thrust::sort(lut.begin(), lut.end());
+    // auto new_end = thrust::unique(lut.begin(), lut.end());
+
+    // lut.resize(lut_size);
+    lut.resize(lut_size + n_cubes);
+    // lut.shrink_to_fit();
+
 }

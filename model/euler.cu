@@ -355,7 +355,7 @@ void implicit_euler_cuda()
     iaabb_brute_force_cuda(n_cubes, host_cuda_globals.aabbs, 1, host_cuda_globals.lut_size, PTR(host_cuda_globals.lut), nullptr, PTR(host_cuda_globals.prim_idx), PTR(host_cuda_globals.body_idx), PTR(host_cuda_globals.pt_types));
 
     do {
-        make_lut(host_cuda_globals.lut_size, PTR(host_cuda_globals.lut));
+        // make_lut(host_cuda_globals.lut_size, PTR(host_cuda_globals.lut));
         make_placeholder_sparse_matrix(host_cuda_globals.lut_size, PTR(host_cuda_globals.lut), host_cuda_globals.hess);
 
         project_vt1_kernel<<<1, n_cuda_threads_per_block>>>(n_cubes, host_cuda_globals.cubes, host_cuda_globals.projected_vertices);

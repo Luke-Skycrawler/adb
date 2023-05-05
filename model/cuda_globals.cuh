@@ -79,8 +79,8 @@ struct CollisionSet {
     int device_id, per_stream_buffer_size;
     int *cnt_ret;
 
-    char **small_termporary_buffer, bulk_buffer;
-    char **small_termporary_buffer_back, bulk_buffer_back;
+    char **small_temporary_buffer, **bulk_buffer;
+    char **small_temporary_buffer_back, **bulk_buffer_back;
     CollisionSet pt, ee;
     
     cudaStream_t* streams;
@@ -117,6 +117,6 @@ __forceinline__ __device__ float3 matmul(float3 _q[4], float3 x)
     return ret + _q[0];
 }
 
-void make_lut(int lut_size, i2* lut);
+extern void make_lut(int lut_size, i2* lut);
 
 

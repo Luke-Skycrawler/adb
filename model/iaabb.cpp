@@ -82,9 +82,9 @@ void make_lut_glue(vector<Intersection> &os) {
     for (int i = 0; i < ni; i++) {
         host_lut[i] = { os[i].i, os[i].j };
     }
-    make_lut(host_lut.size(), host_lut.data());
+    //make_lut(host_lut.size(), PTR(host_lut.data()));
 }
-float vf_distance(vec3f _v, Facef f, ipc::PointTriangleDistanceType &pt_type);
+float vf_distance(vec3f _v, Facef f, int &pt_type);
 tuple<float, ipc::PointTriangleDistanceType> vf_distance(vec3f vf, Facef ff); 
 
 void vf_col_set_cuda(
@@ -1197,13 +1197,13 @@ double primitive_brute_force(
                         };
                         vec3f pf{ to_vec3f(
                             cubes[a[0]]->v_transformed[a[1]]) };
-                        ipc::PointTriangleDistanceType ptt;
+                        int ptt;
                         auto d = vf_distance(pf, ff, ptt);
                         auto [d_ref, type_ref] = vf_distance(p, f);
                         auto [d_ref2, type_ref2] = vf_distance(pf, ff);
                         spdlog::error("in diff set: pt distance = {}, ref = {}, ref2 = {}", d, d_ref, d_ref2);
 
-                        spdlog::error ("type, cuda = {}, ref = {}", static_cast<underlying_type_t<ipc::PointTriangleDistanceType>>(ptt), static_cast<underlying_type_t<ipc::PointTriangleDistanceType>>(type_ref));
+                        spdlog::error ("type, cuda = {}, ref = {}", ptt, static_cast<underlying_type_t<ipc::PointTriangleDistanceType>>(type_ref));
                     }
                     for (auto a: cuda_ref) {
                         Face f{ *cubes[a[2]], unsigned(a[3]), true, true };
@@ -1213,12 +1213,12 @@ double primitive_brute_force(
                         };
                         vec3f pf{ to_vec3f(
                             cubes[a[0]]->v_transformed[a[1]]) };
-                        ipc::PointTriangleDistanceType ptt;
+                        int ptt;
                         auto d = vf_distance(pf, ff, ptt);
                         auto [d_ref, type_ref] = vf_distance(p, f);
                         auto [d_ref2, type_ref2] = vf_distance(pf, ff);
                         spdlog::error("in diff (cuda - ref): pt distance = {}, ref = {}, ref2 = {}", d, d_ref, d_ref2);
-                        spdlog::error ("type, cuda = {}, ref = {}", static_cast<underlying_type_t<ipc::PointTriangleDistanceType>>(ptt), static_cast<underlying_type_t<ipc::PointTriangleDistanceType>>(type_ref));
+                        spdlog::error ("type, cuda = {}, ref = {}", ptt, static_cast<underlying_type_t<ipc::PointTriangleDistanceType>>(type_ref));
 
                     }
                 }
