@@ -8,7 +8,7 @@ CudaGlobals host_cuda_globals;
 //__constant__ CudaGlobals *cuda_globals;
 //__constant__ float3 gravity;
 
-void gpuCholSolver(CsrSparseMatrix& hess, float* x);
+void gpuCholSolver(CsrSparseMatrix& hess, float* x, float *b);
 __global__ void ipc_pt_kernel(
     int n_cubes, int npt,
     i2* prims, i2* body,
@@ -379,7 +379,7 @@ void implicit_euler_cuda()
         // );
 
         // ipc vg kernel
-        gpuCholSolver(host_cuda_globals.hess, host_cuda_globals.dq);
+        gpuCholSolver(host_cuda_globals.hess, host_cuda_globals.dq, nullptr);
         float sup_dq = thrust::reduce(host_cuda_globals.dq, host_cuda_globals.dq + 12 * n_cubes, 0.0f);
         // FIXME: squared sum
         float toi = upper_bound_cuda(n_cubes, host_cuda_globals.aabbs, host_cuda_globals.lut_size, PTR(host_cuda_globals.lut));

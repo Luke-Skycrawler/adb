@@ -39,12 +39,12 @@ struct CsrSparseMatrix
 	int rows = 0;
 	int cols = 0;
 	int nnz = 0;
-	// thrust::device_vector<int> outer_start;
-	thrust::host_vector<int> outer_start;
-	// thrust::device_vector<int> inner;
-	thrust::host_vector<int> inner;
-	// thrust::device_vector<float> values;
-	thrust::host_vector<float> values;
+	thrust::device_vector<int> outer_start;
+	// thrust::host_vector<int> outer_start;
+	thrust::device_vector<int> inner;
+	// thrust::host_vector<int> inner;
+	thrust::device_vector<float> values;
+	// thrust::host_vector<float> values;
 };
 
 

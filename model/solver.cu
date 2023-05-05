@@ -40,7 +40,7 @@ void freeCublasAndCusparse()
 	cusolverSpDestroyCsrcholInfo(sp_chol_info);
 }
 
-void gpuCholSolver(CsrSparseMatrix& hess, float* x)
+void gpuCholSolver(CsrSparseMatrix& hess, float* x, float *b)
 {
     // hess must be filled by all nonzero value.
     float tol = 1.e-12f;
@@ -51,11 +51,11 @@ void gpuCholSolver(CsrSparseMatrix& hess, float* x)
     auto values = thrust::raw_pointer_cast(hess.values.data());
     auto outer_start = thrust::raw_pointer_cast(hess.outer_start.data());
     auto inner = thrust::raw_pointer_cast(hess.inner.data());
-    auto rhs = thrust::raw_pointer_cast(host_cuda_globals.b);
+    //auto rhs = thrust::raw_pointer_cast(host_cuda_globals.b);
     cusolverStatus_t t = cusolverSpScsrlsvchol(
         cusolverSpH, hess.rows, hess.nnz,
         spdescrA, values, outer_start, inner,
-        rhs, tol, reorder, x, &singularity);
+        b, tol, reorder, x, &singularity);
     cudaDeviceSynchronize();
     if (0 <= singularity)
     {

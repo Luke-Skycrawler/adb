@@ -12,9 +12,8 @@ using namespace utils;
 
 #include "cuda_globals.cuh"
 
-static const bool strict = false;
 void build_csr(int n_cubes, const thrust::device_vector<i2>& lut, CsrSparseMatrix& sparse_matrix);
-void gpuCholSolver(CsrSparseMatrix& hess, float* x);
+void gpuCholSolver(CsrSparseMatrix& hess, float* x, float *b);
 
 void make_lut_test_glue(map<array<int, 2>, int>& lut, thrust::host_vector<i2>& host_lut)
 {
@@ -25,40 +24,83 @@ void make_lut_test_glue(map<array<int, 2>, int>& lut, thrust::host_vector<i2>& h
     }
 }
 
+
+void compare (SparseMatrix<double> sparse_hess, CsrSparseMatrix& hess) {
+    const bool strict = false;
+
+    assert(sparse_hess.nonZeros() == hess.nnz); // "error: nnz: " ;// sparse_hess.nonZeros() ;// " " ;// hess.nnz;
+    assert(sparse_hess.rows() == hess.rows); // "error: rows: " ;// sparse_hess.rows() ;// " " ;// hess.rows;
+    assert(sparse_hess.cols() == hess.cols); // "error: cols: " ;// sparse_hess.cols() ;// " " ;// hess.cols;
+    vector<int> outer = from_thrust(hess.outer_start);
+    vector<int> inner = from_thrust(hess.inner);
+    for (int i = 0; i < sparse_hess.cols(); i++) {
+        auto ref = sparse_hess.outerIndexPtr()[i], act = outer[i];
+        if (!strict) {
+            if (ref != act)
+                spdlog::warn("outer, ref, value = {}, {}", ref, act);
+        }
+        else
+            assert(ref == act);
+    }
+    for (int i = 0; i < sparse_hess.nonZeros(); i++) {
+        auto ref = sparse_hess.innerIndexPtr()[i], act = inner[i];
+        auto value_ref = sparse_hess.valuePtr()[i];
+        
+        //float value_act = hess.values[i];
+        if (!strict) {
+            if (ref != act)
+                spdlog ::warn("ref, value = {}, {}", ref, act);
+            // if (abs(value_ref -value_act) > 1e-1)
+            //     spdlog::warn("value_ref, value_act = {}, {}", value_ref, value_act);
+        }
+
+        else
+            assert(ref == act);// && abs(value_ref - value_act) < 1e-12);
+    }
+}
+
 void to_csr(Eigen::SparseMatrix<double>& hess, CsrSparseMatrix& ret)
 {
     ret.rows = hess.rows();
     int cols = ret.cols = hess.cols();
     int nnz = ret.nnz = hess.nonZeros();
 
-    ret.outer_start = thrust::device_vector<int>{ hess.outerIndexPtr(), hess.outerIndexPtr() + cols };
+    auto tmp_outer = thrust::host_vector<int>{ hess.outerIndexPtr(), hess.outerIndexPtr() + cols };
+    tmp_outer.push_back(nnz);
+    ret.outer_start = tmp_outer;
     ret.inner = thrust::device_vector<int>{ hess.innerIndexPtr(), hess.innerIndexPtr() + nnz };
     vector<float> values;
     values.resize(nnz);
     for (int i = 0; i < nnz; i++) {
         values[i] = hess.valuePtr()[i];
     }
-    ret.values = thrust::device_vector<float>{ values.data(), values.data() + nnz };
+     ret.values = thrust::device_vector<float>{ values.data(), values.data() + nnz };
 }
 
 void cuda_solve(Eigen::VectorXd &_dq, Eigen::SparseMatrix<double>& sparse_hess, Eigen::VectorXd &r)
 {
     auto& hess{ host_cuda_globals.hess };
     to_csr(sparse_hess, hess);
-    float* dq = new float[hess.cols];
     vector<float> r_vec;
     r_vec.resize(sparse_hess.cols());
     for (int i = 0; i < sparse_hess.cols(); i++) {
         r_vec[i] = r[i];
     }
+    // compare(sparse_hess, hess);
     cudaMemcpy(host_cuda_globals.b, r_vec.data(), r_vec.size() * sizeof(float), cudaMemcpyHostToDevice);
-    gpuCholSolver(hess, dq);
+    cudaDeviceSynchronize();
+    auto dq{ host_cuda_globals.dq };
+    gpuCholSolver(hess, dq,  host_cuda_globals.b);
+    vector<float> dq_vec;
+    dq_vec.resize(sparse_hess.cols());
+    cudaMemcpy(dq_vec.data(), dq, dq_vec.size() * sizeof(float), cudaMemcpyDeviceToHost);
+    cudaDeviceSynchronize();
     for (int i = 0; i < hess.cols; i++) {
-        _dq[i] = -dq[i];
+        _dq[i] = -dq_vec[i];
     }
-    delete[] dq;
     
 }
+
 
 void gen_empty_sm_glue(
 
@@ -78,45 +120,9 @@ void gen_empty_sm_glue(
     // make_lut(host_lut.size(), PTR(host_lut));
     build_csr(n_cubes, host_cuda_globals.lut, host_cuda_globals.hess);
     auto& hess = host_cuda_globals.hess;
-    assert(sparse_hess.nonZeros() == hess.nnz); // "error: nnz: " ;// sparse_hess.nonZeros() ;// " " ;// hess.nnz;
-    assert(sparse_hess.rows() == hess.rows); // "error: rows: " ;// sparse_hess.rows() ;// " " ;// hess.rows;
-    assert(sparse_hess.cols() == hess.cols); // "error: cols: " ;// sparse_hess.cols() ;// " " ;// hess.cols;
 
-    // thrust::host_vector<float> host_values(hess.values.begin(), hess.values.end());
-    // thrust::host_vector<int> host_inner(hess.inner.begin(), hess.inner.end()),
-    //     host_outer_start(hess.outer_start.begin(), hess.outer_start.end());
-    // const auto from_thrust = [](thrust::device_vector<int> &a) ->vector<int> {
-    //     thrust::host_vector<int> host(a.begin(), a.end());
-    //     vector<int > ret;
-    //     ret.resize(host.size());
-    //     for (int i = 0; i < host.size(); i ++) {
-    //         ret[i] = host[i];
-    //     }
-    //     return ret;
-    // } ;
-    vector<int> outer = from_thrust(hess.outer_start);
-    vector<int> inner = from_thrust(hess.inner);
-    for (int i = 0; i < sparse_hess.cols(); i++) {
-        auto ref = sparse_hess.outerIndexPtr()[i], act = outer[i];
-        if (!strict) {
-            if (ref != act)
-                spdlog::warn("outer, ref, value = {}, {}", ref, act);
-        }
-        else
-            assert(ref == act); 
-    }
-    for (int i = 0; i < sparse_hess.nonZeros(); i++) {
-        auto ref = sparse_hess.innerIndexPtr()[i], act = inner[i];
 
-        if (!strict) {
-            if (ref != act)
-                spdlog ::warn("ref, value = {}, {}", ref, act);
-
-        }
-
-        else 
-            assert(ref == act) ;
-    }
+    compare(sparse_hess, hess);
 }
 namespace utils {
 
