@@ -71,6 +71,7 @@
         "make_lut": 0,
         "gen_sm_test": 1,
         "cuda_solver": 1,
-        "cuda_hess": 1
+        "cuda_hess": 1,
+        "cuda_intersection": 1
     }
 }

@@ -1274,7 +1274,10 @@ double primitive_brute_force(
     toi_global = min(toi_global, toi_ee_pt);
     return cull_trajectory ? toi_global : 1.0;
 }
-
+void cuda_culling_glue(
+    int vtn,
+    thrust::device_vector<luf>& aabbs,
+    thrust::device_vector<luf>& ret_culls);
 double iaabb_brute_force(
     int n_cubes,
     const std::vector<std::unique_ptr<AffineBody>>& cubes,
@@ -1296,7 +1299,34 @@ double iaabb_brute_force(
     vector<Intersection> ret;
     intersect_sort(n_cubes, cubes, aabbs, ret, vtn);
     double toi;
+    if (globals.params_int["cuda_intersection"]) {
+        thrust::device_vector<luf> ret_culls, dev_aabbs;
+        thrust::host_vector<luf> host_aabbs, host_culls;
+        host_aabbs.resize(n_cubes);
+        for (int i = 0; i < n_cubes; i++) {
+            host_aabbs[i] = to_luf(aabbs[i]);
+        }
+        dev_aabbs = host_aabbs;
+        cuda_culling_glue(vtn, dev_aabbs, ret_culls);
+        host_culls = ret_culls;
+        auto lut = from_thrust(host_cuda_globals.lut);
+        sort(lut.begin(), lut.end());
+        const auto to_i2 = [](vector<Intersection>& l) -> vector<i2> {
+            vector<i2> ret;
+            for (auto& i : l) {
+                ret.push_back({ i.i, i.j });
+            }
+            sort(ret.begin(), ret.end());
+            return ret;
+        };
+        auto ref = to_i2(ret);
+        vector<i2> ref_it;
 
+        set_intersection(ref.begin(), ref.end(), lut.begin(), lut.end(), std::back_inserter(ref_it));
+        if (ref_it.size() != lut.size() || ref_it.size()!= ref.size() ) {
+            spdlog::warn("size : ref = {}, lut = {}, intersection(ref, lut) = {}", ref.size(), lut.size(), ref_it.size());
+        } 
+    }
     toi = primitive_brute_force(n_cubes, ret, cubes, vtn,
 #ifdef TESTING
         pt_tois, ee_tois,

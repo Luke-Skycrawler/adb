@@ -57,9 +57,16 @@ struct CollisionSet {
     i2* b; // body index
     i2* p; // primitive index
 };
- struct CudaGlobals {
+
+static const int max_pairs_per_thread = 512, max_aabb_list_size = 512;
+static const int max_n_vertices = 1024 * 1024;
+static const int n_blocks = 64;
+static const int n_aabb_list_per_block = 16, max_pairs_per_block = 1024 * 2;
+static const int max_prmts_per_block = 1024 * 16;
+
+struct CudaGlobals {
     thrust::device_vector<FrictionInfo> friction_info;
-    cudaAffineBody *cubes;
+    cudaAffineBody* cubes;
     luf* aabbs;
     thrust::device_vector<i2> prim_idx, body_idx;
     thrust::device_vector<i2> prim_idx_update, body_idx_update;
@@ -70,30 +77,33 @@ struct CollisionSet {
     CsrSparseMatrix hess;
     // FIXME: __device__ refer lan's imple
     // thrust::device_vector<float> b;
-    float *b, *hess_diag, *dq, * float_buffer;
-    float dt;
-    float3 *projected_vertices, *float3_buffer;
-    thrust::device_vector<i2> lut;
-    // i2 * lut;
-    void *buffer_chunk;
-    int device_id, per_stream_buffer_size;
-    int *cnt_ret;
 
+    // permenant designated buffers
+    float *b, *hess_diag, *dq, *float_buffer;
+    float3 *projected_vertices, *float3_buffer;
+    float dt;
+    thrust::device_vector<i2> lut;
+    void* buffer_chunk;
+
+    int device_id, per_stream_buffer_size;
+    int* cnt_ret;
+
+    // temporary buffers
+    const int st_size = 128, blk_size = max_pairs_per_block * (sizeof(i2) * 2 + sizeof(int) * 2) * 8;
+    // only fit for small data;
     char **small_temporary_buffer, **bulk_buffer;
     char **small_temporary_buffer_back, **bulk_buffer_back;
+    char *leader_thread_buffer_back, *leader_thread_buffer;
     CollisionSet pt, ee;
-    
+
     cudaStream_t* streams;
     float3 gravity;
     CudaGlobals(int n_cubes = 0);
     ~CudaGlobals();
     void allocate_buffers();
     void free_buffers();
-    __device__ __host__ CudaGlobals(CudaGlobals &CudaGlobals);
+    __device__ __host__ CudaGlobals(CudaGlobals& CudaGlobals);
 };
-
-static const int max_pairs_per_thread = 512, max_aabb_list_size = 512;
-static const int max_n_vertices = 1024 * 1024;
 
 // __constant__ CudaGlobals *cuda_globals;
 extern CudaGlobals host_cuda_globals;
