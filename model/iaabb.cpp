@@ -1299,7 +1299,7 @@ double iaabb_brute_force(
     vector<Intersection> ret;
     intersect_sort(n_cubes, cubes, aabbs, ret, vtn);
     double toi;
-    if (globals.params_int["cuda_intersection"] && vtn == 1) {
+    if (globals.params_int["cuda_intersection"]) {
         thrust::device_vector<luf> ret_culls, dev_aabbs;
         thrust::host_vector<luf> host_aabbs, host_culls;
         thrust::host_vector<cudaAffineBody> host_cubes(n_cubes);

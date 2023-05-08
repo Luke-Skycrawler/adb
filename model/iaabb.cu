@@ -558,16 +558,6 @@ __device__ luf affine(luf aabb, cudaAffineBody& c, int vtn)
 {
     vec3f cull[8];
     vec3f l, u;
-    if (vtn == 3) {
-        auto updated =  affine(aabb, c, 2);
-        l.x = CUDA_MIN(l.x, updated.l.x);
-        l.y = CUDA_MIN(l.y, updated.l.y);
-        l.z = CUDA_MIN(l.z, updated.l.z);
-        u.x = CUDA_MAX(u.x, updated.u.x);
-        u.y = CUDA_MAX(u.y, updated.u.y);
-        u.z = CUDA_MAX(u.z, updated.u.z);
-        return {l, u};
-    }
     auto q{ vtn == 2 ? c.q_update : c.q };
     for (int i = 0; i < 2; i++)
         for (int j = 0; j < 2; j++)
@@ -591,6 +581,16 @@ __device__ luf affine(luf aabb, cudaAffineBody& c, int vtn)
             u.y = CUDA_MAX(u.y, cull[i].y);
             u.z = CUDA_MAX(u.z, cull[i].z);
         }
+    }
+    if (vtn == 3) {
+        auto updated =  affine(aabb, c, 2);
+        l.x = CUDA_MIN(l.x, updated.l.x);
+        l.y = CUDA_MIN(l.y, updated.l.y);
+        l.z = CUDA_MIN(l.z, updated.l.z);
+        u.x = CUDA_MAX(u.x, updated.u.x);
+        u.y = CUDA_MAX(u.y, updated.u.y);
+        u.z = CUDA_MAX(u.z, updated.u.z);
+        return {l, u};
     }
     return { l, u };
 }
