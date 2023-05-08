@@ -383,7 +383,7 @@ void vf_col_set_cuda(
     }
 
 }
-__device__ __constant__ const int max_overlap_size = 16;
+__device__ __constant__ const int max_overlap_size = 1024;
 __global__ void culling_kernel_atomic (
     // inputs:
     int n_cubes, cudaAffineBody* cubes,
@@ -767,6 +767,11 @@ __global__ void prepare_aabb_vi_fj_kernel(
 
 void per_intersection_core(int n_overlaps, luf* culls, i2* overlaps)
 {
+    #ifdef PT_ONLY
+    #define MAX_TYPES 2
+    #else 
+    #define MAX_TYPES 3
+    #endif
 #pragma omp parallel for schedule(guided)
     for (int i = 0; i < n_overlaps; i++) {
         auto tid = omp_get_thread_num();
@@ -781,7 +786,7 @@ void per_intersection_core(int n_overlaps, luf* culls, i2* overlaps)
         auto& st{ host_cuda_globals.small_temporary_buffer_back[tid] };
         auto& bulk{ host_cuda_globals.bulk_buffer_back[tid] };
 
-        for (int type = 0; type < 3; type++) {
+        for (int type = 0; type < MAX_TYPES; type++) {
             // designate buffers
 
             int* ret_meta_sizes = (int*)st;
@@ -825,7 +830,7 @@ void per_intersection_core(int n_overlaps, luf* culls, i2* overlaps)
         int nvifj, nvjfi, neiej;
         int *host_cnts[3], cnt[3];
         i2 *vifj_ptr, *vjfi_ptr, *eiej_ptr;
-        for (int type = 0; type < 3; type++) {
+        for (int type = 0; type < MAX_TYPES; type++) {
             // vi fj, vj fi, ei ej (i < j)
 
             float3* vifjs = (float3*)bulk;

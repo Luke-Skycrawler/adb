@@ -1287,6 +1287,7 @@ float iaabb_brute_force_cuda_pt_only(
     int vtn,
     std::vector<std::array<int, 4>>& idx);
 
+void project_glue(int vtn);
 double iaabb_brute_force(
     int n_cubes,
     const std::vector<std::unique_ptr<AffineBody>>& cubes,
@@ -1345,7 +1346,7 @@ double iaabb_brute_force(
             spdlog::warn("size : ref = {}, lut = {}, intersection(ref, lut) = {}", ref.size(), lut.size(), ref_it.size());
         }
     }
-    if (globals.params_int["cuda_pt"] && vtn <= 2) {
+    if (globals.params_int["cuda_pt"] && vtn == 1) {
             vector<array<int, 4>> idx_cuda, int_ref;
             for (int i = 0; i < n_cubes; i++) {
                 auto& b{ host_cuda_globals.host_cubes[i] };
@@ -1358,7 +1359,7 @@ double iaabb_brute_force(
                 }
             }
             cudaMemcpy(host_cuda_globals.cubes, host_cuda_globals.host_cubes.data(), sizeof(cudaAffineBody) * n_cubes, cudaMemcpyHostToDevice);
-            
+            project_glue(vtn);
             iaabb_brute_force_cuda_pt_only(n_cubes, host_cuda_globals.cubes, host_cuda_globals.aabbs, vtn, idx_cuda);
             sort(idx.begin(), idx.end());
             sort(idx_cuda.begin(), idx_cuda.end());

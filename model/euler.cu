@@ -181,9 +181,12 @@ __global__ void project_vt1_kernel(int n_cubes, cudaAffineBody *cubes, float3* b
         int i = tid * n_tasks_per_thread + _i;
         if (i < n_cubes) {
             auto& c{ cubes[i] };
-            auto offset = c.global_vertices_offset;
+            // auto offset = c.global_vertices_offset;
+            // for (int j = 0; j < c.n_vertices; j++) {
+            //     buffer[offset + j] = matmul(c.q, c.vertices[j]);
+            // }
             for (int j = 0; j < c.n_vertices; j++) {
-                buffer[offset + j] = matmul(c.q, c.vertices[j]);
+                c.projected[j] = matmul(c.q, c.vertices[j]);
             }
         }
     }
@@ -498,4 +501,13 @@ __host__ __device__ CudaGlobals::CudaGlobals(CudaGlobals & a) {
     per_stream_buffer_size = a.per_stream_buffer_size;
     streams = a.streams;
     // lut = a.lut;
+}
+
+void project_glue(int vtn)
+{
+    switch (vtn) {
+    case 1:
+        project_vt1_kernel<<<1, n_cuda_threads_per_block>>>(host_cuda_globals.n_cubes, host_cuda_globals.cubes, host_cuda_globals.projected_vertices);
+        break;
+    }
 }
