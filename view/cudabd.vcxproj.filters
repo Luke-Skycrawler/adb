@@ -93,6 +93,9 @@
     <ClCompile Include="..\model\autogen\point_plane.cu">
       <Filter>cuda\autogen</Filter>
     </ClCompile>
+    <ClCompile Include="..\model\cuda_glue.cpp">
+      <Filter>cuda</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\model\cuda_globals.cuh">

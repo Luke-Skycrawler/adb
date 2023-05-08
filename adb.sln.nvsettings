@@ -1,2 +1,2 @@
 [WarpWatch]
-Expressions=i, vi, vis_ptr[0], fj, j
+Expressions=i, j, vi, nv, j, cubes[b]

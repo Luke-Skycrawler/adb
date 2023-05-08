@@ -87,22 +87,22 @@ struct cudaAffineBody {
     float mass, Ic;
     int n_vertices, n_faces, n_edges;
     int *faces, *edges;
-    float3* vertices;
+    float3* vertices, *projected;
     int global_vertices_offset;
     __device__ __host__ void q_minus_qtiled(float3 dq[4]);
     inline __device__ __host__ Facef triangle(int i)
     {
         return Facef{
-            vertices[faces[i * 3]],
-            vertices[faces[i * 3 + 1]],
-            vertices[faces[i * 3 + 2]]
+            projected[faces[i * 3]],
+            projected[faces[i * 3 + 1]],
+            projected[faces[i * 3 + 2]]
         };
     }
     inline __device__ __host__ Edgef edge(int i)
     {
         return Edgef{
-            vertices[edges[i * 2]],
-            vertices[edges[i * 2 + 1]]
+            projected[edges[i * 2]],
+            projected[edges[i * 2 + 1]]
         };
     }
 };

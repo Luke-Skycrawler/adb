@@ -66,12 +66,13 @@
         "gfk": 1,
         "hdk": 1,
         "cuda_supervised": 0,
-        "cuda_direct": 1,
+        "cuda_direct": 0,
         "strict": 0,
         "make_lut": 0,
         "gen_sm_test": 1,
         "cuda_solver": 1,
         "cuda_hess": 1,
-        "cuda_intersection": 1
+        "cuda_intersection": 0,
+        "cuda_pt": 1
     }
 }

@@ -3,6 +3,7 @@
 #include <thrust/device_vector.h>
 #include "cuda_header.cuh"
 #include "cuda_glue.h"
+#include <vector>
 using i2 = cuda::std::array<int, 2>;
 using i4 = cuda::std::array<int, 4>;
 struct CollisionSets {
@@ -67,6 +68,7 @@ static const int max_prmts_per_block = 1024 * 16;
 struct CudaGlobals {
     thrust::device_vector<FrictionInfo> friction_info;
     cudaAffineBody* cubes;
+    std::vector<cudaAffineBody> host_cubes;
     luf* aabbs;
     thrust::device_vector<i2> prim_idx, body_idx;
     thrust::device_vector<i2> prim_idx_update, body_idx_update;
@@ -80,7 +82,7 @@ struct CudaGlobals {
 
     // permenant designated buffers
     float *b, *hess_diag, *dq, *float_buffer;
-    float3 *projected_vertices, *float3_buffer;
+    float3 *float3_buffer;
     float dt;
     thrust::device_vector<i2> lut;
     void* buffer_chunk;
@@ -94,6 +96,8 @@ struct CudaGlobals {
     char **small_temporary_buffer, **bulk_buffer;
     char **small_temporary_buffer_back, **bulk_buffer_back;
     char *leader_thread_buffer_back, *leader_thread_buffer;
+    vec3f *vertices_at_rest, *projected_vertices;
+    int *edges, *faces;
     CollisionSet pt, ee;
 
     cudaStream_t* streams;

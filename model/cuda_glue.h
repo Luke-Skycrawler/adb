@@ -2,6 +2,7 @@
 #include "affine_body.h"
 #include "cuda_globals.cuh"
 #include <vector>
+#include <memory>
 using lu = std::array<vec3, 2>;
 
 inline luf to_luf(const lu& a)
@@ -64,6 +65,12 @@ std::vector<T> from_thrust(thrust::host_vector<T>& b)
     return ret;
 }
 
+void initialize_primitives(
+    const std::vector<std::unique_ptr<AffineBody>>& cubes
+);
+void initialize_aabbs(
+    const std::vector<lu>& aabbs
+);
 
 // template <typename T>
 // thrust::device_vector<T> to_thrust(std::vector<T> &b);

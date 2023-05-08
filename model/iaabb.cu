@@ -1,5 +1,4 @@
 
-// #include "iaabb.h"
 #include "cuda_header.cuh"
 #include "cuda_globals.cuh"
 #include "timer.h"
@@ -123,7 +122,10 @@ __global__ void filter_distance_kernel_atomic(i2* buf_ij, i2* io_tmp,
             io_tmp[idx] = buf_ij[idx];
         }
     }
-    cnt[n_cuda_threads_per_block - 1] = n;
+    if (meta_vifj)
+        *cnt = n;
+    else
+        cnt[n_cuda_threads_per_block - 1] = n;
 }
 __global__ void filter_distance_kernel(i2* ret_ij, int* ret_cnt, i2* tmp,
     // int* vilist, int* fjlist,
@@ -381,8 +383,8 @@ void vf_col_set_cuda(
     }
 
 }
-__device__ __constant__ const int max_overlap_size = 1024;
-__global__ void iaabb_culling_kernel_atomic(
+__device__ __constant__ const int max_overlap_size = 16;
+__global__ void culling_kernel_atomic (
     // inputs:
     int n_cubes, cudaAffineBody* cubes,
     luf* aabbs, 
@@ -464,8 +466,8 @@ __global__ void primitive_intersection_test_kernel(
 
     int tid = threadIdx.x; // each block handles one overlap
 
-    auto& cull{ culls[i_overlap] };
-    auto& body_idx{ body_index[i_overlap] };
+    auto cull{ culls[i_overlap] };
+    auto body_idx{ body_index[i_overlap] };
     int i = body_idx[0], j = body_idx[1];
     int nvi, nv;
     switch (type) {
@@ -487,7 +489,7 @@ __global__ void primitive_intersection_test_kernel(
     for (int _j = 0; _j < n_tasks_per_thread; _j++) {
         int vi = tid * n_tasks_per_thread + _j;
         if (vi < nv) {
-            int j = vi < nvi ? 0 : 1;
+            int J = vi < nvi ? 0 : 1;
             auto b = vi < nvi ? i : j;
             int idx = vi < nvi ? vi : vi - nvi;
 
@@ -495,22 +497,23 @@ __global__ void primitive_intersection_test_kernel(
 
             if (intersects(cull, t)) {
                 int put = atomicAdd(&n, 1);
-                ret_prmts[put] = b;
-                atomicAdd(ret_prmts_meta_sizes + j, 1);
+                ret_prmts[put] = idx;
+                atomicAdd(ret_prmts_meta_sizes + J, 1);
             }
         }
     }
 
 }
 
-double iaabb_brute_force_cuda(
+float iaabb_brute_force_cuda_pt_only(
     int n_cubes,
-    thrust::device_vector<cudaAffineBody>& cubes,
-    thrust::device_vector<luf>& aabbs,
+    cudaAffineBody* cubes,
+    luf* aabbs,
     int vtn,
-    std::vector<std::array<int, 4>>& idx,
-    std::vector<std::array<int, 4>>& eidx,
-    std::vector<std::array<int, 2>>& vidx)
+    std::vector<std::array<int, 4>>& idx
+    // std::vector<std::array<int, 4>>& eidx,
+    // std::vector<std::array<int, 2>>& vidx
+    )
 
 {
     int n_overlaps;
@@ -520,6 +523,9 @@ double iaabb_brute_force_cuda(
     int * dev_n_overlaps = (int *)lt_back;
     lt_back += sizeof(int);
 
+    host_cuda_globals.nee = host_cuda_globals.npt = 0;
+    idx.resize(0);
+
     i2 * overlaps = (i2 *)lt_back;
     lt_back += sizeof(i2) * max_overlap_size;
     
@@ -527,16 +533,22 @@ double iaabb_brute_force_cuda(
     lt_back += sizeof(luf) * max_overlap_size;
     
     
-    iaabb_culling_kernel_atomic<<<1, n_cuda_threads_per_block>>>(n_cubes, PTR(cubes), PTR(aabbs), vtn, dev_n_overlaps, overlaps, culls);
-
+    culling_kernel_atomic <<<1, n_cuda_threads_per_block>>>(n_cubes, cubes, aabbs, vtn, dev_n_overlaps, overlaps, culls);
+    CUDA_CALL(cudaGetLastError());
     cudaMemcpy(&n_overlaps, dev_n_overlaps, sizeof(int), cudaMemcpyDeviceToHost);
+    CUDA_CALL(cudaDeviceSynchronize());
     //make_lut(n_overlaps, PTR(host_cuda_globals.lut));
 
 
     per_intersection_core(n_overlaps, culls, overlaps);
 
     lt_back = stashed_lt_back;
-
+    
+    int npt = host_cuda_globals.npt, nee = host_cuda_globals.nee;
+    for (int i = 0; i< npt; i ++) {
+        auto p = host_cuda_globals.pt.p[i], b = host_cuda_globals.pt.b[i];
+        idx.push_back({b[0], p[0], b[1], p[1]});
+    }
     return 1.0;
 }
 
@@ -781,7 +793,9 @@ void per_intersection_core(int n_overlaps, luf* culls, i2* overlaps)
 
             primitive_intersection_test_kernel<<<1, n_cuda_threads_per_block, 0, stream>>>(
                 type, i, culls, overlaps, cubes, ret_meta_sizes, ret_prmts);
+            CUDA_CALL(cudaStreamSynchronize(stream));
 
+            CUDA_CALL(cudaGetLastError());
             switch (type) {
             case 0:
                 vlist = ret_prmts;
@@ -800,10 +814,11 @@ void per_intersection_core(int n_overlaps, luf* culls, i2* overlaps)
 
 
         int sizes[6];
-        cudaStreamSynchronize(stream);
-        cudaMemcpy(sizes, vlist_meta, sizeof(int) * 6, cudaMemcpyDeviceToHost);
+        CUDA_CALL(cudaStreamSynchronize(stream));
+        CUDA_CALL(cudaMemcpyAsync(sizes, vlist_meta, sizeof(int) * 6, cudaMemcpyDeviceToHost, stream));
         i2 ij;
-        cudaMemcpy(&ij, overlaps + i, sizeof(i2), cudaMemcpyDeviceToHost);
+        CUDA_CALL(cudaMemcpyAsync(&ij, overlaps + i, sizeof(i2), cudaMemcpyDeviceToHost, stream));
+        CUDA_CALL(cudaStreamSynchronize(stream));
         i2 ji = { ij[1], ij[0] };
 
 
@@ -819,7 +834,9 @@ void per_intersection_core(int n_overlaps, luf* culls, i2* overlaps)
 
             prepare_aabb_vi_fj_kernel<<<1, n_cuda_threads_per_block, 0, stream>>>(
                 i, overlaps, cubes, type, vlist_meta, flist_meta, vlist, flist, vifjs, joint_aabbs);
-
+            CUDA_CALL(cudaGetLastError());
+            CUDA_CALL(cudaStreamSynchronize(stream));
+            
             i2* ret_ij = (i2*)bulk;
             bulk += sizeof(i2) * max_pairs_per_block;
             i2* buf_ij = (i2*)bulk;
@@ -838,12 +855,18 @@ void per_intersection_core(int n_overlaps, luf* culls, i2* overlaps)
             }
 
             aabb_intersection_test_kernel<<<1, n_cuda_threads_per_block, 0, stream>>>(joint_aabbs, nvi, nfj, ret_ij, ret_cnt);
+            CUDA_CALL(cudaGetLastError());
+            CUDA_CALL(cudaStreamSynchronize(stream));
+
             filter_distance_kernel_atomic<<<1, n_cuda_threads_per_block, 0, stream>>>(
                 buf_ij, ret_ij, ret_cnt, vifjs, nullptr,
                 vlist, flist,
                 pt_types, 
                 1e-4f, 
                 vlist_meta + type);
+            CUDA_CALL(cudaGetLastError());
+            CUDA_CALL(cudaStreamSynchronize(stream));
+
             host_cnts[type] = ret_cnt;
             switch (type) {
                 case 0: vifj_ptr = ret_ij; break;
@@ -854,8 +877,10 @@ void per_intersection_core(int n_overlaps, luf* culls, i2* overlaps)
 
 
 
-        cudaStreamSynchronize(stream);
-        cudaMemcpy(cnt, host_cnts[0], sizeof (int ) * 3, cudaMemcpyDeviceToHost);
+        CUDA_CALL(cudaStreamSynchronize(stream));
+        CUDA_CALL(cudaMemcpyAsync(cnt, host_cnts[0], sizeof (int ) * 3, cudaMemcpyDeviceToHost, stream));
+        CUDA_CALL(cudaStreamSynchronize(stream));
+
         nvifj = cnt[0]; 
         nvjfi = cnt[1];
         neiej = cnt[2];
@@ -867,9 +892,9 @@ void per_intersection_core(int n_overlaps, luf* culls, i2* overlaps)
             ee_put = host_cuda_globals.nee;
             host_cuda_globals.nee += neiej;
         }
-        cudaMemcpy(host_cuda_globals.pt.p + pt_put, vifj_ptr, nvifj * sizeof(i2), cudaMemcpyDeviceToDevice);
-        cudaMemcpy(host_cuda_globals.pt.p + pt_put + nvifj, vjfi_ptr, nvjfi * sizeof(i2), cudaMemcpyDeviceToDevice);
-        cudaMemcpy(host_cuda_globals.ee.p + ee_put, eiej_ptr, neiej * sizeof(i2), cudaMemcpyDeviceToDevice);
+        cudaMemcpyAsync(host_cuda_globals.pt.p + pt_put, vifj_ptr, nvifj * sizeof(i2), cudaMemcpyDeviceToDevice, stream);
+        cudaMemcpyAsync(host_cuda_globals.pt.p + pt_put + nvifj, vjfi_ptr, nvjfi * sizeof(i2), cudaMemcpyDeviceToDevice, stream);
+        cudaMemcpyAsync(host_cuda_globals.ee.p + ee_put, eiej_ptr, neiej * sizeof(i2), cudaMemcpyDeviceToDevice, stream);
 
         strided_memset_kernel<<<1, n_cuda_threads_per_block, 0, stream>>>(host_cuda_globals.pt.b + pt_put, ij, nvifj);
         strided_memset_kernel<<<1, n_cuda_threads_per_block, 0, stream>>>(host_cuda_globals.pt.b + pt_put + nvifj, ji, nvjfi);
@@ -924,7 +949,7 @@ void cuda_culling_glue(
     luf *culls = (luf *)lt_back;
     lt_back += sizeof(luf) * max_overlap_size;
 
-    iaabb_culling_kernel_atomic<<<1, n_cuda_threads_per_block>>>(n_cubes, cubes, PTR(aabbs), vtn, dev_n_overlaps, overlaps, culls);
+    culling_kernel_atomic <<<1, n_cuda_threads_per_block>>>(n_cubes, cubes, PTR(aabbs), vtn, dev_n_overlaps, overlaps, culls);
     cudaDeviceSynchronize();
     cudaMemcpy(&n_overlaps, dev_n_overlaps, sizeof(int), cudaMemcpyDeviceToHost);
 

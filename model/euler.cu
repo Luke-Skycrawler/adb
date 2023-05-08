@@ -427,7 +427,6 @@ void CudaGlobals::allocate_buffers()
     cudaMallocManaged(&dq, 12 * n_cubes * sizeof(float));
     int n_proc = omp_get_num_procs();
     cudaMallocManaged(&buffer_chunk, per_stream_buffer_size * n_proc);
-    cudaMallocManaged(&projected_vertices, sizeof(float3) * max_n_vertices);
     cudaMallocManaged(&float3_buffer, sizeof(float3) * n_cuda_threads_per_block * max_pairs_per_thread * 4);
     cudaMallocManaged(&hess_diag, 144 * n_cubes * sizeof(float));
     cudaMallocManaged(&cnt_ret, sizeof(int));
@@ -455,12 +454,16 @@ void CudaGlobals::free_buffers()
 {
 
     freeCublasAndCusparse();
+    cudaFree(vertices_at_rest);
+    cudaFree(projected_vertices);
+    cudaFree(edges);
+    cudaFree(faces);
+    cudaFree(aabbs);
     cudaFree(bulk_buffer[0]);
     cudaFree(small_temporary_buffer[0]);
     cudaFree(leader_thread_buffer);
     cudaFree(cnt_ret);
     cudaFree(buffer_chunk);
-    cudaFree(projected_vertices);
     cudaFree(float3_buffer);
     cudaFree(dq);
     cudaFree(hess_diag);

@@ -130,6 +130,8 @@ void reset(bool init)
     }
     host_cuda_globals.n_cubes = n_cubes;
     host_cuda_globals.allocate_buffers();
+    initialize_primitives(globals.cubes);
+    initialize_aabbs(globals.aabbs);
 }
 // process all input: query GLFW whether relevant keys are pressed/released this frame and react accordingly
 // ---------------------------------------------------------------------------------------------------------

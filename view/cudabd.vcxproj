@@ -114,6 +114,7 @@
     <ClCompile Include="..\model\autogen\point_line.cu" />
     <ClCompile Include="..\model\autogen\point_plane.cu" />
     <ClCompile Include="..\model\col_set.cpp" />
+    <ClCompile Include="..\model\cuda_glue.cpp" />
     <ClCompile Include="..\model\geo.cpp" />
     <ClCompile Include="..\model\iaabb.cpp" />
     <ClCompile Include="..\model\othogonal_energy.cpp" />

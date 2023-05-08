@@ -32,38 +32,38 @@ using namespace utils;
 using namespace std::chrono;
 #define DURATION_TO_DOUBLE(X) duration_cast<duration<double>>(high_resolution_clock::now() - (X)).count()
 
-double iaabb_brute_force_cuda(
-    int n_cubes,
-    thrust::device_vector<cudaAffineBody>& cubes,
-    thrust::device_vector<luf>& aabbs,
-    int vtn,
-    std::vector<std::array<int, 4>>& idx,
-    std::vector<std::array<int, 4>>& eidx,
-    std::vector<std::array<int, 2>>& vidx);
-double iaabb_brute_force_glue(
-    int n_cubes,
-    std::vector<std::unique_ptr<AffineBody>>& cubes,
-    std::vector<lu>& aabbs,
-    int vtn,
-    std::vector<std::array<vec3, 4>>& pts,
-    std::vector<std::array<int, 4>>& idx,
-    std::vector<std::array<vec3, 4>>& ees,
-    std::vector<std::array<int, 4>>& eidx,
-    std::vector<std::array<int, 2>>& vidx)
-{
-    thrust::host_vector<luf> host_aabbs;
-    thrust::host_vector<cudaAffineBody> host_cubes;
-    host_aabbs.resize(n_cubes);
-    host_cubes.resize(n_cubes);
-    for (int i = 0; i < n_cubes; i++) {
-        host_aabbs[i] = to_luf(aabbs[i]);
-        // host_cubes[i] = to_cabd(*cubes[i]);
-    }
-    thrust::device_vector<luf> dev_aabbs = host_aabbs;
-    thrust::device_vector<cudaAffineBody> dev_cubes = host_cubes;
+// double iaabb_brute_force_cuda(
+//     int n_cubes,
+//     thrust::device_vector<cudaAffineBody>& cubes,
+//     thrust::device_vector<luf>& aabbs,
+//     int vtn,
+//     std::vector<std::array<int, 4>>& idx,
+//     std::vector<std::array<int, 4>>& eidx,
+//     std::vector<std::array<int, 2>>& vidx);
+// double iaabb_brute_force_glue(
+//     int n_cubes,
+//     std::vector<std::unique_ptr<AffineBody>>& cubes,
+//     std::vector<lu>& aabbs,
+//     int vtn,
+//     std::vector<std::array<vec3, 4>>& pts,
+//     std::vector<std::array<int, 4>>& idx,
+//     std::vector<std::array<vec3, 4>>& ees,
+//     std::vector<std::array<int, 4>>& eidx,
+//     std::vector<std::array<int, 2>>& vidx)
+// {
+//     thrust::host_vector<luf> host_aabbs;
+//     thrust::host_vector<cudaAffineBody> host_cubes;
+//     host_aabbs.resize(n_cubes);
+//     host_cubes.resize(n_cubes);
+//     for (int i = 0; i < n_cubes; i++) {
+//         host_aabbs[i] = to_luf(aabbs[i]);
+//         // host_cubes[i] = to_cabd(*cubes[i]);
+//     }
+//     thrust::device_vector<luf> dev_aabbs = host_aabbs;
+//     thrust::device_vector<cudaAffineBody> dev_cubes = host_cubes;
 
-    return iaabb_brute_force_cuda(n_cubes, dev_cubes, dev_aabbs, vtn, idx, eidx, vidx);
-}
+//     return iaabb_brute_force_cuda(n_cubes, dev_cubes, dev_aabbs, vtn, idx, eidx, vidx);
+// }
 
 void glue_vf_col_set(
     vector<int>& vilist, vector<int>& fjlist,
@@ -1274,10 +1274,19 @@ double primitive_brute_force(
     toi_global = min(toi_global, toi_ee_pt);
     return cull_trajectory ? toi_global : 1.0;
 }
+
 void cuda_culling_glue(
     int vtn,
     thrust::device_vector<luf>& aabbs,
     thrust::device_vector<luf>& ret_culls);
+
+float iaabb_brute_force_cuda_pt_only(
+    int n_cubes,
+    cudaAffineBody* cubes,
+    luf* aabbs,
+    int vtn,
+    std::vector<std::array<int, 4>>& idx);
+
 double iaabb_brute_force(
     int n_cubes,
     const std::vector<std::unique_ptr<AffineBody>>& cubes,
@@ -1332,9 +1341,32 @@ double iaabb_brute_force(
         vector<i2> ref_it;
 
         set_intersection(ref.begin(), ref.end(), lut.begin(), lut.end(), std::back_inserter(ref_it));
-        if (ref_it.size() != lut.size() || ref_it.size()!= ref.size() ) {
+        if (ref_it.size() != lut.size() || ref_it.size() != ref.size()) {
             spdlog::warn("size : ref = {}, lut = {}, intersection(ref, lut) = {}", ref.size(), lut.size(), ref_it.size());
-        } 
+        }
+    }
+    if (globals.params_int["cuda_pt"] && vtn <= 2) {
+            vector<array<int, 4>> idx_cuda, int_ref;
+            for (int i = 0; i < n_cubes; i++) {
+                auto& b{ host_cuda_globals.host_cubes[i] };
+                auto& a{ *cubes[i] };
+                for (int i = 0; i < 4; i++) {
+                    b.q[i] = to_vec3f(a.q[i]);
+                    b.q0[i] = to_vec3f(a.q0[i]);
+                    b.dqdt[i] = to_vec3f(a.dqdt[i]);
+                    b.q_update[i] = to_vec3f(a.q[i] + a.dq.segment<3>(i * 3));
+                }
+            }
+            cudaMemcpy(host_cuda_globals.cubes, host_cuda_globals.host_cubes.data(), sizeof(cudaAffineBody) * n_cubes, cudaMemcpyHostToDevice);
+            
+            iaabb_brute_force_cuda_pt_only(n_cubes, host_cuda_globals.cubes, host_cuda_globals.aabbs, vtn, idx_cuda);
+            sort(idx.begin(), idx.end());
+            sort(idx_cuda.begin(), idx_cuda.end());
+            set_intersection(idx.begin(), idx.end(), idx_cuda.begin(), idx_cuda.end(), std::back_inserter(int_ref));
+
+            if (idx.size() != idx_cuda.size() || int_ref.size() != idx.size()) {
+            spdlog::warn("size : ref = {}, cuda = {}, intersection(ref, cuda) = {}", idx.size(), idx_cuda.size(), int_ref.size());
+            }
     }
     toi = primitive_brute_force(n_cubes, ret, cubes, vtn,
 #ifdef TESTING
@@ -1360,3 +1392,4 @@ tuple<float, ipc::PointTriangleDistanceType> vf_distance(vec3f vf, Facef ff){
     float d = ipc::point_triangle_distance(v, f[0], f[1], f[2], pt_type);
     return {d, pt_type};
 }
+
