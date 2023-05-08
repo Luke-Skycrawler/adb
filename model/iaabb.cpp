@@ -1299,17 +1299,26 @@ double iaabb_brute_force(
     vector<Intersection> ret;
     intersect_sort(n_cubes, cubes, aabbs, ret, vtn);
     double toi;
-    if (globals.params_int["cuda_intersection"]) {
+    if (globals.params_int["cuda_intersection"] && vtn == 1) {
         thrust::device_vector<luf> ret_culls, dev_aabbs;
         thrust::host_vector<luf> host_aabbs, host_culls;
+        thrust::host_vector<cudaAffineBody> host_cubes(n_cubes);
         host_aabbs.resize(n_cubes);
+        
         for (int i = 0; i < n_cubes; i++) {
             host_aabbs[i] = to_luf(aabbs[i]);
+            host_cubes[i] = to_cabd(*cubes[i]);
         }
+        cudaMemcpy(host_cuda_globals.cubes, host_cubes.data(), sizeof(cudaAffineBody) * n_cubes, cudaMemcpyHostToDevice);
         dev_aabbs = host_aabbs;
         cuda_culling_glue(vtn, dev_aabbs, ret_culls);
         host_culls = ret_culls;
         auto lut = from_thrust(host_cuda_globals.lut);
+        int n = lut.size();
+        for (int i = 0; i < n; i ++) {
+            auto o {lut[i]};
+            lut.push_back({ o[1], o[0] });
+        }
         sort(lut.begin(), lut.end());
         const auto to_i2 = [](vector<Intersection>& l) -> vector<i2> {
             vector<i2> ret;
