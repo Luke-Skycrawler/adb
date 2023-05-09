@@ -3,20 +3,18 @@
 #include "cuda_globals.cuh"
 #include "timer.h"
 #include <omp.h>
-#include <ipc/distance/edge_edge.hpp>
-#include <ipc/distance/point_triangle.hpp>
+// #include <ipc/distance/edge_edge.hpp>
+// #include <ipc/distance/point_triangle.hpp>
 #include <spdlog/spdlog.h>
 #include <tuple>
 
 #include <assert.h>
 #include <thrust/iterator/discard_iterator.h>
 #include <thrust/iterator/zip_iterator.h>
-#include <cuda/std/tuple>
-#include <cuda/std/type_traits>
 #include <thrust/set_operations.h>
 
 using namespace std;
-using namespace ipc;
+//using namespace ipc;
 // using namespace cuda::std;
 // using namespace Eigen;
 // FIXME: tid probably not in 1 block
@@ -29,7 +27,7 @@ __device__ luf affine(luf aabb, cudaAffineBody &c, int vtn);
 __device__ luf compute_aabb(const Facef& f, float d_hat_sqrt);
 __device__ luf compute_aabb(const Edgef& e, float d_hat_sqrt);
 
-tuple<float, PointTriangleDistanceType> vf_distance(vec3f vf, Facef ff);
+//tuple<float, PointTriangleDistanceType> vf_distance(vec3f vf, Facef ff);
 void per_intersection_core(int n_overlaps, luf* culls, i2* overlaps);
 
 /* NOTE: kernel argument convention:
@@ -550,140 +548,6 @@ float iaabb_brute_force_cuda_pt_only(
         idx.push_back({b[0], p[0], b[1], p[1]});
     }
     return 1.0;
-}
-
-__device__ luf intersection(const luf& a, const luf& b)
-{
-    vec3f l, u;
-    l = make_float3(
-        CUDA_MAX(a.l.x, b.l.x),
-        CUDA_MAX(a.l.y, b.l.y),
-        CUDA_MAX(a.l.z, b.l.z));
-    u = make_float3(
-        CUDA_MIN(a.u.x, b.u.x),
-        CUDA_MIN(a.u.y, b.u.y),
-        CUDA_MIN(a.u.z, b.u.z));
-    return { l, u };
-}
-__device__ luf affine(luf aabb, cudaAffineBody& c, int vtn)
-{
-    vec3f cull[8];
-    vec3f l, u;
-    auto q{ vtn == 2 ? c.q_update : c.q };
-    for (int i = 0; i < 2; i++)
-        for (int j = 0; j < 2; j++)
-            for (int k = 0; k < 2; k++) {
-                auto I = (i << 2) | (j << 1) | k;
-                cull[I] = make_float3(
-                    i ? aabb.u.x : aabb.l.x,
-                    j ? aabb.u.y : aabb.l.y,
-                    k ? aabb.u.z : aabb.l.z);
-                cull[I] = matmul(q, cull[I]);
-            }
-    for (int i = 0; i < 8; i++) {
-        if (i == 0) {
-            l = u = cull[i];
-        }
-        else {
-            l.x = CUDA_MIN(l.x, cull[i].x);
-            l.y = CUDA_MIN(l.y, cull[i].y);
-            l.z = CUDA_MIN(l.z, cull[i].z);
-            u.x = CUDA_MAX(u.x, cull[i].x);
-            u.y = CUDA_MAX(u.y, cull[i].y);
-            u.z = CUDA_MAX(u.z, cull[i].z);
-        }
-    }
-    if (vtn == 3) {
-        auto updated =  affine(aabb, c, 2);
-        l.x = CUDA_MIN(l.x, updated.l.x);
-        l.y = CUDA_MIN(l.y, updated.l.y);
-        l.z = CUDA_MIN(l.z, updated.l.z);
-        u.x = CUDA_MAX(u.x, updated.u.x);
-        u.y = CUDA_MAX(u.y, updated.u.y);
-        u.z = CUDA_MAX(u.z, updated.u.z);
-        return {l, u};
-    }
-    return { l, u };
-}
-
-__device__ __host__ float vf_distance(vec3f _v, Facef f, int& _pt_type)
-{
-    auto n = unit_normal(f);
-    auto d = dot(n, _v - f.t0);
-    auto a1 = area_x2(f.t1, f.t0, f.t2);
-    auto v = _v - n * d;
-    d = d * d;
-    // float a2 = ((f[0] - v).cross(f[1] - v).norm() + (f[1] - v).cross(f[2] - v).norm() + (f[2] - v).cross(f[0] - v).norm());
-    // auto a2 = area_x2(f[0], f[1], v) + area_x2(f[1], f[2], v) + area_x2(f[2], f[0], v);
-    auto _a1 = dot(cross(f.t0 - v, f.t1 - v), n);
-    auto _a2 = dot(cross(f.t1 - v, f.t2 - v), n);
-    auto _a3 = dot(cross(f.t2 - v, f.t0 - v), n);
-    bool inside = _a1 * _a2 > 0.0f && _a2 * _a3 > 0.0f;
-    PointTriangleDistanceType pt_type;
-    // if (a2 > a1 + 1e-8) {
-    if (!inside) {
-        // projection outside of triangle
-
-        auto d_ab = h(f.t0, f.t1, v);
-        auto d_bc = h(f.t1, f.t2, v);
-        auto d_ac = h(f.t0, f.t2, v);
-
-        auto d_a = ab(v, f.t0);
-        auto d_b = ab(v, f.t1);
-        auto d_c = ab(v, f.t2);
-
-        auto dab = is_obtuse_triangle(f.t0, f.t1, v) ? CUDA_MIN(d_a, d_b) : d_ab;
-        auto dbc = is_obtuse_triangle(f.t2, f.t1, v) ? CUDA_MIN(d_c, d_b) : d_bc;
-        auto dac = is_obtuse_triangle(f.t0, f.t2, v) ? CUDA_MIN(d_a, d_c) : d_ac;
-
-        auto d_projected = CUDA_MIN3(dab, dbc, dac);
-        d += d_projected * d_projected;
-
-        if (d_projected == d_ab)
-            pt_type = PointTriangleDistanceType::P_E0;
-        else if (d_projected == d_bc)
-            pt_type = PointTriangleDistanceType::P_E1;
-        else if (d_projected == d_ac)
-            pt_type = PointTriangleDistanceType::P_E2;
-        else if (d_projected == d_a)
-            pt_type = PointTriangleDistanceType::P_T0;
-        else if (d_projected == d_b)
-            pt_type = PointTriangleDistanceType::P_T1;
-        else
-            pt_type = PointTriangleDistanceType::P_T2;
-    }
-    else
-        pt_type = PointTriangleDistanceType::P_T;
-    _pt_type = static_cast<underlying_type_t<PointTriangleDistanceType>>(pt_type);
-    return d;
-}
-
-__device__ luf compute_aabb(const Edgef& e, float d_hat_sqrt)
-{
-    vec3f l, u;
-    l = make_float3(
-        CUDA_MIN(e.e0.x, e.e1.x),
-        CUDA_MIN(e.e0.y, e.e1.y),
-        CUDA_MIN(e.e0.z, e.e1.z));
-    u = make_float3(
-        CUDA_MAX(e.e0.x, e.e1.x),
-        CUDA_MAX(e.e0.y, e.e1.y),
-        CUDA_MAX(e.e0.z, e.e1.z));
-    return { l, u };
-}
-
-__device__ luf compute_aabb(const Facef& f, float d_hat_sqrt)
-{
-    vec3f l, u;
-    l = make_float3 (
-        CUDA_MIN3(f.t0.x, f.t1.x, f.t2.x),
-        CUDA_MIN3(f.t0.y, f.t1.y, f.t2.y),
-        CUDA_MIN3(f.t0.z, f.t1.z, f.t2.z));
-    u = make_float3 (
-        CUDA_MAX3(f.t0.x, f.t1.x, f.t2.x),
-        CUDA_MAX3(f.t0.y, f.t1.y, f.t2.y),
-        CUDA_MAX3(f.t0.z, f.t1.z, f.t2.z));
-    return { l, u };
 }
 
 __global__ void strided_memset_kernel(

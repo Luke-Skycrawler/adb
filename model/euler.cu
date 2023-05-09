@@ -2,11 +2,14 @@
 #include "cuda_globals.cuh"
 
 
-__constant__ float kappa = 1e9f, dt = 1e-2f;
-
+static __constant__ float kappa = 1e9f, dt = 1e-2f;
 CudaGlobals host_cuda_globals;
 //__constant__ CudaGlobals *cuda_globals;
 //__constant__ float3 gravity;
+__host__ __device__ void orthogonal_grad(float3 q[4], float dt, float ret[12]);
+__host__ __device__ void orthogonal_hess(float3 q[4], float dt, float ret[144]);
+__host__ __device__ void inertia_grad(cudaAffineBody& c, float dt, float ret[12]);
+__host__ __device__ void inertia_hess(cudaAffineBody& c, float ret[144]);
 
 void gpuCholSolver(CsrSparseMatrix& hess, float* x, float *b);
 __global__ void ipc_pt_kernel(
@@ -29,10 +32,6 @@ __global__ void set_q_kernel(int n_cubes, cudaAffineBody* cubes)
     }
 }
 
-__forceinline__ __device__ __host__ float kronecker(int i, int j)
-{
-    return i == j ? 1.0f : 0.0f;
-}
 void initialize_precompute_aabbs()
 {
 }
@@ -62,11 +61,6 @@ __global__ void update_line_search_kernel(int n_cubes, cudaAffineBody *cubes, fl
     }
 }
 
-__host__ __device__ float dev::barrier_function(float d)
-{
-    if (d >= dev::d_hat) return 0.0;
-    return dev::kappa * -(d - dev::d_hat) * (d - dev::d_hat) * log(d / dev::d_hat) / (dev::d_hat * dev::d_hat);
-}
 __global__ void barrier_kernel(float& E, int n_col, float* distance)
 {
     auto tid = threadIdx.x + blockIdx.x * blockDim.x;
@@ -86,23 +80,6 @@ __global__ void barrier_kernel(float& E, int n_col, float* distance)
     }
 }
 
-//__device__ void cudaAffineBody::q_minus_qtiled(float3 dq[4])
-//{
-//    __constant__ float  h =  cuda_globals->dt;
-//    __constant__ float h2 = h * h;
-//    for (int i = 0; i < 4; i++) {
-//        dq[i] = q_update[i] - (q[i] + dqdt[i] * h + cuda_globals->gravity * h2);
-//    }
-//}
-__host__ __device__ void cudaAffineBody::q_minus_qtiled(float3 dq[4])
-{
-    float h = dt;
-    float h2 = h * h;
-    for (int i = 0; i < 4; i++) {
-        dq[i] = q_update[i] - (q0[i] + dqdt[i] * h);
-        if (i == 0) dq[0] = dq[0] - make_float3(0.0f, -9.8f, 0.0f) * h2;
-    }
-}
 __global__ void inertia_kernel(float& E, int n_cubes, cudaAffineBody* cubes)
 {
     auto tid = threadIdx.x + blockIdx.x * blockDim.x;
@@ -193,82 +170,6 @@ __global__ void project_vt1_kernel(int n_cubes, cudaAffineBody *cubes, float3* b
 }
 
 
-__host__ __device__ void orthogonal_grad(float3 q[4], float dt, float ret[12])
-{
-    auto h2 = dt * dt;
-    ret[0] = ret[1] = ret[2] = 0.0f;
-    for (int i = 1; i < 4; i++) {
-        float3 g = make_float3(0.0f, 0.0f, 0.0f);
-        for (int j = 1; j < 4; j++) {
-            g = g + q[j] * (dot(q[i], q[j]) - kronecker(i, j));
-        }
-
-        g = g * (4 * kappa * h2);
-        ret[i * 3 + 0] = g.x;
-        ret[i * 3 + 1] = g.y;
-        ret[i * 3 + 2] = g.z;
-    }
-}
-
-__host__ __device__ void orthogonal_hess(float3 q[4], float dt, float ret[144])
-{
-    auto h2 = dt * dt;
-    for (int i = 0; i < 144; i ++ ) ret[i]  = 0.0f;
-    for (int i = 1; i < 4; i++)
-        for (int j = 1; j < 4; j++) {
-            float h[9]{ 0.0f };
-            if (i == j) {
-
-                for (int k = 1; k < 4; k++) {
-                    float w = k == i ? 2.0f : 1.0f;
-                    float _q[3]{ q[k].x, q[k].y, q[k].z };
-                    for (int ii = 0; ii < 3; ii++)
-                        for (int jj = 0; jj < 3; jj++) {
-                            auto qii = _q[ii], qjj = _q[jj];
-                            h[ii + jj * 3] += w * qii * qjj;
-                        }
-                }
-                for (int ii = 1; ii < 4; ii++) {
-                    h[ii * 4] += dot(q[i], q[i]) - 1.0f;
-                }
-            }
-            else {
-                float d = dot(q[i], q[j]);
-                for (int ii = 0; ii < 3; ii++)
-                    for (int jj = 0; jj < 3; jj++) {
-                        auto qjii = ii == 0 ? q[j].x : (ii == 1 ? q[j].y : q[j].z);
-                        auto qijj = jj == 0 ? q[i].x : (jj == 1 ? q[i].y : q[i].z);
-                        h[ii + jj * 3] = qjii * qijj + kronecker(ii, jj) * d;
-                    }
-            }
-            auto scale = 4 * kappa * h2;
-            for (int ii = 0; ii < 3; ii++)
-                for (int jj = 0; jj < 3; jj++) {
-                    ret[(i * 3 + ii) + (j * 3 + jj) * 12] = scale * h[ii + jj * 3];
-                }
-        }
-}
-__host__ __device__ void inertia_grad(cudaAffineBody& c, float dt, float ret[12])
-{
-    float3 g[4];
-    c.q_minus_qtiled(g);
-    for (int i = 0; i < 4; i++) {
-        float w = i == 0 ? c.mass : c.Ic;
-        ret[i * 3 + 0] += w * g[i].x;
-        ret[i * 3 + 1] += w * g[i].y;
-        ret[i * 3 + 2] += w * g[i].z;
-    }
-}
-
-__host__ __device__ void inertia_hess(cudaAffineBody& c, float ret[144])
-{
-    for (int i = 0; i < 3; i++) {
-        ret[i * 13] += c.mass;
-    }
-    for (int i = 3; i < 12; i++) {
-        ret[i * 13] += c.Ic;
-    }
-}
 
 __global__ void inertia_grad_hess_kernel(int n_cubes, cudaAffineBody *cubes, float dt, float* b, float* diag)
 {

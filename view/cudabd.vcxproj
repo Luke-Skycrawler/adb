@@ -47,7 +47,7 @@
   <PropertyGroup Label="UserMacros" />
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
     <IncludePath>D:\third_party_libs\thrust-2.1.0\thrust-2.1.0\;$(IncludePath)</IncludePath>
-    <LinkIncremental>false</LinkIncremental>
+    <LinkIncremental>true</LinkIncremental>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
     <IncludePath>D:\third_party_libs\thrust-2.1.0\thrust-2.1.0\;$(IncludePath)</IncludePath>
@@ -60,6 +60,7 @@
       <AdditionalIncludeDirectories>D:\ref_repos\ipc-toolkit\src;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <LanguageStandard>stdcpp17</LanguageStandard>
       <AdditionalOptions>/bigobj %(AdditionalOptions)</AdditionalOptions>
+      <MinimalRebuild>true</MinimalRebuild>
     </ClCompile>
     <Link>
       <GenerateDebugInformation>true</GenerateDebugInformation>
@@ -73,6 +74,8 @@
       <AdditionalOptions>--extended-lambda %(AdditionalOptions)</AdditionalOptions>
       <GenerateRelocatableDeviceCode>true</GenerateRelocatableDeviceCode>
       <Runtime>InheritFromHost</Runtime>
+      <UseHostInclude>false</UseHostInclude>
+      <Include>%(Include)</Include>
     </CudaCompile>
     <CudaLink>
       <UseHostLibraryDirectories>false</UseHostLibraryDirectories>

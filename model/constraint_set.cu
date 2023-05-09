@@ -2,39 +2,9 @@
 #include "cuda_globals.cuh"
 #include <thrust/sort.h>
 #include <thrust/unique.h>
- #include "autogen/autogen.cuh"
+#include "autogen/autogen.cuh"
 using namespace std;
 
-namespace dev {
-//__device__ __constant__ float kappa = 1e-1f, d_hat = 1e-4f, d_hat_sqr = 1e-2f;
-
-__host__ __device__ float barrier_derivative_d(float x)
-{
-    if (x >= d_hat)
-        return 0.0f;
-    return -(x - d_hat) * kappa * (2 * log(x / d_hat) + (x - d_hat) / x) / (d_hat * d_hat);
-}
-__host__ __device__ float barrier_second_derivative(float d)
-{
-    if (d >= d_hat)
-        return 0.0f;
-    return -kappa * (2 * log(d / d_hat) + (d - d_hat) / d + (d - d_hat) * (2 / d + d_hat / d / d)) / (d_hat * d_hat);
-}
-
-}
-
-__device__ float point_triangle_distance(vec3f p, vec3f t0, vec3f t1, vec3f t2) {return 0.0f;}
-__device__ void point_triangle_distance_gradient(vec3f p, vec3f t0, vec3f t1, vec3f t2, float *pt_grad) {
-    autogen::point_plane_distance_gradient(
-        p.x, p.y, p.z, t0.x, t0.y, t0.z, t1.x, t1.y, t1.z, t2.x,
-        t2.y, t2.z, pt_grad);
-}
-
-__device__ void point_triangle_distance_hessian(vec3f p, vec3f t0, vec3f t1, vec3f t2, float *pt_hess){
-    autogen::point_plane_distance_hessian(
-        p.x, p.y, p.z, t0.x, t0.y, t0.z, t1.x, t1.y, t1.z, t2.x,
-        t2.y, t2.z, pt_hess);
-}
 __device__ void dev_project_to_psd(int dim, float* A){
 
 }
@@ -148,9 +118,9 @@ void make_placeholder_sparse_matrix(int n_cubes, CsrSparseMatrix &sparse_matrix)
 __device__ void pt_grad_hess12x12(vec3f* pt, float* pt_grad, float* pt_hess, bool psd = true)
 {
 
-    auto dist = point_triangle_distance(pt[0], pt[1], pt[2], pt[3]);
-    point_triangle_distance_gradient(pt[0], pt[1], pt[2], pt[3], pt_grad);
-    point_triangle_distance_hessian(pt[0], pt[1], pt[2], pt[3], pt_hess);
+    auto dist = dev::point_triangle_distance(pt[0], pt[1], pt[2], pt[3]);
+    dev::point_triangle_distance_gradient(pt[0], pt[1], pt[2], pt[3], pt_grad);
+    dev::point_triangle_distance_hessian(pt[0], pt[1], pt[2], pt[3], pt_hess);
 
     auto B_ = dev::barrier_derivative_d(dist);
     auto B__ = dev::barrier_second_derivative(dist);

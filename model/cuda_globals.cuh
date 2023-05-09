@@ -118,6 +118,9 @@ __host__ __device__ float barrier_function(float d);
 __host__ __device__ float barrier_derivative_d(float x);
 __host__ __device__ float barrier_second_derivative(float d);
 
+__device__ void point_triangle_distance_hessian(vec3f p, vec3f t0, vec3f t1, vec3f t2, float* pt_hess);
+__device__ float point_triangle_distance(vec3f p, vec3f t0, vec3f t1, vec3f t2);
+__device__ void point_triangle_distance_gradient(vec3f p, vec3f t0, vec3f t1, vec3f t2, float *pt_grad);
 
 }
 
@@ -133,4 +136,8 @@ __forceinline__ __device__ float3 matmul(float3 _q[4], float3 x)
 
 extern void make_lut(int lut_size, i2* lut);
 
+__forceinline__ __device__ __host__ float kronecker(int i, int j)
+{
+    return i == j ? 1.0f : 0.0f;
+}
 

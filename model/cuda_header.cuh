@@ -20,6 +20,9 @@ float3 make_float3(float x, float y, float z) {
 #include <thrust/scan.h>
 #include <thrust/execution_policy.h>
 #include <cuda/std/array>
+#include <cuda/std/tuple>
+#include <cuda/std/type_traits>
+
 #endif
 
 #define CUDA_CALL(x) { const cudaError_t a = (x); if(a != cudaSuccess){ printf("\nCUDA Error: %s (err_num = %d) \n", cudaGetErrorString(a), a); cudaDeviceReset(); assert(0);}}
