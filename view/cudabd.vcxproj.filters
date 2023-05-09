@@ -19,6 +19,18 @@
     <CudaCompile Include="..\model\utils.cu">
       <Filter>cuda</Filter>
     </CudaCompile>
+    <CudaCompile Include="..\model\autogen\edge_edge_mollifier.cu">
+      <Filter>cuda\autogen</Filter>
+    </CudaCompile>
+    <CudaCompile Include="..\model\autogen\line_line.cu">
+      <Filter>cuda\autogen</Filter>
+    </CudaCompile>
+    <CudaCompile Include="..\model\autogen\point_line.cu">
+      <Filter>cuda\autogen</Filter>
+    </CudaCompile>
+    <CudaCompile Include="..\model\autogen\point_plane.cu">
+      <Filter>cuda\autogen</Filter>
+    </CudaCompile>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="..\view\light.cpp">
@@ -80,18 +92,6 @@
     </ClCompile>
     <ClCompile Include="..\model\upper_bound.cpp">
       <Filter>model</Filter>
-    </ClCompile>
-    <ClCompile Include="..\model\autogen\edge_edge_mollifier.cu">
-      <Filter>cuda\autogen</Filter>
-    </ClCompile>
-    <ClCompile Include="..\model\autogen\line_line.cu">
-      <Filter>cuda\autogen</Filter>
-    </ClCompile>
-    <ClCompile Include="..\model\autogen\point_line.cu">
-      <Filter>cuda\autogen</Filter>
-    </ClCompile>
-    <ClCompile Include="..\model\autogen\point_plane.cu">
-      <Filter>cuda\autogen</Filter>
     </ClCompile>
     <ClCompile Include="..\model\cuda_glue.cpp">
       <Filter>cuda</Filter>

@@ -2,7 +2,7 @@
 #include "cuda_globals.cuh"
 #include <thrust/sort.h>
 #include <thrust/unique.h>
-// #include "autogen/autogen.cuh"
+ #include "autogen/autogen.cuh"
 using namespace std;
 
 namespace dev {
@@ -25,15 +25,15 @@ __host__ __device__ float barrier_second_derivative(float d)
 
 __device__ float point_triangle_distance(vec3f p, vec3f t0, vec3f t1, vec3f t2) {return 0.0f;}
 __device__ void point_triangle_distance_gradient(vec3f p, vec3f t0, vec3f t1, vec3f t2, float *pt_grad) {
-    // autogen::point_plane_distance_gradient(
-    //     p[0], p[1], p[2], t0[0], t0[1], t0[2], t1[0], t1[1], t1[2], t2[0],
-    //     t2[1], t2[2], pt_grad);
+    autogen::point_plane_distance_gradient(
+        p.x, p.y, p.z, t0.x, t0.y, t0.z, t1.x, t1.y, t1.z, t2.x,
+        t2.y, t2.z, pt_grad);
 }
 
 __device__ void point_triangle_distance_hessian(vec3f p, vec3f t0, vec3f t1, vec3f t2, float *pt_hess){
-    // autogen::point_plane_distance_hessian(
-    //     p[0], p[1], p[2], t0[0], t0[1], t0[2], t1[0], t1[1], t1[2], t2[0],
-    //     t2[1], t2[2], pt_hess);
+    autogen::point_plane_distance_hessian(
+        p.x, p.y, p.z, t0.x, t0.y, t0.z, t1.x, t1.y, t1.z, t2.x,
+        t2.y, t2.z, pt_hess);
 }
 __device__ void dev_project_to_psd(int dim, float* A){
 
@@ -148,9 +148,6 @@ void make_placeholder_sparse_matrix(int n_cubes, CsrSparseMatrix &sparse_matrix)
 __device__ void pt_grad_hess12x12(vec3f* pt, float* pt_grad, float* pt_hess, bool psd = true)
 {
 
-    // auto dist = point_triangle_distance(p, t.t0, t.t1, t.t2);
-    // point_triangle_distance_gradient(p, t.t0, t.t1, t.t2, pt_grad);
-    // point_triangle_distance_hessian(p, t.t0, t.t1, t.t2, pt_hess);
     auto dist = point_triangle_distance(pt[0], pt[1], pt[2], pt[3]);
     point_triangle_distance_gradient(pt[0], pt[1], pt[2], pt[3], pt_grad);
     point_triangle_distance_hessian(pt[0], pt[1], pt[2], pt[3], pt_hess);
