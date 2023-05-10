@@ -117,7 +117,7 @@ __device__ __host__ float vf_distance(vec3f _v, Facef f, int& _pt_type)
     return d;
 }
 
-__device__ luf compute_aabb(const Edgef& e, float d_hat_sqrt)
+__device__ __host__ luf compute_aabb(const Edgef& e, float d_hat_sqrt)
 {
     vec3f l, u;
     l = make_float3(
@@ -131,7 +131,7 @@ __device__ luf compute_aabb(const Edgef& e, float d_hat_sqrt)
     return { l, u };
 }
 
-__device__ luf compute_aabb(const Facef& f, float d_hat_sqrt)
+__device__ __host__ luf compute_aabb(const Facef& f, float d_hat_sqrt)
 {
     vec3f l, u;
     l = make_float3 (

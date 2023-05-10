@@ -29,7 +29,10 @@ void initialize_primitives(
     cudaMallocManaged(&host_cuda_globals.projected_vertices, ptot * sizeof(vec3f));
     cudaMallocManaged(&host_cuda_globals.edges, etot * 2 * sizeof(int));
     cudaMallocManaged(&host_cuda_globals.faces, ftot * 3 * sizeof(int));
-
+    host_cuda_globals.n_vertices = ptot;
+    host_cuda_globals.n_edges = etot;
+    host_cuda_globals.n_faces = ftot;
+    
     int start = 0, estart = 0, fstart = 0;
     vector<vec3f> vertices;
     vector<int> edges, faces;
