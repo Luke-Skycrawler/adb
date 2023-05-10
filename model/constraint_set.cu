@@ -160,16 +160,6 @@ __forceinline__ int __device__ rc_to_1d(int r, int c)
 // __global__ void ipc_pt_batch_kernel(int npt, vec3f *p, Facef * t) {
 // }
 
-void ipc_pt_kernel(
-    int npt, vec3f* pt, i2* ij, bool* is_static,
-    int lut_size, i2* lut,
-    CsrSparseMatrix& sparse_hess,
-
-    float* buffer,
-    float* lambdas, float* Tk)
-{
-}
-
 __device__ void JTJ(vec3f a, float* ipc_hess)
 {
 }
@@ -189,13 +179,39 @@ __device__ void plain_matrix_product(int ar, int ac, int bc, float* a, float* b,
         }
     }
 }
-__global__ void ipc_pt(
-    int npt, 
-    i2* pt, i2* ij, 
-    
+
+__device__ void put(float* values, i2 offset_stride, float* mat12x12)
+{
+    int offset = offset_stride[0], stride = offset_stride[1];
+    for (int c = 0; c < 12; c++)
+        for (int r = 0; r < 12; r++) {
+            atomicAdd(values + offset + c * stride + r, mat12x12[c * 12 + r]);
+        }
+}
+
+
+__device__ void put_T(float* values, i2 offset_stride, float* mat12x12)
+{
+    int offset = offset_stride[0], stride = offset_stride[1];
+    for (int c = 0; c < 12; c++)
+        for (int r = 0; r < 12; r++) {
+            atomicAdd(values + offset + c * stride + r, mat12x12[r * 12 + c]);
+        }
+}
+
+__device__ i2 to_os(i2 ij, int lut_size, i2* lut, int* outers)
+{
+    int k = binary_search(lut_size, lut, ij);
+    return offset_and_stride(k, lut, outers);
+}
+
+__global__ void ipc_pt_kernel(
+    int npt,
+    i2* pt, i2* ij,
     cudaAffineBody* cubes,
 
     int lut_size, i2* lut,
+
     float* values, int* inners, int* outers,
     // CsrSparseMatrix& sparse_hess,
     float* b, // rhs
@@ -224,31 +240,27 @@ __global__ void ipc_pt(
             float* ipc_hess = hess_start + 144 * tid;
             float* pt_grad = buffer + tid * 12;
 
-            pt_grad_hess12x12(pt + I * 4, pt_grad, ipc_hess);
-
-            vec3f p_tile, t0_tile, t1_tile, t2_tile; // TODO: forward declare, fill in the args later
-
-            const auto to_3x12 = [] __device__(vec3f x, float* J) {
-                // cudaMemset(J, 0, 36 * sizeof(float));
-                for (int i = 0; i < 4; i++) {
-                    auto e = i == 0 ? 1.0f : i == 1 ? x.x
-                        : i == 2                    ? x.y
-                                                    : x.z;
-                    for (int d = 0; d < 3; d++) {
-                        // Jdd = x_{d-1}
-                        J[d + d * 3] = e;
-                    }
-                }
+            int ii = ij[I][0], jj = ij[I][1];
+            auto &ci{ cubes[ii] }, &cj{ cubes[jj] };
+            auto fp {cj.triangle(pt[I][1])};
+            vec3f projected[4] {
+                ci.projected[pt[I][0]],
+                fp.t0,
+                fp.t1,
+                fp.t2
             };
 
-            float Jp[36], Jt[36 * 3];
-            to_3x12(p_tile, Jp);
-            to_3x12(t0_tile, Jt);
-            to_3x12(t1_tile, Jt + 36);
-            to_3x12(t2_tile, Jt + 72);
+            pt_grad_hess12x12(projected, pt_grad, ipc_hess);
+
+            vec3f p_tile, t0_tile, t1_tile, t2_tile;
+            p_tile = ci.vertices[pt[I][0]];
+            Facef f = cj.triangle_at_rest(pt[I][1]);
+            t0_tile = f.t0;
+            t1_tile = f.t1;
+            t2_tile = f.t2;
 
             float kerp[4]{ 1.0, p_tile.x, p_tile.y, p_tile.z },
-                kert[][4]{
+                kert[3][4]{
                     { 1.0, t0_tile.x, t0_tile.y, t0_tile.z },
                     { 1.0, t1_tile.x, t1_tile.y, t1_tile.z },
                     { 1.0, t2_tile.x, t2_tile.y, t2_tile.z }
@@ -256,72 +268,60 @@ __global__ void ipc_pt(
 
             float *hess_p, *hess_t, *off_diag; // TODO: forward declare, fill in the args later
             for (int i = 0; i < 4; i++)
-                    for (int j = 0; j < 4; j++) {
-                        for (int c = 0; c < 3; c++)
-                            for (int r = 0; r < 3; r++) {
-                                hess_p[rc_to_1d(i * 3 + r, j * 3 + c)] = ipc_hess[rc_to_1d(r, c)] * kerp[i] * kerp[j];
-                            }
-                        // FIXME: make sure ipc autogen is row-major
-                        for (int k = 0; k < 3; k++)
-                            for (int l = 0; l < 3; l++) {
-                                for (int c = 0; c < 3; c++)
-                                    for (int r = 0; r < 3; r++) {
-                                        hess_t[rc_to_1d(i * 3 + r, j * 3 + c)] += ipc_hess[rc_to_1d((k + 1) * 3 + r, (l + 1) * 3 + c)] * kert[k][i] * kert[l][j];
-                                    }
-                            }
-                        for (int l = 0; l < 3; l ++) {
-                            for (int c =0; c < 3; c++) {
+                for (int j = 0; j < 4; j++) {
+                    for (int c = 0; c < 3; c++)
+                        for (int r = 0; r < 3; r++) {
+                            hess_p[rc_to_1d(i * 3 + r, j * 3 + c)] = ipc_hess[rc_to_1d(r, c)] * kerp[i] * kerp[j];
+                        }
+                    // FIXME: make sure ipc autogen is row-major
+                    for (int k = 0; k < 3; k++)
+                        for (int l = 0; l < 3; l++) {
+                            for (int c = 0; c < 3; c++)
                                 for (int r = 0; r < 3; r++) {
-                                    off_diag[rc_to_1d(i * 3 + r, j * 3 + c)] += ipc_hess[rc_to_1d(r, (l + 1) * 3 + c)] * (kerp[i] * kerp[l][j]);
+                                    hess_t[rc_to_1d(i * 3 + r, j * 3 + c)] += ipc_hess[rc_to_1d((k + 1) * 3 + r, (l + 1) * 3 + c)] * kert[k][i] * kert[l][j];
                                 }
+                        }
+                    for (int l = 0; l < 3; l++) {
+                        for (int c = 0; c < 3; c++) {
+                            for (int r = 0; r < 3; r++) {
+                                off_diag[rc_to_1d(i * 3 + r, j * 3 + c)] += ipc_hess[rc_to_1d(r, (l + 1) * 3 + c)] * (kerp[i] * kert[l][j]);
                             }
                         }
                     }
-            
-
-            // auto outer_ptr = thrust::raw_pointer_cast(outers.data());
-            // auto value_ptr = thrust::raw_pointer_cast(values.data());
-            int k = binary_search(lut_size, lut, ij[I]);
-            auto os = offset_and_stride(k, lut, outers);
-            int offset = os[0], stride = os[1];
-
-            for (int c = 0; c < 12; c++)
-                for (int r = 0; r < 12; r++) {
-                    // FIXME: add lock, static body
-                    atomicAdd(values + offset + c * stride + r, hess_start[144 * tid + c * 12 + r]);
                 }
             float dgp[12], dgt[12];
-            for (int j = 0; j < 12; j++) {
-                float dgpj = 0.0f, dgtj = 0.0f;
-                for (int k = 0; k < 3; k++) {
-                    // dgp = JpT * pt_grad_3
-                    // dgp i = Jp ki * pt_grad_k
-                    dgpj += pt_grad[k] * Jp[k + j * 3];
-                }
-                dgp[j] = dgpj;
 
-                for (int k = 3; k < 12; k++) {
-                    dgtj += pt_grad[k] * Jt[k - 3 + j * 3];
+            for (int i = 0; i < 4; i++) {
+                for (int j = 0; j < 3; j++) {
+                    dgp[i * 3 + j] = pt_grad[j] * kerp[i];
+                    dgt[i * 3 + j] = pt_grad[j + 3] * kert[0][i]
+                        + pt_grad[j + 6] * kert[1][i]
+                        + pt_grad[j + 9] * kert[2][i];
                 }
-                dgt[j] = dgtj;
             }
-            for (int i = 0; i < 12; i++) {
-                atomicAdd(b + i + ij[I][0] * 12, dgp[i]);
-                atomicAdd(b + i + ij[I][1] * 12, dgt[i]);
+
+            auto osii = to_os({ ii, ii }, lut_size, lut, outers);
+            auto osij = to_os({ ii, jj }, lut_size, lut, outers);
+            auto osjj = to_os({ jj, jj }, lut_size, lut, outers);
+            auto osji = to_os({ jj, ii }, lut_size, lut, outers);
+
+            if (cj.mass > 0.0f) {
+                if (ci.mass > 0.0f)
+                    put(values, osij, off_diag);
+                put(values, osjj, hess_t);
+                for (int i = 0; i < 12; i++) {
+                    atomicAdd(b + i + jj * 12, dgt[i]);
+                }
+            }
+            if (ci.mass > 0.0f) {
+                if (cj.mass > 0.0f)
+                    put_T(values, osji, off_diag);
+                put(values, osii, hess_p);
+                for (int i = 0; i < 12; i++) {
+                    atomicAdd(b + i + ii * 12, dgp[i]);
+                }
             }
         }
-        // for (int r = 0; r < 12; r++) {
-        //     atomicAdd()
-        //             pt_grad_hess
-        //         +
-        // }
     }
 }
 
-
-
-__global__ void ipc_pt_kernel(
-    int n_cubes, int npt,
-    i2* prmts, i2* body,
-    CsrSparseMatrix& hess,
-    int lut_size, i2* lut){}

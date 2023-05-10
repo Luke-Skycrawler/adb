@@ -933,19 +933,22 @@ void per_intersection_core(int n_overlaps, luf* culls, i2* overlaps)
             int* ret_cnt = (int*)st;
             st += sizeof(int);
 
-            int nvi, nfj;
+            int nvi, nfj, f_offset = 0, v_offset = 0;
             switch (type) {
             case 0:
                 nvi = sizes[0];
                 nfj = sizes[3];
+                f_offset = sizes[2];
                 break;
             case 1:
                 nvi = sizes[1];
                 nfj = sizes[2];
+                v_offset = sizes[0];
                 break;
             case 2:
                 nvi = sizes[4];
                 nfj = sizes[5];
+                f_offset = sizes[4];
                 break;
             }
             
@@ -994,16 +997,27 @@ void per_intersection_core(int n_overlaps, luf* culls, i2* overlaps)
 
             CUDA_CALL(cudaGetLastError());
             CUDA_CALL(cudaStreamSynchronize(stream));
+#ifdef CPU_REF
+            int host_ret_cnt;
+            cudaMemcpy(&host_ret_cnt, ret_cnt, sizeof(int), cudaMemcpyDeviceToHost);
+            auto host_culled_pairs{ from_thrust(thrust::device_vector<i2>(ret_ij, ret_ij + host_ret_cnt)) };
 
+#endif
+            auto _flist = flist + f_offset;
+            auto _vlist = vlist + v_offset; 
             filter_distance_kernel_atomic<<<1, n_cuda_threads_per_block, 0, stream>>>(
                 buf_ij, ret_ij, ret_cnt, vifjs, nullptr,
-                vlist, flist,
+                _vlist, _flist,
                 pt_types,
                 1e-4f,
                 nvi);
             CUDA_CALL(cudaGetLastError());
             CUDA_CALL(cudaStreamSynchronize(stream));
+#ifdef CPU_REF
+            cudaMemcpy(&host_ret_cnt, ret_cnt, sizeof(int), cudaMemcpyDeviceToHost);
+            auto host_filtered_pairs{ from_thrust(thrust::device_vector<i2>(ret_ij, ret_ij + host_ret_cnt)) };
 
+#endif
             host_cnts[type] = ret_cnt;
             switch (type) {
                 case 0: vifj_ptr = ret_ij; break;
@@ -1042,7 +1056,8 @@ void per_intersection_core(int n_overlaps, luf* culls, i2* overlaps)
         host_cuda_globals.bulk_buffer_back[tid] = bulk_back_stashed;
         host_cuda_globals.small_temporary_buffer_back[tid] = st_back_stashed;
     }
-    #ifdef CPU_REF
+    CUDA_CALL(cudaDeviceSynchronize());
+#ifdef CPU_REF
     delete[] host_edges;
     delete[] host_faces;
     delete [] host_projected;

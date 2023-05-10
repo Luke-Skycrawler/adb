@@ -1,6 +1,7 @@
 #include "cuda_header.cuh"
 #include "cuda_globals.cuh"
 
+using namespace std;
 
 static __constant__ float kappa = 1e9f, dt = 1e-2f;
 CudaGlobals host_cuda_globals;
@@ -13,10 +14,34 @@ __host__ __device__ void inertia_hess(cudaAffineBody& c, float ret[144]);
 
 void gpuCholSolver(CsrSparseMatrix& hess, float* x, float *b);
 __global__ void ipc_pt_kernel(
-    int n_cubes, int npt,
-    i2* prims, i2* body,
-    CsrSparseMatrix& hess,
-    int lut_size, i2* lut);
+    int npt,
+    i2* pt, i2* ij,
+    cudaAffineBody* cubes,
+
+    int lut_size, i2* lut,
+
+    float* values, int* inners, int* outers,
+    // CsrSparseMatrix& sparse_hess,
+    float* b, // rhs
+    float* buffer,
+    float* lambdas, float* Tk
+
+);
+
+__global__ void norm_kernel(int dim, float *x, float *ret_norm) {
+    auto tid = threadIdx.x + blockIdx.x * blockDim.x;
+    int n_tasks_per_thread = (dim + blockDim.x - 1) / blockDim.x;
+    __shared__ float norm;
+    norm = 0.0f;
+    for (int _i = 0; _i < n_tasks_per_thread; _i++) {
+        int i = tid * n_tasks_per_thread + _i;
+        if (i < dim) {
+            norm += x[i] * x[i];
+        }
+    }
+    __syncthreads();
+    *ret_norm = norm;
+}
 
 __global__ void set_q_kernel(int n_cubes, cudaAffineBody* cubes)
 {
@@ -192,32 +217,32 @@ __global__ void inertia_grad_hess_kernel(int n_cubes, cudaAffineBody *cubes, flo
         }
     }
 }
+// deprecated
+// __global__ void prepare_pt_kernel(int n_cubes, cudaAffineBody *cubes, int npt, i2* prims, i2* body, vec3f* buffer, vec3f *projected_vertices)
+// {
+//     int tid = threadIdx.x + blockIdx.x * blockDim.x;
+//     int n_tasks_per_thread = (npt + blockDim.x - 1) / blockDim.x;
+//     for (int _i = 0; _i < n_tasks_per_thread; _i++) {
+//         int I = tid * n_tasks_per_thread + _i;
+//         if (I < npt) {
+//             auto &ci{ cubes[body[I][0]] },
+//                 &cj{ cubes[body[I][1]] };
+//             int i0, i1, i2;
+//             i0 = cj.faces[prims[I][1] * 3 + 0];
+//             i1 = cj.faces[prims[I][1] * 3 + 1];
+//             i2 = cj.faces[prims[I][1] * 3 + 2];
+//             vec3f p(projected_vertices[ci.global_vertices_offset + prims[I][0]]),
+//                 t0{ projected_vertices[cj.global_vertices_offset + i0] },
+//                 t1{ projected_vertices[cj.global_vertices_offset + i1] },
+//                 t2{ projected_vertices[cj.global_vertices_offset + i2] };
 
-__global__ void prepare_pt_kernel(int n_cubes, cudaAffineBody *cubes, int npt, i2* prims, i2* body, vec3f* buffer, vec3f *projected_vertices)
-{
-    int tid = threadIdx.x + blockIdx.x * blockDim.x;
-    int n_tasks_per_thread = (npt + blockDim.x - 1) / blockDim.x;
-    for (int _i = 0; _i < n_tasks_per_thread; _i++) {
-        int I = tid * n_tasks_per_thread + _i;
-        if (I < npt) {
-            auto &ci{ cubes[body[I][0]] },
-                &cj{ cubes[body[I][1]] };
-            int i0, i1, i2;
-            i0 = cj.faces[prims[I][1] * 3 + 0];
-            i1 = cj.faces[prims[I][1] * 3 + 1];
-            i2 = cj.faces[prims[I][1] * 3 + 2];
-            vec3f p(projected_vertices[ci.global_vertices_offset + prims[I][0]]),
-                t0{ projected_vertices[cj.global_vertices_offset + i0] },
-                t1{ projected_vertices[cj.global_vertices_offset + i1] },
-                t2{ projected_vertices[cj.global_vertices_offset + i2] };
-
-            buffer[I * 4 + 0] = p;
-            buffer[I * 4 + 1] = t0;
-            buffer[I * 4 + 2] = t1;
-            buffer[I * 4 + 3] = t2;
-        }
-    }
-}
+//             buffer[I * 4 + 0] = p;
+//             buffer[I * 4 + 1] = t0;
+//             buffer[I * 4 + 2] = t1;
+//             buffer[I * 4 + 3] = t2;
+//         }
+//     }
+// }
 
 __global__ void update_timestep_kernel(int n_cubes, cudaAffineBody* cubes)
 {
@@ -250,30 +275,50 @@ __global__ void update_newton_kernel(int n_cubes, cudaAffineBody* cubes, float* 
     }
 }
 
+
+float iaabb_brute_force_cuda_pt_only(
+    int n_cubes,
+    cudaAffineBody* cubes,
+    luf* aabbs,
+    int vtn,
+    std::vector<std::array<int, 4>>& idx
+    // std::vector<std::array<int, 4>>& eidx,
+    // std::vector<std::array<int, 2>>& vidx
+    );
+
 void implicit_euler_cuda()
 {
-    int n_cubes = host_cuda_globals.n_cubes;
-    float dt = host_cuda_globals.dt, tol = 1e-2;
-    set_q_kernel<<<1, n_cuda_threads_per_block>>>(n_cubes, host_cuda_globals.cubes);
+    auto &g {host_cuda_globals};
+    auto &bulk {g.bulk_buffer_back[0]};
+    auto &st {g.small_temporary_buffer_back[0]};
+    auto st_stashed = st;
+    auto bulk_stashed = bulk;
 
-    iaabb_brute_force_cuda(n_cubes, host_cuda_globals.aabbs, 1, host_cuda_globals.lut_size, PTR(host_cuda_globals.lut), nullptr, PTR(host_cuda_globals.prim_idx), PTR(host_cuda_globals.body_idx), PTR(host_cuda_globals.pt_types));
+    int n_cubes = g.n_cubes;
+    float dt = g.dt, tol = 1e-2;
+    set_q_kernel<<<1, n_cuda_threads_per_block>>>(n_cubes, g.cubes);
+
+    // iaabb_brute_force_cuda(n_cubes, host_cuda_globals.aabbs, 1, host_cuda_globals.lut_size, PTR(host_cuda_globals.lut), nullptr, PTR(host_cuda_globals.prim_idx), PTR(host_cuda_globals.body_idx), PTR(host_cuda_globals.pt_types));
+    vector<array<int, 4>> foo;
+    iaabb_brute_force_cuda_pt_only(
+        n_cubes, g.cubes, g.aabbs, 1, foo);
 
     do {
         // make_lut(host_cuda_globals.lut_size, PTR(host_cuda_globals.lut));
-        make_placeholder_sparse_matrix(host_cuda_globals.lut_size, PTR(host_cuda_globals.lut), host_cuda_globals.hess);
+        make_placeholder_sparse_matrix(g.lut_size, PTR(g.lut), g.hess);
 
-        project_vt1_kernel<<<1, n_cuda_threads_per_block>>>(n_cubes, host_cuda_globals.cubes, host_cuda_globals.projected_vertices);
-        inertia_grad_hess_kernel<<<1, n_cuda_threads_per_block>>>(n_cubes, host_cuda_globals.cubes, dt, host_cuda_globals.b, host_cuda_globals.hess_diag);
+        project_vt1_kernel<<<1, n_cuda_threads_per_block>>>(n_cubes, g.cubes, g.projected_vertices);
+        inertia_grad_hess_kernel<<<1, n_cuda_threads_per_block>>>(n_cubes, g.cubes, dt, g.b, g.hess_diag);
 
-        prepare_pt_kernel<<<1, n_cuda_threads_per_block>>>(
-            n_cubes, host_cuda_globals.cubes,host_cuda_globals.npt,
-            PTR(host_cuda_globals.prim_idx), PTR(host_cuda_globals.body_idx),
-            host_cuda_globals.float3_buffer, host_cuda_globals.projected_vertices);
-
-        ipc_pt_kernel<<<1, n_cuda_threads_per_block, 0, host_cuda_globals.streams[0]>>>(
-            n_cubes, host_cuda_globals.npt, PTR(host_cuda_globals.prim_idx), PTR(host_cuda_globals.body_idx),
-            host_cuda_globals.hess,
-            host_cuda_globals.lut_size, PTR(host_cuda_globals.lut));
+        auto &hess {g.hess}; 
+        ipc_pt_kernel<<<1, n_cuda_threads_per_block>>> (
+            g.npt, g.pt.p, g.pt.b, g.cubes, g.lut_size, PTR(g.lut),
+            PTR(hess.values), PTR(hess.inner), PTR(hess.outer_start),
+            g.b, 
+            nullptr, // buffer undecided
+            nullptr, 
+            nullptr     // lambda and Tk undecided
+        );
         // TODO: merge the two kernels
 
         // ipc_ee_kernel<<<1, n_cuda_threads_per_block, 0, host_cuda_globals.streams[0]>>>(
@@ -283,9 +328,16 @@ void implicit_euler_cuda()
         // );
 
         // ipc vg kernel
-        gpuCholSolver(host_cuda_globals.hess, host_cuda_globals.dq, nullptr);
-        float sup_dq = thrust::reduce(host_cuda_globals.dq, host_cuda_globals.dq + 12 * n_cubes, 0.0f);
-        // FIXME: squared sum
+
+        gpuCholSolver(host_cuda_globals.hess, host_cuda_globals.dq, g.b);
+        float* ret_norm = (float*)st;
+        bulk += sizeof(float);
+
+
+        norm_kernel<<<1, n_cuda_threads_per_block>>>(n_cubes * 12, g.dq, ret_norm);
+        float sup_dq;
+        cudaMemcpy(&sup_dq, ret_norm, sizeof(float), cudaMemcpyDeviceToHost);
+
         float toi = upper_bound_cuda(n_cubes, host_cuda_globals.aabbs, host_cuda_globals.lut_size, PTR(host_cuda_globals.lut));
         toi = toi == 1.0f ? 1.0f : 0.8f * toi;
         float alpha = line_search_cuda(n_cubes, host_cuda_globals.dq, toi, PTR(host_cuda_globals.prim_idx_update), PTR(host_cuda_globals.body_idx_update), PTR(host_cuda_globals.pt_types_update));

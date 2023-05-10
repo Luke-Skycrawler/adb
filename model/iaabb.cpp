@@ -1336,6 +1336,7 @@ double iaabb_brute_force(
             if (idx.size() != idx_cuda.size() || int_ref.size() != idx.size()) {
             spdlog::warn("size : ref = {}, cuda = {}, intersection(ref, cuda) = {}", idx.size(), idx_cuda.size(), int_ref.size());
             }
+            if (globals.params_int["cuda_pt_direct"]) idx = idx_cuda;
     }
     toi = primitive_brute_force(n_cubes, ret, cubes, vtn,
 #ifdef TESTING

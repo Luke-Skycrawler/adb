@@ -108,6 +108,19 @@ struct cudaAffineBody {
             projected[edges[i * 2 + 1]]
         };
     }
+    inline __device__ __host__ Facef triangle_at_rest(int i) {
+        return Facef{
+            vertices[faces[i * 3]],
+            vertices[faces[i * 3 + 1]],
+            vertices[faces[i * 3 + 2]]
+        };
+    }
+    inline __device__ __host__ Edgef edge_at_rest(int i) {
+        return Edgef{
+            vertices[edges[i * 2]],
+            vertices[edges[i * 2 + 1]]
+        };
+    }
 };
 
 __forceinline__ __host__ __device__ vec3f operator+(vec3f a, vec3f b)
