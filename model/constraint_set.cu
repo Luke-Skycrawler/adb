@@ -5,7 +5,7 @@
 #include "autogen/autogen.cuh"
 using namespace std;
 
-__device__ void dev_project_to_psd(int dim, float* A){
+__host__ __device__ void dev_project_to_psd(int dim, float* A){
 
 }
 
@@ -115,7 +115,7 @@ void make_placeholder_sparse_matrix(int n_cubes, CsrSparseMatrix &sparse_matrix)
     build_csr(n_cubes, lut, sparse_matrix);
 }
 
-__device__ void pt_grad_hess12x12(vec3f* pt, float* pt_grad, float* pt_hess, bool psd = true)
+__host__ __device__ void pt_grad_hess12x12(vec3f* pt, float* pt_grad, float* pt_hess, bool psd = true)
 {
 
     auto dist = dev::point_triangle_distance(pt[0], pt[1], pt[2], pt[3]);

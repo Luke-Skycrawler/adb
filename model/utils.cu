@@ -146,11 +146,6 @@ __device__ __host__ luf compute_aabb(const Facef& f, float d_hat_sqrt)
 }
 
 
-__host__ __device__ float dev::barrier_function(float d)
-{
-    if (d >= dev::d_hat) return 0.0;
-    return dev::kappa * -(d - dev::d_hat) * (d - dev::d_hat) * log(d / dev::d_hat) / (dev::d_hat * dev::d_hat);
-}
 
 //__device__ void cudaAffineBody::q_minus_qtiled(float3 dq[4])
 //{
@@ -248,29 +243,39 @@ __host__ __device__ void inertia_hess(cudaAffineBody& c, float ret[144])
     }
 }
 namespace dev {
-//__device__ __constant__ float kappa = 1e-1f, d_hat = 1e-4f, d_hat_sqr = 1e-2f;
 
 __host__ __device__ float barrier_derivative_d(float x)
 {
-    if (x >= d_hat)
+    if (x >= dev::d_hat)
         return 0.0f;
-    return -(x - d_hat) * kappa * (2 * log(x / d_hat) + (x - d_hat) / x) / (d_hat * d_hat);
+    return -(x - dev::d_hat) * dev::kappa * (2 * CUDA_LOG(x / dev::d_hat) + (x - dev::d_hat) / x) / (dev::d_hat * dev::d_hat);
 }
 __host__ __device__ float barrier_second_derivative(float d)
 {
-    if (d >= d_hat)
+    if (d >= dev::d_hat)
         return 0.0f;
-    return -kappa * (2 * log(d / d_hat) + (d - d_hat) / d + (d - d_hat) * (2 / d + d_hat / d / d)) / (d_hat * d_hat);
+    return -dev::kappa * (2 * CUDA_LOG(d / dev::d_hat) + (d - dev::d_hat) / d + (d - dev::d_hat) * (2 / d + dev::d_hat / d / d)) / (dev::d_hat * dev::d_hat);
 }
 
-__device__ float point_triangle_distance(vec3f p, vec3f t0, vec3f t1, vec3f t2) {return 0.0f;}
-__device__ void point_triangle_distance_gradient(vec3f p, vec3f t0, vec3f t1, vec3f t2, float *pt_grad) {
+__host__ __device__ float barrier_function(float d)
+{
+    if (d >= dev::d_hat) return 0.0;
+    return dev::kappa * -(d - dev::d_hat) * (d - dev::d_hat) * CUDA_LOG(d / dev::d_hat) / (dev::d_hat * dev::d_hat);
+}
+
+__host__ __device__ float point_triangle_distance(vec3f p, vec3f t0, vec3f t1, vec3f t2) {
+    auto normal = cross(t1 - t0, t2 - t0);
+    auto pt = p - t0;
+    float a = dot(normal, pt);
+    return a * a / dot(normal, normal);
+}
+__host__ __device__ void point_triangle_distance_gradient(vec3f p, vec3f t0, vec3f t1, vec3f t2, float *pt_grad) {
     autogen::point_plane_distance_gradient(
         p.x, p.y, p.z, t0.x, t0.y, t0.z, t1.x, t1.y, t1.z, t2.x,
         t2.y, t2.z, pt_grad);
 }
 
-__device__ void point_triangle_distance_hessian(vec3f p, vec3f t0, vec3f t1, vec3f t2, float *pt_hess){
+__host__ __device__ void point_triangle_distance_hessian(vec3f p, vec3f t0, vec3f t1, vec3f t2, float *pt_hess){
     autogen::point_plane_distance_hessian(
         p.x, p.y, p.z, t0.x, t0.y, t0.z, t1.x, t1.y, t1.z, t2.x,
         t2.y, t2.z, pt_hess);

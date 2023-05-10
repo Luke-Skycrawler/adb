@@ -17,6 +17,8 @@ extern Globals globals;
 #include "time_integrator.h"
 #include <omp.h>
 #include <tuple>
+#include "cuda_globals.cuh"
+#include "cuda_glue.h"
 using namespace std;
 using mat12 = Matrix<double, 12, 12>;
 void put(double* values, int offset, int _stride, const Matrix<double, 12, 12>& block)
@@ -197,6 +199,8 @@ void ipc_term_vg(AffineBody& c, int v
             J.transpose() * Tk, c.grad, c.hess);
 #endif
 };
+void pt_grad_hess12x12(vec3f * pt, float *pt_grad, float *pt_hess, bool psd = true);
+
 
 tuple<mat12, vec12> ipc_hess_pt_12x12(
     array<vec3, 4> pt, array<int, 4> ij, ipc::PointTriangleDistanceType pt_type, double dist)
@@ -221,11 +225,52 @@ tuple<mat12, vec12> ipc_hess_pt_12x12(
 
     pt_grad *= B_;
 
+
+    // overtime babysitting
+
+    if (globals.params_int["cuda_ipc_term"]) {
+        if (pt_type == ipc::PointTriangleDistanceType::P_T) {
+            float g[12], h [144];
+            vec3f ptf[4];
+            for (int i =0; i < 4;i++) 
+                ptf[i]  = to_vec3f(pt[i]);
+            pt_grad_hess12x12(ptf, g, h);
+            vec12 g_cuda = Map<Vector<float, 12>>(g).cast<double>();
+            mat12 h_cuda = Map<Matrix<float, 12, 12>>(h).cast<double>();
+            if (!g_cuda.isApprox(pt_grad, 1e-3)) {
+                spdlog::error("ipc grad mismatch");
+            }
+            if (!h_cuda.isApprox(ipc_hess, 1e-3)) {
+                spdlog::error("ipc hess mismatch");
+            }
+            auto distf = dev::point_triangle_distance(ptf[0], ptf[1], ptf[2], ptf[3]);
+            auto B_f = dev::barrier_derivative_d(distf);
+            auto B__f = dev::barrier_second_derivative(distf);
+            auto Bf = dev::barrier_function(distf);
+            auto B = barrier::barrier_function(dist);
+            if (abs(Bf - B) > 1e-8) {
+                spdlog::error("B mismatch");
+            }
+            if (abs(B_f - B_) > 1e-3) {
+                spdlog::error("B. mismatch");
+            }
+            if (abs(B__f - B__) > 1e-3) {
+                spdlog::error("B.. mismatch");
+            }
+            if (abs(distf - dist) > 1e-6) {
+                spdlog::error("dist mismatch");
+            }
+
+        }
+        
+    }
+
     if (globals.psd)
         ipc_hess = project_to_psd(ipc_hess);
 
     return { ipc_hess, pt_grad };
 }
+
 void ipc_term(
     array<vec3, 4> pt, array<int, 4> ij, ipc::PointTriangleDistanceType pt_type, double dist,
 #ifdef _SM_OUT_
@@ -346,6 +391,8 @@ void ipc_term(
         grad_p, grad_t,
         dgp, dgt,
         hess_p, hess_t, off_diag, off_T);
+
+
 }
 tuple<mat12, vec12, double> ipc_hess_ee_12x12(
     array<vec3, 4> ee, array<int, 4> ij,

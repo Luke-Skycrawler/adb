@@ -113,15 +113,15 @@ struct CudaGlobals {
 // __constant__ CudaGlobals *cuda_globals;
 extern CudaGlobals host_cuda_globals;
 namespace dev {
-__device__ __constant__ static const float kappa = 1e-1f, d_hat = 1e-4f, d_hat_sqr = 1e-2f;
+__device__ __constant__ static const float kappa = 1e-4f, d_hat = 1e-4f, d_hat_sqr = 1e-2f;
 
 __host__ __device__ float barrier_function(float d);
 __host__ __device__ float barrier_derivative_d(float x);
 __host__ __device__ float barrier_second_derivative(float d);
 
-__device__ void point_triangle_distance_hessian(vec3f p, vec3f t0, vec3f t1, vec3f t2, float* pt_hess);
-__device__ float point_triangle_distance(vec3f p, vec3f t0, vec3f t1, vec3f t2);
-__device__ void point_triangle_distance_gradient(vec3f p, vec3f t0, vec3f t1, vec3f t2, float *pt_grad);
+__host__ __device__ void point_triangle_distance_hessian(vec3f p, vec3f t0, vec3f t1, vec3f t2, float* pt_hess);
+__host__ __device__ float point_triangle_distance(vec3f p, vec3f t0, vec3f t1, vec3f t2);
+__host__ __device__ void point_triangle_distance_gradient(vec3f p, vec3f t0, vec3f t1, vec3f t2, float *pt_grad);
 
 }
 
@@ -135,7 +135,7 @@ __forceinline__ __device__ float3 matmul(float3 _q[4], float3 x)
     return ret + _q[0];
 }
 
-extern void make_lut(int lut_size, i2* lut);
+void make_lut(int lut_size, i2* lut);
 
 __forceinline__ __device__ __host__ float kronecker(int i, int j)
 {

@@ -116,8 +116,21 @@ void gen_empty_sm_glue(
     thrust::host_vector<i2> host_lut;
     make_lut_test_glue(lut, host_lut);
 
-    host_cuda_globals.lut = host_lut;
     // make_lut(host_lut.size(), PTR(host_lut));
+    auto cuda_gen = from_thrust(host_cuda_globals.lut);
+    auto host_gen = from_thrust(host_lut);
+    vector<i2> cuda_minus_host, host_minus_cuda;
+
+    sort(cuda_gen.begin(), cuda_gen.end());
+    sort(host_gen.begin(), host_gen.end());
+    
+    // set_difference(cuda_gen.begin(), cuda_gen.end(), host_gen.begin(), host_gen.end(), back_inserter(cuda_minus_host));
+    set_difference(host_gen.begin(), host_gen.end(), cuda_gen.begin(), cuda_gen.end(), std::back_inserter(host_minus_cuda));
+
+    if (host_minus_cuda.size()) {
+        spdlog::error("host_minus_cuda.size() = {}", host_minus_cuda.size());
+    }
+    host_cuda_globals.lut = host_lut;
     build_csr(n_cubes, host_cuda_globals.lut, host_cuda_globals.hess);
     auto& hess = host_cuda_globals.hess;
 

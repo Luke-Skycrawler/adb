@@ -358,12 +358,10 @@ void implicit_euler(vector<unique_ptr<AffineBody>>& cubes, double dt)
         {
             lut.clear();
             sparse_hess.setZero();
-            if (globals.params_int["gen_sm_test"])
+            if (globals.params_int["gen_sm_test"] && iter ==  0)
                 gen_empty_sm_glue(n_cubes, idx, eidx, sparse_hess, lut);
             else
                 gen_empty_sm(n_cubes, idx, eidx, sparse_hess, lut);
-            // if (globals.params_int["gen_lut_test"]) 
-            //     gen_lut_test_glue(n_cubes, lut);
   
             n_pt = idx.size();
             n_ee = eidx.size();

@@ -70,10 +70,11 @@
         "strict": 0,
         "make_lut": 0,
         "gen_sm_test": 1,
-        "cuda_solver": 1,
+        "cuda_solver": 0,
         "cuda_hess": 1,
         "cuda_intersection": 0,
         "cuda_pt": 1,
-        "cuda_pt_direct": 1
+        "cuda_pt_direct": 1,
+        "cuda_ipc_term": 1
     }
 }

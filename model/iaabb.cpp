@@ -40,6 +40,7 @@ void glue_vf_col_set(
     vector<array<vec3, 4>>& pts,
     vector<array<int, 4>>& idx,
     int tid = 0);
+void project_glue(int vtn);
 
 
 void make_lut_glue(vector<Intersection> &os) {
@@ -1255,7 +1256,8 @@ float iaabb_brute_force_cuda_pt_only(
     int vtn,
     std::vector<std::array<int, 4>>& idx);
 
-void project_glue(int vtn);
+
+
 double iaabb_brute_force(
     int n_cubes,
     const std::vector<std::unique_ptr<AffineBody>>& cubes,
