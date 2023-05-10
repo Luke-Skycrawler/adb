@@ -190,7 +190,11 @@ __device__ void plain_matrix_product(int ar, int ac, int bc, float* a, float* b,
     }
 }
 __global__ void ipc_pt(
-    int npt, vec3f* pt, i2* ij, bool* is_static,
+    int npt, 
+    i2* pt, i2* ij, 
+    
+    cudaAffineBody* cubes,
+
     int lut_size, i2* lut,
     float* values, int* inners, int* outers,
     // CsrSparseMatrix& sparse_hess,
@@ -221,7 +225,6 @@ __global__ void ipc_pt(
             float* pt_grad = buffer + tid * 12;
 
             pt_grad_hess12x12(pt + I * 4, pt_grad, ipc_hess);
-            int k = binary_search(lut_size, lut, ij[I]);
 
             vec3f p_tile, t0_tile, t1_tile, t2_tile; // TODO: forward declare, fill in the args later
 
@@ -244,34 +247,41 @@ __global__ void ipc_pt(
             to_3x12(t1_tile, Jt + 36);
             to_3x12(t2_tile, Jt + 72);
 
-            // float kerp[4]{ 1.0, p_tile.x, p_tile.y, p_tile.z },
-            //     kert[][4]{
-            //         { 1.0, t0_tile.x, t0_tile.y, t0_tile.z },
-            //         { 1.0, t1_tile.x, t1_tile.y, t1_tile.z },
-            //         { 1.0, t2_tile.x, t2_tile.y, t2_tile.z }
-            //     };
+            float kerp[4]{ 1.0, p_tile.x, p_tile.y, p_tile.z },
+                kert[][4]{
+                    { 1.0, t0_tile.x, t0_tile.y, t0_tile.z },
+                    { 1.0, t1_tile.x, t1_tile.y, t1_tile.z },
+                    { 1.0, t2_tile.x, t2_tile.y, t2_tile.z }
+                };
 
             float *hess_p, *hess_t, *off_diag; // TODO: forward declare, fill in the args later
-            // for (int i = 0; i < 4; i++)
-            //         for (int j = 0; j < 4; j++) {
-            //             for (int c = 0; c < 3; c++)
-            //                 for (int r = 0; r < 3; r++) {
-            //                     hess_p[rc_to_1d(i * 3 + r, j * 3 + c)] = ipc_hess[rc_to_1d(r, c)] * kerp[i] * kerp[j];
-            //                 }
-            //             // FIXME: make sure ipc autogen is row-major
-            //             for (int k = 0; k < 3; k++)
-            //                 for (int l = 0; l < 3; l++) {
-            //                     for (int c = 0; c < 3; c++)
-            //                         for (int r = 0; r < 3; r++) {
-            //                             hess_t[rc_to_1d(i * 3 + r, j * 3 + c)] += ipc_hess[rc_to_1d((k + 1) * 3 + r, (l + 1) * 3 + c)] * kert[k][i] * kert[l][j];
-            //                         }
-            //                 }
-            //             for (int c = 0; c < 3; c++)
-            //         }
-            // }
+            for (int i = 0; i < 4; i++)
+                    for (int j = 0; j < 4; j++) {
+                        for (int c = 0; c < 3; c++)
+                            for (int r = 0; r < 3; r++) {
+                                hess_p[rc_to_1d(i * 3 + r, j * 3 + c)] = ipc_hess[rc_to_1d(r, c)] * kerp[i] * kerp[j];
+                            }
+                        // FIXME: make sure ipc autogen is row-major
+                        for (int k = 0; k < 3; k++)
+                            for (int l = 0; l < 3; l++) {
+                                for (int c = 0; c < 3; c++)
+                                    for (int r = 0; r < 3; r++) {
+                                        hess_t[rc_to_1d(i * 3 + r, j * 3 + c)] += ipc_hess[rc_to_1d((k + 1) * 3 + r, (l + 1) * 3 + c)] * kert[k][i] * kert[l][j];
+                                    }
+                            }
+                        for (int l = 0; l < 3; l ++) {
+                            for (int c =0; c < 3; c++) {
+                                for (int r = 0; r < 3; r++) {
+                                    off_diag[rc_to_1d(i * 3 + r, j * 3 + c)] += ipc_hess[rc_to_1d(r, (l + 1) * 3 + c)] * (kerp[i] * kerp[l][j]);
+                                }
+                            }
+                        }
+                    }
+            
 
             // auto outer_ptr = thrust::raw_pointer_cast(outers.data());
             // auto value_ptr = thrust::raw_pointer_cast(values.data());
+            int k = binary_search(lut_size, lut, ij[I]);
             auto os = offset_and_stride(k, lut, outers);
             int offset = os[0], stride = os[1];
 

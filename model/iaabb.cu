@@ -108,7 +108,7 @@ __global__ void filter_distance_kernel_atomic(i2* buf_ij, i2* io_tmp,
 
     int* vilist, int* fjlist,
     int* ret_pt_types,
-    float dhat = 1e-4f, int* meta_vifj = nullptr)
+    float dhat = 1e-4f, int nvi = 0)
 {
 
     int tid = threadIdx.x + blockIdx.x * blockDim.x;
@@ -116,7 +116,6 @@ __global__ void filter_distance_kernel_atomic(i2* buf_ij, i2* io_tmp,
     int n_task_per_thread = (n_tasks + n_cuda_threads_per_block - 1) / n_cuda_threads_per_block;
     __shared__ int n;
     n = 0;
-    auto nvi = meta_vifj? meta_vifj[0]: 0;
     for (int _i = 0; _i < n_task_per_thread; _i++) {
         int idx = tid * n_task_per_thread + _i;
         if (idx < n_tasks) {
@@ -1001,7 +1000,7 @@ void per_intersection_core(int n_overlaps, luf* culls, i2* overlaps)
                 vlist, flist,
                 pt_types,
                 1e-4f,
-                vlist_meta + type);
+                nvi);
             CUDA_CALL(cudaGetLastError());
             CUDA_CALL(cudaStreamSynchronize(stream));
 
