@@ -613,7 +613,8 @@ void prepare_vifj(
 
     vifjs.resize(T + T_2 * 3);
     joint_aabbs.resize(T + T_2);
-    auto &ci{ cubes[ij[0]] }, &cj{ cubes[ij[1]] };
+    int ii = type == 1? ij[1]: ij[0], jj = type == 1? ij[0]: ij[1];
+    auto &ci{ cubes[ii] }, &cj{ cubes[jj] };
     for (int I = 0; I < T; I ++) {
         int i = type == 1 ? vjs[I] : vis[I];
         switch (type) {
@@ -669,7 +670,7 @@ __global__ void prepare_aabb_vi_fj_kernel(
 {
     auto tid = threadIdx.x;
     auto i = overlaps[i_overlap][0], j = overlaps[i_overlap][1];
-    auto &ci{ cubes[i] }, &cj{ cubes[j] };
+    auto &ci{ cubes[type == 1 ? j: i] }, &cj{ cubes[type == 1? i : j] };
     int nvi = vi_meta_sizes[0], nvj = vi_meta_sizes[1], nfj = fj_meta_sizes[1], nfi = fj_meta_sizes[0];
 
     auto T_t = type == 1 ? nvj : nvi;
