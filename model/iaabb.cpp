@@ -1316,29 +1316,33 @@ double iaabb_brute_force(
             spdlog::warn("size : ref = {}, lut = {}, intersection(ref, lut) = {}", ref.size(), lut.size(), ref_it.size());
         }
     }
-    if (globals.params_int["cuda_pt"] && vtn == 1) {
-            vector<array<int, 4>> idx_cuda, int_ref;
-            for (int i = 0; i < n_cubes; i++) {
-                auto& b{ host_cuda_globals.host_cubes[i] };
-                auto& a{ *cubes[i] };
-                for (int i = 0; i < 4; i++) {
-                    b.q[i] = to_vec3f(a.q[i]);
-                    b.q0[i] = to_vec3f(a.q0[i]);
-                    b.dqdt[i] = to_vec3f(a.dqdt[i]);
-                    b.q_update[i] = to_vec3f(a.q[i] + a.dq.segment<3>(i * 3));
-                }
+    if (globals.params_int["cuda_pt"] && vtn != 3) {
+        vector<array<int, 4>> idx_cuda, int_ref;
+        for (int i = 0; i < n_cubes; i++) {
+            auto& b{ host_cuda_globals.host_cubes[i] };
+            auto& a{ *cubes[i] };
+            for (int i = 0; i < 4; i++) {
+                b.q[i] = to_vec3f(a.q[i]);
+                b.q0[i] = to_vec3f(a.q0[i]);
+                b.dqdt[i] = to_vec3f(a.dqdt[i]);
+                b.q_update[i] = to_vec3f(a.q[i] + a.dq.segment<3>(i * 3));
             }
-            cudaMemcpy(host_cuda_globals.cubes, host_cuda_globals.host_cubes.data(), sizeof(cudaAffineBody) * n_cubes, cudaMemcpyHostToDevice);
-            project_glue(vtn);
-            iaabb_brute_force_cuda_pt_only(n_cubes, host_cuda_globals.cubes, host_cuda_globals.aabbs, vtn, idx_cuda);
+        }
+        cudaMemcpy(host_cuda_globals.cubes, host_cuda_globals.host_cubes.data(), sizeof(cudaAffineBody) * n_cubes, cudaMemcpyHostToDevice);
+        project_glue(vtn);
+        iaabb_brute_force_cuda_pt_only(n_cubes, host_cuda_globals.cubes, host_cuda_globals.aabbs, vtn, idx_cuda);
+
+        bool compare = true;
+        if (compare) {
             sort(idx.begin(), idx.end());
             sort(idx_cuda.begin(), idx_cuda.end());
             set_intersection(idx.begin(), idx.end(), idx_cuda.begin(), idx_cuda.end(), std::back_inserter(int_ref));
 
             if (idx.size() != idx_cuda.size() || int_ref.size() != idx.size()) {
-            spdlog::warn("size : ref = {}, cuda = {}, intersection(ref, cuda) = {}", idx.size(), idx_cuda.size(), int_ref.size());
+                spdlog::warn("size : ref = {}, cuda = {}, intersection(ref, cuda) = {}", idx.size(), idx_cuda.size(), int_ref.size());
             }
-            if (globals.params_int["cuda_pt_direct"]) idx = idx_cuda;
+        }
+        if (globals.params_int["cuda_pt_direct"]) idx = idx_cuda;
     }
     toi = primitive_brute_force(n_cubes, ret, cubes, vtn,
 #ifdef TESTING

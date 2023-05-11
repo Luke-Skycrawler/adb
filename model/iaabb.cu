@@ -484,13 +484,12 @@ inline luf __device__ __host__ aabb(cudaAffineBody& c, int idx, int type)
 }
 
 __global__ void primitive_intersection_test_kernel(
-    int type, // 0: vertex, 1: edge, 2: face
+    int type, // 0: vertex, 2: edge, 1: face
     int i_overlap, luf* culls, i2* body_index,
     cudaAffineBody* cubes,
     int* ret_prmts_meta_sizes,
     int* ret_prmts)
 {
-    // __shared__ int cnt[n_cuda_threads_per_block * 2];
     __shared__ int n;
     n = 0;
 

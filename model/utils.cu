@@ -22,7 +22,12 @@ __device__ luf affine(luf aabb, cudaAffineBody& c, int vtn)
 {
     vec3f cull[8];
     vec3f l, u;
-    auto q{ vtn == 2 ? c.q_update : c.q };
+    auto q{ vtn == 2 ? c.q_update : vtn == 0? c.q0: c.q };
+    // vtn == 2, q update 
+    // vtn == 3, merge q update and q
+    // vtn == 1, q
+    // vtn == 0, q0
+
     for (int i = 0; i < 2; i++)
         for (int j = 0; j < 2; j++)
             for (int k = 0; k < 2; k++) {

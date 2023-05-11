@@ -5,6 +5,7 @@
 #include "autogen/autogen.cuh"
 using namespace std;
 
+__device__ __host__ float vf_distance(vec3f _v, Facef f, int& _pt_type);
 __host__ __device__ void dev_project_to_psd(int dim, float* A){
 
 }
@@ -115,12 +116,13 @@ void make_placeholder_sparse_matrix(int n_cubes, CsrSparseMatrix &sparse_matrix)
     build_csr(n_cubes, lut, sparse_matrix);
 }
 
-__host__ __device__ void pt_grad_hess12x12(vec3f* pt, float* pt_grad, float* pt_hess, bool psd = true)
+__host__ __device__ void pt_grad_hess12x12(vec3f pt[4], float pt_grad[12], float pt_hess[144], bool psd = true)
 {
 
-    auto dist = dev::point_triangle_distance(pt[0], pt[1], pt[2], pt[3]);
-    dev::point_triangle_distance_gradient(pt[0], pt[1], pt[2], pt[3], pt_grad);
-    dev::point_triangle_distance_hessian(pt[0], pt[1], pt[2], pt[3], pt_hess);
+    int type;
+    auto dist = vf_distance(pt[0], Facef{pt[1], pt[2], pt[3]}, type);
+    dev::point_triangle_distance_gradient(pt[0], pt[1], pt[2], pt[3], pt_grad, type);
+    dev::point_triangle_distance_hessian(pt[0], pt[1], pt[2], pt[3], pt_hess, type);
 
     auto B_ = dev::barrier_derivative_d(dist);
     auto B__ = dev::barrier_second_derivative(dist);
@@ -223,14 +225,19 @@ __global__ void ipc_pt_kernel(
 
     // input: pt data, body index, is static
     // output: basis Tk (2x12), lambda, gradient g (12x1), hessian H (12x12)
+
     // __shared__ float pt_grad_hess[13 * 12 * n_cuda_threads_per_block];
     auto tid = threadIdx.x + blockIdx.x * blockDim.x;
-    auto hess_start = buffer + 12 * blockDim.x;
-    // FIXME: align with cacheline size
 
-    // auto values = sparse_hess.values;
-    // auto inners = sparse_hess.inner;
-    // auto outers = sparse_hess.outer_start;
+    auto grad_start = buffer;
+    auto hess_start = buffer + 12 * blockDim.x;
+    auto hess_p_start = hess_start + 144 * blockDim.x;
+    auto hess_t_start = hess_p_start + 144 * blockDim.x;
+    auto off_diag_start = hess_t_start + 144 * blockDim.x;
+
+    // FIXME: align with cacheline size
+    // FIXME: make sure ipc autogen is row-major
+
 
     int n_tasks_per_thread = (npt + n_cuda_threads_per_block - 1) / n_cuda_threads_per_block;
 
@@ -238,7 +245,7 @@ __global__ void ipc_pt_kernel(
         int I = tid * n_tasks_per_thread + _i;
         if (I < npt) {
             float* ipc_hess = hess_start + 144 * tid;
-            float* pt_grad = buffer + tid * 12;
+            float* pt_grad = grad_start + tid * 12;
 
             int ii = ij[I][0], jj = ij[I][1];
             auto &ci{ cubes[ii] }, &cj{ cubes[jj] };
@@ -266,20 +273,39 @@ __global__ void ipc_pt_kernel(
                     { 1.0, t2_tile.x, t2_tile.y, t2_tile.z }
                 };
 
-            float *hess_p, *hess_t, *off_diag; // TODO: forward declare, fill in the args later
+            float *hess_p, *hess_t, *off_diag; 
+            float dgp[12], dgt[12];
+
+            hess_p = hess_p_start + 144 * tid;
+            hess_t = hess_t_start + 144 * tid;
+            off_diag = off_diag_start + 144 * tid;
+
             for (int i = 0; i < 4; i++)
                 for (int j = 0; j < 4; j++) {
+                    // set hess_p
                     for (int c = 0; c < 3; c++)
                         for (int r = 0; r < 3; r++) {
                             hess_p[rc_to_1d(i * 3 + r, j * 3 + c)] = ipc_hess[rc_to_1d(r, c)] * kerp[i] * kerp[j];
                         }
-                    // FIXME: make sure ipc autogen is row-major
+
+
+                    // set hess_t
+                    for (int c=  0; c < 3; c++)
+                        for (int r= 0; r< 3; r++) {
+                            hess_t[rc_to_1d(i * 3 + r, j * 3 + c)] = 0.0f;
+                        }
                     for (int k = 0; k < 3; k++)
                         for (int l = 0; l < 3; l++) {
                             for (int c = 0; c < 3; c++)
                                 for (int r = 0; r < 3; r++) {
                                     hess_t[rc_to_1d(i * 3 + r, j * 3 + c)] += ipc_hess[rc_to_1d((k + 1) * 3 + r, (l + 1) * 3 + c)] * kert[k][i] * kert[l][j];
                                 }
+                        }
+
+                    // set off_diag
+                    for (int c=  0; c < 3; c++)
+                        for (int r= 0; r< 3; r++) {
+                            off_diag[rc_to_1d(i * 3 + r, j * 3 + c)] = 0.0f;
                         }
                     for (int l = 0; l < 3; l++) {
                         for (int c = 0; c < 3; c++) {
@@ -289,7 +315,6 @@ __global__ void ipc_pt_kernel(
                         }
                     }
                 }
-            float dgp[12], dgt[12];
 
             for (int i = 0; i < 4; i++) {
                 for (int j = 0; j < 3; j++) {
@@ -305,20 +330,20 @@ __global__ void ipc_pt_kernel(
             auto osjj = to_os({ jj, jj }, lut_size, lut, outers);
             auto osji = to_os({ jj, ii }, lut_size, lut, outers);
 
-            if (cj.mass > 0.0f) {
-                if (ci.mass > 0.0f)
-                    put(values, osij, off_diag);
-                put(values, osjj, hess_t);
-                for (int i = 0; i < 12; i++) {
-                    atomicAdd(b + i + jj * 12, dgt[i]);
-                }
-            }
             if (ci.mass > 0.0f) {
                 if (cj.mass > 0.0f)
                     put_T(values, osji, off_diag);
                 put(values, osii, hess_p);
                 for (int i = 0; i < 12; i++) {
                     atomicAdd(b + i + ii * 12, dgp[i]);
+                }
+            }
+            if (cj.mass > 0.0f) {
+                if (ci.mass > 0.0f)
+                    put(values, osij, off_diag);
+                put(values, osjj, hess_t);
+                for (int i = 0; i < 12; i++) {
+                    atomicAdd(b + i + jj * 12, dgt[i]);
                 }
             }
         }

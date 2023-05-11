@@ -183,12 +183,22 @@ __global__ void project_vt1_kernel(int n_cubes, cudaAffineBody *cubes, float3* b
         int i = tid * n_tasks_per_thread + _i;
         if (i < n_cubes) {
             auto& c{ cubes[i] };
-            // auto offset = c.global_vertices_offset;
-            // for (int j = 0; j < c.n_vertices; j++) {
-            //     buffer[offset + j] = matmul(c.q, c.vertices[j]);
-            // }
             for (int j = 0; j < c.n_vertices; j++) {
                 c.projected[j] = matmul(c.q, c.vertices[j]);
+            }
+        }
+    }
+}
+__global__ void project_vt2_kernel(int n_cubes, cudaAffineBody *cubes, float3* buffer)
+{
+    int tid = threadIdx.x + blockIdx.x * blockDim.x;
+    int n_tasks_per_thread = (n_cubes + blockDim.x - 1) / blockDim.x;
+    for (int _i = 0; _i < n_tasks_per_thread; _i++) {
+        int i = tid * n_tasks_per_thread + _i;
+        if (i < n_cubes) {
+            auto& c{ cubes[i] };
+            for (int j = 0; j < c.n_vertices; j++) {
+                c.projected[j] = matmul(c.q_update, c.vertices[j]);
             }
         }
     }
@@ -462,9 +472,12 @@ __host__ __device__ CudaGlobals::CudaGlobals(CudaGlobals & a) {
 
 void project_glue(int vtn)
 {
+    auto &g {host_cuda_globals};
     switch (vtn) {
     case 1:
-        project_vt1_kernel<<<1, n_cuda_threads_per_block>>>(host_cuda_globals.n_cubes, host_cuda_globals.cubes, host_cuda_globals.projected_vertices);
+        project_vt1_kernel<<<1, n_cuda_threads_per_block>>>(g.n_cubes, g.cubes, g.projected_vertices);
         break;
+    case 2:
+        project_vt2_kernel<<<1, n_cuda_threads_per_block>>>(g.n_cubes, g.cubes, g.projected_vertices);
     }
 }
