@@ -10,7 +10,7 @@ __host__ __device__ void dev_project_to_psd(int dim, float* A){
 
 }
 
-__device__ i2 offset_and_stride(int I, const i2* lut, int* outers)
+__host__ __device__ i2 offset_and_stride(int I, const i2* lut, int* outers)
 {
     // TEST COVERED
     int i = lut[I][0];
@@ -111,18 +111,14 @@ void build_csr(int n_cubes, const thrust::device_vector<i2> &lut, CsrSparseMatri
 }
 
 
-void make_placeholder_sparse_matrix(int n_cubes, CsrSparseMatrix &sparse_matrix) {
-    auto& lut{ host_cuda_globals.lut}; 
-    build_csr(n_cubes, lut, sparse_matrix);
-}
-
-__host__ __device__ void pt_grad_hess12x12(vec3f pt[4], float pt_grad[12], float pt_hess[144], bool psd = true)
+__host__ __device__ void pt_grad_hess12x12(vec3f *pt, float *pt_grad, float *pt_hess, bool psd = true)
 {
 
     int type;
     auto dist = vf_distance(pt[0], Facef{pt[1], pt[2], pt[3]}, type);
     dev::point_triangle_distance_gradient(pt[0], pt[1], pt[2], pt[3], pt_grad, type);
     dev::point_triangle_distance_hessian(pt[0], pt[1], pt[2], pt[3], pt_hess, type);
+    printf("pt grad hess generated\n");
 
     auto B_ = dev::barrier_derivative_d(dist);
     auto B__ = dev::barrier_second_derivative(dist);
@@ -135,14 +131,16 @@ __host__ __device__ void pt_grad_hess12x12(vec3f pt[4], float pt_grad[12], float
         }
     for (int i = 0; i < 12; i++)
         pt_grad[i] *= B_;
+    printf("pt grad, ipc hess processed\n");
 
     if (psd)
         dev_project_to_psd(12, pt_hess);
+    printf("sub program returned\n");
 }
 
-__device__ int binary_search(int lut_size, i2* lut, i2 value)
+__host__ __device__ int binary_search(int lut_size, i2* lut, i2 value)
 {
-    int l = 0, u = lut_size;
+    int l = 0, u = lut_size - 1;
     while (l < u) {
         int mid = (l + u) / 2;
         if (lut[mid] < value)
@@ -150,7 +148,8 @@ __device__ int binary_search(int lut_size, i2* lut, i2 value)
         else
             u = mid;
     }
-    return l;
+    // u is the immediate value over x
+    return u;
 }
 
 __forceinline__ int __device__ rc_to_1d(int r, int c)
@@ -201,10 +200,27 @@ __device__ void put_T(float* values, i2 offset_stride, float* mat12x12)
         }
 }
 
-__device__ i2 to_os(i2 ij, int lut_size, i2* lut, int* outers)
+__host__ __device__ i2 to_os(i2 ij, int lut_size, i2* lut, int* outers)
 {
     int k = binary_search(lut_size, lut, ij);
     return offset_and_stride(k, lut, outers);
+}
+
+void get_submat_glue(
+    int ii, int jj, 
+    float *submat12x12
+) 
+{
+    auto &g{host_cuda_globals};
+    auto &h {g.hess};
+    auto outers = from_thrust(h.outer_start);
+    auto values = from_thrust(h.values);
+    auto lut = from_thrust(g.lut);
+    auto os = to_os(i2{ii, jj}, g.lut_size, lut.data(), outers.data());
+    int offset = os[0], stride = os[1];
+    for (int c = 0; c < 12; c++) for (int r = 0; r < 12; r ++){
+        submat12x12[c * 12 + r] = values[offset + c * stride + r];
+    }
 }
 
 __global__ void ipc_pt_kernel(
@@ -244,11 +260,12 @@ __global__ void ipc_pt_kernel(
     for (int _i = 0; _i < n_tasks_per_thread; _i++) {
         int I = tid * n_tasks_per_thread + _i;
         if (I < npt) {
-            float* ipc_hess = hess_start + 144 * tid;
-            float* pt_grad = grad_start + tid * 12;
 
+            printf("tid = %d  created\n", tid);
             int ii = ij[I][0], jj = ij[I][1];
             auto &ci{ cubes[ii] }, &cj{ cubes[jj] };
+            printf("tid = %d  ci, cj access, ij = {%d, %d}\n pt[I] = {%d, %d}", tid, ii, jj, pt[I][0], pt[I][1]);
+
             auto fp {cj.triangle(pt[I][1])};
             vec3f projected[4] {
                 ci.projected[pt[I][0]],
@@ -256,8 +273,13 @@ __global__ void ipc_pt_kernel(
                 fp.t1,
                 fp.t2
             };
+            printf("tid = %d  projected vertices\n", tid);
+            
+            float* ipc_hess = hess_start + 144 * tid;
+            float* pt_grad = grad_start + tid * 12;
 
-            pt_grad_hess12x12(projected, pt_grad, ipc_hess);
+            pt_grad_hess12x12(projected, pt_grad, ipc_hess, true);
+            printf("tid = %d  pt grad hess checkpoint passed\n", tid);
 
             vec3f p_tile, t0_tile, t1_tile, t2_tile;
             p_tile = ci.vertices[pt[I][0]];
@@ -315,6 +337,8 @@ __global__ void ipc_pt_kernel(
                         }
                     }
                 }
+                
+            printf("tid = %d  grad_p, grad_t checkpoint passed\n", tid);
 
             for (int i = 0; i < 4; i++) {
                 for (int j = 0; j < 3; j++) {
@@ -324,6 +348,7 @@ __global__ void ipc_pt_kernel(
                         + pt_grad[j + 9] * kert[2][i];
                 }
             }
+            printf("tid = %d  dgp checkpoint passed\n", tid);
 
             auto osii = to_os({ ii, ii }, lut_size, lut, outers);
             auto osij = to_os({ ii, jj }, lut_size, lut, outers);
@@ -346,7 +371,29 @@ __global__ void ipc_pt_kernel(
                     atomicAdd(b + i + jj * 12, dgt[i]);
                 }
             }
+            printf("tid = %d  output checkpoint passed, success\n", tid);
+
         }
     }
 }
+void project_glue(int vtn);
+void cuda_ipc_glue()
+{
+    auto& g{ host_cuda_globals };
+    auto& lt{ g.leader_thread_buffer_back };
+    auto lt_stashed = lt;
+    
+    auto ps = from_thrust(thrust::device_vector<i2>(g.pt.p, g.pt.p + g.npt));
+    auto bs = from_thrust(thrust::device_vector<i2>(g.pt.b, g.pt.b + g.npt));
+    
 
+    project_glue(1);
+    ipc_pt_kernel<<<1, 1>>>(g.npt, g.pt.p, g.pt.b,
+        g.cubes,
+        g.lut_size, PTR(g.lut),
+        PTR(g.hess.values), PTR(g.hess.inner), PTR(g.hess.outer_start),
+        g.b, (float*)lt,
+        nullptr, nullptr);
+    CUDA_CALL(cudaDeviceSynchronize());
+    lt = lt_stashed;
+}

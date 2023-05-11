@@ -1,4 +1,5 @@
 #pragma once
+// works in conjunction with eigen and cuda environment
 #include "affine_body.h"
 #include "cuda_globals.cuh"
 #include <vector>
@@ -74,4 +75,19 @@ void initialize_aabbs(
 
 // template <typename T>
 // thrust::device_vector<T> to_thrust(std::vector<T> &b);
+void project_glue(int vtn);
+void cuda_ipc_glue();
+void hess_cuda(int n_cubes, float dt, float* grads, float* hess);
+void cuda_solve(Eigen::VectorXd& dq, Eigen::SparseMatrix<double>& sparse_hess, Eigen::VectorXd& r);
 
+void glue_vf_col_set(
+    std::vector<int>& vilist, std::vector<int>& fjlist,
+    const std::vector<std::unique_ptr<AffineBody>>& cubes,
+    int I, int J,
+    std::vector<std::array<vec3, 4>>& pts,
+    std::vector<std::array<int, 4>>& idx,
+    int tid = 0);
+
+void get_submat_glue(
+    int ii, int jj,
+    float* submat12x12);

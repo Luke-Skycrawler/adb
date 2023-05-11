@@ -738,7 +738,7 @@ void per_intersection_core(int n_overlaps, luf* culls, i2* overlaps)
 
     static vector<i2> host_overlaps;
     host_overlaps.resize(n_overlaps);
-// #define CPU_REF
+#define CPU_REF
 #ifdef CPU_REF
     static vector<luf> host_culls;
 
@@ -1091,6 +1091,7 @@ void make_lut(int n_overlaps, i2* overlaps)
         make_sym_kernel<<<1, n_cuda_threads_per_block>>>(n_overlaps, overlaps, n_cubes);
 
     g.lut_size = n_overlaps * 2 + n_cubes;
+    CUDA_CALL(cudaDeviceSynchronize());
     g.lut = thrust::device_vector<i2>(overlaps, overlaps + g.lut_size);
     thrust::sort(g.lut.begin(), g.lut.end());
     // g.lut.resize(lut_size + n_cubes);

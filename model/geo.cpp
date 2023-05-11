@@ -199,7 +199,7 @@ void ipc_term_vg(AffineBody& c, int v
             J.transpose() * Tk, c.grad, c.hess);
 #endif
 };
-void pt_grad_hess12x12(vec3f pt[4], float pt_grad[12], float pt_hess[144], bool psd = true);
+void pt_grad_hess12x12(vec3f *pt, float *pt_grad, float *pt_hess, bool psd = true);
 
 
 tuple<mat12, vec12> ipc_hess_pt_12x12(

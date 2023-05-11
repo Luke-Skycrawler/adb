@@ -70,9 +70,9 @@ struct CudaGlobals {
     cudaAffineBody* cubes;
     std::vector<cudaAffineBody> host_cubes;
     luf* aabbs;
-    thrust::device_vector<i2> prim_idx, body_idx;
-    thrust::device_vector<i2> prim_idx_update, body_idx_update;
-    thrust::device_vector<int> pt_types, pt_types_update;
+    // thrust::device_vector<i2> prim_idx, body_idx;
+    // thrust::device_vector<i2> prim_idx_update, body_idx_update;
+    // thrust::device_vector<int> pt_types, pt_types_update;
     int npt, nee;
     int n_cubes, lut_size;
     CollisionSets collision_sets;
@@ -81,14 +81,13 @@ struct CudaGlobals {
     // thrust::device_vector<float> b;
 
     // permenant designated buffers
-    float *b, *hess_diag, *dq, *float_buffer;
-    float3 *float3_buffer;
+    float *b, *hess_diag, *dq; //, *float_buffer;
+    // float3 *float3_buffer;
     float dt;
     thrust::device_vector<i2> lut;
     void* buffer_chunk;
 
     int device_id, per_stream_buffer_size;
-    int* cnt_ret;
 
     // temporary buffers
     const int st_size = 128, blk_size = max_pairs_per_block * (sizeof(i2) * 2 + sizeof(int) * 2) * 8;

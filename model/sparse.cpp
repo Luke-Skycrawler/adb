@@ -6,11 +6,11 @@
 #include <set>
 #include <spdlog/spdlog.h>
 #include <assert.h>
+#include "cuda_globals.cuh"
 using namespace std;
 using namespace Eigen;
 using namespace utils;
 
-#include "cuda_globals.cuh"
 
 void build_csr(int n_cubes, const thrust::device_vector<i2>& lut, CsrSparseMatrix& sparse_matrix);
 void gpuCholSolver(CsrSparseMatrix& hess, float* x, float *b);

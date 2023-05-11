@@ -13,7 +13,8 @@
 #include <cuda/std/array>
 #include <thrust/host_vector.h>
 #include <type_traits>
-#include "cuda_globals.cuh"
+#include "cuda_glue.h"
+
 // #define _FULL_PARALLEL_
 
 #ifndef TESTING
@@ -24,7 +25,6 @@
 #define DT 1e-2
 #endif
 #include <chrono>
-#include "cuda_glue.h"
 
 using namespace std;
 using namespace Eigen;
@@ -33,26 +33,8 @@ using namespace std::chrono;
 #define DURATION_TO_DOUBLE(X) duration_cast<duration<double>>(high_resolution_clock::now() - (X)).count()
 
 
-void glue_vf_col_set(
-    vector<int>& vilist, vector<int>& fjlist,
-    const std::vector<std::unique_ptr<AffineBody>>& cubes,
-    int I, int J,
-    vector<array<vec3, 4>>& pts,
-    vector<array<int, 4>>& idx,
-    int tid = 0);
-void project_glue(int vtn);
 
 
-void make_lut_glue(vector<Intersection> &os) {
-    int ni = os.size();
-    thrust::host_vector<i2> host_lut(ni);
-    host_lut.resize(ni);
-    #pragma omp parallel for
-    for (int i = 0; i < ni; i++) {
-        host_lut[i] = { os[i].i, os[i].j };
-    }
-    //make_lut(host_lut.size(), PTR(host_lut.data()));
-}
 float vf_distance(vec3f _v, Facef f, int &pt_type);
 tuple<float, ipc::PointTriangleDistanceType> vf_distance(vec3f vf, Facef ff); 
 
@@ -691,9 +673,6 @@ double primitive_brute_force(
     }
 #endif
 
-    if (globals.params_int["cuda_direct"] && globals.params_int["make_lut"]) {
-        make_lut_glue(overlaps);
-    }
     tbb::parallel_sort(overlaps.begin(), overlaps.end(), [](const Intersection& a, const Intersection& b) -> bool {
         auto ad = a.i + a.j, am = abs(a.i - a.j);
         auto bd = b.i + b.j, bm = abs(b.i - b.j);

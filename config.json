@@ -1,6 +1,6 @@
 {
     "player": false,
-    "starting_ts": -1,
+    "starting_ts": 13,
     "ending_ts": 500,
     "dt": 1e-2,
     "max_iter": 1000,
@@ -68,13 +68,13 @@
         "cuda_supervised": 0,
         "cuda_direct": 0,
         "strict": 0,
-        "make_lut": 0,
         "gen_sm_test": 1,
-        "cuda_solver": 0,
+        "cuda_solver": 1,
         "cuda_hess": 1,
         "cuda_intersection": 0,
         "cuda_pt": 1,
-        "cuda_pt_direct": 1,
-        "cuda_ipc_term": 1
+        "cuda_pt_direct": 0,
+        "cuda_ipc_term": 1,
+        "cuda_ipc_pt": 1
     }
 }

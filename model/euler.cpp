@@ -17,6 +17,8 @@
 #include <Eigen/PardisoSupport>
 #endif
 #include <ipc/distance/edge_edge_mollifier.hpp>
+#include "cuda_glue.h"
+
 //#define IAABB_COMPARING
 // #define IAABB_INTERNSHIP
 #ifdef IAABB_COMPARING
@@ -31,8 +33,6 @@ using namespace utils;
 #define __SOLVER__ 1
 #define __CCD__ 2
 #define __LINE_SEARCH__ 3
-#include "cuda_glue.h"
-void hess_cuda(int n_cubes, float dt, float* grads, float* hess);
 static const bool strict = false;
 void cuda_hess_glue(
     int n_cubes,
@@ -73,7 +73,6 @@ void cuda_hess_glue(
     delete [] grads; 
     delete[] hess;
 }
-void cuda_solve(Eigen::VectorXd& dq, Eigen::SparseMatrix<double>& sparse_hess, Eigen::VectorXd& r);
 
 double E_global(const VectorXd& q_plus_dq, const VectorXd& dq, int n_cubes, int n_pt, int n_ee, int n_g,
     const vector<array<int, 4>>& idx,
@@ -540,6 +539,37 @@ void implicit_euler(vector<unique_ptr<AffineBody>>& cubes, double dt)
                 }
 #endif
             }
+    }
+
+    // before adding the ee term
+
+    if (globals.params_int["cuda_ipc_pt"]) {
+        for (int i = 0; i < n_cubes; i++) {
+            auto& b{ host_cuda_globals.host_cubes[i] };
+            auto& a{ *cubes[i] };
+            for (int i = 0; i < 4; i++) {
+                b.q[i] = to_vec3f(a.q[i]);
+                b.q0[i] = to_vec3f(a.q0[i]);
+                b.dqdt[i] = to_vec3f(a.dqdt[i]);
+                b.q_update[i] = to_vec3f(a.q[i] + a.dq.segment<3>(i * 3));
+            }
+        }
+        cudaMemcpy(host_cuda_globals.cubes, host_cuda_globals.host_cubes.data(), sizeof(cudaAffineBody) * n_cubes, cudaMemcpyHostToDevice);
+
+        cuda_ipc_glue();
+        float submat[144];
+        for (auto &p: lut ) {
+            int i = p.first[0]; 
+            int j = p.first[1];
+            
+            get_submat_glue(i, j, submat);
+            mat12 ref = sparse_hess.block(i * 12, j * 12, 12, 12);
+            mat12 cuda_submat = Map<Matrix<float, 12, 12>>(submat).cast<double>();
+            if (!cuda_submat.isApprox(ref, 1e-3)) {
+                spdlog::error("cuda submat error, diff norm = {}", (cuda_submat - ref).norm());
+            }
+        }
+
     }
 #pragma omp parallel for schedule(static)
         for (int k = 0; k < n_ee; k++) {
