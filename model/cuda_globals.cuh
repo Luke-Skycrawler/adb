@@ -119,10 +119,13 @@ __host__ __device__ float barrier_function(float d);
 __host__ __device__ float barrier_derivative_d(float x);
 __host__ __device__ float barrier_second_derivative(float d);
 
-__host__ __device__ void point_triangle_distance_hessian(vec3f p, vec3f t0, vec3f t1, vec3f t2, float* pt_hess);
-__host__ __device__ float point_triangle_distance(vec3f p, vec3f t0, vec3f t1, vec3f t2);
-__host__ __device__ void point_triangle_distance_gradient(vec3f p, vec3f t0, vec3f t1, vec3f t2, float *pt_grad);
+__host__ __device__ float point_triangle_distance(vec3f p, vec3f t0, vec3f t1, vec3f t2, int type = 7);
+__host__ __device__ void point_triangle_distance_gradient(vec3f p, vec3f t0, vec3f t1, vec3f t2, float* pt_grad, int type = 7);
+__host__ __device__ void point_triangle_distance_hessian(vec3f p, vec3f t0, vec3f t1, vec3f t2, float* pt_hess, int type = 7);
+__host__ __device__ void point_point_distance_gradient(vec3f p, vec3f t0, float* pt_hess);
+__host__ __device__ void point_point_distance_hessian(vec3f p, vec3f t0, float* pt_hess);
 
+__host__ __device__ int point_triangle_distance_type(vec3f p, vec3f t0, vec3f t1, vec3f t2);
 }
 
 __forceinline__ __device__ float3 matmul(float3 _q[4], float3 x)

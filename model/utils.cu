@@ -17,6 +17,7 @@ __device__ luf intersection(const luf& a, const luf& b)
         CUDA_MIN(a.u.z, b.u.z));
     return { l, u };
 }
+
 __device__ luf affine(luf aabb, cudaAffineBody& c, int vtn)
 {
     vec3f cull[8];
@@ -242,6 +243,34 @@ __host__ __device__ void inertia_hess(cudaAffineBody& c, float ret[144])
         ret[i * 13] += c.Ic;
     }
 }
+
+
+__forceinline__ __host__ __device__ int rc12(int i, int j) {
+    return j * 12+ i;
+}
+__forceinline__ __host__ __device__ int rc9(int i, int j) {
+    return j * 9 + i;
+}
+__forceinline__ __host__ __device__ int rc6(int i, int j) {
+    return j * 6 + i;
+}
+
+__host__ __device__ void put6(float *src6x6, i2 ij_src, float* dst12x12, i2 ij_dst) {
+    int i = ij_src[0] * 3, j = ij_src[1] * 3;
+    int ii = ij_dst[0] * 3, jj = ij_dst[1] * 3;
+    for (int c = 0; c <3; c++) for (int r = 0; r < 3; r++) {
+        dst12x12[rc12(ii + r, jj + c)] = src6x6[rc6(i + r, j + c)];
+    }
+}
+
+__host__ __device__ void put9(float *src9x9, i2 ij_src, float* dst12x12, i2 ij_dst) {
+    int i = ij_src[0] * 3, j = ij_src[1] * 3;
+    int ii = ij_dst[0] * 3, jj = ij_dst[1] * 3;
+    for (int c = 0; c <3; c++) for (int r = 0; r < 3; r++) {
+        dst12x12[rc12(ii + r, jj + c)] = src9x9[rc9(i + r, j + c)];
+    }
+}
+
 namespace dev {
 
 __host__ __device__ float barrier_derivative_d(float x)
@@ -263,22 +292,188 @@ __host__ __device__ float barrier_function(float d)
     return dev::kappa * -(d - dev::d_hat) * (d - dev::d_hat) * CUDA_LOG(d / dev::d_hat) / (dev::d_hat * dev::d_hat);
 }
 
-__host__ __device__ float point_triangle_distance(vec3f p, vec3f t0, vec3f t1, vec3f t2) {
+__host__ __device__ float point_triangle_distance(vec3f p, vec3f t0, vec3f t1, vec3f t2, int type) {
+
+    // crude
+    return vf_distance(p, {t0, t1, t2}, type);
+
     auto normal = cross(t1 - t0, t2 - t0);
     auto pt = p - t0;
     float a = dot(normal, pt);
     return a * a / dot(normal, normal);
 }
-__host__ __device__ void point_triangle_distance_gradient(vec3f p, vec3f t0, vec3f t1, vec3f t2, float *pt_grad) {
-    autogen::point_plane_distance_gradient(
-        p.x, p.y, p.z, t0.x, t0.y, t0.z, t1.x, t1.y, t1.z, t2.x,
-        t2.y, t2.z, pt_grad);
+__host__ __device__ void point_triangle_distance_gradient(vec3f p, vec3f t0, vec3f t1, vec3f t2, float* pt_grad, int type)
+{
+    for (int i = 0; i < 12; i++) pt_grad[i] = 0.0f;
+    float local_grad[9];
+    switch (type) {
+    case 0:
+        // P_T0
+        point_point_distance_gradient(p, t0, local_grad);
+        for (int i = 0; i < 6; i++) pt_grad[i] = local_grad[i];
+        break;
+    case 1:
+        point_point_distance_gradient(p, t1, local_grad);
+        for (int i = 0; i < 3; i++) {
+            pt_grad[i] = local_grad[i];
+            pt_grad[i + 6] = local_grad[i + 3];
+        }
+        break;
+    case 2:
+        point_point_distance_gradient(p, t2, local_grad);
+        for (int i = 0; i < 3; i++) {
+            pt_grad[i] = local_grad[i];
+            pt_grad[i + 9] = local_grad[i + 3];
+        }
+        break;
+    case 3:
+        // P_E0
+        autogen::point_line_distance_gradient_3D(p, t0, t1, local_grad);
+        for (int i = 0; i < 9; i++) {
+            pt_grad[i] = local_grad[i];
+        }
+        break;
+    case 4:
+        // P_E1
+        autogen::point_line_distance_gradient_3D(p, t1, t2, local_grad);
+        for (int i = 0; i < 3; i++) {
+            pt_grad[i] = local_grad[i];
+            pt_grad[i + 6] = local_grad[i + 3];
+            pt_grad[i + 9] = local_grad[i + 6];
+        }
+        break;
+    case 5:
+        // P_E2
+        autogen::point_line_distance_gradient_3D(p, t2, t0, local_grad);
+        for (int i = 0; i < 3; i++) {
+            pt_grad[i] = local_grad[i];
+            pt_grad[i + 3] = local_grad[i + 3];
+            pt_grad[i + 9] = local_grad[i + 6];
+        }
+        break;
+    case 6:
+        // P_T
+        autogen::point_plane_distance_gradient(
+            p.x, p.y, p.z, t0.x, t0.y, t0.z, t1.x, t1.y, t1.z, t2.x,
+            t2.y, t2.z, pt_grad);
+    case 7:
+        // AUTO
+        type = point_triangle_distance_type(p, t0, t1, t2);
+        point_triangle_distance_gradient(p, t0, t1, t2, pt_grad, type);
+        break;
+    }
 }
 
-__host__ __device__ void point_triangle_distance_hessian(vec3f p, vec3f t0, vec3f t1, vec3f t2, float *pt_hess){
+__host__ __device__ void point_triangle_distance_hessian(vec3f p, vec3f t0, vec3f t1, vec3f t2, float* pt_hess, int type)
+{
+    float local_hess[81];
+    switch ( type)
+    {
+    case 0:
+        // P_T0
+        point_point_distance_hessian(p, t0, local_hess);
+
+        put6(local_hess, {0,0}, pt_hess, {0,0});
+        put6(local_hess, {0,1}, pt_hess, {0,1});
+        put6(local_hess, {1,0}, pt_hess, {1,0});
+        put6(local_hess, {1,1}, pt_hess, {1,1});
+
+        break;
+    case 1:
+        // P_T1
+        point_point_distance_hessian(p, t1, local_hess);
+
+        put6(local_hess, {0,0}, pt_hess, {0,0});
+        put6(local_hess, {0,1}, pt_hess, {0,2});
+        put6(local_hess, {1,0}, pt_hess, {2,0});
+        put6(local_hess, {1,1}, pt_hess, {2,2});
+        break;
+    case 2:
+        // P_T2
+        point_point_distance_hessian(p, t2, local_hess);
+        put6(local_hess, {0,0}, pt_hess, {0,0});
+        put6(local_hess, {0,1}, pt_hess, {0,3});
+        put6(local_hess, {1,0}, pt_hess, {3,0});
+        put6(local_hess, {1,1}, pt_hess, {3,3});
+        break;  
+    case 3: 
+        // P_E0
+        autogen::point_line_distance_hessian_3D(p, t0, t1, local_hess);
+        put9(local_hess, {0,0}, pt_hess, {0,0});
+        put9(local_hess, {0,1}, pt_hess, {0,1});
+        put9(local_hess, {0,2}, pt_hess, {0,2});
+        put9(local_hess, {1,0}, pt_hess, {1,0});
+        put9(local_hess, {1,1}, pt_hess, {1,1});
+        put9(local_hess, {1,2}, pt_hess, {1,2});
+        put9(local_hess, {2,0}, pt_hess, {2,0});
+        put9(local_hess, {2,1}, pt_hess, {2,1});
+        put9(local_hess, {2,2}, pt_hess, {2,2});
+        break;  
+    case 4: 
+        // P_E1
+        autogen::point_line_distance_hessian_3D(p, t1, t2, local_hess);
+        put9(local_hess, {0,0}, pt_hess, {0,0});
+        put9(local_hess, {0,1}, pt_hess, {0,2});
+        put9(local_hess, {0,2}, pt_hess, {0,3});
+        put9(local_hess, {1,0}, pt_hess, {2,0});
+        put9(local_hess, {1,1}, pt_hess, {2,2});
+        put9(local_hess, {1,2}, pt_hess, {2,3});
+        put9(local_hess, {2,0}, pt_hess, {3,0});
+        put9(local_hess, {2,1}, pt_hess, {3,2});
+        put9(local_hess, {2,2}, pt_hess, {3,3});
+        break;
+    case 5: 
+        // P_E2
+        autogen::point_line_distance_hessian_3D(p, t2, t0, local_hess);
+        put9(local_hess, {0,0}, pt_hess, {0,0});
+        put9(local_hess, {0,1}, pt_hess, {0,3});
+        put9(local_hess, {0,2}, pt_hess, {0,1});
+        put9(local_hess, {1,0}, pt_hess, {3,0});
+        put9(local_hess, {1,1}, pt_hess, {3,3});
+        put9(local_hess, {1,2}, pt_hess, {3,1});
+        put9(local_hess, {2,0}, pt_hess, {1,0});
+        put9(local_hess, {2,1}, pt_hess, {1,3});
+        put9(local_hess, {2,2}, pt_hess, {1,1});
+        break;
+    case 6: 
+        // P_T
     autogen::point_plane_distance_hessian(
         p.x, p.y, p.z, t0.x, t0.y, t0.z, t1.x, t1.y, t1.z, t2.x,
         t2.y, t2.z, pt_hess);
-}
+        break;
+    case 7: 
+        // AUTO
+        type = point_triangle_distance_type(p, t0, t1, t2);
+        point_triangle_distance_hessian(p, t0, t1, t2, pt_hess, type);
+        break;
+    }
 }
 
+__host__ __device__ int point_triangle_distance_type(vec3f p, vec3f t0, vec3f t1, vec3f t2)
+{
+    int type = 0;
+    vf_distance(p, { t0, t1, t2 }, type);
+    return type;
+    // crude
+}
+
+__host__ __device__ void point_point_distance_gradient(vec3f p, vec3f q, float* pp_grad)
+{
+    // no autogen this time
+    auto t = (p - q) * 2.0f;
+    pp_grad[0] = t.x;
+    pp_grad[1] = t.y;
+    pp_grad[2] = t.z;
+    pp_grad[3] = -t.x;
+    pp_grad[4] = -t.y;
+    pp_grad[5] = -t.z;
+}
+__host__ __device__ void point_point_distance_hessian(vec3f p, vec3f q, float* pp_hess)
+{
+    for (int i = 0; i < 6; i++)
+        for (int j = 0; j < 6; j++) {
+            pp_hess[i + j * 6] = i == j ? i < 3 ? 2.0f : -2.0f : 0.0f;
+            // column major
+        }
+}
+} // namespace dev
