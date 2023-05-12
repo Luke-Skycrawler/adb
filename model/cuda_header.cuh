@@ -230,3 +230,9 @@ std::vector<T> from_thrust(thrust::host_vector<T>& b)
     }
     return ret;
 }
+
+template <typename T>
+std::vector<T> from_dev_ptr(T * dev_ptr, int n) {
+    thrust::device_vector<T> a(dev_ptr, dev_ptr + n);
+    return from_thrust(a);
+}

@@ -120,6 +120,7 @@ __device__ __host__ float vf_distance(vec3f _v, Facef f, int& _pt_type)
         // pt_type = ipc::PointTriangleDistanceType::P_T;
         pt_type = 6;
     // _pt_type = static_cast<cuda::std::underlying_type_t<ipc::PointTriangleDistanceType>>(pt_type);
+    _pt_type = pt_type;
     return d;
 }
 

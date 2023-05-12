@@ -135,8 +135,8 @@ void gen_empty_sm_glue(
             printf("(%d, %d)", t[0], t[1]);
         }
     }
-    bool test_placeholder = false;
-    if (test_placeholder) {
+    if (host_cuda_globals.params["test_placeholder"]) {
+        
         thrust::device_vector<i2> dev_lut = host_lut;
         build_csr(n_cubes, dev_lut, host_cuda_globals.hess);
         auto& hess = host_cuda_globals.hess;
@@ -144,6 +144,7 @@ void gen_empty_sm_glue(
         compare(sparse_hess, hess);
     }
     else {
+        // generate the sparse matrix according to cuda generated lut
         build_csr(n_cubes, host_cuda_globals.lut, host_cuda_globals.hess);
     }
 }

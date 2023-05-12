@@ -123,6 +123,7 @@ void reset(bool init)
     auto &params_int {data["params_int"]};
     for (auto p: params_int.items()) {
         globals.params_int[p.key()] = p.value();
+        host_cuda_globals.params[p.key()] = p.value();
     }
     barrier::kappa = globals.kappa;
     for (int i = 0; i < 9; i++) {

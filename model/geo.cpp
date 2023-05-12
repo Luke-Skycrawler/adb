@@ -237,6 +237,7 @@ tuple<mat12, vec12> ipc_hess_pt_12x12(
                 ptf[i]  = to_vec3f(pt[i]);
             float * buf = new float[144];
             pt_grad_hess12x12(ptf, g, h, true, buf);
+            delete [] buf;
             vec12 g_cuda = Map<Vector<float, 12>>(g).cast<double>();
             mat12 h_cuda = Map<Matrix<float, 12, 12>>(h).cast<double>();
             if (!g_cuda.isApprox(pt_grad, 1e-3)) {

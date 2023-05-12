@@ -244,8 +244,8 @@ void get_submat_glue(
     int offset = os[0], stride = os[1];
     for (int c = 0; c < 12; c++) for (int r = 0; r < 12; r ++){
         submat12x12[c * 12 + r] = values[offset + c * stride + r];
-        if (inners[offset + c * stride + r] != ii * 12 + r) {
-            printf("index error, should be (%d %d) but inner index = %d\n", ii * 12 + r, jj * 12 + c, inners[offset + c * stride + r]);
+        if (inners[offset + c * stride + r] != jj * 12 + r) {
+            printf("index error, should be (%d %d) but inner index = %d\n", jj * 12 + r, ii * 12 + c, inners[offset + c * stride + r]);
         }
     }
 }
@@ -269,7 +269,6 @@ __global__ void ipc_pt_kernel(
     // input: pt data, body index, is static
     // output: basis Tk (2x12), lambda, gradient g (12x1), hessian H (12x12)
 
-    // __shared__ float pt_grad_hess[13 * 12 * n_cuda_threads_per_block];
     auto tid = threadIdx.x + blockIdx.x * blockDim.x;
 
     auto grad_start = buffer;
@@ -314,7 +313,15 @@ __global__ void ipc_pt_kernel(
             off_diag = off_diag_start + 144 * tid;
 
             pt_grad_hess12x12(projected, pt_grad, ipc_hess, true, hess_p);
+            const auto all_zero = [](float* a) -> int {
+                for (int i = 0; i < 144; i++) {
+                    if (a[i] != 0.0f) return 0;
+                }
+                return 1;
+            };
+
             printf("tid = %d  pt grad hess checkpoint passed\n", tid);
+            printf("pt grad hess zero status: %d\n", all_zero(ipc_hess));
 
             vec3f p_tile, t0_tile, t1_tile, t2_tile;
             p_tile = ci.vertices[pt[I][0]];
@@ -368,7 +375,7 @@ __global__ void ipc_pt_kernel(
                 }
                 
             printf("tid = %d  grad_p, grad_t checkpoint passed\n", tid);
-
+            printf(" zero status: p: %d t: %d, off_diag: %d\n", all_zero(hess_p), all_zero(hess_t), all_zero(off_diag));
             for (int i = 0; i < 4; i++) {
                 for (int j = 0; j < 3; j++) {
                     dgp[i * 3 + j] = pt_grad[j] * kerp[i];
@@ -426,7 +433,6 @@ void ipc_pt_cpu(
     // input: pt data, body index, is static
     // output: basis Tk (2x12), lambda, gradient g (12x1), hessian H (12x12)
 
-    // __shared__ float pt_grad_hess[13 * 12 * n_cuda_threads_per_block];
     // FIXME: align with cacheline size
     // FIXME: make sure ipc autogen is row-major
 
@@ -547,12 +553,54 @@ void cuda_ipc_glue()
     
 
     project_glue(1);
-    ipc_pt_kernel<<<1, 1>>>(g.npt, g.pt.p, g.pt.b,
-        g.cubes,
-        g.lut_size, PTR(g.lut),
-        PTR(g.hess.values), PTR(g.hess.inner), PTR(g.hess.outer_start),
-        g.b, (float*)lt,
-        nullptr, nullptr);
+    float b[12], buf[144];
+    if (g.params["ipc_cpu_debug"]) {
+        auto host_cubes = host_cuda_globals.host_cubes;
+        vec3f* host_projected = new vec3f[host_cuda_globals.n_vertices], *host_vertices = new vec3f[host_cuda_globals.n_vertices];
+        int* host_edges = new int[host_cuda_globals.n_edges * 2];
+        int* host_faces = new int[host_cuda_globals.n_faces * 3];
+
+        int start = 0;
+        cudaMemcpy(host_projected, host_cuda_globals.projected_vertices, sizeof(vec3f) * host_cuda_globals.n_vertices, cudaMemcpyDeviceToHost);
+        cudaMemcpy(host_edges, host_cuda_globals.edges, sizeof(int) * host_cuda_globals.n_edges * 2, cudaMemcpyDeviceToHost);
+        cudaMemcpy(host_faces, host_cuda_globals.faces, sizeof(int) * host_cuda_globals.n_faces * 3, cudaMemcpyDeviceToHost);
+        cudaMemcpy(host_vertices, host_cuda_globals.vertices_at_rest, sizeof(vec3f) * host_cuda_globals.n_vertices, cudaMemcpyDeviceToHost);
+        for (int i = 0; i < host_cubes.size(); i++) {
+            host_cubes[i].projected = host_projected + start;
+            host_cubes[i].vertices  = host_vertices + start;
+            start += host_cubes[i].n_vertices;
+            host_cubes[i].edges = host_cubes[i].edges - host_cuda_globals.edges + host_edges;
+            host_cubes[i].faces = host_cubes[i].faces - host_cuda_globals.faces + host_faces;
+        }
+        ipc_pt_cpu(g.npt, ps.data(), bs.data(),
+            host_cubes.data(),
+            g.lut_size, from_thrust(g.lut).data(),
+            from_thrust(g.hess.values).data(), from_thrust(g.hess.inner).data(), from_thrust(g.hess.outer_start).data(),
+            b, buf,
+            nullptr, nullptr);
+
+        delete []host_projected;
+        delete []host_edges;
+        delete []host_faces;
+        delete []host_vertices;
+
+    }
+    else
+        ipc_pt_kernel<<<1, 1>>>(g.npt, g.pt.p, g.pt.b,
+            g.cubes,
+            g.lut_size, PTR(g.lut),
+            PTR(g.hess.values), PTR(g.hess.inner), PTR(g.hess.outer_start),
+            g.b, (float*)lt,
+            nullptr, nullptr);
     CUDA_CALL(cudaDeviceSynchronize());
+    const auto all_zero = [](vector<float> values, int n) {
+        for (int i = 0; i < n; i++) {
+            if (values[i] != 0.0f) return false;
+        }
+        return true;
+    };
+    if (g.npt && all_zero(from_thrust(g.hess.values), g.hess.nnz)) {
+    printf("\nerror: all zero in sparse matrix\n");
+    }
     lt = lt_stashed;
 }

@@ -27,7 +27,7 @@
         "beta": 2.5e-2
     },
     "eps_x": 1e-3,
-    "psd": true,
+    "psd": false,
     "_spatial hashing": {
         "min_xyz": -5.0,
         "max_xyz": 5.0,
@@ -75,6 +75,8 @@
         "cuda_pt": 1,
         "cuda_pt_direct": 0,
         "cuda_ipc_term": 1,
-        "cuda_ipc_pt": 1
+        "cuda_ipc_pt": 1,
+        "ipc_cpu_debug": 0,
+        "test_placeholder": 0
     }
 }

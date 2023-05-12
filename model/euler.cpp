@@ -566,7 +566,7 @@ void implicit_euler(vector<unique_ptr<AffineBody>>& cubes, double dt)
             mat12 ref = sparse_hess.block(i * 12, j * 12, 12, 12);
             mat12 cuda_submat = Map<Matrix<float, 12, 12>>(submat).cast<double>();
             if (!cuda_submat.isApprox(ref, 1e-3)) {
-                spdlog::error("cuda submat error, diff norm = {}", (cuda_submat - ref).norm());
+                spdlog::error("({},{}) cuda submat error, diff norm = {}, ref_norm = {}", j, i, (cuda_submat - ref).norm(), ref.norm());
             }
         }
 

@@ -1,6 +1,8 @@
 #pragma once
 #include "cuda_header.cuh"
 #include <vector>
+#include <string>
+#include <map>
 #ifdef TESTING
 #include <array>
 using i2 = std::array<int, 2>;
@@ -110,6 +112,8 @@ struct CudaGlobals {
     void allocate_buffers();
     void free_buffers();
     __device__ __host__ CudaGlobals(CudaGlobals& CudaGlobals);
+
+    std::map<std::string, int> params;
 };
 
 // __constant__ CudaGlobals *cuda_globals;
