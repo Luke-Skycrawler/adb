@@ -209,3 +209,24 @@ __forceinline__ __host__ __device__ bool is_obtuse_triangle(vec3f e0, vec3f e1, 
 static const int n_cuda_threads_per_block = 256;
 #define PTR(x) thrust::raw_pointer_cast((x).data())
 
+template <typename T>
+std::vector<T> from_thrust(thrust::device_vector<T> &a)
+{
+    thrust::host_vector<T> b = a;
+    std::vector<T> ret;
+    ret.resize(b.size());
+    for (int i = 0; i < b.size(); i++) {
+        ret[i] = b[i];
+    }
+    return ret;
+}
+template <typename T>
+std::vector<T> from_thrust(thrust::host_vector<T>& b)
+{
+    std::vector<T> ret;
+    ret.resize(b.size());
+    for (int i = 0; i < b.size(); i++) {
+        ret[i] = b[i];
+    }
+    return ret;
+}

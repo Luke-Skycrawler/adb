@@ -9,7 +9,7 @@
 #include "../model/time_integrator.h"
 #include "spdlog/sinks/basic_file_sink.h"
 #include "../model/barrier.h"
-#include "../model/cuda_globals.cuh"
+#include "../model/cuda_glue.h"
 
 #define __IPC__ 0
 #define __SOLVER__ 1

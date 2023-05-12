@@ -15,7 +15,7 @@ using namespace utils;
 void build_csr(int n_cubes, const thrust::device_vector<i2>& lut, CsrSparseMatrix& sparse_matrix);
 void gpuCholSolver(CsrSparseMatrix& hess, float* x, float *b);
 
-void make_lut_test_glue(map<array<int, 2>, int>& lut, thrust::host_vector<i2>& host_lut)
+void map_to_thrust_vector(map<array<int, 2>, int>& lut, thrust::host_vector<i2>& host_lut)
 {
     host_lut.resize(lut.size());
     int i = 0;
@@ -114,28 +114,38 @@ void gen_empty_sm_glue(
     // cuda version
     gen_empty_sm(n_cubes, idx, eidx, sparse_hess, lut);
     thrust::host_vector<i2> host_lut;
-    make_lut_test_glue(lut, host_lut);
+    map_to_thrust_vector(lut, host_lut);
 
-    // make_lut(host_lut.size(), PTR(host_lut));
     auto cuda_gen = from_thrust(host_cuda_globals.lut);
     auto host_gen = from_thrust(host_lut);
     vector<i2> cuda_minus_host, host_minus_cuda;
 
-    sort(cuda_gen.begin(), cuda_gen.end());
+    //sort(cuda_gen.begin(), cuda_gen.end());
     sort(host_gen.begin(), host_gen.end());
     
-    // set_difference(cuda_gen.begin(), cuda_gen.end(), host_gen.begin(), host_gen.end(), back_inserter(cuda_minus_host));
+    set_difference(cuda_gen.begin(), cuda_gen.end(), host_gen.begin(), host_gen.end(), std::back_inserter(cuda_minus_host));
     set_difference(host_gen.begin(), host_gen.end(), cuda_gen.begin(), cuda_gen.end(), std::back_inserter(host_minus_cuda));
 
     if (host_minus_cuda.size()) {
         spdlog::error("host_minus_cuda.size() = {}", host_minus_cuda.size());
     }
-    host_cuda_globals.lut = host_lut;
-    build_csr(n_cubes, host_cuda_globals.lut, host_cuda_globals.hess);
-    auto& hess = host_cuda_globals.hess;
+    if (cuda_minus_host.size()) {
+        spdlog::error("cuda_minus_host.size() = {}", cuda_minus_host.size());
+        for (auto t: cuda_minus_host) {
+            printf("(%d, %d)", t[0], t[1]);
+        }
+    }
+    bool test_placeholder = false;
+    if (test_placeholder) {
+        thrust::device_vector<i2> dev_lut = host_lut;
+        build_csr(n_cubes, dev_lut, host_cuda_globals.hess);
+        auto& hess = host_cuda_globals.hess;
 
-
-    compare(sparse_hess, hess);
+        compare(sparse_hess, hess);
+    }
+    else {
+        build_csr(n_cubes, host_cuda_globals.lut, host_cuda_globals.hess);
+    }
 }
 namespace utils {
 

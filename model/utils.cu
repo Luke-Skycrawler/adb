@@ -514,7 +514,7 @@ __host__ __device__ int edge_edge_distance_type(vec3f ea0, vec3f ea1, vec3f eb0,
 
     int default_case = 8;
 
-    auto sN = (b * e - c * d), tN;
+    float sN = (b * e - c * d), tN;
     if (sN <= 0.0f) {
         tN = e;
         tD = c;

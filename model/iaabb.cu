@@ -1087,8 +1087,7 @@ void make_lut(int n_overlaps, i2* overlaps)
 {
     int n_cubes = host_cuda_globals.n_cubes;
     auto& g{ host_cuda_globals };
-    if (true)
-        make_sym_kernel<<<1, n_cuda_threads_per_block>>>(n_overlaps, overlaps, n_cubes);
+    make_sym_kernel<<<1, n_cuda_threads_per_block>>>(n_overlaps, overlaps, n_cubes);
 
     g.lut_size = n_overlaps * 2 + n_cubes;
     CUDA_CALL(cudaDeviceSynchronize());

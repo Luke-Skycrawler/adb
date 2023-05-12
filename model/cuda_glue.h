@@ -44,27 +44,6 @@ inline cudaAffineBody to_cabd(AffineBody &a){
    return b;
 }
 
-template <typename T>
-std::vector<T> from_thrust(thrust::device_vector<T> &a)
-{
-    thrust::host_vector<T> b = a;
-    std::vector<T> ret;
-    ret.resize(b.size());
-    for (int i = 0; i < b.size(); i++) {
-        ret[i] = b[i];
-    }
-    return ret;
-}
-template <typename T>
-std::vector<T> from_thrust(thrust::host_vector<T>& b)
-{
-    std::vector<T> ret;
-    ret.resize(b.size());
-    for (int i = 0; i < b.size(); i++) {
-        ret[i] = b[i];
-    }
-    return ret;
-}
 
 
 #ifndef TESTING

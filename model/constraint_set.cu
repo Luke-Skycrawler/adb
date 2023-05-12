@@ -151,11 +151,11 @@ __host__ __device__ int binary_search(int lut_size, i2* lut, i2 value)
         else
             u = mid;
     }
-    // u is the immediate value over x
+    // u is the immediate value >= x
     return u;
 }
 
-__forceinline__ int __device__ rc_to_1d(int r, int c)
+__forceinline__ int __device__ __host__ rc_to_1d(int r, int c)
 {
     return c * 12 + r;
 }
@@ -164,9 +164,9 @@ __forceinline__ int __device__ rc_to_1d(int r, int c)
 // __global__ void ipc_pt_batch_kernel(int npt, vec3f *p, Facef * t) {
 // }
 
-__device__ void JTJ(vec3f a, float* ipc_hess)
-{
-}
+// __device__ void JTJ(vec3f a, float* ipc_hess)
+// {
+// }
 
 __device__ void plain_matrix_product(int ar, int ac, int bc, float* a, float* b, float* c)
 {
@@ -202,7 +202,27 @@ __device__ void put_T(float* values, i2 offset_stride, float* mat12x12)
             atomicAdd(values + offset + c * stride + r, mat12x12[r * 12 + c]);
         }
 }
+#define CPU_REF
+#ifdef CPU_REF
+void _put(float* values, i2 offset_stride, float* mat12x12)
+{
+    int offset = offset_stride[0], stride = offset_stride[1];
+    for (int c = 0; c < 12; c++)
+        for (int r = 0; r < 12; r++) {
+            values[offset + c * stride + r]+= mat12x12[c * 12 + r];
+        }
+}
 
+
+void _put_T(float* values, i2 offset_stride, float* mat12x12)
+{
+    int offset = offset_stride[0], stride = offset_stride[1];
+    for (int c = 0; c < 12; c++)
+        for (int r = 0; r < 12; r++) {
+            values [offset + c * stride + r]+= mat12x12[r * 12 + c];
+        }
+}
+#endif
 __host__ __device__ i2 to_os(i2 ij, int lut_size, i2* lut, int* outers)
 {
     int k = binary_search(lut_size, lut, ij);
@@ -219,10 +239,14 @@ void get_submat_glue(
     auto outers = from_thrust(h.outer_start);
     auto values = from_thrust(h.values);
     auto lut = from_thrust(g.lut);
+    auto inners = from_thrust(h.inner);
     auto os = to_os(i2{ii, jj}, g.lut_size, lut.data(), outers.data());
     int offset = os[0], stride = os[1];
     for (int c = 0; c < 12; c++) for (int r = 0; r < 12; r ++){
         submat12x12[c * 12 + r] = values[offset + c * stride + r];
+        if (inners[offset + c * stride + r] != ii * 12 + r) {
+            printf("index error, should be (%d %d) but inner index = %d\n", ii * 12 + r, jj * 12 + c, inners[offset + c * stride + r]);
+        }
     }
 }
 
@@ -381,6 +405,136 @@ __global__ void ipc_pt_kernel(
         }
     }
 }
+#define CPU_REF
+#ifdef CPU_REF
+void ipc_pt_cpu(
+    int npt,
+    i2* pt, i2* ij,
+    cudaAffineBody* cubes,
+
+    int lut_size, i2* lut,
+
+    float* values, int* inners, int* outers,
+    // CsrSparseMatrix& sparse_hess,
+    float* b, // rhs
+    float* buffer,
+    float* lambdas, float* Tk
+
+)
+{
+
+    // input: pt data, body index, is static
+    // output: basis Tk (2x12), lambda, gradient g (12x1), hessian H (12x12)
+
+    // __shared__ float pt_grad_hess[13 * 12 * n_cuda_threads_per_block];
+    // FIXME: align with cacheline size
+    // FIXME: make sure ipc autogen is row-major
+
+    for (int I = 0; I < npt; I++) {
+
+        int ii = ij[I][0], jj = ij[I][1];
+        auto &ci{ cubes[ii] }, &cj{ cubes[jj] };
+
+        auto fp{ cj.triangle(pt[I][1]) };
+        vec3f projected[4]{
+            ci.projected[pt[I][0]],
+            fp.t0,
+            fp.t1,
+            fp.t2
+        };
+
+        float ipc_hess[144];
+        float pt_grad[12];
+
+        float hess_p[144], hess_t[144], off_diag[144];
+        float *dgp = ipc_hess, *dgt = ipc_hess + 12;
+        // reuse ipc_hess buffer, when dgp computation ipc_hess should be used up
+
+        pt_grad_hess12x12(projected, pt_grad, ipc_hess, true, hess_p);
+
+        vec3f p_tile, t0_tile, t1_tile, t2_tile;
+        p_tile = ci.vertices[pt[I][0]];
+        Facef f = cj.triangle_at_rest(pt[I][1]);
+        t0_tile = f.t0;
+        t1_tile = f.t1;
+        t2_tile = f.t2;
+
+        float kerp[4]{ 1.0, p_tile.x, p_tile.y, p_tile.z },
+            kert[3][4]{
+                { 1.0, t0_tile.x, t0_tile.y, t0_tile.z },
+                { 1.0, t1_tile.x, t1_tile.y, t1_tile.z },
+                { 1.0, t2_tile.x, t2_tile.y, t2_tile.z }
+            };
+
+        for (int i = 0; i < 4; i++)
+            for (int j = 0; j < 4; j++) {
+                // set hess_p
+                for (int c = 0; c < 3; c++)
+                    for (int r = 0; r < 3; r++) {
+                        hess_p[rc_to_1d(i * 3 + r, j * 3 + c)] = ipc_hess[rc_to_1d(r, c)] * kerp[i] * kerp[j];
+                    }
+
+                // set hess_t
+                for (int c = 0; c < 3; c++)
+                    for (int r = 0; r < 3; r++) {
+                        hess_t[rc_to_1d(i * 3 + r, j * 3 + c)] = 0.0f;
+                    }
+                for (int k = 0; k < 3; k++)
+                    for (int l = 0; l < 3; l++) {
+                        for (int c = 0; c < 3; c++)
+                            for (int r = 0; r < 3; r++) {
+                                hess_t[rc_to_1d(i * 3 + r, j * 3 + c)] += ipc_hess[rc_to_1d((k + 1) * 3 + r, (l + 1) * 3 + c)] * kert[k][i] * kert[l][j];
+                            }
+                    }
+
+                // set off_diag
+                for (int c = 0; c < 3; c++)
+                    for (int r = 0; r < 3; r++) {
+                        off_diag[rc_to_1d(i * 3 + r, j * 3 + c)] = 0.0f;
+                    }
+                for (int l = 0; l < 3; l++) {
+                    for (int c = 0; c < 3; c++) {
+                        for (int r = 0; r < 3; r++) {
+                            off_diag[rc_to_1d(i * 3 + r, j * 3 + c)] += ipc_hess[rc_to_1d(r, (l + 1) * 3 + c)] * (kerp[i] * kert[l][j]);
+                        }
+                    }
+                }
+            }
+
+        for (int i = 0; i < 4; i++) {
+            for (int j = 0; j < 3; j++) {
+                dgp[i * 3 + j] = pt_grad[j] * kerp[i];
+                dgt[i * 3 + j] = pt_grad[j + 3] * kert[0][i]
+                    + pt_grad[j + 6] * kert[1][i]
+                    + pt_grad[j + 9] * kert[2][i];
+            }
+        }
+
+        auto osii = to_os({ ii, ii }, lut_size, lut, outers);
+        auto osij = to_os({ ii, jj }, lut_size, lut, outers);
+        auto osjj = to_os({ jj, jj }, lut_size, lut, outers);
+        auto osji = to_os({ jj, ii }, lut_size, lut, outers);
+
+        if (ci.mass > 0.0f) {
+            if (cj.mass > 0.0f)
+                _put_T(values, osji, off_diag);
+            _put(values, osii, hess_p);
+            for (int i = 0; i < 12; i++) {
+                b [i + ii * 12] += dgp[i];
+            }
+        }
+        if (cj.mass > 0.0f) {
+            if (ci.mass > 0.0f)
+                _put(values, osij, off_diag);
+            _put(values, osjj, hess_t);
+            for (int i = 0; i < 12; i++) {
+                b[i + jj * 12] += dgt[i];
+            }
+        }
+    }
+}
+
+#endif
 void project_glue(int vtn);
 void cuda_ipc_glue()
 {
