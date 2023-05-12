@@ -307,10 +307,9 @@ __host__ __device__ float point_triangle_distance(vec3f p, vec3f t0, vec3f t1, v
     float a = dot(normal, pt);
     return a * a / dot(normal, normal);
 }
-__host__ __device__ void point_triangle_distance_gradient(vec3f p, vec3f t0, vec3f t1, vec3f t2, float* pt_grad, int type)
+__host__ __device__ void point_triangle_distance_gradient(vec3f p, vec3f t0, vec3f t1, vec3f t2, float* pt_grad, int type, float * local_grad)
 {
     for (int i = 0; i < 12; i++) pt_grad[i] = 0.0f;
-    float local_grad[9];
     switch (type) {
     case 0:
         // P_T0
@@ -363,15 +362,15 @@ __host__ __device__ void point_triangle_distance_gradient(vec3f p, vec3f t0, vec
             t2.y, t2.z, pt_grad);
     case 7:
         // AUTO
-        type = point_triangle_distance_type(p, t0, t1, t2);
-        point_triangle_distance_gradient(p, t0, t1, t2, pt_grad, type);
-        break;
+        //type = point_triangle_distance_type(p, t0, t1, t2);
+        //point_triangle_distance_gradient(p, t0, t1, t2, pt_grad, type);
+        //break;
+        printf("error: auto not supported");
     }
 }
 
-__host__ __device__ void point_triangle_distance_hessian(vec3f p, vec3f t0, vec3f t1, vec3f t2, float* pt_hess, int type)
+__host__ __device__ void point_triangle_distance_hessian(vec3f p, vec3f t0, vec3f t1, vec3f t2, float* pt_hess, int type, float *local_hess)
 {
-    float local_hess[81];
     switch ( type)
     {
     case 0:
@@ -447,10 +446,11 @@ __host__ __device__ void point_triangle_distance_hessian(vec3f p, vec3f t0, vec3
         t2.y, t2.z, pt_hess);
         break;
     case 7: 
-        // AUTO
-        type = point_triangle_distance_type(p, t0, t1, t2);
-        point_triangle_distance_hessian(p, t0, t1, t2, pt_hess, type);
-        break;
+        printf("error: not supposed to support auto");
+        //// AUTO
+        //type = point_triangle_distance_type(p, t0, t1, t2);
+        //point_triangle_distance_hessian(p, t0, t1, t2, pt_hess, type);
+        //break;
     }
 }
 

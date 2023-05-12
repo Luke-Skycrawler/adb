@@ -199,7 +199,8 @@ void ipc_term_vg(AffineBody& c, int v
             J.transpose() * Tk, c.grad, c.hess);
 #endif
 };
-void pt_grad_hess12x12(vec3f *pt, float *pt_grad, float *pt_hess, bool psd = true);
+void pt_grad_hess12x12(vec3f *pt, float *pt_grad, float *pt_hess, bool psd , float *buf);
+// buf is not optional
 
 
 tuple<mat12, vec12> ipc_hess_pt_12x12(
@@ -234,7 +235,8 @@ tuple<mat12, vec12> ipc_hess_pt_12x12(
             vec3f ptf[4];
             for (int i =0; i < 4;i++) 
                 ptf[i]  = to_vec3f(pt[i]);
-            pt_grad_hess12x12(ptf, g, h);
+            float * buf = new float[144];
+            pt_grad_hess12x12(ptf, g, h, true, buf);
             vec12 g_cuda = Map<Vector<float, 12>>(g).cast<double>();
             mat12 h_cuda = Map<Matrix<float, 12, 12>>(h).cast<double>();
             if (!g_cuda.isApprox(pt_grad, 1e-3)) {

@@ -111,13 +111,16 @@ void build_csr(int n_cubes, const thrust::device_vector<i2> &lut, CsrSparseMatri
 }
 
 
-__host__ __device__ void pt_grad_hess12x12(vec3f *pt, float *pt_grad, float *pt_hess, bool psd = true)
+__host__ __device__ void pt_grad_hess12x12(vec3f *pt, 
+    float *pt_grad, float *pt_hess, bool psd, 
+    float *buf  // for local grad and hess return
+)
 {
 
     int type;
     auto dist = vf_distance(pt[0], Facef{pt[1], pt[2], pt[3]}, type);
-    dev::point_triangle_distance_gradient(pt[0], pt[1], pt[2], pt[3], pt_grad, type);
-    dev::point_triangle_distance_hessian(pt[0], pt[1], pt[2], pt[3], pt_hess, type);
+    dev::point_triangle_distance_gradient(pt[0], pt[1], pt[2], pt[3], pt_grad, type, buf);
+    dev::point_triangle_distance_hessian(pt[0], pt[1], pt[2], pt[3], pt_hess, type, buf);
     printf("pt grad hess generated\n");
 
     auto B_ = dev::barrier_derivative_d(dist);
@@ -125,16 +128,16 @@ __host__ __device__ void pt_grad_hess12x12(vec3f *pt, float *pt_grad, float *pt_
 
     // pt_hess = pt_hess * B_ + pt_grad * pt_grad.transpose() * B__;
     for (int i = 0; i < 12; i++)
-        for (int j = 0; j < 12; j++) {
-            pt_hess[j * 12 + i] = B_ * pt_hess[j * 12 + i] + pt_grad[i] * pt_grad[j] * B__;
-            // column major
-        }
+       for (int j = 0; j < 12; j++) {
+           pt_hess[j * 12 + i] = B_ * pt_hess[j * 12 + i] + pt_grad[i] * pt_grad[j] * B__;
+           // column major
+       }
     for (int i = 0; i < 12; i++)
-        pt_grad[i] *= B_;
+       pt_grad[i] *= B_;
     printf("pt grad, ipc hess processed\n");
 
     if (psd)
-        dev_project_to_psd(12, pt_hess);
+       dev_project_to_psd(12, pt_hess);
     printf("sub program returned\n");
 }
 
@@ -278,7 +281,15 @@ __global__ void ipc_pt_kernel(
             float* ipc_hess = hess_start + 144 * tid;
             float* pt_grad = grad_start + tid * 12;
 
-            pt_grad_hess12x12(projected, pt_grad, ipc_hess, true);
+            float *hess_p, *hess_t, *off_diag; 
+            float *dgp = ipc_hess, *dgt = ipc_hess + 12;
+            // reuse ipc_hess buffer, when dgp computation ipc_hess should be used up
+
+            hess_p = hess_p_start + 144 * tid;
+            hess_t = hess_t_start + 144 * tid;
+            off_diag = off_diag_start + 144 * tid;
+
+            pt_grad_hess12x12(projected, pt_grad, ipc_hess, true, hess_p);
             printf("tid = %d  pt grad hess checkpoint passed\n", tid);
 
             vec3f p_tile, t0_tile, t1_tile, t2_tile;
@@ -295,12 +306,6 @@ __global__ void ipc_pt_kernel(
                     { 1.0, t2_tile.x, t2_tile.y, t2_tile.z }
                 };
 
-            float *hess_p, *hess_t, *off_diag; 
-            float dgp[12], dgt[12];
-
-            hess_p = hess_p_start + 144 * tid;
-            hess_t = hess_t_start + 144 * tid;
-            off_diag = off_diag_start + 144 * tid;
 
             for (int i = 0; i < 4; i++)
                 for (int j = 0; j < 4; j++) {
