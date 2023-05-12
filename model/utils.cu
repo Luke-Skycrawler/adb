@@ -481,4 +481,84 @@ __host__ __device__ void point_point_distance_hessian(vec3f p, vec3f q, float* p
             // column major
         }
 }
+
+__host__ __device__ int edge_edge_distance_type(vec3f ea0, vec3f ea1, vec3f eb0, vec3f eb1)
+{
+
+    
+    // EA0_EB0, ///< The edges are closest at vertex 0 of edge A and 0 of edge B.
+    // EA0_EB1, ///< The edges are closest at vertex 0 of edge A and 1 of edge B.
+    // EA1_EB0, ///< The edges are closest at vertex 1 of edge A and 0 of edge B.
+    // EA1_EB1, ///< The edges are closest at vertex 1 of edge A and 1 of edge B.
+    // /// The edges are closest at the interior of edge A and vertex 0 of edge B.
+    // EA_EB0,
+    // /// The edges are closest at the interior of edge A and vertex 1 of edge B.
+    // EA_EB1,
+    // /// The edges are closest at vertex 0 of edge A and the interior of edge B.
+    // EA0_EB,
+    // /// The edges are closest at vertex 1 of edge A and the interior of edge B.
+    // EA1_EB,
+    // EA_EB, ///< The edges are closest at an interior point of edge A and B.
+    // AUTO   ///< Automatically determine the closest pair.
+
+    auto u = ea1 - ea0;
+    auto v = eb1 - eb0;
+    auto w = ea0 - eb0;
+    auto a = dot(u, u);
+    auto b = dot(u, v);
+    auto c = dot(v, v);
+    auto d = dot(u, w);
+    auto e = dot(v, w);
+    auto D = a * c - b * b;
+    auto tD = D;
+
+    int default_case = 8;
+
+    auto sN = (b * e - c * d), tN;
+    if (sN <= 0.0f) {
+        tN = e;
+        tD = c;
+        default_case = 6;
+    } else if (sN >= D) {
+        tN = e + b;
+        tD = c;
+        default_case = 7;
+    } else {
+        tN = a * e - b * d;
+        auto tmp = cross(u, v);
+        if (tN > 0.0 && tN < tD && dot(tmp, tmp) < 1e-20f * a * c) {
+            // avoid nearly parallel edge-edge
+            if (sN  < D / 2) {
+                tN = e;
+                tD = c;
+                default_case = 6;
+            } else {
+                tN = e + b;
+                tD = c;
+                default_case = 7;
+            }
+        }
+    }
+
+    if (tN<= 0.0f) {
+        if (-d <= 0.0f) {
+            return 0;
+        }
+        else if (-d >= a) {
+            return 2;
+        }
+        else {
+            return 4;
+        }
+    } else if (tN >= tD) {
+        if ((-d + b) <= 0.0f) {
+            return 1;
+        } else if ((-d + b) >= a) {
+            return 3;
+        } else {
+            return 5;
+        }
+    }
+    return default_case;
+}
 } // namespace dev
