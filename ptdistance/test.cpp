@@ -2,12 +2,20 @@
 #include <Eigen/Eigen>
 #include <Eigen/Geometry>
 #include <ipc/distance/point_triangle.hpp>
+#include <ipc/distance/edge_edge.hpp>
 #include "../model/affine_body.h"
 #include "../model/geometry.h"
 #include <random>
 #include <array>
+#include "../model/cuda_header.cuh"
+//#include "../model/cuda_glue.h"
 using namespace std;
 
+
+inline vec3f to_vec3f(const vec3& a)
+{
+    return make_float3(a[0], a[1], a[2]);
+}
 TEST(ipctkref, random) {
     static const int n_pts = 1000;
     array<vec3, 4> pts[n_pts];
@@ -26,6 +34,111 @@ TEST(ipctkref, random) {
         double dself = vf_distance(pt[0], f, pt_type);
         EXPECT_TRUE(abs(dipc - dself) < 1e-6) << pt[0].transpose() << " " << pt[1].transpose() << " " << pt[2].transpose() << " " << pt[3].transpose();
        ;
+    }
+
+}
+
+
+int edge_edge_distance_type(vec3f ea0, vec3f ea1, vec3f eb0, vec3f eb1)
+{
+
+    
+    // EA0_EB0, ///< The edges are closest at vertex 0 of edge A and 0 of edge B.
+    // EA0_EB1, ///< The edges are closest at vertex 0 of edge A and 1 of edge B.
+    // EA1_EB0, ///< The edges are closest at vertex 1 of edge A and 0 of edge B.
+    // EA1_EB1, ///< The edges are closest at vertex 1 of edge A and 1 of edge B.
+    // /// The edges are closest at the interior of edge A and vertex 0 of edge B.
+    // EA_EB0,
+    // /// The edges are closest at the interior of edge A and vertex 1 of edge B.
+    // EA_EB1,
+    // /// The edges are closest at vertex 0 of edge A and the interior of edge B.
+    // EA0_EB,
+    // /// The edges are closest at vertex 1 of edge A and the interior of edge B.
+    // EA1_EB,
+    // EA_EB, ///< The edges are closest at an interior point of edge A and B.
+    // AUTO   ///< Automatically determine the closest pair.
+
+    auto u = ea1 - ea0;
+    auto v = eb1 - eb0;
+    auto w = ea0 - eb0;
+    auto a = dot(u, u);
+    auto b = dot(u, v);
+    auto c = dot(v, v);
+    auto d = dot(u, w);
+    auto e = dot(v, w);
+    auto D = a * c - b * b;
+    auto tD = D;
+
+    int default_case = 8;
+
+    float sN = (b * e - c * d), tN;
+    if (sN <= 0.0f) {
+        tN = e;
+        tD = c;
+        default_case = 6;
+    } else if (sN >= D) {
+        tN = e + b;
+        tD = c;
+        default_case = 7;
+    } else {
+        tN = a * e - b * d;
+        auto tmp = cross(u, v);
+        if (tN > 0.0 && tN < tD && dot(tmp, tmp) < 1e-20f * a * c) {
+            // avoid nearly parallel edge-edge
+            if (sN  < D / 2) {
+                tN = e;
+                tD = c;
+                default_case = 6;
+            } else {
+                tN = e + b;
+                tD = c;
+                default_case = 7;
+            }
+        }
+    }
+
+    if (tN<= 0.0f) {
+        if (-d <= 0.0f) {
+            return 0;
+        }
+        else if (-d >= a) {
+            return 2;
+        }
+        else {
+            return 4;
+        }
+    } else if (tN >= tD) {
+        if ((-d + b) <= 0.0f) {
+            return 1;
+        } else if ((-d + b) >= a) {
+            return 3;
+        } else {
+            return 5;
+        }
+    }
+    return default_case;
+}
+
+TEST(ipctkref, random_ee) {
+    static const int n_ees = 1000;
+    array<vec3, 4> ees[n_ees];
+    default_random_engine gen;
+    uniform_real_distribution<double> dist(0.0, 1.0);
+    for (int i = 0; i < n_ees; i++)
+        for (int j = 0; j < 12; j++) {
+            ees[i][j / 3](j % 3) = dist(gen);
+        }
+    for (int i = 0; i < n_ees; i++) {
+        auto& ee{ ees[i] };
+        // Edge ei{ ee[0], ee[1]}, ej { ee[2],  ee[3] };
+        auto tipc = ipc::edge_edge_distance_type(ee[0], ee[1], ee[2], ee[3]);
+        auto iipc = static_cast<int>(tipc);
+        vec3f eef[4];
+
+        for (int j = 0; j < 4; j++)
+            eef[j] = to_vec3f(ee[j]);
+        int tself = edge_edge_distance_type(eef[0], eef[1], eef[2], eef[3]);
+        EXPECT_TRUE(iipc == tself) << "ipc type = " << iipc << ", self = " << tself <<"\n";
     }
 
 }

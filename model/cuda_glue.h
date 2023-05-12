@@ -66,6 +66,11 @@ std::vector<T> from_thrust(thrust::host_vector<T>& b)
     return ret;
 }
 
+
+#ifndef TESTING
+// function declarations
+
+
 void initialize_primitives(
     const std::vector<std::unique_ptr<AffineBody>>& cubes
 );
@@ -91,3 +96,4 @@ void glue_vf_col_set(
 void get_submat_glue(
     int ii, int jj,
     float* submat12x12);
+#endif

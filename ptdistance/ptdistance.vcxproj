@@ -36,8 +36,13 @@
     <IncludePath>D:\ref_repos\ipc-toolkit\src;$(IncludePath)</IncludePath>
     <LibraryPath>D:\ref_repos\ipc-toolkit\build\temp.win-amd64-cpython-38\Release\ipctk\Release;$(LibraryPath)</LibraryPath>
   </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
+    <IncludePath>D:\ref_repos\ipc-toolkit\src;D:\third_party_libs\thrust-2.1.0\thrust-2.1.0\;C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v12.0\include;$(IncludePath)</IncludePath>
+    <LibraryPath>D:\ref_repos\ipc-toolkit\build\Debug;$(LibraryPath)</LibraryPath>
+  </PropertyGroup>
   <ItemGroup>
     <ClInclude Include="..\model\affine_body.h" />
+    <ClInclude Include="..\model\cuda_glue.h" />
     <ClInclude Include="..\model\geometry.h" />
     <ClInclude Include="pch.h" />
   </ItemGroup>
@@ -78,10 +83,10 @@
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
     <ClCompile>
-      <PrecompiledHeader>Use</PrecompiledHeader>
+      <PrecompiledHeader>NotUsing</PrecompiledHeader>
       <PrecompiledHeaderFile>pch.h</PrecompiledHeaderFile>
       <Optimization>Disabled</Optimization>
-      <PreprocessorDefinitions>X64;_DEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PreprocessorDefinitions>TESTING;X64;_DEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <BasicRuntimeChecks>EnableFastChecks</BasicRuntimeChecks>
       <RuntimeLibrary>MultiThreadedDebugDLL</RuntimeLibrary>
       <WarningLevel>Level3</WarningLevel>
@@ -89,6 +94,7 @@
     <Link>
       <GenerateDebugInformation>true</GenerateDebugInformation>
       <SubSystem>Console</SubSystem>
+      <AdditionalDependencies>ipc_toolkit.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">

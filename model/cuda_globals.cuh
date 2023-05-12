@@ -1,11 +1,14 @@
 #pragma once
-#include <cuda/std/array>
-#include <thrust/device_vector.h>
 #include "cuda_header.cuh"
-#include "cuda_glue.h"
 #include <vector>
+#ifdef TESTING
+#include <array>
+using i2 = std::array<int, 2>;
+using i4 = std::array<int ,4>;
+#else
 using i2 = cuda::std::array<int, 2>;
 using i4 = cuda::std::array<int, 4>;
+#endif
 struct CollisionSets {
     int pt_cnt[7], ee_cnt[9];
     i2* pt_set[7];

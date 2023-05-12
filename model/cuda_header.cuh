@@ -14,14 +14,14 @@ float3 make_float3(float x, float y, float z) {
 #else 
 #include <cuda_runtime.h>
 #include "device_launch_parameters.h"
+#include <cuda/std/array>
+#include <cuda/std/tuple>
+#include <cuda/std/type_traits>
 #include <thrust/device_vector.h>
 #include <thrust/host_vector.h>
 #include <thrust/sort.h>
 #include <thrust/scan.h>
 #include <thrust/execution_policy.h>
-#include <cuda/std/array>
-#include <cuda/std/tuple>
-#include <cuda/std/type_traits>
 
 #endif
 
