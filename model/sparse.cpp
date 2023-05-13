@@ -129,12 +129,12 @@ void gen_empty_sm_glue(
     if (host_minus_cuda.size()) {
         spdlog::error("host_minus_cuda.size() = {}", host_minus_cuda.size());
     }
-    if (cuda_minus_host.size()) {
-        spdlog::error("cuda_minus_host.size() = {}", cuda_minus_host.size());
-        for (auto t: cuda_minus_host) {
-            printf("(%d, %d)", t[0], t[1]);
-        }
-    }
+    // if (cuda_minus_host.size()) {
+    //     spdlog::info("cuda_minus_host.size() = {}", cuda_minus_host.size());
+    //     for (auto t: cuda_minus_host) {
+    //         printf("(%d, %d)", t[0], t[1]);
+    //     }
+    // }
     if (host_cuda_globals.params["test_placeholder"]) {
         
         thrust::device_vector<i2> dev_lut = host_lut;

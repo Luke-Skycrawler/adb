@@ -43,7 +43,7 @@ void freeCublasAndCusparse()
 void gpuCholSolver(CsrSparseMatrix& hess, float* x, float *b)
 {
     // hess must be filled by all nonzero value.
-    float tol = 1.e-12f;
+    float tol = 1.e-15f;
     const int reorder = 0; // symrcm
     int singularity = 0;
 

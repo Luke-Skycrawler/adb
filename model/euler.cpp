@@ -558,6 +558,7 @@ void implicit_euler(vector<unique_ptr<AffineBody>>& cubes, double dt)
 
         cuda_ipc_glue();
         float submat[144];
+        // grad comparison not available
         for (auto &p: lut ) {
             int i = p.first[0]; 
             int j = p.first[1];

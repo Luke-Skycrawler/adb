@@ -1,6 +1,6 @@
 {
     "player": false,
-    "starting_ts": 13,
+    "starting_ts": -1,
     "ending_ts": 500,
     "dt": 1e-2,
     "max_iter": 1000,
@@ -13,7 +13,7 @@
     "gravity": true, 
     "line_search": true,
     "col_set": true,
-    "ee": true,
+    "ee": false,
     "pt": true,
     "ground": true,
     "safe_factor": 1.0,
@@ -69,14 +69,14 @@
         "cuda_direct": 0,
         "strict": 0,
         "gen_sm_test": 1,
-        "cuda_solver": 1,
+        "cuda_solver": 0,
         "cuda_hess": 1,
         "cuda_intersection": 0,
         "cuda_pt": 1,
         "cuda_pt_direct": 0,
         "cuda_ipc_term": 1,
         "cuda_ipc_pt": 1,
-        "ipc_cpu_debug": 0,
+        "ipc_cpu_debug": 1,
         "test_placeholder": 0
     }
 }

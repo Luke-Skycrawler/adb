@@ -121,7 +121,6 @@ __host__ __device__ void pt_grad_hess12x12(vec3f *pt,
     auto dist = vf_distance(pt[0], Facef{pt[1], pt[2], pt[3]}, type);
     dev::point_triangle_distance_gradient(pt[0], pt[1], pt[2], pt[3], pt_grad, type, buf);
     dev::point_triangle_distance_hessian(pt[0], pt[1], pt[2], pt[3], pt_hess, type, buf);
-    printf("pt grad hess generated\n");
 
     auto B_ = dev::barrier_derivative_d(dist);
     auto B__ = dev::barrier_second_derivative(dist);
@@ -134,11 +133,9 @@ __host__ __device__ void pt_grad_hess12x12(vec3f *pt,
        }
     for (int i = 0; i < 12; i++)
        pt_grad[i] *= B_;
-    printf("pt grad, ipc hess processed\n");
 
     if (psd)
        dev_project_to_psd(12, pt_hess);
-    printf("sub program returned\n");
 }
 
 __host__ __device__ int binary_search(int lut_size, i2* lut, i2 value)
@@ -257,7 +254,7 @@ __global__ void ipc_pt_kernel(
 
     int lut_size, i2* lut,
 
-    float* values, int* inners, int* outers,
+    float* values, int* outers,
     // CsrSparseMatrix& sparse_hess,
     float* b, // rhs
     float* buffer,
@@ -421,7 +418,7 @@ void ipc_pt_cpu(
 
     int lut_size, i2* lut,
 
-    float* values, int* inners, int* outers,
+    float* values, int* outers,
     // CsrSparseMatrix& sparse_hess,
     float* b, // rhs
     float* buffer,
@@ -553,8 +550,8 @@ void cuda_ipc_glue()
     
 
     project_glue(1);
-    float b[12], buf[144];
     if (g.params["ipc_cpu_debug"]) {
+        float b[12], buf[144];
         auto host_cubes = host_cuda_globals.host_cubes;
         vec3f* host_projected = new vec3f[host_cuda_globals.n_vertices], *host_vertices = new vec3f[host_cuda_globals.n_vertices];
         int* host_edges = new int[host_cuda_globals.n_edges * 2];
@@ -572,12 +569,16 @@ void cuda_ipc_glue()
             host_cubes[i].edges = host_cubes[i].edges - host_cuda_globals.edges + host_edges;
             host_cubes[i].faces = host_cubes[i].faces - host_cuda_globals.faces + host_faces;
         }
+
+        thrust::host_vector<float> ret_values = g.hess.values;
         ipc_pt_cpu(g.npt, ps.data(), bs.data(),
             host_cubes.data(),
             g.lut_size, from_thrust(g.lut).data(),
-            from_thrust(g.hess.values).data(), from_thrust(g.hess.inner).data(), from_thrust(g.hess.outer_start).data(),
+            ret_values.data(), from_thrust(g.hess.outer_start).data(),
             b, buf,
             nullptr, nullptr);
+
+        g.hess.values = ret_values;
 
         delete []host_projected;
         delete []host_edges;
@@ -589,7 +590,7 @@ void cuda_ipc_glue()
         ipc_pt_kernel<<<1, 1>>>(g.npt, g.pt.p, g.pt.b,
             g.cubes,
             g.lut_size, PTR(g.lut),
-            PTR(g.hess.values), PTR(g.hess.inner), PTR(g.hess.outer_start),
+            PTR(g.hess.values), PTR(g.hess.outer_start),
             g.b, (float*)lt,
             nullptr, nullptr);
     CUDA_CALL(cudaDeviceSynchronize());

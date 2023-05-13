@@ -237,32 +237,36 @@ tuple<mat12, vec12> ipc_hess_pt_12x12(
                 ptf[i]  = to_vec3f(pt[i]);
             float * buf = new float[144];
             pt_grad_hess12x12(ptf, g, h, true, buf);
-            delete [] buf;
             vec12 g_cuda = Map<Vector<float, 12>>(g).cast<double>();
             mat12 h_cuda = Map<Matrix<float, 12, 12>>(h).cast<double>();
             if (!g_cuda.isApprox(pt_grad, 1e-3)) {
-                spdlog::error("ipc grad mismatch");
+                spdlog::error("ipc grad mismatch, norm diff = {}, norm ref = {}, margin = {}", (g_cuda - pt_grad).norm(), pt_grad.norm(), (g_cuda - pt_grad).norm() / pt_grad.norm());
             }
             if (!h_cuda.isApprox(ipc_hess, 1e-3)) {
-                spdlog::error("ipc hess mismatch");
+                spdlog::error("ipc hess mismatch, norm diff= {}, norm ref = {}, margin = {}", (h_cuda - ipc_hess).norm(), ipc_hess.norm(), (h_cuda - ipc_hess).norm() / ipc_hess.norm());
             }
             auto distf = dev::point_triangle_distance(ptf[0], ptf[1], ptf[2], ptf[3]);
             auto B_f = dev::barrier_derivative_d(distf);
             auto B__f = dev::barrier_second_derivative(distf);
             auto Bf = dev::barrier_function(distf);
             auto B = barrier::barrier_function(dist);
-            if (abs(Bf - B) > 1e-8) {
-                spdlog::error("B mismatch");
+            auto b0m = abs((Bf - B)/ B);
+            auto b1m = abs((B_f - B_) / B_);
+            auto b2m = abs((B__f - B__) / B__);
+            auto dm = abs((distf - dist) / dist);
+            if ( b0m> 1e-4) {
+                spdlog::error("B mismatch, margin = {}", b0m);
             }
-            if (abs(B_f - B_) > 1e-3) {
-                spdlog::error("B. mismatch");
+            if (b1m > 1e-4) {
+                spdlog::error("B. mismatch, margin = {}", b1m);
             }
-            if (abs(B__f - B__) > 1e-3) {
-                spdlog::error("B.. mismatch");
+            if (b2m > 1e-4) {
+                spdlog::error("B.. mismatch, margin = {}, B.. = {}", b2m, B__);
             }
-            if (abs(distf - dist) > 1e-6) {
-                spdlog::error("dist mismatch");
+            if (dm > 1e-4) {
+                spdlog::error("dist mismatch, margin = {}, dist = {}", dm, dist);
             }
+            delete[] buf;
 
         }
         

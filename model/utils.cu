@@ -361,6 +361,7 @@ __host__ __device__ void point_triangle_distance_gradient(vec3f p, vec3f t0, vec
         autogen::point_plane_distance_gradient(
             p.x, p.y, p.z, t0.x, t0.y, t0.z, t1.x, t1.y, t1.z, t2.x,
             t2.y, t2.z, pt_grad);
+        break;
     case 7:
         // AUTO
         //type = point_triangle_distance_type(p, t0, t1, t2);
@@ -372,6 +373,8 @@ __host__ __device__ void point_triangle_distance_gradient(vec3f p, vec3f t0, vec
 
 __host__ __device__ void point_triangle_distance_hessian(vec3f p, vec3f t0, vec3f t1, vec3f t2, float* pt_hess, int type, float *local_hess)
 {
+    for (int i = 0; i < 144; i++) pt_hess[i] = 0.0f;
+
     switch ( type)
     {
     case 0:
@@ -442,9 +445,9 @@ __host__ __device__ void point_triangle_distance_hessian(vec3f p, vec3f t0, vec3
         break;
     case 6: 
         // P_T
-    autogen::point_plane_distance_hessian(
-        p.x, p.y, p.z, t0.x, t0.y, t0.z, t1.x, t1.y, t1.z, t2.x,
-        t2.y, t2.z, pt_hess);
+        autogen::point_plane_distance_hessian(
+            p.x, p.y, p.z, t0.x, t0.y, t0.z, t1.x, t1.y, t1.z, t2.x,
+            t2.y, t2.z, pt_hess);
         break;
     case 7: 
         printf("error: not supposed to support auto");
