@@ -565,4 +565,202 @@ __host__ __device__ int edge_edge_distance_type(vec3f ea0, vec3f ea1, vec3f eb0,
     }
     return default_case;
 }
+
+__host__ __device__ edge_edge_distance(vec3f ea0, vec3f ea1, vec3f eb0, vec3f eb1, int type) {
+    float t;
+    switch (type) {
+    case 0: // EA0_EB0
+        return dot(ea0 - eb0, ea0 - eb0);
+        case 1: // EA0_EB1
+        return dot(ea0 - eb1, ea0 - eb1);
+        case 2: // EA1_EB0
+        return dot(ea1 - eb0, ea1 - eb0);
+        case 3: // EA1_EB1
+        return dot(ea1 - eb1, ea1 - eb1);
+        case 4: // EA_EB0
+        t = h(ea0, ea1, eb0);
+        return t * t;
+        case 5: // EA_EB1
+        t = h(ea0, ea1, eb1);
+        return t * t;
+        case 6: // EA0_EB
+        t=  h(eb0, eb1, ea0);
+        return t * t;
+
+        case 7: // EA1_EB
+        t =  h(eb0, eb1, ea1);
+        return t * t;
+
+        case 8: // EA_EB
+        auto normal = cross(ea1 - ea0, eb1 - eb0);
+        t = dot(normal, ea0 - eb0);
+        return t * t / dot(normal, normal);
+        case 9: // AUTO
+        printf("ee distance error: auto not supported");
+    }
+}
+
+__host__ __device__ void edge_edge_distance_gradient(vec3f ea0, vec3f ea1, vec3f eb0, vec3f eb1, float* ee_grad, int type, float *local_grad) {
+    for(int i = 0; i < 12; i++) {
+        local_grad[i] = 0.0f;
+    }
+    switch (type) {
+        case 0: // EA0_EB0
+        point_point_distance_gradient(ea0, eb0, local_grad);
+        for (int i = 0; i <3;i ++) {
+            ee_grad[i] = local_grad[i];
+            ee_grad[i + 6] = local_grad[i + 3];
+        }
+        break;
+        case 1: // EA0_EB1
+        point_point_distance_gradient(ea0, eb1, local_grad);
+        for (int i = 0; i < 3; i ++) {
+            ee_grad[i] = local_grad[i];
+            ee_grad[i + 9] = local_grad[i + 3];
+        }
+        break;
+        case 2: // EA1_EB0
+        point_point_distance_gradient(ea1, eb0, local_grad);
+        for (int i = 0; i < 3; i ++) {
+            ee_grad[i + 3] = local_grad[i];
+            ee_grad[i + 6] = local_grad[i + 3];
+        }
+        break;
+        case 3: // EA1_EB1
+        point_point_distance_gradient(ea1, eb1, local_grad);
+        for (int i = 0; i < 3; i ++) {
+            ee_grad[i + 3] = local_grad[i];
+            ee_grad[i + 9] = local_grad[i + 3];
+        }
+        break;
+        case 4: // EA_EB0
+        autogen::point_line_distance_gradient_3D(eb0, ea0, ea1, local_grad);
+        for (int i = 0; i < 3; i ++) {
+            ee_grad[i + 6] = local_grad[i];
+            ee_grad[i] = local_grad[i + 3];
+            ee_grad[i + 3] = local_grad[i  + 6];
+        }
+        break;
+        case 5: // EA_EB1
+        autogen::point_line_distance_gradient_3D(eb1, ea0, ea1, local_grad);
+        for (int i = 0; i < 3; i ++) {
+            ee_grad[i + 9] = local_grad[i];
+            ee_grad[i] = local_grad[i + 3];
+            ee_grad[i + 3] = local_grad[i  + 6];
+        }
+        break;
+        case 6: // EA0_EB
+        autogen::point_line_distance_gradient_3D(ea0, eb0, eb1, local_grad);
+        for (int i = 0; i < 3; i ++) {
+            ee_grad[i] = local_grad[i];
+            ee_grad[i + 6] = local_grad[i + 3];
+            ee_grad[i + 9] = local_grad[i  + 6];
+        }
+        break;
+        case 7: // EA1_EB
+        autogen::point_line_distance_gradient_3D(ea1, eb0, eb1, local_grad);
+        for (int i = 0; i < 3; i ++) {
+            ee_grad[i + 3] = local_grad[i];
+            ee_grad[i + 6] = local_grad[i + 3];
+            ee_grad[i + 9] = local_grad[i  + 6];
+        }
+        break;
+        case 8: // EA_EB
+        autogen::line_line_distance( ea0, ea1, eb0, eb1, ee_grad);
+        break;
+        case 9: // AUTO
+        printf("ee distance error: auto not supported");
+
+    }
+}
+__host__ __device__ void edge_edge_distance_hessian(vec3f ea0, vec3f ea1, vec3f eb0, vec3f eb1, float* ee_hess, int type, float *local_hess) {
+    for(int i = 0; i < 144; i++) {
+        local_hess[i] = 0.0f;
+    }
+    switch (type) {
+        case 0: // EA0_EB0
+        point_point_distance_hessian(ea0, eb0, local_hess);
+        put6(local_hess, {0, 0}, ee_hess, {0,0});
+        put6(local_hess, {0, 1}, ee_hess, {0,2});
+        put6(local_hess, {1, 0}, ee_hess, {2, 0});
+        put6(local_hess, {1, 1}, ee_hess, {2, 2});
+        break;
+        case 1: // EA0_EB1
+        point_point_distance_hessian(ea0, eb1, local_hess);
+        put6(local_hess, {0, 0}, ee_hess, {0,0});
+        put6(local_hess, {0, 1}, ee_hess, {0,3});
+        put6(local_hess, {1, 0}, ee_hess, {3, 0});
+        put6(local_hess, {1, 1}, ee_hess, {3, 3});
+
+        break;
+        case 2: // EA1_EB0
+        point_point_distance_hessian(ea1, eb0, local_hess);
+        put6(local_hess, {0, 0}, ee_hess, {1,1});
+        put6(local_hess, {0, 1}, ee_hess, {1,2});
+        put6(local_hess, {1, 0}, ee_hess, {2, 1});
+        put6(local_hess, {1, 1}, ee_hess, {2, 2});
+        break;
+        case 3: // EA1_EB1
+        point_point_distance_hessian(ea1, eb1, local_hess);
+        put6(local_hess, {0, 0}, ee_hess, {1,1});
+        put6(local_hess, {0, 1}, ee_hess, {1,3});
+        put6(local_hess, {1, 0}, ee_hess, {3, 1});
+        put6(local_hess, {1, 1}, ee_hess, {3, 3});
+        break;
+        case 4: // EA_EB0
+        autogen::point_line_distance_hessian_3D(eb0, ea0, ea1, local_hess);
+        put9(local_hess, {0, 0}, ee_hess, {2,2});
+        put9(local_hess, {0, 1}, ee_hess, {2,0});
+        put9(local_hess, {0, 2}, ee_hess, {2,1});
+        put9(local_hess, {1, 0}, ee_hess, {0,2});
+        put9(local_hess, {1, 1}, ee_hess, {0,0});
+        put9(local_hess, {1, 2}, ee_hess, {0,1});
+        put9(local_hess, {2, 0}, ee_hess, {1,2});
+        put9(local_hess, {2, 1}, ee_hess, {1,0});
+        put9(local_hess, {2, 2}, ee_hess, {1,1});
+        break;
+        case 5: // EA_EB1
+        autogen::point_line_distance_hessian_3D(eb1, ea0, ea1, local_hess);
+        put9(local_hess, {0, 0}, ee_hess, {3, 3});
+        put9(local_hess, {0, 1}, ee_hess, {3, 0});
+        put9(local_hess, {0, 2}, ee_hess, {3, 1});
+        put9(local_hess, {1, 0}, ee_hess, {0, 3});
+        put9(local_hess, {1, 1}, ee_hess, {0, 0});
+        put9(local_hess, {1, 2}, ee_hess, {0, 1});
+        put9(local_hess, {2, 0}, ee_hess, {1, 3});
+        put9(local_hess, {2, 1}, ee_hess, {1, 0});
+        put9(local_hess, {2, 2}, ee_hess, {1, 1});
+        break;
+        case 6: // EA0_EB
+        autogen::point_line_distance_hessian_3D(ea0, eb0, eb1, local_hess);
+        put9(local_hess, {0, 0}, ee_hess, {0,0});
+        put9(local_hess, {0, 1}, ee_hess, {0,2});
+        put9(local_hess, {0, 2}, ee_hess, {0,3});
+        put9(local_hess, {1, 0}, ee_hess, {2,0});
+        put9(local_hess, {1, 1}, ee_hess, {2,2});
+        put9(local_hess, {1, 2}, ee_hess, {2,3});
+        put9(local_hess, {2, 0}, ee_hess, {3,0});
+        put9(local_hess, {2, 1}, ee_hess, {3,2});
+        put9(local_hess, {2, 2}, ee_hess, {3,3});
+
+        break;
+        case 7: // EA1_EB
+        autogen::point_line_distance_hessian_3D(ea1, eb0, eb1, local_hess);
+        put9(local_hess, {0, 0}, ee_hess, {1,1});
+        put9(local_hess, {0, 1}, ee_hess, {1,2});
+        put9(local_hess, {0, 2}, ee_hess, {1,3});
+        put9(local_hess, {1, 0}, ee_hess, {2,1});
+        put9(local_hess, {1, 1}, ee_hess, {2,2});
+        put9(local_hess, {1, 2}, ee_hess, {2,3});
+        put9(local_hess, {2, 0}, ee_hess, {3,1});
+        put9(local_hess, {2, 1}, ee_hess, {3,2});
+        put9(local_hess, {2, 2}, ee_hess, {3,3});
+        break;
+        case 8: // EA_EB
+        autogen::line_line_distance_hessian_3D(ea0, ea1, eb0, eb1, ee_hess);
+        break;
+        case 9: // AUTO
+        printf("ee hess error: AUTO not implemented\n");
+        
+}
 } // namespace dev

@@ -130,6 +130,9 @@ __host__ __device__ void point_triangle_distance_gradient(vec3f p, vec3f t0, vec
 __host__ __device__ void point_triangle_distance_hessian(vec3f p, vec3f t0, vec3f t1, vec3f t2, float* pt_hess, int type = 7, float *local_hess = nullptr);
 __host__ __device__ void point_point_distance_gradient(vec3f p, vec3f t0, float* pt_hess);
 __host__ __device__ void point_point_distance_hessian(vec3f p, vec3f t0, float* pt_hess);
+__host__ __device__ float edge_edge_distance(vec3f ea0, vec3f ea1, vec3f eb0, vec3f eb1, int type = 9);
+__host__ __device__ void edge_edge_distance_gradient(vec3f ea0, vec3f ea1, vec3f eb0, vec3f eb1, float* ee_grad, int type = 9, float *local_grad = nullptr);
+__host__ __device__ void edge_edge_distance_hessian(vec3f ea0, vec3f ea1, vec3f eb0, vec3f eb1, float* ee_hess, int type = 9, float *local_hess = nullptr);
 
 __host__ __device__ int point_triangle_distance_type(vec3f p, vec3f t0, vec3f t1, vec3f t2);
 __host__ __device__ int edge_edge_distance_type(vec3f ea0, vec3f ea1, vec3f eb0, vec3f eb1);
