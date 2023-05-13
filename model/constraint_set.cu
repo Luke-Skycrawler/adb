@@ -275,7 +275,6 @@ __global__ void ipc_pt_kernel(
     auto off_diag_start = hess_t_start + 144 * blockDim.x;
 
     // FIXME: align with cacheline size
-    // FIXME: make sure ipc autogen is row-major
 
 
     int n_tasks_per_thread = (npt + n_cuda_threads_per_block - 1) / n_cuda_threads_per_block;
@@ -405,6 +404,116 @@ __global__ void ipc_pt_kernel(
                 }
             }
             printf("tid = %d  output checkpoint passed, success\n", tid);
+
+        }
+    }
+}
+
+__global__ void ipc_ee_kernel(
+    int nee, 
+    i2 *ee, i2 *ij, 
+    cudaAffineBody *cubes,
+    int lut_size, i2 *lut,
+    float *values, int *outers,
+    float *b,
+    float *buffer,
+    float *lambdas, float *Tk
+) {
+    auto tid = threadIdx.x + blockIdx.x * blockDim.x;
+
+    auto grad_start = buffer;
+    auto hess_start = buffer + 12 * blockDim.x;
+    auto hess_0_start = hess_start + 144 * blockDim.x;
+    auto hess_1_start = hess_0_start + 144 * blockDim.x;
+    auto off_diag_start = hess_1_start + 144 * blockDim.x;
+
+    int n_tasks_per_thread = (nee + n_cuda_threads_per_block - 1) / n_cuda_threads_per_block;
+
+    for (int _i = 0; _i < n_tasks_per_thread; _i++) {
+        int I = tid * n_tasks_per_thread + _i;
+        if (I < nee) {
+            int ii = ij[I][0], jj = ij[I][1];
+            auto &ci{ cubes[ii] }, &cj{ cubes[jj] };
+
+            auto ei {ci.edge(ee[I][0])}, ej {cj.edge(ee[I][1])};
+            vec3f projected[4] {
+                ei.e0, ei.e1, ej.e0, ej.e1
+            };
+            float* ipc_hess = hess_start + 144 * tid;
+            float* ee_grad = grad_start + tid * 12;
+
+            float *hess_0, *hess_1, *off_diag; 
+            float *dg0 = ipc_hess, *dg1 = ipc_hess + 12;
+            hess_0 = hess_0_start + 144 * tid;
+            hess_1 = hess_1_start + 144 * tid;
+            off_diag = off_diag_start + 144 * tid;
+
+            ee_grad_hess12x12(projected, ee_grad, ipc_hess, true, hess_0);
+
+            vec3f ei0_tile, ei1_tile, ej0_tile, ej1_tile;
+            auto eir {ci.edge_at_rest(ee[I][0])}, ejr {cj.edge_at_rest(ee[I][1])};
+            ei0_tile = eir.e0; ei1_tile = eir.e1;
+            ej0_tile = ejr.e0; ej1_tile = ejr.e1;
+
+            float ker0[][4] {
+                {1.0f, ei0_tile.x, ei0_tile.y, ei0_tile.z},
+                {1.0f, ei1_tile.x, ei1_tile.y, ei1_tile.z},
+            }, ker1[][4]{
+                {1.0f, ej0_tile.x, ej0_tile.y, ej0_tile.z},
+                {1.0f, ej1_tile.x, ej1_tile.y, ej1_tile.z}
+            };
+
+            // fill hess_0, hess_2, off_diag
+            for(int i = 0;  i < 4; i ++)
+                for (int j = 0; j < 4; j ++) {
+                    for (int c = 0; c < 3; c++)
+                        for (int  r = 0; r < 3; r++) {
+                            hess_1[rc_to_1d(i * 3+ r, j * 3 + c)] = 0.0f;
+                            hess_0[rc_to_1d(i * 3+ r, j * 3 + c)] = 0.0f;
+                            off_diag[rc_to_1d(i * 3+ r, j * 3 + c)] = 0.0f;
+                        }
+                    for (int k = 0; k < 2; k++) 
+                        for(int l = 0; l < 2; l ++){
+                            
+                            for (int c = 0; c < 3; c++)
+                                for (int r = 0; r < 3; r++) {
+                                    hess_0[rc_to_1d(i *  3 + r, j * 3 + c)] += ipc_hess[rc_to_1d(k * 3 + r, l * 3 + c)] * ker0[k][i] * ker0[l][j];
+
+                                    hess_1[rc_to_1d(i  * 3+ r, j * 3 + j)] += ipc_hess[rc_to_1d((k + 2) * 3 + r, (l + 2) * 3 + c)] * ker1[k][i] * ker1[l][j];
+
+                                    off_diag[rc_to_1d(i * 3 + r, j * 3 + c)] += ipc_hess[rc_to_1d(k * 3 + r, (l + 2) * 3 + c)] * ker0[k][i] * ker1[l][j];
+                                }
+                        }
+
+                }
+            
+            // fill dg0, dg1
+            for (int i = 0; i < 12; i++) {
+                dg0[i] = ker0[0][i / 3] * ee_grad[i % 3] + ker0[1][i / 3] * ee_grad[i % 3 + 3];
+                dg1[i] = ker1[0][i / 3] * ee_grad[i % 3 + 6] + ker1[1][i / 3] * ee_grad[i % 3 + 9];
+            }
+            
+            auto osii = to_os({ ii, ii }, lut_size, lut, outers);
+            auto osij = to_os({ ii, jj }, lut_size, lut, outers);
+            auto osjj = to_os({ jj, jj }, lut_size, lut, outers);
+            auto osji = to_os({ jj, ii }, lut_size, lut, outers);
+
+            if (ci.mass > 0.0f) {
+                if (cj.mass > 0.0f)
+                    put_T(values, osji, off_diag);
+                put(values,osii, hess_0);
+                for (int i = 0; i < 12; i ++) {
+                    atomicAdd(b + i, ii * 12, dg0[i]);
+                }
+            }
+            if (cj.mass > 0.0f) {
+                if (ci.mass > 0.0f)
+                    put(values, osij, off_diag);
+                put(values, osjj, hess_1);
+                for (int i = 0; i < 12; i++) {
+                    atomicAdd(b + i + jj * 12, dg1[i]);
+                }
+            }
 
         }
     }
@@ -571,12 +680,15 @@ void cuda_ipc_glue()
         }
 
         thrust::host_vector<float> ret_values = g.hess.values;
+        if (g.params["pt_enable"])
         ipc_pt_cpu(g.npt, ps.data(), bs.data(),
             host_cubes.data(),
             g.lut_size, from_thrust(g.lut).data(),
             ret_values.data(), from_thrust(g.hess.outer_start).data(),
             b, buf,
             nullptr, nullptr);
+        // if (g.params["ee_enable"])
+        // ipc_ee_cpu(g.nee, from_thrust)
 
         g.hess.values = ret_values;
 
@@ -586,13 +698,23 @@ void cuda_ipc_glue()
         delete []host_vertices;
 
     }
-    else
+    else {
+        if (g.params["pt_enable"])
         ipc_pt_kernel<<<1, 1>>>(g.npt, g.pt.p, g.pt.b,
             g.cubes,
             g.lut_size, PTR(g.lut),
             PTR(g.hess.values), PTR(g.hess.outer_start),
             g.b, (float*)lt,
             nullptr, nullptr);
+        if (g.params["ee_enable"]) 
+        ipc_ee_kernel<<<1, 1>>>(g.nee, g.ee.p, g.ee.b,
+            g.cubes,
+            g.lut_size, PTR(g.lut),
+            PTR(g.hess.values), PTR(g.hess.outer_start),
+            g.b, (float*)lt,
+            nullptr, nullptr);
+    }
+    
     CUDA_CALL(cudaDeviceSynchronize());
     const auto all_zero = [](vector<float> values, int n) {
         for (int i = 0; i < n; i++) {
