@@ -409,6 +409,39 @@ __global__ void ipc_pt_kernel(
     }
 }
 
+__host__ __device__ ee_grad_hess12x12(vec3f *ee, float *ee_grad, float *ipc_hess, float * buf_start) {
+    int type;
+    
+    float *buf = buf_start;
+    float *mollifier_grad = buf;
+    buf += 12;
+    float* mollifier_hess = buf;
+    buf += 144;
+    
+    type = dev::edge_edge_distance_type(ee[0], ee[1], ee[2], ee[3]);
+    float dist = dev::edge_edge_distance(ee[0], ee[1], ee[2], ee[3], type);
+    float p = dev::edge_edge_mollifier(ee[0], ee[1], ee[2], ee[3]);
+    dev::edge_edge_distance_gradient(ee[0], ee[1], ee[2], ee[3], mollifier_grad);
+    dev::edge_edge_mollifier_hessian(ee[0], ee[1], ee[2], ee[3], mollifier_hess);
+    
+    
+    
+    dev::edge_edge_distance_gradient(ee[0], ee[1], ee[2], ee[3], ee_grad, type, buf);
+    dev::edge_edge_distance_hessian(ee[0], ee[1], ee[2], ee[3], ipc_hess, type, buf);
+
+    float B = dev::barrier_function(dist);
+    float B_ = dev::barrier_derivative_d(dist);
+    float B__ = dev::barrier_second_derivative(dist);
+
+    for (int I = 0; I < 144; I++) {
+        int i = I % 12, j = I / 12; // column major
+        ipc_hess[i] = mollifier_hess[i] * B + B_ * (mollifier_grad[i] * ee_grad[j] + mollifier_grad[j] * ee_grad[i]) + p * (B__ * ee_grad[i] * ee_grad[j] + B_ * ipc_hess[i]);
+    }
+    for (int i = 0; i < 12; i++) {
+        ee_grad[i] = ee_grad[i] * B_ + mollifier_grad[i] * B;
+    }
+    dev_project_to_psd(12, ipc_hess);
+}
 __global__ void ipc_ee_kernel(
     int nee, 
     i2 *ee, i2 *ij, 

@@ -136,7 +136,9 @@ __host__ __device__ void edge_edge_distance_hessian(vec3f ea0, vec3f ea1, vec3f 
 
 __host__ __device__ int point_triangle_distance_type(vec3f p, vec3f t0, vec3f t1, vec3f t2);
 __host__ __device__ int edge_edge_distance_type(vec3f ea0, vec3f ea1, vec3f eb0, vec3f eb1);
-
+__host__ __device__ edge_edge_mollifier(vec3f ea0, vec3f ea1, vec3f eb0, vec3f eb1);
+__host__ __device__ edge_edge_mollifier_gradient(vec3f ea0, vec3f ea1, vec3f eb0, vec3f eb1, float* grad);
+__host__ __device__ edge_edge_mollifier_hessian(vec3f ea0, vec3f ea1, vec3f eb0, vec3f eb1, float* hess);
 }
 
 __forceinline__ __device__ float3 matmul(float3 _q[4], float3 x)
