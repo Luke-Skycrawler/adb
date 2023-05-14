@@ -420,9 +420,12 @@ __host__ __device__ ee_grad_hess12x12(vec3f *ee, float *ee_grad, float *ipc_hess
     
     type = dev::edge_edge_distance_type(ee[0], ee[1], ee[2], ee[3]);
     float dist = dev::edge_edge_distance(ee[0], ee[1], ee[2], ee[3], type);
-    float p = dev::edge_edge_mollifier(ee[0], ee[1], ee[2], ee[3]);
-    dev::edge_edge_distance_gradient(ee[0], ee[1], ee[2], ee[3], mollifier_grad);
-    dev::edge_edge_mollifier_hessian(ee[0], ee[1], ee[2], ee[3], mollifier_hess);
+    auto ei = ee[1] - ee[0], ej = ee[3] - ee[2];
+    float eps_x = dev::eps * dot(ei, ei) * dot(ej, ej);
+
+    float p = dev::edge_edge_mollifier(ee[0], ee[1], ee[2], ee[3], eps_x);
+    dev::edge_edge_distance_gradient(ee[0], ee[1], ee[2], ee[3], eps_x, mollifier_grad);
+    dev::edge_edge_mollifier_hessian(ee[0], ee[1], ee[2], ee[3], eps_x, mollifier_grad, mollifier_hess);
     
     
     

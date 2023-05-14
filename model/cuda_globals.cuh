@@ -119,7 +119,7 @@ struct CudaGlobals {
 // __constant__ CudaGlobals *cuda_globals;
 extern CudaGlobals host_cuda_globals;
 namespace dev {
-__device__ __constant__ static const float kappa = 1e-4f, d_hat = 1e-4f, d_hat_sqr = 1e-2f;
+__device__ __constant__ static const float kappa = 1e-4f, d_hat = 1e-4f, d_hat_sqr = 1e-2f, eps = 1e-3f;
 
 __host__ __device__ float barrier_function(float d);
 __host__ __device__ float barrier_derivative_d(float x);
@@ -136,9 +136,13 @@ __host__ __device__ void edge_edge_distance_hessian(vec3f ea0, vec3f ea1, vec3f 
 
 __host__ __device__ int point_triangle_distance_type(vec3f p, vec3f t0, vec3f t1, vec3f t2);
 __host__ __device__ int edge_edge_distance_type(vec3f ea0, vec3f ea1, vec3f eb0, vec3f eb1);
-__host__ __device__ edge_edge_mollifier(vec3f ea0, vec3f ea1, vec3f eb0, vec3f eb1);
-__host__ __device__ edge_edge_mollifier_gradient(vec3f ea0, vec3f ea1, vec3f eb0, vec3f eb1, float* grad);
-__host__ __device__ edge_edge_mollifier_hessian(vec3f ea0, vec3f ea1, vec3f eb0, vec3f eb1, float* hess);
+__host__ __device__ float edge_edge_mollifier(vec3f ea0, vec3f ea1, vec3f eb0, vec3f eb1, float eps_x);
+__host__ __device__ void edge_edge_mollifier_gradient(vec3f ea0, vec3f ea1, vec3f eb0, vec3f eb1, float eps_x, float* grad);
+__host__ __device__ void edge_edge_mollifier_hessian(vec3f ea0, vec3f ea1, vec3f eb0, vec3f eb1, float eps_x, float *grad_input, float* hess);
+__host__ __device__ float edge_edge_mollifier(float x, float eps_x);
+__host__ __device__ float edge_edge_mollifier_gradient(float x, float eps_x);
+__host__ __device__ float edge_edge_mollifier_hessian(float x, float eps_x);
+__host__ __device__ float edge_edge_cross_squarednorm(vec3f ea0, vec3f ea1, vec3f eb0, vec3f eb1);
 }
 
 __forceinline__ __device__ float3 matmul(float3 _q[4], float3 x)

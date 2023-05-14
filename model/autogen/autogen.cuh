@@ -143,4 +143,52 @@ namespace autogen {
         line_line_distance_hessian(p0.x, p0.y, p0.z, p1.x, p1.y, p1.z, q0.x, q0.y, q0.z, q1.x, q1.y, q1.z, H);
     }
 
+
+    __host__ __device__ void edge_edge_cross_squarednorm_gradient(
+        float v01,
+        float v02,
+        float v03,
+        float v11,
+        float v12,
+        float v13,
+        float v21,
+        float v22,
+        float v23,
+        float v31,
+        float v32,
+        float v33,
+        float g[12]);
+    
+    __host__ __device__ void edge_edge_cross_squarednorm_gradient(
+        vec3f ea0, vec3f ea1, vec3f eb0, vec3f eb1
+        float grad[12]
+    ){
+        edge_edge_cross_squarednorm_gradient(
+            ea0.x, ea0.y, ea0.z, ea1.x, ea1.y, ea1.z, eb0.x, eb0.y, eb0.z, eb1.x, eb1.y, eb1.z, grad
+        );
+    }
+
+    __host__ __device__ void edge_edge_cross_squarednorm_hessian(
+        float v01,
+        float v02,
+        float v03,
+        float v11,
+        float v12,
+        float v13,
+        float v21,
+        float v22,
+        float v23,
+        float v31,
+        float v32,
+        float v33,
+        float H[144]);
+
+    __host__ __device__ void edge_edge_cross_squarednorm_hessian(
+        vec3f ea0, vec3f ea1, vec3f eb0, vec3f eb1
+        float hess[144]
+    ){
+        edge_edge_cross_squarednorm_hessian(
+            ea0.x, ea0.y, ea0.z, ea1.x, ea1.y, ea1.z, eb0.x, eb0.y, eb0.z, eb1.x, eb1.y, eb1.z, hess
+        );
+    }
 } // namespace autogen

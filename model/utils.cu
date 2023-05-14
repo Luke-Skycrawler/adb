@@ -763,4 +763,67 @@ __host__ __device__ void edge_edge_distance_hessian(vec3f ea0, vec3f ea1, vec3f 
         printf("ee hess error: AUTO not implemented\n");
         
 }
+
+
+__host__ __device__ float edge_edge_cross_squarednorm(vec3f ea0, vec3f ea1, vec3f eb0, vec3f eb1) {
+    auto ea = ea1 - ea0;
+    auto eb = eb1 - eb0;
+    auto ea_cross_eb = cross(ea, eb);
+    return dot(ea_cross_eb, ea_cross_eb);
+}
+
+__host__ __device__ float edge_edge_mollifier(float x, float eps_x)    {
+    float x_div_eps_x = x / eps_x;
+    return (-x_div_eps_x + 2.0) * x_div_eps_x;
+}
+
+__host__ __device__ float edge_edge_mollifier_gradient(float x, float eps_x)
+{
+    T one_div_eps_x = 1.0 / eps_x;
+    return 2.0 * one_div_eps_x * (-one_div_eps_x * x + 1.0);
+}
+
+__host__ __device__ float edge_edge_mollifier_hessian(float x, float eps_x)
+{
+    return -2.0 / (eps_x * eps_x);
+}
+
+__host__ __device__ float edge_edge_mollifier(vec3f ea0, vec3f ea1, vec3f eb0, vec3f eb1, float eps_x) {
+    auto ee_cross_norm_sqr = edge_edge_cross_squarednorm(ea0, ea1, eb0, eb1);
+    if (ee_cross_norm_sqr < eps_x) {
+        return edge_edge_mollifier(ee_cross_norm_sqr, eps_x);
+    } else {
+        return 1.0f;
+    }
+}
+
+__host__ __device__ void edge_edge_mollifier_gradient(vec3f ea0, vec3f ea1, vec3f eb0, vec3f eb1, float eps_x, float *grad) {
+    auto ee_cross_norm_sqr = edge_edge_cross_squarednorm(ea0, ea1, eb0, eb1);
+    if (ee_cross_norm_sqr < eps_x) {
+        autogen::edge_edge_cross_squarednorm_gradient(ea0, ea1, eb0, eb1, grad);
+        auto scale = edge_edge_mollifier_gradient(ee_cross_norm_sqr, eps_x);
+        for (int i = 0; i < 12; i ++) grad[i] *= scale;
+    } else {
+        for (int i = 0; i < 12; i ++) grad[i] = 0.0f;
+    }
+}
+
+__host__ __device__ void edge_edge_mollifier_hessian(vec3f ea0, vec3f ea1, vec3f eb0, vec3f eb1, float eps_x, float *grad_input, float *hess) {
+    auto ee_cross_norm_sqr = edge_edge_cross_squarednorm(ea0, ea1, eb0, eb1);
+    if (ee_cross_norm_sqr < eps_x) {
+
+        autogen::edge_edge_cross_squarednorm_hessian(ea0, ea1, eb0, eb1, hess);
+        auto scale = edge_edge_mollifier_gradient(ee_cross_norm_sqr, eps_x);
+        for (int i = 0; i < 144; i ++) hess[i] *= scale;
+
+        scale = edge_edge_mollifier_hessian(ee_cross_norm_sqr, eps_x);
+
+        for (int I = 0; I < 144; I++) {
+            int i = i % 12, j = I / 12;
+            hess[i] += scale * grad_input[i] * grad_input[j];
+        }
+    } else {
+        for (int i = 0; i < 144; i ++) hess[i] = 0.0f;
+    }
+}
 } // namespace dev
