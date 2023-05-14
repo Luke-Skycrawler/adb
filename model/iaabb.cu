@@ -28,7 +28,7 @@ __device__ __host__ luf compute_aabb(const Facef& f, float d_hat_sqrt);
 __device__ __host__ luf compute_aabb(const Edgef& e, float d_hat_sqrt);
 
 //tuple<float, PointTriangleDistanceType> vf_distance(vec3f vf, Facef ff);
-void per_intersection_core(int n_overlaps, luf* culls, i2* overlaps);
+void per_intersection_core(int n_overlaps, luf* culls, i2* overlaps, int vtn);
 
 /* NOTE: kernel argument convention:
     buf_: device buffer
@@ -99,6 +99,50 @@ __global__ void inclusive_scan_kernel(int* io_cnt)
 {
     for (int i = 1; i < n_cuda_threads_per_block; i++) {
         io_cnt[i] = io_cnt[i - 1] + io_cnt[i];
+    }
+}
+
+
+__host__ __device__ float vf_toi(
+    vec3f vt1, vec3f vt2, Facef ft1, Facef ft2
+){
+    return 1.0f;
+}
+__global__ void toi_decision_kernel(
+    i2 *ijs, 
+    int *io_cnt,
+    vec3f *vifjs,
+    float *ret_toi, int nvi = 0
+){
+    int tid = threadIdx.x + blockIdx.x * blockDim.x;
+    int n_tasks = *io_cnt;
+    int n_task_per_thread = (n_tasks + n_cuda_threads_per_block - 1) / n_cuda_threads_per_block;
+    // __shared__ int n;
+    nvi *= 2;
+    __shared__ float tois[n_cuda_threads_per_block];
+    tois[tid] = 1.0f;
+    for (int _i = 0; _i < n_task_per_thread; _i++) {
+        int idx = tid * n_task_per_thread + _i;
+        if (idx < n_tasks) {
+            auto ij = ijs[idx];
+            int i = ij[0];
+            int j = ij[1];
+
+            auto vt1{ vifjs[i * 2] }, vt2{vifjs[i * 2 + 1]};
+            Facef ft1{ vis[j * 6 + nvi], vis[j * 6 + 1 + nvi], vis[j * 6 + 2 + nvi] }
+                ft2 {vis[j * 6 + 3 + nvi], vis[j * 6 + 4 + nvi], vis[j * 6 + 5 + nvi]};
+            
+            auto toi = vf_toi(vt1, vt2, ft1, ft2);
+            tois[tid] = CUDA_MIN(tois[tid], toi);
+        }
+    }
+    __syncthreads();
+    if (tid == 0) {
+        float toi_min;
+        for(int i = 0; i < n_cuda_threads_per_block; i ++) {
+            toi_min = CUDA_MIN(toi_min, tois[i]);
+        }
+        *ret_toi = toi_min;
     }
 }
 
@@ -468,23 +512,57 @@ __global__ void culling_kernel_atomic (
     __syncthreads();
 }
 
+__host__ __device__ luf merge(luf a, luf b) {
+    vec3f l = make_float3(
+        CUDA_MIN(a.l.x, b.l.x),
+        CUDA_MIN(a.l.y, b.l.y),
+        CUDA_MIN(a.l.z, b.l.z)
+    );
+    vec3f u = make_float3(
+        CUDA_MAX(a.u.x, b.u.x),
+        CUDA_MAX(a.u.y, b.u.y),
+        CUDA_MAX(a.u.z, b.u.z)
+    );
+    return luf{ l, u };
+}
 
-inline luf __device__ __host__ aabb(cudaAffineBody& c, int idx, int type)
+
+inline luf __device__ __host__ aabb(cudaAffineBody& c, int idx, int type, int  vtn)
 {
-    if (type == 0) {
-        auto v = c.projected[idx];
-        return luf{ v - dev::d_hat_sqr, v + dev::d_hat_sqr };
+    if (vtn != 3) {
+        if (type == 0) {
+            auto v = c.projected[idx];
+            return luf{ v - dev::d_hat_sqr, v + dev::d_hat_sqr };
+        }
+        else if (type == 2) {
+            return compute_aabb(c.edge(idx), dev::d_hat_sqr);
+        }
+        else {
+            return compute_aabb(c.triangle(idx), dev::d_hat_sqr);
+        }
+
     }
-    else if (type == 2) {
-        return compute_aabb(c.edge(idx), dev::d_hat_sqr);
-    }
-    else {
-        return compute_aabb(c.triangle(idx), dev::d_hat_sqr);
+    else  {
+        if (type == 0) {
+            Edgef p_u{c.projected[idx], c.updated[idx]};
+            return compute_aabb(p_u, 0.0f);
+        }
+        else if (type == 2) {
+            auto et2 = c.edge_updated(idx), et1  = c.edge(idx);
+            luf lu2 = compute_aabb(et2, 0.0f), lu1 = compute_aabb(et1, 0.0f);
+            return merge(lu1, lu2);
+        }
+        else {
+            auto t2 = c.triangle_updated(idx), t1 = c.triangle(idx);
+            luf lu2 = compute_aabb(t2, 0.0f), lu1 = compute_aabb(t1, 0.0f);
+            return merge(lu1, lu2);
+        }
     }
 }
 
 __global__ void primitive_intersection_test_kernel(
     int type, // 0: vertex, 2: edge, 1: face
+    int vtn,
     int i_overlap, luf* culls, i2* body_index,
     cudaAffineBody* cubes,
     int* ret_prmts_meta_sizes,
@@ -522,7 +600,7 @@ __global__ void primitive_intersection_test_kernel(
             auto b = vi < nvi ? i : j;
             int idx = vi < nvi ? vi : vi - nvi;
 
-            auto t = aabb(cubes[b], idx, type);
+            auto t = aabb(cubes[b], idx, type, vtn);
 
             if (intersects(cull, t)) {
                 int put = atomicAdd(&n, 1);
@@ -568,7 +646,7 @@ float iaabb_brute_force_cuda_pt_only(
     CUDA_CALL(cudaDeviceSynchronize());
     make_lut(n_overlaps, overlaps);
 
-    per_intersection_core(n_overlaps, culls, overlaps);
+    per_intersection_core(n_overlaps, culls, overlaps, vtn);
 
     lt_back = stashed_lt_back;
 
@@ -659,6 +737,7 @@ __global__ void prepare_aabb_vi_fj_kernel(
     int i_overlap, i2* overlaps,
     cudaAffineBody* cubes,
     int type, // vi fj; vj fi; ei ej (i < j)
+    int vtn,
 
     int* vi_meta_sizes, int* fj_meta_sizes, // i.e. nvi, nfj
     // int nvi, int nfj,
@@ -682,15 +761,37 @@ __global__ void prepare_aabb_vi_fj_kernel(
             case 1: i = vilist[I + nvi];
             case 0: {
                 auto& p{ ci.projected[i] };
-                vifjs[I] = p;
-                joint_aabbs[I] = { p - dev::d_hat_sqr, p + dev::d_hat_sqr };
+
+
+                if (vtn != 3){
+                    vifjs[I] = p;
+                    joint_aabbs[I] = { p - dev::d_hat_sqr, p + dev::d_hat_sqr };
+
+                }
+                else {
+                    auto &pt2 = ci.updated[i];
+                    vifjs[I * 2] = p;
+                    vifjs[I * 2 + 1] = pt2;
+                    joint_aabbs[I] = compute_aabb({p, pt2}, 0.0f);
+                }
                 break;
             }
             case 2: {
                 auto& e{ ci.edge(i) };
-                vifjs[I * 2] = e.e0;
-                vifjs[I * 2 + 1] = e.e1;
-                joint_aabbs[I] = compute_aabb(e, dev::d_hat_sqr);
+                if (vtn != 3) {
+
+                    vifjs[I * 2] = e.e0;
+                    vifjs[I * 2 + 1] = e.e1;
+                    joint_aabbs[I] = compute_aabb(e, dev::d_hat_sqr);
+                }
+                else {
+                    auto  &e2 = ci.edge_updated(i);
+                    vifjs[I * 4] = e.e0;
+                    vifjs[I * 4 + 1] = e.e1;
+                    vifjs[I * 4 + 2] = e2.e0;
+                    vifjs[I * 4 + 3] = e2.e1;
+                    joint_aabbs[I] = merge(compute_aabb(e, 0.0f), compure_aabb(e2, 0.0f));
+                }
                 break;
             }
             }
@@ -706,18 +807,41 @@ __global__ void prepare_aabb_vi_fj_kernel(
             case 1: i = fjlist[I];
             case 0: {
                 Facef f{ cj.triangle(i) };
-                vifjs[T_t + I * 3] = f.t0;
-                vifjs[T_t + I * 3 + 1] = f.t1;
-                vifjs[T_t + I * 3 + 2] = f.t2;
 
-                joint_aabbs[T_t + I] = compute_aabb(f, dev::d_hat_sqr);
+                if (vtn != 3) {
+
+                    vifjs[T_t + I * 3] = f.t0;
+                    vifjs[T_t + I * 3 + 1] = f.t1;
+                    vifjs[T_t + I * 3 + 2] = f.t2;
+    
+                    joint_aabbs[T_t + I] = compute_aabb(f, dev::d_hat_sqr);
+                }
+                else {
+                    vifjs[T_t * 2 + I * 6] = f.t0;
+                    vifjs[T_t * 2 + I * 6 + 1] = f.t1;
+                    vifjs[T_t * 2 + I * 6 + 2] = f.t2;
+                    auto &f2 = cj.triangle_updated(i);
+                    vifjs[T_t * 2 + I * 6 + 3] = f2.t0;
+                    vifjs[T_t * 2 + I * 6 + 4] = f2.t1;
+                    vifjs[T_t * 2 + I * 6 + 5] = f2.t2;
+                    joint_aabbs[T_t + I] = merge(compute_aabb(f, 0.0f), compute_aabb(f2, 0.0f));
+                }
                 break;
             }
             case 2: {
                 auto& e{ cj.edge(i) };
-                vifjs[T_t * 2 + I * 2] = e.e0;
-                vifjs[T_t * 2 + I * 2 + 1] = e.e1;
-                joint_aabbs[T_t + I] = compute_aabb(e, dev::d_hat_sqr);
+                if (vtn != 3) {
+                    vifjs[T_t * 2 + I * 2] = e.e0;
+                    vifjs[T_t * 2 + I * 2 + 1] = e.e1;
+                    joint_aabbs[T_t + I] = compute_aabb(e, dev::d_hat_sqr);
+                }
+                else {
+                    vifjs[T_t * 4 + I * 4] = e.e0;
+                    vifjs[T_t * 4 + I * 4 + 1] = e.e1;
+                    auto &e2 = cj.edge_updated(i);
+                    vifjs[T_t * 4 + I * 4 + 2] = e2.e0;
+                    vifjs[T_t * 4 + I * 4 + 3] = e2.e1;
+                }
                 break;
             }
             }
@@ -725,7 +849,7 @@ __global__ void prepare_aabb_vi_fj_kernel(
     }
 }
 
-void per_intersection_core(int n_overlaps, luf* culls, i2* overlaps)
+void per_intersection_core(int n_overlaps, luf* culls, i2* overlaps, int vtn)
 {
 #define PT_ONLY
 #ifdef PT_ONLY
@@ -794,7 +918,7 @@ void per_intersection_core(int n_overlaps, luf* culls, i2* overlaps)
             bulk += sizeof(i2) * max_prmts_per_block;
             if (kernel) {
                 primitive_intersection_test_kernel<<<1, n_cuda_threads_per_block, 0, stream>>>(
-                    type, i, culls, overlaps, cubes, ret_meta_sizes, ret_prmts);
+                    type, vtn, i, culls, overlaps, cubes, ret_meta_sizes, ret_prmts);
             }
 #ifdef CPU_REF
             // else
@@ -822,7 +946,7 @@ void per_intersection_core(int n_overlaps, luf* culls, i2* overlaps)
                     auto b = vi < nvi ? I : J;
                     int id = vi < nvi ? vi : vi - nvi;
                     int iorj = vi < nvi ? 0 : 1;
-                    auto t = aabb(host_cubes[b], id, type);
+                    auto t = aabb(host_cubes[b], id, type, vtn);
                     if (intersects(cull, t)) {
                         host_prmts[type][iorj].push_back(id);
                     }
@@ -944,9 +1068,9 @@ void per_intersection_core(int n_overlaps, luf* culls, i2* overlaps)
                 f_offset = sizes[4];
                 break;
             }
-
+            
             prepare_aabb_vi_fj_kernel<<<1, n_cuda_threads_per_block, 0, stream>>>(
-                i, overlaps, cubes, type,
+                i, overlaps, cubes, type, vtn,
                 type == 2 ? elist_meta : vlist_meta,
                 type == 2 ? elist_meta : flist_meta,
                 // nvi, nfj,

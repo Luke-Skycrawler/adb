@@ -100,7 +100,7 @@ struct CudaGlobals {
     char **small_temporary_buffer, **bulk_buffer;
     char **small_temporary_buffer_back, **bulk_buffer_back;
     char *leader_thread_buffer_back, *leader_thread_buffer;
-    vec3f *vertices_at_rest, *projected_vertices;
+    vec3f *vertices_at_rest, *projected_vertices, *updated_vertices;
     int n_vertices, n_edges, n_faces;
     int *edges, *faces;
     CollisionSet pt, ee;

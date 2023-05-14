@@ -27,6 +27,8 @@ void initialize_primitives(
 
     cudaMallocManaged(&host_cuda_globals.vertices_at_rest, ptot * sizeof(vec3f));
     cudaMallocManaged(&host_cuda_globals.projected_vertices, ptot * sizeof(vec3f));
+    cudaMallocManaged(&host_cuda_globals.updated_vertices, ptot * sizeof(vec3f));
+    
     cudaMallocManaged(&host_cuda_globals.edges, etot * 2 * sizeof(int));
     cudaMallocManaged(&host_cuda_globals.faces, ftot * 3 * sizeof(int));
     host_cuda_globals.n_vertices = ptot;
@@ -45,6 +47,8 @@ void initialize_primitives(
         auto& cabd{ host_cubes[i] };
         cabd.projected = host_cuda_globals.projected_vertices + start;
         cabd.vertices = host_cuda_globals.vertices_at_rest + start;
+        cabd.updated = host_cuda_globals.updated_vertices + start;
+        
         cabd.edges = host_cuda_globals.edges + estart;
         cabd.faces = host_cuda_globals.faces + fstart;
          

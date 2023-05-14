@@ -193,7 +193,7 @@ __global__ void project_vt2_kernel(int n_cubes, cudaAffineBody *cubes, float3* b
         if (i < n_cubes) {
             auto& c{ cubes[i] };
             for (int j = 0; j < c.n_vertices; j++) {
-                c.projected[j] = matmul(c.q_update, c.vertices[j]);
+                c.updated[j] = c.projected[j] = matmul(c.q_update, c.vertices[j]);
             }
         }
     }
@@ -395,6 +395,7 @@ void CudaGlobals::free_buffers()
     freeCublasAndCusparse();
     cudaFree(vertices_at_rest);
     cudaFree(projected_vertices);
+    cudaFree(updated_vertices);
     cudaFree(edges);
     cudaFree(faces);
     cudaFree(aabbs);
