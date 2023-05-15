@@ -159,8 +159,8 @@ namespace autogen {
         float v33,
         float g[12]);
     
-    __host__ __device__ void edge_edge_cross_squarednorm_gradient(
-        vec3f ea0, vec3f ea1, vec3f eb0, vec3f eb1
+    inline __host__ __device__ void edge_edge_cross_squarednorm_gradient(
+        vec3f ea0, vec3f ea1, vec3f eb0, vec3f eb1,
         float grad[12]
     ){
         edge_edge_cross_squarednorm_gradient(
@@ -183,8 +183,8 @@ namespace autogen {
         float v33,
         float H[144]);
 
-    __host__ __device__ void edge_edge_cross_squarednorm_hessian(
-        vec3f ea0, vec3f ea1, vec3f eb0, vec3f eb1
+    inline __host__ __device__ void edge_edge_cross_squarednorm_hessian(
+        vec3f ea0, vec3f ea1, vec3f eb0, vec3f eb1,
         float hess[144]
     ){
         edge_edge_cross_squarednorm_hessian(

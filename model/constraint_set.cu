@@ -409,7 +409,7 @@ __global__ void ipc_pt_kernel(
     }
 }
 
-__host__ __device__ ee_grad_hess12x12(vec3f *ee, float *ee_grad, float *ipc_hess, float * buf_start) {
+__host__ __device__ void ee_grad_hess12x12(vec3f *ee, float *ee_grad, float *ipc_hess, float * buf_start) {
     int type;
     
     float *buf = buf_start;
@@ -424,7 +424,7 @@ __host__ __device__ ee_grad_hess12x12(vec3f *ee, float *ee_grad, float *ipc_hess
     float eps_x = dev::eps * dot(ei, ei) * dot(ej, ej);
 
     float p = dev::edge_edge_mollifier(ee[0], ee[1], ee[2], ee[3], eps_x);
-    dev::edge_edge_distance_gradient(ee[0], ee[1], ee[2], ee[3], eps_x, mollifier_grad);
+    dev::edge_edge_mollifier_gradient(ee[0], ee[1], ee[2], ee[3], eps_x, mollifier_grad);
     dev::edge_edge_mollifier_hessian(ee[0], ee[1], ee[2], ee[3], eps_x, mollifier_grad, mollifier_hess);
     
     
@@ -484,7 +484,7 @@ __global__ void ipc_ee_kernel(
             hess_1 = hess_1_start + 144 * tid;
             off_diag = off_diag_start + 144 * tid;
 
-            ee_grad_hess12x12(projected, ee_grad, ipc_hess, true, hess_0);
+            ee_grad_hess12x12(projected, ee_grad, ipc_hess, hess_0);
 
             vec3f ei0_tile, ei1_tile, ej0_tile, ej1_tile;
             auto eir {ci.edge_at_rest(ee[I][0])}, ejr {cj.edge_at_rest(ee[I][1])};
@@ -539,7 +539,7 @@ __global__ void ipc_ee_kernel(
                     put_T(values, osji, off_diag);
                 put(values,osii, hess_0);
                 for (int i = 0; i < 12; i ++) {
-                    atomicAdd(b + i, ii * 12, dg0[i]);
+                    atomicAdd(b + i + ii * 12, dg0[i]);
                 }
             }
             if (cj.mass > 0.0f) {

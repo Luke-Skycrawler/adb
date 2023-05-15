@@ -19,9 +19,6 @@
     <CudaCompile Include="..\model\utils.cu">
       <Filter>cuda</Filter>
     </CudaCompile>
-    <CudaCompile Include="..\model\autogen\edge_edge_mollifier.cu">
-      <Filter>cuda\autogen</Filter>
-    </CudaCompile>
     <CudaCompile Include="..\model\autogen\line_line.cu">
       <Filter>cuda\autogen</Filter>
     </CudaCompile>
@@ -29,6 +26,9 @@
       <Filter>cuda\autogen</Filter>
     </CudaCompile>
     <CudaCompile Include="..\model\autogen\point_plane.cu">
+      <Filter>cuda\autogen</Filter>
+    </CudaCompile>
+    <CudaCompile Include="..\model\autogen\mollifier.cu">
       <Filter>cuda\autogen</Filter>
     </CudaCompile>
   </ItemGroup>

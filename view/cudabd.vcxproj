@@ -119,6 +119,7 @@
     </CudaLink>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <CudaCompile Include="..\model\autogen\mollifier.cu" />
     <CudaCompile Include="..\model\constraint_set.cu" />
     <CudaCompile Include="..\model\euler.cu" />
     <CudaCompile Include="..\model\iaabb.cu" />
@@ -127,9 +128,6 @@
     <CudaCompile Include="kernel.cu" />
     <ClCompile Include="..\iAABB\finitediff.cpp" />
     <ClCompile Include="..\model\affine_obj.cpp" />
-    <CudaCompile Include="..\model\autogen\edge_edge_mollifier.cu">
-      <FileType>Document</FileType>
-    </CudaCompile>
     <CudaCompile Include="..\model\autogen\line_line.cu">
       <FileType>Document</FileType>
     </CudaCompile>

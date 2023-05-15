@@ -131,7 +131,7 @@ struct cudaAffineBody {
         return Edgef{
             updated[edges[i * 2]],
             updated[edges[i * 2 + 1]]
-        }
+        };
     }
 };
 

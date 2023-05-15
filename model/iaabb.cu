@@ -129,8 +129,8 @@ __global__ void toi_decision_kernel(
             int j = ij[1];
 
             auto vt1{ vifjs[i * 2] }, vt2{vifjs[i * 2 + 1]};
-            Facef ft1{ vis[j * 6 + nvi], vis[j * 6 + 1 + nvi], vis[j * 6 + 2 + nvi] }
-                ft2 {vis[j * 6 + 3 + nvi], vis[j * 6 + 4 + nvi], vis[j * 6 + 5 + nvi]};
+            Facef ft1{ vifjs[j * 6 + nvi], vifjs[j * 6 + 1 + nvi], vifjs[j * 6 + 2 + nvi] },
+                ft2 {vifjs[j * 6 + 3 + nvi], vifjs[j * 6 + 4 + nvi], vifjs[j * 6 + 5 + nvi]};
             
             auto toi = vf_toi(vt1, vt2, ft1, ft2);
             tois[tid] = CUDA_MIN(tois[tid], toi);
@@ -772,7 +772,7 @@ __global__ void prepare_aabb_vi_fj_kernel(
                     auto &pt2 = ci.updated[i];
                     vifjs[I * 2] = p;
                     vifjs[I * 2 + 1] = pt2;
-                    joint_aabbs[I] = compute_aabb({p, pt2}, 0.0f);
+                    joint_aabbs[I] = compute_aabb(Edgef{p, pt2}, 0.0f);
                 }
                 break;
             }
@@ -790,7 +790,7 @@ __global__ void prepare_aabb_vi_fj_kernel(
                     vifjs[I * 4 + 1] = e.e1;
                     vifjs[I * 4 + 2] = e2.e0;
                     vifjs[I * 4 + 3] = e2.e1;
-                    joint_aabbs[I] = merge(compute_aabb(e, 0.0f), compure_aabb(e2, 0.0f));
+                    joint_aabbs[I] = merge(compute_aabb(e, 0.0f), compute_aabb(e2, 0.0f));
                 }
                 break;
             }
