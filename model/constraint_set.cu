@@ -277,7 +277,7 @@ __global__ void ipc_pt_kernel(
     // FIXME: align with cacheline size
 
 
-    int n_tasks_per_thread = (npt + n_cuda_threads_per_block - 1) / n_cuda_threads_per_block;
+    int n_tasks_per_thread = (npt + blockDim.x - 1) / blockDim.x;
 
     for (int _i = 0; _i < n_tasks_per_thread; _i++) {
         int I = tid * n_tasks_per_thread + _i;

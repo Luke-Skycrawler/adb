@@ -76,7 +76,7 @@
         "cuda_pt_direct": 0,
         "cuda_ipc_term": 1,
         "cuda_ipc_pt": 1,
-        "ipc_cpu_debug": 1,
+        "ipc_cpu_debug": 0,
         "test_placeholder": 0,
         "pt_enable": 1,
         "ee_enable": 1

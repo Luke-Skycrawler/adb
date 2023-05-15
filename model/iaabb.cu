@@ -114,6 +114,7 @@ __global__ void toi_decision_kernel(
     vec3f *vifjs,
     float *ret_toi, int nvi = 0
 ){
+    // NOTE: can only launched with n_cuda_threads_per_block threads
     int tid = threadIdx.x + blockIdx.x * blockDim.x;
     int n_tasks = *io_cnt;
     int n_task_per_thread = (n_tasks + n_cuda_threads_per_block - 1) / n_cuda_threads_per_block;
@@ -157,7 +158,7 @@ __global__ void filter_distance_kernel_atomic(i2* buf_ij, i2* io_tmp,
 
     int tid = threadIdx.x + blockIdx.x * blockDim.x;
     int n_tasks = *io_cnt;
-    int n_task_per_thread = (n_tasks + n_cuda_threads_per_block - 1) / n_cuda_threads_per_block;
+    int n_task_per_thread = (n_tasks + blockDim.x - 1) / blockDim.x;
     __shared__ int n;
     n = 0;
     for (int _i = 0; _i < n_task_per_thread; _i++) {
@@ -203,7 +204,6 @@ __global__ void filter_distance_kernel(i2* ret_ij, int* ret_cnt, i2* tmp,
     float dhat = 1e-4)
 {
     // // squeeze the ret_ij list according to a prefix sum array ret_cnt
-    // // FIXME: asserting blockDim.x == n_cuda_threads_per_block
     int tid = threadIdx.x + blockIdx.x * blockDim.x;
     // int start = tid == 0 ? 0 : ret_cnt[tid - 1];
     int n_tasks = ret_cnt[blockDim.x - 1];
@@ -470,6 +470,7 @@ __global__ void culling_kernel_atomic (
     luf* ret_culls // n_overlaps
 )
 {
+    // NOTE: can only be launched with <<<1, n_cuda_threads_per_block>>>
     __shared__ luf affine_aabb[n_cuda_threads_per_block];
     __shared__ int n;
     n = 0;
@@ -591,7 +592,7 @@ __global__ void primitive_intersection_test_kernel(
         nv = cubes[i].n_faces + cubes[j].n_faces;
         break;
     }
-    int n_tasks_per_thread = (nv + n_cuda_threads_per_block - 1) / n_cuda_threads_per_block;
+    int n_tasks_per_thread = (nv + blockDim.x - 1) / blockDim.x;
     ret_prmts_meta_sizes[0] = ret_prmts_meta_sizes[1] = 0;
     for (int _j = 0; _j < n_tasks_per_thread; _j++) {
         int vi = tid * n_tasks_per_thread + _j;
@@ -752,7 +753,7 @@ __global__ void prepare_aabb_vi_fj_kernel(
 
     auto T_t = type == 1 ? nvj : nvi;
     // type = 1 is vj fi intersection test
-    int n_tasks_per_thread = T_t + n_cuda_threads_per_block - 1 / n_cuda_threads_per_block;
+    int n_tasks_per_thread = T_t + blockDim.x - 1 / blockDim.x;
     for (int _j = 0; _j < n_tasks_per_thread; _j++) {
         auto I = _j + tid * n_tasks_per_thread;
         if (I < T_t) {
@@ -798,7 +799,7 @@ __global__ void prepare_aabb_vi_fj_kernel(
         }
     }
     auto T_t2 = type == 1 ? nfi : nfj;
-    n_tasks_per_thread = T_t2 + n_cuda_threads_per_block - 1 / n_cuda_threads_per_block;
+    n_tasks_per_thread = T_t2 + blockDim.x - 1 / blockDim.x;
     for (int _j = 0; _j < n_tasks_per_thread; _j++) {
         auto I = _j + tid * n_tasks_per_thread;
         if (I < T_t2) {
