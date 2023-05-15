@@ -283,10 +283,10 @@ __global__ void ipc_pt_kernel(
         int I = tid * n_tasks_per_thread + _i;
         if (I < npt) {
 
-            printf("tid = %d  created\n", tid);
+            // printf("tid = %d  created\n", tid);
             int ii = ij[I][0], jj = ij[I][1];
             auto &ci{ cubes[ii] }, &cj{ cubes[jj] };
-            printf("tid = %d  ci, cj access, ij = {%d, %d}\n pt[I] = {%d, %d}", tid, ii, jj, pt[I][0], pt[I][1]);
+            // printf("tid = %d  ci, cj access, ij = {%d, %d}\n pt[I] = {%d, %d}", tid, ii, jj, pt[I][0], pt[I][1]);
 
             auto fp {cj.triangle(pt[I][1])};
             vec3f projected[4] {
@@ -295,7 +295,7 @@ __global__ void ipc_pt_kernel(
                 fp.t1,
                 fp.t2
             };
-            printf("tid = %d  projected vertices\n", tid);
+            // printf("tid = %d  projected vertices\n", tid);
             
             float* ipc_hess = hess_start + 144 * tid;
             float* pt_grad = grad_start + tid * 12;
@@ -316,8 +316,8 @@ __global__ void ipc_pt_kernel(
                 return 1;
             };
 
-            printf("tid = %d  pt grad hess checkpoint passed\n", tid);
-            printf("pt grad hess zero status: %d\n", all_zero(ipc_hess));
+            // printf("tid = %d  pt grad hess checkpoint passed\n", tid);
+            // printf("pt grad hess zero status: %d\n", all_zero(ipc_hess));
 
             vec3f p_tile, t0_tile, t1_tile, t2_tile;
             p_tile = ci.vertices[pt[I][0]];
@@ -370,8 +370,8 @@ __global__ void ipc_pt_kernel(
                     }
                 }
                 
-            printf("tid = %d  grad_p, grad_t checkpoint passed\n", tid);
-            printf(" zero status: p: %d t: %d, off_diag: %d\n", all_zero(hess_p), all_zero(hess_t), all_zero(off_diag));
+            // printf("tid = %d  grad_p, grad_t checkpoint passed\n", tid);
+            // printf(" zero status: p: %d t: %d, off_diag: %d\n", all_zero(hess_p), all_zero(hess_t), all_zero(off_diag));
             for (int i = 0; i < 4; i++) {
                 for (int j = 0; j < 3; j++) {
                     dgp[i * 3 + j] = pt_grad[j] * kerp[i];
@@ -380,7 +380,7 @@ __global__ void ipc_pt_kernel(
                         + pt_grad[j + 9] * kert[2][i];
                 }
             }
-            printf("tid = %d  dgp checkpoint passed\n", tid);
+            // printf("tid = %d  dgp checkpoint passed\n", tid);
 
             auto osii = to_os({ ii, ii }, lut_size, lut, outers);
             auto osij = to_os({ ii, jj }, lut_size, lut, outers);
@@ -403,7 +403,7 @@ __global__ void ipc_pt_kernel(
                     atomicAdd(b + i + jj * 12, dgt[i]);
                 }
             }
-            printf("tid = %d  output checkpoint passed, success\n", tid);
+            // printf("tid = %d  output checkpoint passed, success\n", tid);
 
         }
     }

@@ -80,15 +80,21 @@ void to_csr(Eigen::SparseMatrix<double>& hess, CsrSparseMatrix& ret)
 void cuda_solve(Eigen::VectorXd &_dq, Eigen::SparseMatrix<double>& sparse_hess, Eigen::VectorXd &r)
 {
     auto& hess{ host_cuda_globals.hess };
-    to_csr(sparse_hess, hess);
-    vector<float> r_vec;
-    r_vec.resize(sparse_hess.cols());
-    for (int i = 0; i < sparse_hess.cols(); i++) {
-        r_vec[i] = r[i];
+    if (host_cuda_globals.params["solve_with_cuda_matrix"]) {
+        
     }
-    // compare(sparse_hess, hess);
-    cudaMemcpy(host_cuda_globals.b, r_vec.data(), r_vec.size() * sizeof(float), cudaMemcpyHostToDevice);
-    cudaDeviceSynchronize();
+    else {
+        to_csr(sparse_hess, hess);
+        vector<float> r_vec;
+        r_vec.resize(sparse_hess.cols());
+        for (int i = 0; i < sparse_hess.cols(); i++) {
+            r_vec[i] = r[i];
+        }
+        // compare(sparse_hess, hess);
+        cudaMemcpy(host_cuda_globals.b, r_vec.data(), r_vec.size() * sizeof(float), cudaMemcpyHostToDevice);
+        cudaDeviceSynchronize();
+
+    }
     auto dq{ host_cuda_globals.dq };
     gpuCholSolver(hess, dq,  host_cuda_globals.b);
     vector<float> dq_vec;
