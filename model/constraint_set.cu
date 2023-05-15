@@ -445,6 +445,31 @@ __host__ __device__ void ee_grad_hess12x12(vec3f *ee, float *ee_grad, float *ipc
     }
     dev_project_to_psd(12, ipc_hess);
 }
+
+__global__ void put_inertia_kernel(
+    int n_cubes, 
+    cudaAffineBody *cubes,
+    int lut_size, i2 *lut,
+    float *values, int *outers,
+    float *b,
+    float *diag
+) {
+    int tid = threadIdx.x + blockIdx.x * blockDim.x;
+    int n_tasks_per_thread = (n_cubes + blockDim.x - 1) / blockDim.x;
+    for (int _i =0; _i < n_task_per_thread; _i ++) {
+        int I = _i + tid * n_tasks_per_thread;
+        if (I < n_cubes){
+            auto osii = to_os({ I, I }, lut_size, lut, outers);
+            int offset = osii[0], stride = osii[1];
+
+            for (int c = 0; c < 12; c++)
+                for (int r =0; r < 12; r ++) {
+                    values[offset + c * stride + r] += diag[c * 12 + r];
+                }
+            // grad is already added to globals.b
+        }
+    }
+}
 __global__ void ipc_ee_kernel(
     int nee, 
     i2 *ee, i2 *ij, 
@@ -463,7 +488,7 @@ __global__ void ipc_ee_kernel(
     auto hess_1_start = hess_0_start + 144 * blockDim.x;
     auto off_diag_start = hess_1_start + 144 * blockDim.x;
 
-    int n_tasks_per_thread = (nee + n_cuda_threads_per_block - 1) / n_cuda_threads_per_block;
+    int n_tasks_per_thread = (nee + blockDim.x - 1) / blockDim.x;
 
     for (int _i = 0; _i < n_tasks_per_thread; _i++) {
         int I = tid * n_tasks_per_thread + _i;
@@ -749,6 +774,13 @@ void cuda_ipc_glue()
             PTR(g.hess.values), PTR(g.hess.outer_start),
             g.b, (float*)lt,
             nullptr, nullptr);
+        put_inertia_kernel<<<1, 1>>>(
+            g.n_cubes,
+            g.cubes,
+            g.lut_size, PTR(g.lut),
+            PTR(g.hess.values), PTR(g.hess.outer_start),
+            g.b, g.hess_diag
+        );
     }
     
     CUDA_CALL(cudaDeviceSynchronize());
