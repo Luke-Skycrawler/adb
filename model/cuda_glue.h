@@ -27,6 +27,13 @@ inline Facef to_facef(const Face& f)
     };
 }
 
+inline Edgef to_edgef(const Edge &f) {
+    return {
+        to_vec3f(f.e0),
+        to_vec3f(f.e1)
+    };
+}
+
 inline cudaAffineBody to_cabd(AffineBody &a){
    cudaAffineBody b;
    for (int i = 0; i < 4; i ++){
