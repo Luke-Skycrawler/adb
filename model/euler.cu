@@ -170,7 +170,7 @@ __global__ void friction_kernel(float &E){}
 // }
 
 
-__global__ void project_vt1_kernel(int n_cubes, cudaAffineBody *cubes, float3* buffer)
+__global__ void project_vt1_kernel(int n_cubes, cudaAffineBody *cubes)
 {
     int tid = threadIdx.x + blockIdx.x * blockDim.x;
     int n_tasks_per_thread = (n_cubes + blockDim.x - 1) / blockDim.x;
@@ -184,7 +184,7 @@ __global__ void project_vt1_kernel(int n_cubes, cudaAffineBody *cubes, float3* b
         }
     }
 }
-__global__ void project_vt2_kernel(int n_cubes, cudaAffineBody *cubes, float3* buffer)
+__global__ void project_vt2_kernel(int n_cubes, cudaAffineBody *cubes)
 {
     int tid = threadIdx.x + blockIdx.x * blockDim.x;
     int n_tasks_per_thread = (n_cubes + blockDim.x - 1) / blockDim.x;
@@ -456,9 +456,15 @@ void project_glue(int vtn)
     auto &g {host_cuda_globals};
     switch (vtn) {
     case 1:
-        project_vt1_kernel<<<1, n_cuda_threads_per_block>>>(g.n_cubes, g.cubes, g.projected_vertices);
+        project_vt1_kernel<<<1, n_cuda_threads_per_block>>>(g.n_cubes, g.cubes);
         break;
     case 2:
-        project_vt2_kernel<<<1, n_cuda_threads_per_block>>>(g.n_cubes, g.cubes, g.projected_vertices);
+        project_vt2_kernel<<<1, n_cuda_threads_per_block>>>(g.n_cubes, g.cubes);
+        break;
+    case 3:
+        project_vt2_kernel<<<1, n_cuda_threads_per_block>>>(g.n_cubes, g.cubes);
+        project_vt1_kernel<<<1, n_cuda_threads_per_block>>>(g.n_cubes, g.cubes);
+        // updated will have vt2 value and projected will have vt1 value
+        break;
     }
 }

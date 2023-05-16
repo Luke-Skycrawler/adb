@@ -1307,7 +1307,7 @@ double iaabb_brute_force(
         ees,
         eidx,
         vidx);
-    if (globals.params_int["cuda_pt"] && vtn != 3) {
+    if (globals.params_int["cuda_pt"]) {
         vector<array<int, 4>> idx_cuda, int_ref;
         for (int i = 0; i < n_cubes; i++) {
             auto& b{ host_cuda_globals.host_cubes[i] };
@@ -1321,7 +1321,7 @@ double iaabb_brute_force(
         }
         cudaMemcpy(host_cuda_globals.cubes, host_cuda_globals.host_cubes.data(), sizeof(cudaAffineBody) * n_cubes, cudaMemcpyHostToDevice);
         project_glue(vtn);
-        float toi = iaabb_brute_force_cuda_pt_only(n_cubes, host_cuda_globals.cubes, host_cuda_globals.aabbs, vtn, idx_cuda);
+        float toif = iaabb_brute_force_cuda_pt_only(n_cubes, host_cuda_globals.cubes, host_cuda_globals.aabbs, vtn, idx_cuda);
 
         bool compare = true;
         if (compare) {
@@ -1331,6 +1331,10 @@ double iaabb_brute_force(
 
             if (idx.size() != idx_cuda.size() || int_ref.size() != idx.size()) {
                 spdlog::warn("size : ref = {}, cuda = {}, intersection(ref, cuda) = {}", idx.size(), idx_cuda.size(), int_ref.size());
+            }
+
+            if (abs(toi - toif) > 1e-4) {
+                spdlog::warn("toi : ref = {}, cuda = {}", toi, toif);
             }
         }
         if (globals.params_int["cuda_pt_direct"]) idx = idx_cuda;

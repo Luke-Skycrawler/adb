@@ -724,7 +724,8 @@ void cuda_ipc_glue()
     if (g.params["ipc_cpu_debug"]) {
         float b[12], buf[144];
         auto host_cubes = host_cuda_globals.host_cubes;
-        vec3f* host_projected = new vec3f[host_cuda_globals.n_vertices], *host_vertices = new vec3f[host_cuda_globals.n_vertices];
+        vec3f* host_projected = new vec3f[host_cuda_globals.n_vertices], *host_vertices = new vec3f[host_cuda_globals.n_vertices],
+         *host_updated = new vec3f [host_cuda_globals.n_vertices];
         int* host_edges = new int[host_cuda_globals.n_edges * 2];
         int* host_faces = new int[host_cuda_globals.n_faces * 3];
 

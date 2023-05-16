@@ -906,7 +906,7 @@ void per_intersection_core(int n_overlaps, luf* culls, i2* overlaps, int vtn, fl
 
     static vector<i2> host_overlaps;
     host_overlaps.resize(n_overlaps);
-#define CPU_REF
+//#define CPU_REF
 #ifdef CPU_REF
     static vector<luf> host_culls;
 
@@ -915,17 +915,20 @@ void per_intersection_core(int n_overlaps, luf* culls, i2* overlaps, int vtn, fl
     static vector<cudaAffineBody> host_cubes_stashed;
     host_cubes_stashed = host_cuda_globals.host_cubes;
     auto& host_cubes{ host_cuda_globals.host_cubes };
-    vec3f* host_projected = new vec3f[host_cuda_globals.n_vertices];
+    vec3f* host_projected = new vec3f[host_cuda_globals.n_vertices],
+     * host_updated = new vec3f[host_cuda_globals.n_vertices];
     int* host_edges = new int[host_cuda_globals.n_edges * 2];
     int* host_faces = new int[host_cuda_globals.n_faces * 3];
 
     int start = 0;
     cudaMemcpy(host_projected, host_cuda_globals.projected_vertices, sizeof(vec3f) * host_cuda_globals.n_vertices, cudaMemcpyDeviceToHost);
+    cudaMemcpy(host_updated, host_cuda_globals.updated_vertices, sizeof(vec3f) * host_cuda_globals.n_vertices, cudaMemcpyDeviceToHost);
     cudaMemcpy(host_edges, host_cuda_globals.edges, sizeof(int) * host_cuda_globals.n_edges * 2, cudaMemcpyDeviceToHost);
     cudaMemcpy(host_faces, host_cuda_globals.faces, sizeof(int) * host_cuda_globals.n_faces * 3, cudaMemcpyDeviceToHost);
-
+    
     for (int i = 0; i < host_cubes.size(); i++) {
         host_cubes[i].projected = host_projected + start;
+        host_cubes[i].updated = host_updated + start;
         start += host_cubes[i].n_vertices;
         host_cubes[i].edges = host_cubes[i].edges - host_cuda_globals.edges + host_edges;
         host_cubes[i].faces = host_cubes[i].faces - host_cuda_globals.faces + host_faces;
@@ -1237,6 +1240,7 @@ void per_intersection_core(int n_overlaps, luf* culls, i2* overlaps, int vtn, fl
     delete[] host_edges;
     delete[] host_faces;
     delete[] host_projected;
+    delete[] host_updated;
     host_cubes = host_cubes_stashed;
 #endif
 }
