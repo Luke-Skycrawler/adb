@@ -121,7 +121,7 @@ int edge_edge_distance_type(vec3f ea0, vec3f ea1, vec3f eb0, vec3f eb1)
 }
 
 TEST(ipctkref, random_ee) {
-    static const int n_ees = 1;
+    static const int n_ees = 1000;
     array<vec3, 4> ees[n_ees];
     default_random_engine gen;
     uniform_real_distribution<double> dist(0.0, 1.0);
