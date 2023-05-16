@@ -23,6 +23,36 @@ float3 make_float3(float x, float y, float z) {
 #include <thrust/scan.h>
 #include <thrust/execution_policy.h>
 
+
+template <typename T>
+std::vector<T> from_thrust(thrust::device_vector<T> &a)
+{
+    thrust::host_vector<T> b = a;
+    std::vector<T> ret;
+    ret.resize(b.size());
+    for (int i = 0; i < b.size(); i++) {
+        ret[i] = b[i];
+    }
+    return ret;
+}
+
+template <typename T>
+std::vector<T> from_thrust(thrust::host_vector<T>& b)
+{
+    std::vector<T> ret;
+    ret.resize(b.size());
+    for (int i = 0; i < b.size(); i++) {
+        ret[i] = b[i];
+    }
+    return ret;
+}
+
+template <typename T>
+std::vector<T> from_dev_ptr(T * dev_ptr, int n) {
+    thrust::device_vector<T> a(dev_ptr, dev_ptr + n);
+    return from_thrust(a);
+}
+
 #endif
 
 #define CUDA_CALL(x) { const cudaError_t a = (x); if(a != cudaSuccess){ printf("\nCUDA Error: %s (err_num = %d) \n", cudaGetErrorString(a), a); cudaDeviceReset(); assert(0);}}
@@ -221,31 +251,3 @@ __forceinline__ __host__ __device__ bool is_obtuse_triangle(vec3f e0, vec3f e1, 
 
 static const int n_cuda_threads_per_block = 256;
 #define PTR(x) thrust::raw_pointer_cast((x).data())
-
-template <typename T>
-std::vector<T> from_thrust(thrust::device_vector<T> &a)
-{
-    thrust::host_vector<T> b = a;
-    std::vector<T> ret;
-    ret.resize(b.size());
-    for (int i = 0; i < b.size(); i++) {
-        ret[i] = b[i];
-    }
-    return ret;
-}
-template <typename T>
-std::vector<T> from_thrust(thrust::host_vector<T>& b)
-{
-    std::vector<T> ret;
-    ret.resize(b.size());
-    for (int i = 0; i < b.size(); i++) {
-        ret[i] = b[i];
-    }
-    return ret;
-}
-
-template <typename T>
-std::vector<T> from_dev_ptr(T * dev_ptr, int n) {
-    thrust::device_vector<T> a(dev_ptr, dev_ptr + n);
-    return from_thrust(a);
-}
