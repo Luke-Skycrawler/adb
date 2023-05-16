@@ -7,10 +7,11 @@
 struct float3 {
     float x, y, z;
 };
-float3 make_float3(float x, float y, float z) {
+inline float3 make_float3(float x, float y, float z) {
     return { x, y, z };
 }
 #define USE_DOUBLE_PRECISION
+#include <cmath>
 #else 
 #include <cuda_runtime.h>
 #include "device_launch_parameters.h"

@@ -3,7 +3,7 @@
 
 
 inline __host__ __device__ vec3f linerp(vec3f pt1, vec3f pt0, float t){
-    return t * pt1 + (1.0f - t) * pt0;
+    return pt1 * t + pt0 * (1.0f - t);
 }
 inline __host__ __device__ Facef linerp(Facef tt1, Facef tt0, float t) {
     return Facef {
@@ -20,10 +20,10 @@ inline __host__ __device__ Edgef linerp(Edgef et1, Edgef et0, float t) {
 }
 
 __host__ __device__ void cubic_binomial (float a[3], float b[3], float ret_polynomial[4]){
-    polynomial[0] += b[0] * b[1] * b[2];
-    polynomial[1] += a[0] * b[1] * b[2] + b[0] * b[1] * a[2] + b[0] * a[1] * b[2];
-    polynomial[2] += a[0] * a[1] * b[2] + b[0] * a[1] * a[2] + a[0] * b[1] * a[2];
-    polynomial[3] += a[0] * a[1] * a[2];
+    ret_polynomial[0] += b[0] * b[1] * b[2];
+    ret_polynomial[1] += a[0] * b[1] * b[2] + b[0] * b[1] * a[2] + b[0] * a[1] * b[2];
+    ret_polynomial[2] += a[0] * a[1] * b[2] + b[0] * a[1] * a[2] + a[0] * b[1] * a[2];
+    ret_polynomial[3] += a[0] * a[1] * a[2];
 }
 
 __forceinline__ int rc_3(int i, int j) {
@@ -83,6 +83,7 @@ __host__ __device__ void det_polynomial(
     for (int i = 0; i < 4; i++) ret_polynomial[i] = pos_polynomial[i] - neg_polynomial[i];
 }
 
+__host__ __device__ int cubic_roots(float roots[3], float coef[4], float x0, float x1);
 
 
 int build_and_solve_4_points_coplanar(
@@ -100,9 +101,9 @@ int build_and_solve_4_points_coplanar(
 {
 
     float a1[9] {
-        pt_t1.x - p1_t0.x, pt_t1.y - p1_t0.y, pt_t1.z - p1_t0.z,
-        pt_t2.x - p2_t0.x, pt_t2.y - p2_t0.y, pt_t2.z - p2_t0.z,
-        pt_t3.x - p3_t0.x, pt_t3.y - p3_t0.y, pt_t3.z - p3_t0.z
+        p1_t1.x - p1_t0.x, p1_t1.y - p1_t0.y, p1_t1.z - p1_t0.z,
+        p2_t1.x - p2_t0.x, p2_t1.y - p2_t0.y, p2_t1.z - p2_t0.z,
+        p3_t1.x - p3_t0.x, p3_t1.y - p3_t0.y, p3_t1.z - p3_t0.z
     },
     a2[9] {
         p0_t1.x - p0_t0.x, p0_t1.y - p0_t0.y, p0_t1.z - p0_t0.z,
@@ -161,7 +162,7 @@ __device__ __host__ bool _cross(const Edgef &ei, const Edgef &ej){
     auto vei = ei.e1 - ei.e0;
     auto vej0 = ej.e0 - ei.e0;
     auto vej1 = ej.e1 - ei.e0;
-    return (cross(vei, vej0), cross(vei, vej1)) < 0.0f;
+    return dot(cross(vei, vej0), cross(vei, vej1)) < 0.0f;
 }
 
 __device__ __host__ bool verify_root_ee(
@@ -172,18 +173,18 @@ __device__ __host__ bool verify_root_ee(
 }
 
 __forceinline__ __device__ __host__ bool inside(const Facef &f, const vec3f &p) {
-    auto f01 = cross(t0 - p, t1- p);
-    auto f12 = cross(t1 - p, t2- p);
-    auto f20 = cross(t2 - p, t0- p);
+    auto f01 = cross(f.t0 - p, f.t1- p);
+    auto f12 = cross(f.t1 - p, f.t2- p);
+    auto f20 = cross(f.t2 - p, f.t0- p);
     return dot(f01, f12) >= 0.0f && dot(f12, f20) >= 0.0f;
 }
 
-__device__ __host__ verify_root_pt(
+__device__ __host__ bool verify_root_pt(
     const vec3f &p, const Facef &f
  ) {
-    auto n = f.unit_normal();
+    auto n = unit_normal(f);
     double d = dot(n, p - f.t0);
-    auto v = p - d * n;
+    auto v = p - n * d;
     return inside(f, v);
  }
 __device__ __host__ float pt_collision_time(
@@ -195,6 +196,7 @@ __device__ __host__ float pt_collision_time(
     float roots[3];
     int found = build_and_solve_4_points_coplanar(p0, t0.t0, t0.t1, t0.t2, p1, t1.t0, t1.t1, t1.t2, roots);
     bool true_root = false;
+    float root;
     for (int i = 0; i < found && !true_root; i ++) {
         root = roots[i];
         true_root = verify_root_pt(linerp(p1, p0, root), linerp(t1, t0, root));
@@ -218,7 +220,7 @@ __device__ __host__ float ee_collision_time(
     bool true_root = false;
     for (int i = 0; i < found && !true_root; i ++) {
         root = roots[i];
-        true_root = verify_root_ee(linerp(ei1, ei0, root), lerp(ej1, ej0, root));
+        true_root = verify_root_ee(linerp(ei1, ei0, root), linerp(ej1, ej0, root));
     }
     return found && true_root? root: 1.0f;
 }

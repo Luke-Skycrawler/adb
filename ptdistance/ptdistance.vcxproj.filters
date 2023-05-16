@@ -1,0 +1,32 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup>
+    <ClCompile Include="..\model\geometry.cpp" />
+    <ClCompile Include="test.cpp" />
+    <ClCompile Include="pch.cpp" />
+    <ClCompile Include="..\model\collision.cpp" />
+    <ClCompile Include="..\model\cubic_roots.cu">
+      <Filter>cuda</Filter>
+    </ClCompile>
+    <ClCompile Include="..\model\ccd_toi.cu">
+      <Filter>cuda</Filter>
+    </ClCompile>
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="..\model\affine_body.h" />
+    <ClInclude Include="..\model\geometry.h" />
+    <ClInclude Include="pch.h" />
+    <ClInclude Include="..\model\collision.h" />
+    <ClInclude Include="..\model\cuda_header.cuh">
+      <Filter>cuda</Filter>
+    </ClInclude>
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="packages.config" />
+  </ItemGroup>
+  <ItemGroup>
+    <Filter Include="cuda">
+      <UniqueIdentifier>{14a9becf-25f1-4833-b114-9048dc01a6dd}</UniqueIdentifier>
+    </Filter>
+  </ItemGroup>
+</Project>

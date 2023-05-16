@@ -42,11 +42,12 @@
   </PropertyGroup>
   <ItemGroup>
     <ClInclude Include="..\model\affine_body.h" />
-    <ClInclude Include="..\model\cuda_glue.h" />
+    <ClInclude Include="..\model\collision.h" />
     <ClInclude Include="..\model\geometry.h" />
     <ClInclude Include="pch.h" />
   </ItemGroup>
   <ItemGroup>
+    <ClCompile Include="..\model\collision.cpp" />
     <ClCompile Include="..\model\geometry.cpp">
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|x64'">NotUsing</PrecompiledHeader>
     </ClCompile>
@@ -59,6 +60,15 @@
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
+    <ClCompile Include="..\model\ccd_toi.cu">
+      <FileType>CppCode</FileType>
+    </ClCompile>
+    <ClCompile Include="..\model\cubic_roots.cu">
+      <FileType>CppCode</FileType>
+    </ClCompile>
+    <ClInclude Include="..\model\cuda_header.cuh">
+      <FileType>CppHeader</FileType>
+    </ClInclude>
     <None Include="packages.config" />
   </ItemGroup>
   <ItemDefinitionGroup />
@@ -115,7 +125,7 @@
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
     <ClCompile>
-      <PrecompiledHeader>Use</PrecompiledHeader>
+      <PrecompiledHeader>NotUsing</PrecompiledHeader>
       <PrecompiledHeaderFile>pch.h</PrecompiledHeaderFile>
       <PreprocessorDefinitions>X64;NDEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <RuntimeLibrary>MultiThreadedDLL</RuntimeLibrary>

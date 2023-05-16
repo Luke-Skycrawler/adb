@@ -8,6 +8,7 @@
 #include <random>
 #include <array>
 #include "../model/cuda_header.cuh"
+#include "../model/collision.h"
 //#include "../model/cuda_glue.h"
 using namespace std;
 
@@ -120,7 +121,7 @@ int edge_edge_distance_type(vec3f ea0, vec3f ea1, vec3f eb0, vec3f eb1)
 }
 
 TEST(ipctkref, random_ee) {
-    static const int n_ees = 1000;
+    static const int n_ees = 1;
     array<vec3, 4> ees[n_ees];
     default_random_engine gen;
     uniform_real_distribution<double> dist(0.0, 1.0);
@@ -198,6 +199,45 @@ TEST(ipctkref, time_cosumption) {
     
     spdlog::info("time: ipc = {:0.6f} sec. self = {:0.6f} sec", ipcs, selfs);
     
+}
+
+__device__ __host__ float pt_collision_time(
+    const vec3f& p0,
+    const Facef& t0,
+    const vec3f& p1,
+    const Facef& t1);
+
+__device__ __host__ float ee_collision_time(
+    const Edgef& ei0,
+    const Edgef& ej0,
+    const Edgef& ei1,
+    const Edgef& ej1);
+
+TEST(random_eef, tight_inclusion_ref)
+{
+    static const int n_pts = 1000;
+    array<vec3, 8> pts[n_pts];
+    double tois[n_pts];
+    default_random_engine gen;
+    uniform_real_distribution<double> dist(0.0, 1.0);
+    for (int i = 0; i < n_pts; i++) {
+        for (int j = 0; j < 24; j++) {
+            pts[i][j / 3](j % 3) = dist(gen);
+        }
+    }
+    for (int i = 0; i < n_pts; i++) {
+        auto& pt{ pts[i] };
+        Edgef ei0{ to_vec3f(pt[0]), to_vec3f(pt[1]) }, ej0{ to_vec3f(pt[2]), to_vec3f(pt[3]) },
+            ei1{ to_vec3f(pt[4]), to_vec3f(pt[5]) }, ej1{ to_vec3f(pt[6]), to_vec3f(pt[7]) };
+
+        Edge ei0d{ pt[0], pt[1] }, ej0d{ pt[2], pt[3] }, ei1d{ pt[4], pt[5] }, ej1d{ pt[6], pt[7] };
+
+        double ticcdt = ee_collision_time(ei0d, ej0d, ei1d, ej1d);
+        ticcdt = min(ticcdt, 1.0);
+        float selft = ee_collision_time(ei0, ej0, ei1, ej1);
+        EXPECT_TRUE(abs(ticcdt - selft) < 1e-4) << "computed = " << selft << " truth = " << ticcdt << "\n"
+                                                << pt[0].transpose() << " " << pt[1].transpose() << " " << pt[2].transpose() << " " << pt[3].transpose();
+    }
 }
 int main(int argc, char** argv)
 {

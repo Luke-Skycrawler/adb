@@ -1,4 +1,6 @@
 #include "pch.h"
+#include "../model/cuda_header.cuh"
+#include <cmath>
 #include "../model/affine_body.h"
 #include "../model/collision.h"
 #include <random>
