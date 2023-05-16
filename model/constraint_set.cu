@@ -795,3 +795,175 @@ void cuda_ipc_glue()
     }
     lt = lt_stashed;
 }
+
+
+inline __host__ __device__ vec3f linerp(vec3f pt1, vec3f pt0, float t){
+    return t * pt1 + (1.0f - t) * pt0;
+}
+inline __host__ __device__ Facef linerp(Facef tt1, Facef tt0, float t) {
+    return Facef {
+        linerp(tt1.t0, tt0.t0, t),
+        linerp(tt1.t1, tt0.t1, t),
+        linerp(tt1.t2, tt0.t2, t),
+    };
+}
+inline __host__ __device__ Edgef linerp(Edgef et1, Edgef et0, float t) {
+    return Edgef {
+        linerp(et1.e0, et0.e0, t),
+        linerp(et1.e1, et0.e1, t),
+    };
+}
+
+__host__ __device__ void cubic_binomial (float a[3], float b[3], float ret_polynomial[4]){
+    polynomial[0] += b[0] * b[1] * b[2];
+    polynomial[1] += a[0] * b[1] * b[2] + b[0] * b[1] * a[2] + b[0] * a[1] * b[2];
+    polynomial[2] += a[0] * a[1] * b[2] + b[0] * a[1] * a[2] + a[0] * b[1] * a[2];
+    polynomial[3] += a[0] * a[1] * a[2];
+}
+
+__forceinline__ int rc_3(int i, int j) {
+    return 3 * j + i;
+}
+__host__ __device__ void det_polynomial(
+    // const mat3& a, const mat3& b
+    float *a, float *b, float *ret_polynomial
+)
+{
+    float pos_polynomial[4]{ 0.0 }, neg_polynomial[4]{ 0.0 };
+    float c11c22c33[2][3]{
+        { a[rc_3(0, 0)], a[rc_3(1, 1)], a[rc_3(2, 2)] },
+        { b[rc_3(0, 0)], b[rc_3(1, 1)], b[rc_3(2, 2)] }
+    },
+        c12c23c31[2][3]{
+            { a[rc_3(0, 1)], a[rc_3(1, 2)], a[rc_3(2, 0)] },
+            { b[rc_3(0, 1)], b[rc_3(1, 2)], b[rc_3(2, 0)] }
+        },
+        c13c21c32[2][3]{
+            { a[rc_3(0, 2)], a[rc_3(1, 0)], a[rc_3(2, 1)] },
+            { b[rc_3(0, 2)], b[rc_3(1, 0)], b[rc_3(2, 1)] }
+        };
+    float c11c23c32[2][3]{
+        { a[rc_3(0, 0)], a[rc_3(1, 2)], a[rc_3(2, 1)] }, { b[rc_3(0, 0)], b[rc_3(1, 2)], b[rc_3(2, 1)] }
+    },
+        c12c21c33[2][3]{
+            { a[rc_3(0, 1)], a[rc_3(1, 0)], a[rc_3(2, 2)] }, { b[rc_3(0, 1)], b[rc_3(1, 0)], b[rc_3(2, 2)] }
+        },
+        c13c22c31[2][3]{
+            { a[rc_3(0, 2)], a[rc_3(1, 1)], a[rc_3(2, 0)] }, { b[rc_3(0, 2)], b[rc_3(1, 1)], b[rc_3(2, 0)] }
+        };
+    cubic_binomial(
+        c11c22c33[0],
+        c11c22c33[1],
+        pos_polynomial);
+    cubic_binomial(
+        c12c23c31[0],
+        c12c23c31[1],
+        pos_polynomial);
+    cubic_binomial(
+        c13c21c32[0],
+        c13c21c32[1],
+        pos_polynomial);
+    cubic_binomial(
+        c11c23c32[0],
+        c11c23c32[1],
+        neg_polynomial);
+    cubic_binomial(
+        c12c21c33[0],
+        c12c21c33[1],
+        neg_polynomial);
+    cubic_binomial(
+        c13c22c31[0],
+        c13c22c31[1],
+        neg_polynomial);
+    for (int i = 0; i < 4; i++) ret_polynomial[i] = pos_polynomial[i] - neg_polynomial[i];
+}
+
+
+
+int build_and_solve_4_points_coplanar(
+    const vec3f& p0_t0,
+    const vec3f& p1_t0,
+    const vec3f& p2_t0,
+    const vec3f& p3_t0,
+
+    const vec3f& p0_t1,
+    const vec3f& p1_t1,
+    const vec3f& p2_t1,
+    const vec3f& p3_t1,
+
+    float roots[3])
+{
+    mat3 a1, a2, a3, a4;
+    mat3 b1, b2, b3, b4;
+
+    b1 << p1_t0, p2_t0, p3_t0;
+    b2 << p0_t0, p2_t0, p3_t0;
+    b3 << p0_t0, p1_t0, p3_t0;
+    b4 << p0_t0, p1_t0, p2_t0;
+
+    a1 << p1_t1, p2_t1, p3_t1;
+    a2 << p0_t1, p2_t1, p3_t1;
+    a3 << p0_t1, p1_t1, p3_t1;
+    a4 << p0_t1, p1_t1, p2_t1;
+
+    a1 -= b1;
+    a2 -= b2;
+    a3 -= b3;
+    a4 -= b4;
+
+    float a1[9] {
+        pt_t1.x - p1_t0.x, pt_t1.y - p1_t0.y, pt_t1.z - p1_t0.z,
+        pt_t2.x - p2_t0.x, pt_t2.y - p2_t0.y, pt_t2.z - p2_t0.z,
+        pt_t3.x - p3_t0.x, pt_t3.y - p3_t0.y, pt_t3.z - p3_t0.z
+    },
+    a2[9] {
+        p0_t1.x - p0_t0.x, p0_t1.y - p0_t0.y, p0_t1.z - p0_t0.z,
+        p2_t1.x - p2_t0.x, p2_t1.y - p2_t0.y, p2_t1.z - p2_t0.z,
+        p3_t1.x - p3_t0.x, p3_t1.y - p3_t0.y, p3_t1.z - p3_t0.z
+    }, 
+    a3[9] {
+        p0_t1.x - p0_t0.x, p0_t1.y - p0_t0.y, p0_t1.z - p0_t0.z,
+        p1_t1.x - p1_t0.x, p1_t1.y - p1_t0.y, p1_t1.z - p1_t0.z,
+        p3_t1.x - p3_t0.x, p3_t1.y - p3_t0.y, p3_t1.z - p3_t0.z
+    },
+    a4[9] {
+        p0_t1.x - p0_t0.x, p0_t1.y - p0_t0.y, p0_t1.z - p0_t0.z,
+        p1_t1.x - p1_t0.x, p1_t1.y - p1_t0.y, p1_t1.z - p1_t0.z,
+        p2_t1.x - p2_t0.x, p2_t1.y - p2_t0.y, p2_t1.z - p2_t0.z
+    };
+    float b1[9] {
+        p1_t0.x, p1_t0.y, p1_t0.z,
+        p2_t0.x, p2_t0.y, p2_t0.z,
+        p3_t0.x, p3_t0.y, p3_t0.z
+    }, 
+    b2[9] {
+        p0_t0.x, p0_t0.y, p0_t0.z,
+        p2_t0.x, p2_t0.y, p2_t0.z,
+        p3_t0.x, p3_t0.y, p3_t0.z
+    },
+    b3[9] {
+        p0_t0.x, p0_t0.y, p0_t0.z,
+        p1_t0.x, p1_t0.y, p1_t0.z,
+        p3_t0.x, p3_t0.y, p3_t0.z
+    },
+    b4[9] {
+        p0_t0.x, p0_t0.y, p0_t0.z,
+        p1_t0.x, p1_t0.y, p1_t0.z,
+        p2_t0.x, p2_t0.y, p2_t0.z
+    }; 
+    
+    float ret_polynomial[4] {0.0f};
+    float tmp_polynomial[4] {0.0f};
+
+    det_polynomial(a1, b1, ret_polynomial);
+    det_polynomial(a2, b2, tmp_polynomial);
+    for (int i = 0 ; i < 4; i ++) ret_polynomial[i] -= tmp_polynomial[i];
+    det_polynomial(a3, b3, tmp_polynomial);
+    for (int i = 0 ; i < 4; i ++) ret_polynomial[i] += tmp_polynomial[i];
+    det_polynomial(a4, b4, tmp_polynomial);
+    for (int i = 0 ; i < 4; i ++) ret_polynomial[i] -= tmp_polynomial[i];
+
+    double root = 1.0;
+    int found = cubic_roots(roots, ret_polynomial, 0.0, 1.0);
+    return found;
+}
