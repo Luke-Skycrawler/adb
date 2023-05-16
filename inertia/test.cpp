@@ -71,6 +71,42 @@ __host__ __device__ void orthogonal_grad(float3 q[4], float dt, float ret[12])
         ret[i * 3 + 2] = g.z;
     }
 }
+struct double3 {
+    double x, y, z;
+};
+double3 operator+(double3 a, double3 b) {
+    return double3 {
+        a.x + b.x,
+        a.y + b.y,
+        a.z + b.z
+    };
+}
+double dot(double3 a, double3 b) {
+    return a.x * b.x + a.y * b.y + a.z * b.z;
+}
+double3 operator*(double3 a, double b) {
+    return double3 {
+        a.x * b,
+        a.y * b,
+        a.z * b
+    };
+}
+__host__ __device__ void orthogonal_grad(double3 q[4], double dt, double ret[12])
+{
+    auto h2 = dt * dt;
+    ret[0] = ret[1] = ret[2] = 0.0;
+    for (int i = 1; i < 4; i++) {
+        double3 g {0.0, 0.0, 0.0};
+        for (int j = 1; j < 4; j++) {
+            g = g + q[j] * (dot(q[i], q[j]) - (i == j ? 1.0 : 0.0));
+        }
+
+        g = g * (4 * kappa * h2);
+        ret[i * 3 + 0] = g.x;
+        ret[i * 3 + 1] = g.y;
+        ret[i * 3 + 2] = g.z;
+    }
+}
 
 __host__ __device__ void orthogonal_hess(float3 q[4], float dt, float ret[144])
 {
@@ -203,15 +239,24 @@ protected:
 };
 TEST_F(inertiaTest, test_against_ref) {
     float *ret = new float [12];
+    double ret_double[12];
     for (int i = 0; i < n_cubes; i ++) {
         auto &c {*cubes[i]};
         const float dt = 1e-2;
         auto g_ref = othogonal_energy::grad (c.q) * dt *dt;
-
+        for (int j = 0; j < 12; j++) {
+            ret[j] = 0;
+            ret_double[j] = 0;
+        }
+        double3 q[4];
+        for (int i = 0; i < 4; i++) q[i] = { c.q[i][0], c.q[i][1], c.q[i][2] };
         orthogonal_grad(cabds[i].q, dt, ret);
+        orthogonal_grad(q, 1e-2, ret_double);
         vec12 g_act = Map<Vector<float, 12>>(ret).cast<double>();
-        //EXPECT_TRUE(g_ref.isApprox(g_act, 1e-3)) << "\nref " << g_ref.transpose() << " \n act " << g_act.transpose() ;
-        EXPECT_TRUE((g_ref - g_act).norm() < 1e-1) << "\nref " << g_ref.transpose() << " \n act " << g_act.transpose();
+        vec12 g_double = Map<vec12>(ret_double);
+        // EXPECT_TRUE(g_ref.isApprox(g_act, 1e-3)) << "\nref norm = " << g_ref.norm() << " \n diff norm = " << (g_act - g_ref).norm();
+        EXPECT_TRUE(g_ref.isApprox(g_double, 1e-3)) << "\nref norm = " << g_ref.norm() << " \n diff norm = " << (g_double - g_ref).norm();
+        //EXPECT_TRUE((g_ref - g_act).norm() < 1e-1) << "\nref " << g_ref.transpose() << " \n act " << g_act.transpose();
     }
     delete[] ret;
 }

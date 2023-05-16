@@ -209,16 +209,26 @@ __global__ void inertia_grad_hess_kernel(int n_cubes, cudaAffineBody *cubes, flo
         int i = tid * n_tasks_per_thread + _i;
         if (i < n_cubes) {
             auto& c{ cubes[i] };
-            for (int j = 0; j < 4; j++) {
-                c.q_update[j] = c.q[j];
+            if (c.mass < 0) {
+                for (int k = 0; k < 144; k++) {
+                    diag[k + 144 * i] = k % 13 == 0 ? 1.0f : 0.0f;
+                }
+                for (int k = 0; k < 12; k++) {
+                    b[k + 12 * i] = 0.0f;
+                }
             }
-            float g12[12]{ 0.0 };
-            orthogonal_grad(c.q, dt, g12);
-            inertia_grad(c, dt, g12);
-            for (int j = 0; j < 12; j++) b[j + 12 * i] = g12[j];
+            else {
+                for (int j = 0; j < 4; j++) {
+                    c.q_update[j] = c.q[j];
+                }
+                float g12[12]{ 0.0 };
+                orthogonal_grad(c.q, dt, g12);
+                inertia_grad(c, dt, g12);
+                for (int j = 0; j < 12; j++) b[j + 12 * i] = g12[j];
 
-            orthogonal_hess(c.q, dt, diag + 144 * i);
-            inertia_hess(c, diag + 144 * i);
+                orthogonal_hess(c.q, dt, diag + 144 * i);
+                inertia_hess(c, diag + 144 * i);
+            }
         }
     }
 }

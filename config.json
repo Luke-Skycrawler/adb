@@ -7,7 +7,7 @@
     "predefined_case" : {
         "enable": false,
         "id" : 2,
-        "custom": "../test_cases/case.json"
+        "custom": "../test_cases/friction_pt.json"
     },
     "solver": "sparse",
     "gravity": true, 
@@ -15,7 +15,7 @@
     "col_set": true,
     "ee": false,
     "pt": true,
-    "ground": true,
+    "ground": false,
     "safe_factor": 1.0,
     "uppper_bound": true, 
     "mu": 0.0,
@@ -69,9 +69,9 @@
         "cuda_direct": 0,
         "strict": 0,
         "gen_sm_test": 1,
-        "cuda_solver": 0,
-        "solve_with_cuda_matrix": 1,
-        "cuda_hess": 0,
+        "cuda_solver": 1,
+        "solve_with_cuda_matrix": 0,
+        "cuda_hess": 1,
         "cuda_intersection": 0,
         "cuda_pt": 1,
         "cuda_pt_direct": 0,
@@ -80,6 +80,7 @@
         "ipc_cpu_debug": 0,
         "test_placeholder": 0,
         "pt_enable": 1,
-        "ee_enable": 0
+        "ee_enable": 0,
+        "submat_compare": 1
     }
 }

@@ -1,7 +1,7 @@
 #include "cuda_globals.cuh"
 #include "autogen/autogen.cuh"
 
-static __constant__ float kappa = 1e9f, dt = 1e-2f;
+static __constant__ float kappa = 1e9f, dt_static = 1e-2f;
 
 
 __device__ luf intersection(const luf& a, const luf& b)

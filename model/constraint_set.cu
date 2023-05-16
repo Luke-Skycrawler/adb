@@ -464,7 +464,7 @@ __global__ void put_inertia_kernel(
 
             for (int c = 0; c < 12; c++)
                 for (int r =0; r < 12; r ++) {
-                    values[offset + c * stride + r] += diag[c * 12 + r];
+                    values[offset + c * stride + r] += diag[I * 144 + c * 12 + r];
                 }
             // grad is already added to globals.b
         }
