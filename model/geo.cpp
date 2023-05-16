@@ -230,7 +230,7 @@ tuple<mat12, vec12> ipc_hess_pt_12x12(
     // overtime babysitting
 
     if (globals.params_int["cuda_ipc_term"]) {
-        if (pt_type == ipc::PointTriangleDistanceType::P_T) {
+        if (true) {
             float g[12], h [144];
             vec3f ptf[4];
             for (int i =0; i < 4;i++) 

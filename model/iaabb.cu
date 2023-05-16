@@ -705,7 +705,7 @@ float iaabb_brute_force_cuda_pt_only(
     }
     delete[] plist;
     delete[] blist;
-    return 1.0;
+    return ret_toi;
 }
 
 __global__ void strided_memset_kernel(
@@ -1181,7 +1181,7 @@ void per_intersection_core(int n_overlaps, luf* culls, i2* overlaps, int vtn, fl
             else
                 toi_decision_kernel<<<1, n_cuda_threads_per_block, 0, stream>>>(ret_ij, ret_cnt, vifjs, nvi, ret_toi);
             if (vtn == 3 && type == 2) {
-                cudaMemcpyAsync(toi_by_type, ret_toi - 2, sizeof(float), cudaMemcpyDeviceToHost, stream);
+                cudaMemcpyAsync(toi_by_type, ret_toi - 2, sizeof(float) * 3, cudaMemcpyDeviceToHost, stream);
             }
             CUDA_CALL(cudaGetLastError());
             CUDA_CALL(cudaStreamSynchronize(stream));

@@ -1295,6 +1295,18 @@ double iaabb_brute_force(
             spdlog::warn("size : ref = {}, lut = {}, intersection(ref, lut) = {}", ref.size(), lut.size(), ref_it.size());
         }
     }
+    toi = primitive_brute_force(n_cubes, ret, cubes, vtn,
+#ifdef TESTING
+        pt_tois, ee_tois,
+#ifndef _BODY_WISE_
+        globals,
+#endif
+#endif
+        pts,
+        idx,
+        ees,
+        eidx,
+        vidx);
     if (globals.params_int["cuda_pt"] && vtn != 3) {
         vector<array<int, 4>> idx_cuda, int_ref;
         for (int i = 0; i < n_cubes; i++) {
@@ -1309,7 +1321,7 @@ double iaabb_brute_force(
         }
         cudaMemcpy(host_cuda_globals.cubes, host_cuda_globals.host_cubes.data(), sizeof(cudaAffineBody) * n_cubes, cudaMemcpyHostToDevice);
         project_glue(vtn);
-        iaabb_brute_force_cuda_pt_only(n_cubes, host_cuda_globals.cubes, host_cuda_globals.aabbs, vtn, idx_cuda);
+        float toi = iaabb_brute_force_cuda_pt_only(n_cubes, host_cuda_globals.cubes, host_cuda_globals.aabbs, vtn, idx_cuda);
 
         bool compare = true;
         if (compare) {
@@ -1323,18 +1335,6 @@ double iaabb_brute_force(
         }
         if (globals.params_int["cuda_pt_direct"]) idx = idx_cuda;
     }
-    toi = primitive_brute_force(n_cubes, ret, cubes, vtn,
-#ifdef TESTING
-        pt_tois, ee_tois,
-#ifndef _BODY_WISE_
-        globals,
-#endif
-#endif
-        pts,
-        idx,
-        ees,
-        eidx,
-        vidx);
     auto t = DURATION_TO_DOUBLE(start);
     spdlog::info("time: {} = {:0.6f} ms", vtn == 3 ? "iaabb upper bound" : "iAABB", t * 1000);
     return toi;
