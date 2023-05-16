@@ -967,3 +967,70 @@ int build_and_solve_4_points_coplanar(
     int found = cubic_roots(roots, ret_polynomial, 0.0, 1.0);
     return found;
 }
+
+
+__device__ __host__ bool _cross(const Edgef &ei, const Edgef &ej){
+    auto vei = ei.e1 - ei.e0;
+    auto vej0 = ej.e0 - ei.e0;
+    auto vej1 = ej.e1 - ei.e0;
+    return (cross(vei, vej0), cross(vei, vej1)) < 0.0f;
+}
+
+__device__ __host__ bool verify_root_ee(
+    const Edgef &ei, 
+    const Edgef &ej
+) {
+    return _cross(ei, ej) && _cross(ej, ei);
+}
+
+__forceinline__ __device__ __host__ bool inside(const Facef &f, const vec3f &p) {
+    auto f01 = cross(t0 - p, t1- p);
+    auto f12 = cross(t1 - p, t2- p);
+    auto f20 = cross(t2 - p, t0- p);
+    return dot(f01, f12) >= 0.0f && dot(f12, f20) >= 0.0f;
+}
+
+__device__ __host__ verify_root_pt(
+    const vec3f &p, const Facef &f
+ ) {
+    auto n = f.unit_normal();
+    double d = dot(n, p - f.t0);
+    auto v = p - d * n;
+    return inside(f, v);
+ }
+__device__ __host__ float pt_collision_time(
+    const vec3f &p0,
+    const Facef &t0, 
+    const vec3f &p1,
+    const Facef &t1
+){
+    float roots[3];
+    int found = build_and_solve_4_points_coplanar(p0, t0.t0, t0.t1, t0.t2, p1, t1.t0, t1.t1, t1.t2, roots);
+    bool true_root = false;
+    for (int i = 0; i < found && !true_root; i ++) {
+        root = roots[i];
+        true_root = verify_root_pt(linerp(p1, p0, root), linerp(t1, t0, root));
+    }
+    return found && true_root? root: 1.0f;
+}
+
+__device__ __host__ float ee_collision_time(
+    const Edgef &ei0, 
+    const Edgef &ej0,
+    const Edgef &ei1,
+    const Edgef &ej1
+){
+    float roots[3];
+    int found = build_and_solve_4_points_coplanar(
+        ei0.e0, ei0.e1, ej0.e0, ej0.e1,
+        ei1.e0, ei1.e1, ej1.e0, ej1.e1,
+        roots
+    );
+    float root = 1.0f;
+    bool true_root = false;
+    for (int i = 0; i < found && !true_root; i ++) {
+        root = roots[i];
+        true_root = verify_root_ee(linerp(ei1, ei0, root), lerp(ej1, ej0, root));
+    }
+    return found && true_root? root: 1.0f;
+}
