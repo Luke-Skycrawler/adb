@@ -120,12 +120,30 @@
   </ItemDefinitionGroup>
   <ItemGroup>
     <CudaCompile Include="..\model\autogen\mollifier.cu" />
-    <CudaCompile Include="..\model\constraint_set.cu" />
-    <CudaCompile Include="..\model\euler.cu" />
-    <CudaCompile Include="..\model\iaabb.cu" />
-    <CudaCompile Include="..\model\solver.cu" />
-    <CudaCompile Include="..\model\utils.cu" />
-    <CudaCompile Include="kernel.cu" />
+    <CudaCompile Include="..\model\ccd_toi.cu">
+      <FileType>CppCode</FileType>
+    </CudaCompile>
+    <CudaCompile Include="..\model\constraint_set.cu">
+      <FileType>CppCode</FileType>
+    </CudaCompile>
+    <CudaCompile Include="..\model\cubic_roots.cu">
+      <FileType>CppCode</FileType>
+    </CudaCompile>
+    <CudaCompile Include="..\model\euler.cu">
+      <FileType>CppCode</FileType>
+    </CudaCompile>
+    <CudaCompile Include="..\model\iaabb.cu">
+      <FileType>CppCode</FileType>
+    </CudaCompile>
+    <CudaCompile Include="..\model\solver.cu">
+      <FileType>CppCode</FileType>
+    </CudaCompile>
+    <CudaCompile Include="..\model\utils.cu">
+      <FileType>CppCode</FileType>
+    </CudaCompile>
+    <CudaCompile Include="kernel.cu">
+      <FileType>CppCode</FileType>
+    </CudaCompile>
     <ClCompile Include="..\iAABB\finitediff.cpp" />
     <ClCompile Include="..\model\affine_obj.cpp" />
     <CudaCompile Include="..\model\autogen\line_line.cu">

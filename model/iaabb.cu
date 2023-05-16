@@ -28,7 +28,7 @@ __device__ __host__ luf compute_aabb(const Facef& f, float d_hat_sqrt);
 __device__ __host__ luf compute_aabb(const Edgef& e, float d_hat_sqrt);
 
 //tuple<float, PointTriangleDistanceType> vf_distance(vec3f vf, Facef ff);
-void per_intersection_core(int n_overlaps, luf* culls, i2* overlaps, int vtn);
+void per_intersection_core(int n_overlaps, luf* culls, i2* overlaps, int vtn, float* toi = nullptr);
 
 /* NOTE: kernel argument convention:
     buf_: device buffer
@@ -147,6 +147,48 @@ __global__ void toi_decision_kernel(
     }
 }
 
+__device__ __host__ float pt_collision_time(
+    const vec3f& p0,
+    const Facef& t0,
+    const vec3f& p1,
+    const Facef& t1);
+
+__device__ __host__ float ee_collision_time(
+    const Edgef& ei0,
+    const Edgef& ej0,
+    const Edgef& ei1,
+    const Edgef& ej1);
+
+__global__ void toi_decision_kernel(
+    i2* ij,
+    int* cnt,
+    vec3f* vifjs,
+    int nvi,
+    float* ret_toi)
+{
+    int n_tasks = *cnt;
+    int tid = threadIdx.x + blockIdx.x * blockDim.x;
+    int n_task_per_thread = (n_tasks + blockDim.x - 1) / blockDim.x;
+    __shared__ float tois[n_cuda_threads_per_block];
+    tois[tid] = 1.0f;
+    for (int _i = 0; _i < n_task_per_thread; _i++) {
+        auto idx = tid * n_task_per_thread + _i;
+        if (idx < n_tasks) {
+            auto pt0{ vifjs[idx * 2] };
+            auto pt1{ vifjs[idx * 2 + 1] };
+            Facef tt0{ vifjs[idx * 6 + nvi * 2], vifjs[idx * 6 + 1 + nvi * 2], vifjs[idx * 6 + 2 + nvi * 2] };
+            Facef tt1{ vifjs[idx * 6 + nvi * 2 + 3], vifjs[idx * 6 + nvi * 2 + 4], vifjs[idx * 6 + nvi * 2 + 5] };
+            auto toi = pt_collision_time(pt0, tt0, pt1, tt1);
+            tois[tid] = CUDA_MIN(tois[tid], toi);
+        }
+    }
+    __syncthreads();
+    if (tid == 0)
+        for (int i = 1; i < n_cuda_threads_per_block; i++) {
+            tois[0] = CUDA_MIN(tois[0], tois[i]);
+        }
+    *ret_toi = tois[0];
+}
 __global__ void filter_distance_kernel_atomic(i2* buf_ij, i2* io_tmp,
     int* io_cnt, 
     vec3f* vis, Facef* fjs,
@@ -647,7 +689,8 @@ float iaabb_brute_force_cuda_pt_only(
     CUDA_CALL(cudaDeviceSynchronize());
     make_lut(n_overlaps, overlaps);
 
-    per_intersection_core(n_overlaps, culls, overlaps, vtn);
+    float ret_toi = 1.0f;
+    per_intersection_core(n_overlaps, culls, overlaps, vtn, &ret_toi);
 
     lt_back = stashed_lt_back;
 
@@ -850,7 +893,7 @@ __global__ void prepare_aabb_vi_fj_kernel(
     }
 }
 
-void per_intersection_core(int n_overlaps, luf* culls, i2* overlaps, int vtn)
+void per_intersection_core(int n_overlaps, luf* culls, i2* overlaps, int vtn, float* toi)
 {
 #define PT_ONLY
 #ifdef PT_ONLY
@@ -1034,6 +1077,7 @@ void per_intersection_core(int n_overlaps, luf* culls, i2* overlaps, int vtn)
         int nvifj, nvjfi, neiej;
         int *host_cnts[3], cnt[3];
         i2 *vifj_ptr, *vjfi_ptr, *eiej_ptr;
+        float toi_by_type[3];
         for (int type = 0; type < MAX_TYPES; type++) {
             // vi fj, vj fi, ei ej (i < j)
 
@@ -1123,14 +1167,25 @@ void per_intersection_core(int n_overlaps, luf* culls, i2* overlaps, int vtn)
 #endif
             auto _flist = flist + f_offset;
             auto _vlist = vlist + v_offset;
-            filter_distance_kernel_atomic<<<1, n_cuda_threads_per_block, 0, stream>>>(
-                buf_ij, ret_ij, ret_cnt, vifjs, nullptr,
-                _vlist, _flist,
-                pt_types,
-                1e-4f,
-                nvi);
+
+            float* ret_toi = (float*)st;
+            st += sizeof(float);
+
+            if (vtn != 3)
+                filter_distance_kernel_atomic<<<1, n_cuda_threads_per_block, 0, stream>>>(
+                    buf_ij, ret_ij, ret_cnt, vifjs, nullptr,
+                    _vlist, _flist,
+                    pt_types,
+                    1e-4f,
+                    nvi);
+            else
+                toi_decision_kernel<<<1, n_cuda_threads_per_block, 0, stream>>>(ret_ij, ret_cnt, vifjs, nvi, ret_toi);
+            if (vtn == 3 && type == 2) {
+                cudaMemcpyAsync(toi_by_type, ret_toi - 2, sizeof(float), cudaMemcpyDeviceToHost, stream);
+            }
             CUDA_CALL(cudaGetLastError());
             CUDA_CALL(cudaStreamSynchronize(stream));
+
 #ifdef CPU_REF
             cudaMemcpy(&host_ret_cnt, ret_cnt, sizeof(int), cudaMemcpyDeviceToHost);
             auto host_filtered_pairs{ from_thrust(thrust::device_vector<i2>(ret_ij, ret_ij + host_ret_cnt)) };
@@ -1144,33 +1199,38 @@ void per_intersection_core(int n_overlaps, luf* culls, i2* overlaps, int vtn)
             }
         }
 
-        CUDA_CALL(cudaStreamSynchronize(stream));
-        CUDA_CALL(cudaMemcpyAsync(cnt, host_cnts[0], sizeof(int) * 3, cudaMemcpyDeviceToHost, stream));
-        CUDA_CALL(cudaStreamSynchronize(stream));
+        if (vtn != 3) {
+            CUDA_CALL(cudaStreamSynchronize(stream));
+            CUDA_CALL(cudaMemcpyAsync(cnt, host_cnts[0], sizeof(int) * 3, cudaMemcpyDeviceToHost, stream));
+            CUDA_CALL(cudaStreamSynchronize(stream));
 
-        nvifj = cnt[0];
-        nvjfi = cnt[1];
-        neiej = cnt[2];
-        int pt_put, ee_put;
+            nvifj = cnt[0];
+            nvjfi = cnt[1];
+            neiej = cnt[2];
+            int pt_put, ee_put;
 #pragma omp critical
-        {
-            pt_put = host_cuda_globals.npt;
-            host_cuda_globals.npt += (nvifj + nvjfi);
-            ee_put = host_cuda_globals.nee;
-            host_cuda_globals.nee += neiej;
+            {
+                pt_put = host_cuda_globals.npt;
+                host_cuda_globals.npt += (nvifj + nvjfi);
+                ee_put = host_cuda_globals.nee;
+                host_cuda_globals.nee += neiej;
+            }
+            cudaMemcpyAsync(host_cuda_globals.pt.p + pt_put, vifj_ptr, nvifj * sizeof(i2), cudaMemcpyDeviceToDevice, stream);
+            cudaMemcpyAsync(host_cuda_globals.pt.p + pt_put + nvifj, vjfi_ptr, nvjfi * sizeof(i2), cudaMemcpyDeviceToDevice, stream);
+#ifndef PT_ONLY
+            cudaMemcpyAsync(host_cuda_globals.ee.p + ee_put, eiej_ptr, neiej * sizeof(i2), cudaMemcpyDeviceToDevice, stream);
+#endif
+            strided_memset_kernel<<<1, n_cuda_threads_per_block, 0, stream>>>(host_cuda_globals.pt.b + pt_put, ij, nvifj);
+            strided_memset_kernel<<<1, n_cuda_threads_per_block, 0, stream>>>(host_cuda_globals.pt.b + pt_put + nvifj, ji, nvjfi);
+#ifndef PT_ONLY
+            strided_memset_kernel<<<1, n_cuda_threads_per_block, 0, stream>>>(host_cuda_globals.ee.b + ee_put, ij, neiej);
+#endif
+            host_cuda_globals.bulk_buffer_back[tid] = bulk_back_stashed;
+            host_cuda_globals.small_temporary_buffer_back[tid] = st_back_stashed;
         }
-        cudaMemcpyAsync(host_cuda_globals.pt.p + pt_put, vifj_ptr, nvifj * sizeof(i2), cudaMemcpyDeviceToDevice, stream);
-        cudaMemcpyAsync(host_cuda_globals.pt.p + pt_put + nvifj, vjfi_ptr, nvjfi * sizeof(i2), cudaMemcpyDeviceToDevice, stream);
-#ifndef PT_ONLY
-        cudaMemcpyAsync(host_cuda_globals.ee.p + ee_put, eiej_ptr, neiej * sizeof(i2), cudaMemcpyDeviceToDevice, stream);
-#endif
-        strided_memset_kernel<<<1, n_cuda_threads_per_block, 0, stream>>>(host_cuda_globals.pt.b + pt_put, ij, nvifj);
-        strided_memset_kernel<<<1, n_cuda_threads_per_block, 0, stream>>>(host_cuda_globals.pt.b + pt_put + nvifj, ji, nvjfi);
-#ifndef PT_ONLY
-        strided_memset_kernel<<<1, n_cuda_threads_per_block, 0, stream>>>(host_cuda_globals.ee.b + ee_put, ij, neiej);
-#endif
-        host_cuda_globals.bulk_buffer_back[tid] = bulk_back_stashed;
-        host_cuda_globals.small_temporary_buffer_back[tid] = st_back_stashed;
+        else {
+            *toi = std::min({ toi_by_type[0], toi_by_type[1], toi_by_type[2] });
+        }
     }
     CUDA_CALL(cudaDeviceSynchronize());
 #ifdef CPU_REF

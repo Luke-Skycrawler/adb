@@ -456,7 +456,7 @@ __global__ void put_inertia_kernel(
 ) {
     int tid = threadIdx.x + blockIdx.x * blockDim.x;
     int n_tasks_per_thread = (n_cubes + blockDim.x - 1) / blockDim.x;
-    for (int _i =0; _i < n_task_per_thread; _i ++) {
+    for (int _i =0; _i < n_tasks_per_thread; _i ++) {
         int I = _i + tid * n_tasks_per_thread;
         if (I < n_cubes){
             auto osii = to_os({ I, I }, lut_size, lut, outers);

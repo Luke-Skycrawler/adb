@@ -31,6 +31,12 @@
     <CudaCompile Include="..\model\autogen\mollifier.cu">
       <Filter>cuda\autogen</Filter>
     </CudaCompile>
+    <CudaCompile Include="..\model\cubic_roots.cu">
+      <Filter>cuda</Filter>
+    </CudaCompile>
+    <CudaCompile Include="..\model\ccd_toi.cu">
+      <Filter>cuda</Filter>
+    </CudaCompile>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="..\view\light.cpp">
@@ -179,7 +185,9 @@
     <ClInclude Include="..\model\autogen\autogen.cuh">
       <Filter>cuda\autogen</Filter>
     </ClInclude>
-    <ClInclude Include="..\model\cuda_glue.h" />
+    <ClInclude Include="..\model\cuda_glue.h">
+      <Filter>cuda</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <Filter Include="cuda">
