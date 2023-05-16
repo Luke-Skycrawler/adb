@@ -249,13 +249,16 @@ TEST_F(inertiaTest, test_against_ref) {
             ret_double[j] = 0;
         }
         double3 q[4];
-        for (int i = 0; i < 4; i++) q[i] = { c.q[i][0], c.q[i][1], c.q[i][2] };
         orthogonal_grad(cabds[i].q, dt, ret);
+        // for (int i = 0; i < 4; i++) q[i] = { c.q[i][0], c.q[i][1], c.q[i][2] };
+        auto &qf = cabds[i].q;
+        for (int i = 0; i < 4; i++) q[i] = { qf[i].x, qf[i].y, qf[i].z };
         orthogonal_grad(q, 1e-2, ret_double);
         vec12 g_act = Map<Vector<float, 12>>(ret).cast<double>();
         vec12 g_double = Map<vec12>(ret_double);
         // EXPECT_TRUE(g_ref.isApprox(g_act, 1e-3)) << "\nref norm = " << g_ref.norm() << " \n diff norm = " << (g_act - g_ref).norm();
         EXPECT_TRUE(g_ref.isApprox(g_double, 1e-3)) << "\nref norm = " << g_ref.norm() << " \n diff norm = " << (g_double - g_ref).norm();
+        EXPECT_TRUE(g_act.isApprox(g_double, 1e-3)) << "\nref norm = " << g_double.norm() << " \n diff norm = " << (g_double - g_act).norm();
         //EXPECT_TRUE((g_ref - g_act).norm() < 1e-1) << "\nref " << g_ref.transpose() << " \n act " << g_act.transpose();
     }
     delete[] ret;

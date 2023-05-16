@@ -56,6 +56,7 @@ __global__ void fill_inner_outers_kernel(int n_cubes, int lut_size, const i2 * l
             }
         }
     }
+    if (tid == 0) outers[n_cubes * 12] = lut_size * 12 * 12;
     __syncthreads(); // wait until finish, then break inners array
 
     int n_block_per_thread = (lut_size + blockDim.x - 1) / blockDim.x;
@@ -91,11 +92,11 @@ void build_csr(int n_cubes, const thrust::device_vector<i2> &lut, CsrSparseMatri
     sparse_matrix.cols = n_cubes * 12;
     sparse_matrix.nnz = nnz;
 
-    sparse_matrix.outer_start.resize(n_cubes * 12);
+    sparse_matrix.outer_start.resize(n_cubes * 12 + 1);
     sparse_matrix.inner.resize(nnz);
     sparse_matrix.values.resize(nnz);
     
-    thrust::device_vector<int> dev_inner(nnz), dev_outer(n_cubes * 12);
+    thrust::device_vector<int> dev_inner(nnz), dev_outer(n_cubes * 12 + 1);
     
     thrust::fill(sparse_matrix.values.begin(), sparse_matrix.values.end(), 0.0f);
     
