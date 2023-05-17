@@ -12,6 +12,13 @@
 #include <thrust/set_operations.h>
 #include <algorithm>
 using namespace std;
+#define CPU_REF
+#define PT_ONLY
+#ifdef PT_ONLY
+#define MAX_TYPES 2
+#else
+#define MAX_TYPES 3
+#endif
 // FIXME: tid probably not in 1 block
 
 static const int max_overlap_size = 1024;
@@ -610,9 +617,10 @@ __global__ void primitive_intersection_test_kernel(
 
 #ifdef CPU_REF
 void primtive_intersection_host(
-    int type, 
+    int type,
     int vtn,
-    int i, 
+    int i,
+    vector<cudaAffineBody> &host_cubes,
     const vector<luf>& host_culls,
     const vector<i2> &host_overlaps,
     vector<int> host_prmts[MAX_TYPES][2]
@@ -938,12 +946,6 @@ std::vector<cudaAffineBody> get_host_cubes_copy(
 
 void per_intersection_core(int n_overlaps, luf* culls, i2* overlaps, int vtn, float* toi)
 {
-#define PT_ONLY
-#ifdef PT_ONLY
-#define MAX_TYPES 2
-#else
-#define MAX_TYPES 3
-#endif
 
     const bool kernel = true;
 
