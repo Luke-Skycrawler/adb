@@ -95,7 +95,7 @@ struct CudaGlobals {
     int device_id, per_stream_buffer_size;
 
     // temporary buffers
-    const int st_size = 128, blk_size = max_pairs_per_block * (sizeof(i2) * 2 + sizeof(int) * 2) * 8;
+    const int st_size = 1024, blk_size = max_pairs_per_block * (sizeof(i2) * 2 + sizeof(int) * 2) * 8;
     // only fit for small data;
     char **small_temporary_buffer, **bulk_buffer;
     char **small_temporary_buffer_back, **bulk_buffer_back;

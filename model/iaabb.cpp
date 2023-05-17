@@ -1194,7 +1194,12 @@ double primitive_brute_force(
             double t2 = vf_col_time(vjlist, filist, cubes, J, I);
             double t3 = ee_col_time(eilist, ejlist, cubes, I, J);
 
-            toi = min(toi, min({ t1, t2, t3 }));
+            if (globals.ee && globals.pt)
+                toi = min(toi, min({ t1, t2, t3 }));
+            else if (globals.pt)
+                toi = min(toi, min(t1, t2));
+            else if (globals.ee)
+                toi = min(toi, t3);
         }
 #pragma omp critical
         {
@@ -1290,7 +1295,7 @@ double iaabb_brute_force(
         ees,
         eidx,
         vidx);
-    if (globals.params_int["cuda_pt"] && vtn != 3) {
+    if (globals.params_int["cuda_pt"] && vtn == 3 ) {
         vector<array<int, 4>> idx_cuda, int_ref;
         for (int i = 0; i < n_cubes; i++) {
             auto& b{ host_cuda_globals.host_cubes[i] };
@@ -1317,7 +1322,11 @@ double iaabb_brute_force(
             }
 
             if (abs(toi - toif) > 1e-4) {
-                spdlog::warn("toi : ref = {}, cuda = {}", toi, toif);
+                spdlog::error("toi : ref = {}, cuda = {}", toi, toif);
+            } else {
+                if (toi < 1.0f) {
+                    spdlog::error("correct toi = {}, toif = {} < 1.0f", toi, toif);
+                }
             }
         }
         if (globals.params_int["cuda_pt_direct"]) idx = idx_cuda;

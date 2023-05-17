@@ -26,7 +26,7 @@ __host__ __device__ void cubic_binomial (float a[3], float b[3], float ret_polyn
     ret_polynomial[3] += a[0] * a[1] * a[2];
 }
 
-__forceinline__ int rc_3(int i, int j) {
+__forceinline__ __host__ __device__ int rc_3(int i, int j) {
     return 3 * j + i;
 }
 __host__ __device__ void det_polynomial(
@@ -86,7 +86,7 @@ __host__ __device__ void det_polynomial(
 __host__ __device__ int cubic_roots(float roots[3], float coef[4], float x0, float x1);
 
 
-int build_and_solve_4_points_coplanar(
+__host__ __device__ int build_and_solve_4_points_coplanar(
     const vec3f& p0_t0,
     const vec3f& p1_t0,
     const vec3f& p2_t0,

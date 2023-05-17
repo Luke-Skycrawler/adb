@@ -369,7 +369,7 @@ void CudaGlobals::allocate_buffers()
     small_temporary_buffer_back = new char*[n_proc];
     bulk_buffer = new char*[n_proc];
     bulk_buffer_back = new char*[n_proc];
-    cudaMallocManaged(&small_temporary_buffer[0], sizeof(char*) * st_size * n_proc);
+    cudaMallocManaged(&small_temporary_buffer[0], st_size * n_proc);
     for (int i = 0; i < n_proc; i++) {
         small_temporary_buffer[i] = small_temporary_buffer[0] + i * st_size;
         small_temporary_buffer_back[i] = small_temporary_buffer[i];
