@@ -31,7 +31,7 @@ __device__ __host__ luf compute_aabb(const Edgef& e, float d_hat_sqrt);
 __host__ __device__ luf merge(luf a, luf b);
 void make_lut(int n_overlaps, i2* overlaps);
 
-void per_intersection_core(int n_overlaps, luf* culls, i2* overlaps, int vtn, float* toi = nullptr);
+void per_intersection_core(int n_overlaps, luf* culls, i2* overlaps, int vtn, float* toi = nullptr, float *E_barrier = nullptr);
 
 /* NOTE: kernel argument convention:
     buf_: device buffer
@@ -116,7 +116,46 @@ __device__ __host__ float ee_collision_time(
     const Edgef& ei1,
     const Edgef& ej1);
 
+__global__ void aggregate_barrier_kernel(
+    i2* ijs,
+    int* cnt,
+    vec3f* vifjs,
+    int nvi,
+    float* ret_barrier,
+    float d_hat = 1e-4f)
+{
+    // NOTE: can only be called with n_cuda_threads_per_block threads
+    int tid = threadIdx.x + blockIdx.x * blockDim.x;
+    int n_tasks = *cnt;
+    int n_task_per_thread = (n_tasks + n_cuda_threads_per_block - 1) / n_cuda_threads_per_block;
+    __shared__ float barriers[n_cuda_threads_per_block];
+    barriers[tid] = 0;
+    for (int _i = 0; _i < n_task_per_thread; _i++) {
+        int idx = tid * n_task_per_thread + _i;
+        if (idx < n_tasks) {
+            auto ij = ijs[idx];
+            int i = ij[0];
+            int j = ij[1];
+            // int vi = vilist[i];
+            // int fj = fjlist[j];
 
+            // compute the distance and type
+            auto v{ vifjs[i] };
+            Facef f{ vifjs[j * 3 + nvi], vifjs[j * 3 + 1 + nvi], vifjs[j * 3 + 2 + nvi] };
+            int pt_type;
+            auto d = vf_distance(v, f, pt_type);
+            barriers[tid] += dev::barrier_function(d);
+        }
+    }
+    __syncthreads();
+    if (tid == 0) {
+        float barrier = 0;
+        for (int i = 0; i < n_cuda_threads_per_block; i++) {
+            barrier += barriers[i];
+        }
+        *ret_barrier = barrier;
+    }
+}
 __global__ void toi_decision_kernel(
     i2 *ijs, 
     int *cnt,
@@ -714,7 +753,8 @@ float iaabb_brute_force_cuda_pt_only(
     make_lut(n_overlaps, overlaps);
 
     float ret_toi = 1.0f;
-    per_intersection_core(n_overlaps, culls, overlaps, vtn, &ret_toi);
+    float E_barrier = 0.0f;
+    per_intersection_core(n_overlaps, culls, overlaps, vtn, &ret_toi, &E_barrier);
 
     lt_back = stashed_lt_back;
 
@@ -729,7 +769,7 @@ float iaabb_brute_force_cuda_pt_only(
     }
     delete[] plist;
     delete[] blist;
-    return ret_toi;
+    return vtn == 3? ret_toi : E_barrier;
 }
 
 __global__ void strided_memset_kernel(
@@ -1008,7 +1048,7 @@ std::vector<cudaAffineBody> get_host_cubes_copy(
 }
 #endif
 
-void per_intersection_core(int n_overlaps, luf* culls, i2* overlaps, int vtn, float* toi)
+void per_intersection_core(int n_overlaps, luf* culls, i2* overlaps, int vtn, float* toi, float *E_barrier)
 {
 
     *toi = 1.0f;
@@ -1191,10 +1231,13 @@ void per_intersection_core(int n_overlaps, luf* culls, i2* overlaps, int vtn, fl
         int *host_cnts[3], cnt[3];
         i2 *vifj_ptr, *vjfi_ptr, *eiej_ptr;
         float toi_by_type[3];
+        float barrier_by_type[3];
 
         int* ret_cnts = (int*)st;
         st += sizeof(int) * 3;
         float* ret_tois = (float*)st;
+        st += sizeof(float) * 3;
+        float* ret_barriers = (float*)st;
         st += sizeof(float) * 3;
 
         for (int type = 0; type < MAX_TYPES; type++) {
@@ -1213,6 +1256,7 @@ void per_intersection_core(int n_overlaps, luf* culls, i2* overlaps, int vtn, fl
             // no tempering with st in this loop
             int* ret_cnt = ret_cnts + type;
             float* ret_toi = ret_tois + type;
+            float* ret_barrier = ret_barriers + type;
             int nvi, nfj, f_offset = 0, v_offset = 0;
             switch (type) {
             case 0:
@@ -1308,6 +1352,13 @@ void per_intersection_core(int n_overlaps, luf* culls, i2* overlaps, int vtn, fl
                     nvi);
                 CUDA_CALL(cudaGetLastError());
                 CUDA_CALL(cudaStreamSynchronize(stream));
+                if (vtn == 2) {
+                    // only called in line search,
+                    // aggregate the barrier function
+                    aggregate_barrier_kernel<<<1, n_cuda_threads_per_block, 0, stream>>>(ret_ij, ret_cnt, vifjs, nvi, ret_barrier);
+                    CUDA_CALL(cudaGetLastError());
+                    CUDA_CALL(cudaStreamSynchronize(stream));
+                }
 
 #ifdef CPU_REF
                 cudaMemcpy(&host_ret_cnt, ret_cnt, sizeof(int), cudaMemcpyDeviceToHost);
@@ -1359,8 +1410,23 @@ void per_intersection_core(int n_overlaps, luf* culls, i2* overlaps, int vtn, fl
 #ifndef PT_ONLY
             strided_memset_kernel<<<1, n_cuda_threads_per_block, 0, stream>>>(host_cuda_globals.ee.b + ee_put, ij, neiej);
 #endif
-        }
 
+            if (vtn  ==2) {
+                // line search step, calculate barrier energy
+                cudaMemcpyAsync(barrier_by_type, ret_barriers, sizeof(float) * 3, cudaMemcpyDeviceToHost, stream);
+                CUDA_CALL(cudaStreamSynchronize(stream));
+                #ifdef PT_ONLY
+                float barrier_per_overlap = barrier_by_type[0] + barrier_by_type[1];
+                #else 
+                float barrier_per_overlap = barrier_by_type[0] + barrier_by_type[1] + barrier_by_type[2];
+                #endif
+                #pragma omp critical
+                {
+                    *E_barrier += barrier_per_overlap;
+                }
+
+            }
+        }
 
         else {
             // vtn == 3, ccd
