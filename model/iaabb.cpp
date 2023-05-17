@@ -1295,7 +1295,7 @@ double iaabb_brute_force(
         ees,
         eidx,
         vidx);
-    if (globals.params_int["cuda_pt"] && vtn == 3 ) {
+    if (globals.params_int["cuda_pt"]) {
         vector<array<int, 4>> idx_cuda, int_ref;
         for (int i = 0; i < n_cubes; i++) {
             auto& b{ host_cuda_globals.host_cubes[i] };
