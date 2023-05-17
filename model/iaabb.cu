@@ -12,7 +12,7 @@
 #include <thrust/set_operations.h>
 #include <algorithm>
 using namespace std;
-#define CPU_REF
+// #define CPU_REF
 #define PT_ONLY
 #ifdef PT_ONLY
 #define MAX_TYPES 2
@@ -240,7 +240,7 @@ __global__ void filter_distance_kernel(i2* ret_ij, int* ret_cnt, i2* tmp,
                 ret_ij[put] = { i, j };
                 ret_cnt[tid]++;
             }
-        }
+        } 
     }
 }
 
@@ -951,6 +951,8 @@ void per_intersection_core(int n_overlaps, luf* culls, i2* overlaps, int vtn, fl
 
     static vector<i2> host_overlaps;
     host_overlaps.resize(n_overlaps);
+    cudaMemcpy(host_overlaps.data(), overlaps, sizeof(i2) * n_overlaps, cudaMemcpyDeviceToHost);
+
 #ifdef CPU_REF
     static vector<luf> host_culls;
 
@@ -980,7 +982,6 @@ void per_intersection_core(int n_overlaps, luf* culls, i2* overlaps, int vtn, fl
 
     {
         cudaMemcpy(host_culls.data(), culls, sizeof(luf) * n_overlaps, cudaMemcpyDeviceToHost);
-        cudaMemcpy(host_overlaps.data(), overlaps, sizeof(i2) * n_overlaps, cudaMemcpyDeviceToHost);
     }
 #endif
 
