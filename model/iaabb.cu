@@ -115,7 +115,7 @@ __global__ void toi_decision_kernel(
     int *cnt,
     vec3f *vifjs,
     int _nvi,
-    float* ret_toi, 
+    float* ret_toi
 ){
     // NOTE: can only launched with n_cuda_threads_per_block threads
     int tid = threadIdx.x + blockIdx.x * blockDim.x;

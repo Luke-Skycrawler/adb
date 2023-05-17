@@ -65,8 +65,6 @@ void initialize_aabbs(
 );
 
 // glue function declarations---------------------------------------------
-// defined in constraint_set.cu
-void project_glue(int vtn);
 // called by "cuda_intersection" option, defined in iaabb.cu
 void cuda_culling_glue(
     int vtn,
@@ -96,6 +94,6 @@ void gen_empty_sm_glue(
     int n_cubes,
     std::vector<std::array<int, 4>>& idx,
     std::vector<std::array<int, 4>>& eidx,
-    SparseMatrix<double>& sparse_hess,
+    Eigen::SparseMatrix<double>& sparse_hess,
     std::map<std::array<int, 2>, int>& lut);
 #endif

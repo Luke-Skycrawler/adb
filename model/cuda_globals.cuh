@@ -180,3 +180,6 @@ void build_csr(int n_cubes, const thrust::device_vector<i2>& lut, CsrSparseMatri
 
 // solve Ax = b, A is the hess matrix
 void gpuCholSolver(CsrSparseMatrix& hess, float* x, float *b);
+
+// defined in constraint_set.cu
+void project_glue(int vtn);
