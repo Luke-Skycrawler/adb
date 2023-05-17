@@ -1316,11 +1316,12 @@ double iaabb_brute_force(
             sort(idx.begin(), idx.end());
             sort(idx_cuda.begin(), idx_cuda.end());
             set_intersection(idx.begin(), idx.end(), idx_cuda.begin(), idx_cuda.end(), std::back_inserter(int_ref));
-
-            if (idx.size() != idx_cuda.size() || int_ref.size() != idx.size()) {
-                spdlog::warn("size : ref = {}, cuda = {}, intersection(ref, cuda) = {}", idx.size(), idx_cuda.size(), int_ref.size());
+            if (vtn != 3) {
+                if (idx.size() != idx_cuda.size() || int_ref.size() != idx.size()) {
+                    spdlog::warn("size : ref = {}, cuda = {}, intersection(ref, cuda) = {}", idx.size(), idx_cuda.size(), int_ref.size());
+                }
             }
-
+            else 
             if (abs(toi - toif) > 1e-4) {
                 spdlog::error("toi : ref = {}, cuda = {}", toi, toif);
             } else {
@@ -1329,7 +1330,7 @@ double iaabb_brute_force(
                 }
             }
         }
-        if (globals.params_int["cuda_pt_direct"]) idx = idx_cuda;
+        if (vtn != 3 && globals.params_int["cuda_pt_direct"]) idx = idx_cuda;
     }
     auto t = DURATION_TO_DOUBLE(start);
     spdlog::info("time: {} = {:0.6f} ms", vtn == 3 ? "iaabb upper bound" : "iAABB", t * 1000);
