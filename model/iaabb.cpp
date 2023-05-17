@@ -33,15 +33,10 @@ using namespace std::chrono;
 #define DURATION_TO_DOUBLE(X) duration_cast<duration<double>>(high_resolution_clock::now() - (X)).count()
 
 
-
-
 float vf_distance(vec3f _v, Facef f, int &pt_type);
 tuple<float, ipc::PointTriangleDistanceType> vf_distance(vec3f vf, Facef ff); 
 
 void vf_col_set_cuda(
-    // vector<int>& vilist, vector<int>& fjlist,
-    // const std::vector<std::unique_ptr<AffineBody>>& cubes,
-    // int I, int J,
     int nvi, int nfj,
     const thrust::host_vector<luf>& aabbs,
     const thrust::host_vector<vec3f>& vis,
@@ -51,7 +46,8 @@ void vf_col_set_cuda(
     int I, int J,
     int tid = 0);
 
-void glue_vf_col_set(
+// called by "cuda_supervised" or "cuda_direct" option
+void vf_col_set_glue(
     vector<int>& vilist, vector<int>& fjlist,
     const std::vector<std::unique_ptr<AffineBody>>& cubes,
     int I, int J,
@@ -1117,15 +1113,13 @@ double primitive_brute_force(
                 vf_col_set(vjlist, filist, cubes, J, I, pts_private[tid], idx_private[tid]);
             }
             else {
-                glue_vf_col_set(vilist, fjlist, cubes, I, J, pts_private[tid], idx_private[tid], tid);
-                glue_vf_col_set(vjlist, filist, cubes, J, I, pts_private[tid], idx_private[tid], tid);
+                vf_col_set_glue(vilist, fjlist, cubes, I, J, pts_private[tid], idx_private[tid], tid);
+                vf_col_set_glue(vjlist, filist, cubes, J, I, pts_private[tid], idx_private[tid], tid);
             }
             if (globals.params_int["cuda_supervised"]) {
                 vector<array<int, 4>>&idx_ref{ idx_private[tid] }, idx_cuda{}, diff{}, cuda_ref{};
-                // glue_vf_col_set(vilist, fjlist, cubes, I, J, pts_private[tid], idx_private[tid]);
-                // glue_vf_col_set(vjlist, filist, cubes, J, I, pts_private[tid], idx_private[tid]);
-                glue_vf_col_set(vilist, fjlist, cubes, I, J, pts_private[tid], idx_cuda, tid);
-                glue_vf_col_set(vjlist, filist, cubes, J, I, pts_private[tid], idx_cuda, tid);
+                vf_col_set_glue(vilist, fjlist, cubes, I, J, pts_private[tid], idx_cuda, tid);
+                vf_col_set_glue(vjlist, filist, cubes, J, I, pts_private[tid], idx_cuda, tid);
                 sort(idx_cuda.begin(), idx_cuda.end());
                 sort(idx_ref.begin(), idx_ref.end());
 
@@ -1223,17 +1217,6 @@ double primitive_brute_force(
     return cull_trajectory ? toi_global : 1.0;
 }
 
-void cuda_culling_glue(
-    int vtn,
-    thrust::device_vector<luf>& aabbs,
-    thrust::device_vector<luf>& ret_culls);
-
-float iaabb_brute_force_cuda_pt_only(
-    int n_cubes,
-    cudaAffineBody* cubes,
-    luf* aabbs,
-    int vtn,
-    std::vector<std::array<int, 4>>& idx);
 
 
 

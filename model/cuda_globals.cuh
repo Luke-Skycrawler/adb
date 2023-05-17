@@ -155,10 +155,28 @@ __forceinline__ __device__ float3 matmul(float3 _q[4], float3 x)
     return ret + _q[0];
 }
 
-void make_lut(int lut_size, i2* lut);
-
 __forceinline__ __device__ __host__ float kronecker(int i, int j)
 {
     return i == j ? 1.0f : 0.0f;
 }
 
+
+// seen in all cuda files & glued files-----------------------------------------
+// high-level functions, can be directly called outside of cuda environment
+
+// full-fledged cuda ipc with cpu verification
+void cuda_ipc();
+
+// full-fledged cuda iaabb
+float iaabb_brute_force_cuda_pt_only(
+    int n_cubes,
+    cudaAffineBody* cubes,
+    luf* aabbs,
+    int vtn,
+    std::vector<std::array<int, 4>>& idx);
+
+// build csr matrix from look up table
+void build_csr(int n_cubes, const thrust::device_vector<i2>& lut, CsrSparseMatrix& sparse_matrix);
+
+// solve Ax = b, A is the hess matrix
+void gpuCholSolver(CsrSparseMatrix& hess, float* x, float *b);

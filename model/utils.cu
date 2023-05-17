@@ -18,6 +18,22 @@ __device__ luf intersection(const luf& a, const luf& b)
     return { l, u };
 }
 
+
+__host__ __device__ luf merge(luf a, luf b) {
+    vec3f l = make_float3(
+        CUDA_MIN(a.l.x, b.l.x),
+        CUDA_MIN(a.l.y, b.l.y),
+        CUDA_MIN(a.l.z, b.l.z)
+    );
+    vec3f u = make_float3(
+        CUDA_MAX(a.u.x, b.u.x),
+        CUDA_MAX(a.u.y, b.u.y),
+        CUDA_MAX(a.u.z, b.u.z)
+    );
+    return luf{ l, u };
+}
+
+
 __device__ luf affine(luf aabb, cudaAffineBody& c, int vtn)
 {
     vec3f cull[8];

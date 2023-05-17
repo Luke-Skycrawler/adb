@@ -44,7 +44,7 @@ void cuda_hess_glue(
     float* hess = new float[n_cubes * 144];
     for (int i = 0; i < n_cubes; i++) cabs[i] = to_cabd(*cubes[i]);
     cudaMemcpy(host_cuda_globals.cubes, cabs.data(), sizeof(cudaAffineBody) * cabs.size(), cudaMemcpyHostToDevice);
-    hess_cuda(n_cubes, dt, grads, hess);
+    cuda_inert_hess_glue(n_cubes, dt, grads, hess);
 #pragma omp parallel for schedule(static)
     for (int k = 0; k < n_cubes; k++) {
         auto& c(*cubes[k]);
@@ -552,7 +552,7 @@ void implicit_euler(vector<unique_ptr<AffineBody>>& cubes, double dt)
             }
             cudaMemcpy(host_cuda_globals.cubes, host_cuda_globals.host_cubes.data(), sizeof(cudaAffineBody) * n_cubes, cudaMemcpyHostToDevice);
 
-            cuda_ipc_glue();
+            cuda_ipc();
         }
 #pragma omp parallel for schedule(static)
         for (int k = 0; k < n_ee; k++) {
@@ -897,7 +897,7 @@ void implicit_euler(vector<unique_ptr<AffineBody>>& cubes, double dt)
             else if (globals.sparse) {
 
                 if (globals.params_int["cuda_solver"]) {
-                    cuda_solve(dq, sparse_hess, r);
+                    cuda_solve_glue(dq, sparse_hess, r);
                 }
                 else {
 

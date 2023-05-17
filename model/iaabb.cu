@@ -3,8 +3,6 @@
 #include "cuda_globals.cuh"
 #include "timer.h"
 #include <omp.h>
-// #include <ipc/distance/edge_edge.hpp>
-// #include <ipc/distance/point_triangle.hpp>
 #include <spdlog/spdlog.h>
 #include <tuple>
 
@@ -14,20 +12,18 @@
 #include <thrust/set_operations.h>
 #include <algorithm>
 using namespace std;
-//using namespace ipc;
-// using namespace cuda::std;
-// using namespace Eigen;
 // FIXME: tid probably not in 1 block
 
-
+static const int max_overlap_size = 1024;
 
 __device__ __host__ float vf_distance(vec3f _v, Facef f, int& pt_type);
 __device__ luf intersection(const luf &a, const luf &b);
 __device__ luf affine(luf aabb, cudaAffineBody &c, int vtn);
 __device__ __host__ luf compute_aabb(const Facef& f, float d_hat_sqrt);
 __device__ __host__ luf compute_aabb(const Edgef& e, float d_hat_sqrt);
+__host__ __device__ luf merge(luf a, luf b);
+void make_lut(int n_overlaps, i2* overlaps);
 
-//tuple<float, PointTriangleDistanceType> vf_distance(vec3f vf, Facef ff);
 void per_intersection_core(int n_overlaps, luf* culls, i2* overlaps, int vtn, float* toi = nullptr);
 
 /* NOTE: kernel argument convention:
@@ -101,25 +97,31 @@ __global__ void inclusive_scan_kernel(int* io_cnt)
         io_cnt[i] = io_cnt[i - 1] + io_cnt[i];
     }
 }
+__device__ __host__ float pt_collision_time(
+    const vec3f& p0,
+    const Facef& t0,
+    const vec3f& p1,
+    const Facef& t1);
+
+__device__ __host__ float ee_collision_time(
+    const Edgef& ei0,
+    const Edgef& ej0,
+    const Edgef& ei1,
+    const Edgef& ej1);
 
 
-__host__ __device__ float vf_toi(
-    vec3f vt1, vec3f vt2, Facef ft1, Facef ft2
-){
-    return 1.0f;
-}
 __global__ void toi_decision_kernel(
     i2 *ijs, 
-    int *io_cnt,
+    int *cnt,
     vec3f *vifjs,
-    float *ret_toi, int nvi = 0
+    int _nvi,
+    float* ret_toi, 
 ){
     // NOTE: can only launched with n_cuda_threads_per_block threads
     int tid = threadIdx.x + blockIdx.x * blockDim.x;
-    int n_tasks = *io_cnt;
+    int n_tasks = *cnt;
     int n_task_per_thread = (n_tasks + n_cuda_threads_per_block - 1) / n_cuda_threads_per_block;
-    // __shared__ int n;
-    nvi *= 2;
+    int nvi = _nvi * 2;
     __shared__ float tois[n_cuda_threads_per_block];
     tois[tid] = 1.0f;
     for (int _i = 0; _i < n_task_per_thread; _i++) {
@@ -133,13 +135,13 @@ __global__ void toi_decision_kernel(
             Facef ft1{ vifjs[j * 6 + nvi], vifjs[j * 6 + 1 + nvi], vifjs[j * 6 + 2 + nvi] },
                 ft2 {vifjs[j * 6 + 3 + nvi], vifjs[j * 6 + 4 + nvi], vifjs[j * 6 + 5 + nvi]};
             
-            auto toi = vf_toi(vt1, vt2, ft1, ft2);
+            auto toi = pt_collision_time(vt1, ft1, vt2, ft2);
             tois[tid] = CUDA_MIN(tois[tid], toi);
         }
     }
     __syncthreads();
     if (tid == 0) {
-        float toi_min;
+        float toi_min = 1.0f;
         for(int i = 0; i < n_cuda_threads_per_block; i ++) {
             toi_min = CUDA_MIN(toi_min, tois[i]);
         }
@@ -147,48 +149,7 @@ __global__ void toi_decision_kernel(
     }
 }
 
-__device__ __host__ float pt_collision_time(
-    const vec3f& p0,
-    const Facef& t0,
-    const vec3f& p1,
-    const Facef& t1);
 
-__device__ __host__ float ee_collision_time(
-    const Edgef& ei0,
-    const Edgef& ej0,
-    const Edgef& ei1,
-    const Edgef& ej1);
-
-__global__ void toi_decision_kernel(
-    i2* ij,
-    int* cnt,
-    vec3f* vifjs,
-    int nvi,
-    float* ret_toi)
-{
-    int n_tasks = *cnt;
-    int tid = threadIdx.x + blockIdx.x * blockDim.x;
-    int n_task_per_thread = (n_tasks + blockDim.x - 1) / blockDim.x;
-    __shared__ float tois[n_cuda_threads_per_block];
-    tois[tid] = 1.0f;
-    for (int _i = 0; _i < n_task_per_thread; _i++) {
-        auto idx = tid * n_task_per_thread + _i;
-        if (idx < n_tasks) {
-            auto pt0{ vifjs[idx * 2] };
-            auto pt1{ vifjs[idx * 2 + 1] };
-            Facef tt0{ vifjs[idx * 6 + nvi * 2], vifjs[idx * 6 + 1 + nvi * 2], vifjs[idx * 6 + 2 + nvi * 2] };
-            Facef tt1{ vifjs[idx * 6 + nvi * 2 + 3], vifjs[idx * 6 + nvi * 2 + 4], vifjs[idx * 6 + nvi * 2 + 5] };
-            auto toi = pt_collision_time(pt0, tt0, pt1, tt1);
-            tois[tid] = CUDA_MIN(tois[tid], toi);
-        }
-    }
-    __syncthreads();
-    if (tid == 0)
-        for (int i = 1; i < n_cuda_threads_per_block; i++) {
-            tois[0] = CUDA_MIN(tois[0], tois[i]);
-        }
-    *ret_toi = tois[0];
-}
 __global__ void filter_distance_kernel_atomic(i2* buf_ij, i2* io_tmp,
     int* io_cnt, 
     vec3f* vis, Facef* fjs,
@@ -238,6 +199,8 @@ __global__ void filter_distance_kernel_atomic(i2* buf_ij, i2* io_tmp,
     }
     *io_cnt = n;
 }
+
+// deprecated
 __global__ void filter_distance_kernel(i2* ret_ij, int* ret_cnt, i2* tmp,
     // int* vilist, int* fjlist,
     vec3f* vis, Facef* fjs,
@@ -273,6 +236,8 @@ __global__ void filter_distance_kernel(i2* ret_ij, int* ret_cnt, i2* tmp,
         }
     }
 }
+
+// deprecated
 __global__ void squeeze_ij_kernel(
     i2* ij, int* cnt, 
     i2* ret_tmp, 
@@ -292,6 +257,8 @@ __global__ void squeeze_ij_kernel(
         // ret_tmp is now dense
     }
 }
+
+// deprecated
 void vf_col_set_cuda(
     int nvi, int nfj,
     const thrust::host_vector<luf>& aabbs,
@@ -499,7 +466,6 @@ void vf_col_set_cuda(
     }
 
 }
-__device__ __constant__ const int max_overlap_size = 1024;
 __global__ void culling_kernel_atomic (
     // inputs:
     int n_cubes, cudaAffineBody* cubes,
@@ -555,22 +521,8 @@ __global__ void culling_kernel_atomic (
     __syncthreads();
 }
 
-__host__ __device__ luf merge(luf a, luf b) {
-    vec3f l = make_float3(
-        CUDA_MIN(a.l.x, b.l.x),
-        CUDA_MIN(a.l.y, b.l.y),
-        CUDA_MIN(a.l.z, b.l.z)
-    );
-    vec3f u = make_float3(
-        CUDA_MAX(a.u.x, b.u.x),
-        CUDA_MAX(a.u.y, b.u.y),
-        CUDA_MAX(a.u.z, b.u.z)
-    );
-    return luf{ l, u };
-}
 
-
-inline luf __device__ __host__ aabb(cudaAffineBody& c, int idx, int type, int  vtn)
+inline __device__ __host__ luf aabb(cudaAffineBody& c, int idx, int type, int  vtn)
 {
     if (vtn != 3) {
         if (type == 0) {
@@ -655,6 +607,47 @@ __global__ void primitive_intersection_test_kernel(
 
 }
 
+
+#ifdef CPU_REF
+void primtive_intersection_host(
+    int type, 
+    int vtn,
+    int i, 
+    const vector<luf>& host_culls,
+    const vector<i2> &host_overlaps,
+    vector<int> host_prmts[MAX_TYPES][2]
+){
+    // CPU_CODE
+    auto cull{ host_culls[i] };
+    auto idx{ host_overlaps[i] };
+    int I{ idx[0] }, J{ idx[1] };
+    int nvi, nv;
+    switch (type) {
+    case 0:
+        nvi = host_cubes[I].n_vertices;
+        nv = host_cubes[I].n_vertices + host_cubes[J].n_vertices;
+        break;
+    case 2:
+        nvi = host_cubes[I].n_edges;
+        nv = host_cubes[I].n_edges + host_cubes[J].n_edges;
+        break;
+    case 1:
+        nvi = host_cubes[I].n_faces;
+        nv = host_cubes[I].n_faces + host_cubes[J].n_faces;
+        break;
+    }
+    for (int vi = 0; vi < nv; vi++) {
+        auto b = vi < nvi ? I : J;
+        int id = vi < nvi ? vi : vi - nvi;
+        int iorj = vi < nvi ? 0 : 1;
+        auto t = aabb(host_cubes[b], id, type, vtn);
+        if (intersects(cull, t)) {
+            host_prmts[type][iorj].push_back(id);
+        }
+    }
+}
+
+#endif
 float iaabb_brute_force_cuda_pt_only(
     int n_cubes,
     cudaAffineBody* cubes,
@@ -720,63 +713,7 @@ __global__ void strided_memset_kernel(
         }
     }
 }
-void prepare_vifj(
-    i2 ij, vector<cudaAffineBody>& cubes, int type,
-    vector<int>& vis, vector<int>& vjs,
-    vector<int>& fis, vector<int>& fjs,
-    vector<vec3f>& vifjs, vector<luf>& joint_aabbs)
-{
-    int nvi = vis.size(), nvj = vjs.size(),
-        nfi = fis.size(), nfj = fjs.size();
-    int T = type == 1 ? nvj : nvi;
-    auto T_2 = type == 1 ? nfi : nfj;
 
-    vifjs.resize(T + T_2 * 3);
-    joint_aabbs.resize(T + T_2);
-    int ii = type == 1 ? ij[1] : ij[0], jj = type == 1 ? ij[0] : ij[1];
-    auto &ci{ cubes[ii] }, &cj{ cubes[jj] };
-    for (int I = 0; I < T; I++) {
-        int i = type == 1 ? vjs[I] : vis[I];
-        switch (type) {
-        case 1:
-        case 0: {
-            auto& p{ ci.projected[i] };
-            vifjs[I] = p;
-            joint_aabbs[I] = { p - dev::d_hat_sqr, p + dev::d_hat_sqr };
-            break;
-        }
-        case 2: {
-            auto& e{ ci.edge(i) };
-            vifjs[I * 2] = e.e0;
-            vifjs[I * 2 + 1] = e.e1;
-            joint_aabbs[I] = compute_aabb(e, dev::d_hat_sqr);
-            break;
-        }
-        }
-    }
-    for (int I = 0; I < T_2; I++) {
-        int i = type == 1 ? fis[I] : fjs[I];
-        switch (type) {
-        case 1:
-        case 0: {
-            Facef f{ cj.triangle(i) };
-            vifjs[T + I * 3] = f.t0;
-            vifjs[T + I * 3 + 1] = f.t1;
-            vifjs[T + I * 3 + 2] = f.t2;
-
-            joint_aabbs[T + I] = compute_aabb(f, dev::d_hat_sqr);
-            break;
-        }
-        case 2: {
-            auto& e{ cj.edge(i) };
-            vifjs[T * 2 + I * 2] = e.e0;
-            vifjs[T * 2 + I * 2 + 1] = e.e1;
-            joint_aabbs[T + I] = compute_aabb(e, dev::d_hat_sqr);
-            break;
-        }
-        }
-    }
-}
 __global__ void prepare_aabb_vi_fj_kernel(
     int i_overlap, i2* overlaps,
     cudaAffineBody* cubes,
@@ -893,6 +830,112 @@ __global__ void prepare_aabb_vi_fj_kernel(
     }
 }
 
+
+
+#ifdef CPU_REF
+void prepare_vifj(
+    i2 ij, vector<cudaAffineBody>& cubes, int type,
+    vector<int>& vis, vector<int>& vjs,
+    vector<int>& fis, vector<int>& fjs,
+    vector<vec3f>& vifjs, vector<luf>& joint_aabbs)
+{
+    int nvi = vis.size(), nvj = vjs.size(),
+        nfi = fis.size(), nfj = fjs.size();
+    int T = type == 1 ? nvj : nvi;
+    auto T_2 = type == 1 ? nfi : nfj;
+
+    vifjs.resize(T + T_2 * 3);
+    joint_aabbs.resize(T + T_2);
+    int ii = type == 1 ? ij[1] : ij[0], jj = type == 1 ? ij[0] : ij[1];
+    auto &ci{ cubes[ii] }, &cj{ cubes[jj] };
+    for (int I = 0; I < T; I++) {
+        int i = type == 1 ? vjs[I] : vis[I];
+        switch (type) {
+        case 1:
+        case 0: {
+            auto& p{ ci.projected[i] };
+            vifjs[I] = p;
+            joint_aabbs[I] = { p - dev::d_hat_sqr, p + dev::d_hat_sqr };
+            break;
+        }
+        case 2: {
+            auto& e{ ci.edge(i) };
+            vifjs[I * 2] = e.e0;
+            vifjs[I * 2 + 1] = e.e1;
+            joint_aabbs[I] = compute_aabb(e, dev::d_hat_sqr);
+            break;
+        }
+        }
+    }
+    for (int I = 0; I < T_2; I++) {
+        int i = type == 1 ? fis[I] : fjs[I];
+        switch (type) {
+        case 1:
+        case 0: {
+            Facef f{ cj.triangle(i) };
+            vifjs[T + I * 3] = f.t0;
+            vifjs[T + I * 3 + 1] = f.t1;
+            vifjs[T + I * 3 + 2] = f.t2;
+
+            joint_aabbs[T + I] = compute_aabb(f, dev::d_hat_sqr);
+            break;
+        }
+        case 2: {
+            auto& e{ cj.edge(i) };
+            vifjs[T * 2 + I * 2] = e.e0;
+            vifjs[T * 2 + I * 2 + 1] = e.e1;
+            joint_aabbs[T + I] = compute_aabb(e, dev::d_hat_sqr);
+            break;
+        }
+        }
+    }
+}
+
+std::vector<cudaAffineBody> get_host_cubes_copy(
+    vec3f * &projected, vec3f * &updated, vec3f *&vertices,
+    int *&edges , int *&faces
+){
+    // create cpu-accessible copy of cubes, 
+    // for debugging purpose only
+    auto &g {host_cuda_globals};
+    auto &cubes{ g.host_cubes };
+    auto host_cubes = cubes;
+
+    vec3f* host_projected = new vec3f[host_cuda_globals.n_vertices],
+     * host_updated = new vec3f[host_cuda_globals.n_vertices],
+     * host_vertices = new vec3f[host_cuda_globals.n_vertices];
+    int* host_edges = new int[host_cuda_globals.n_edges * 2];
+    int* host_faces = new int[host_cuda_globals.n_faces * 3];
+
+    cudaMemcpy(host_projected, host_cuda_globals.projected_vertices, sizeof(vec3f) * host_cuda_globals.n_vertices, cudaMemcpyDeviceToHost);
+    cudaMemcpy(host_updated, host_cuda_globals.updated_vertices, sizeof(vec3f) * host_cuda_globals.n_vertices, cudaMemcpyDeviceToHost);
+    cudaMemcpy(host_vertices, host_cuda_globals.vertices_at_rest, sizeof(vec3f) * host_cuda_globals.n_vertices, cudaMemcpyDeviceToHost);
+    cudaMemcpy(host_edges, host_cuda_globals.edges, sizeof(int) * host_cuda_globals.n_edges * 2, cudaMemcpyDeviceToHost);
+    cudaMemcpy(host_faces, host_cuda_globals.faces, sizeof(int) * host_cuda_globals.n_faces * 3, cudaMemcpyDeviceToHost);
+    
+    int start = 0;
+    for (int i = 0; i < host_cubes.size(); i++) {
+        host_cubes[i].projected = host_projected + start;
+        host_cubes[i].updated = host_updated + start;
+        host_cubes[i].vertices = host_vertices + start;
+        start += host_cubes[i].n_vertices;
+        host_cubes[i].edges = host_cubes[i].edges - host_cuda_globals.edges + host_edges;
+        host_cubes[i].faces = host_cubes[i].faces - host_cuda_globals.faces + host_faces;
+    }
+
+    projected = host_projected;
+    updated = host_updated;
+    vertices = host_vertices;
+    edges = host_edges;
+    faces = host_faces;
+
+    return host_cubes;
+}
+#endif
+
+
+
+
 void per_intersection_core(int n_overlaps, luf* culls, i2* overlaps, int vtn, float* toi)
 {
 #define PT_ONLY
@@ -906,7 +949,6 @@ void per_intersection_core(int n_overlaps, luf* culls, i2* overlaps, int vtn, fl
 
     static vector<i2> host_overlaps;
     host_overlaps.resize(n_overlaps);
-//#define CPU_REF
 #ifdef CPU_REF
     static vector<luf> host_culls;
 
@@ -920,12 +962,12 @@ void per_intersection_core(int n_overlaps, luf* culls, i2* overlaps, int vtn, fl
     int* host_edges = new int[host_cuda_globals.n_edges * 2];
     int* host_faces = new int[host_cuda_globals.n_faces * 3];
 
-    int start = 0;
     cudaMemcpy(host_projected, host_cuda_globals.projected_vertices, sizeof(vec3f) * host_cuda_globals.n_vertices, cudaMemcpyDeviceToHost);
     cudaMemcpy(host_updated, host_cuda_globals.updated_vertices, sizeof(vec3f) * host_cuda_globals.n_vertices, cudaMemcpyDeviceToHost);
     cudaMemcpy(host_edges, host_cuda_globals.edges, sizeof(int) * host_cuda_globals.n_edges * 2, cudaMemcpyDeviceToHost);
     cudaMemcpy(host_faces, host_cuda_globals.faces, sizeof(int) * host_cuda_globals.n_faces * 3, cudaMemcpyDeviceToHost);
     
+    int start = 0;
     for (int i = 0; i < host_cubes.size(); i++) {
         host_cubes[i].projected = host_projected + start;
         host_cubes[i].updated = host_updated + start;
@@ -1018,13 +1060,11 @@ void per_intersection_core(int n_overlaps, luf* culls, i2* overlaps, int vtn, fl
                 flist_meta = ret_meta_sizes;
                 break;
             }
-        }
+        }   // end of primitive-intersection culling loop
 
         int sizes[6];
         CUDA_CALL(cudaStreamSynchronize(stream));
         CUDA_CALL(cudaMemcpyAsync(sizes, vlist_meta, sizeof(int) * 6, cudaMemcpyDeviceToHost, stream));
-        // i2 ij;
-        // CUDA_CALL(cudaMemcpyAsync(&ij, overlaps + i, sizeof(i2), cudaMemcpyDeviceToHost, stream));
         CUDA_CALL(cudaStreamSynchronize(stream));
         i2 ij = host_overlaps[i];
         i2 ji = { ij[1], ij[0] };
@@ -1200,7 +1240,7 @@ void per_intersection_core(int n_overlaps, luf* culls, i2* overlaps, int vtn, fl
             case 1: vjfi_ptr = ret_ij; break;
             case 2: eiej_ptr = ret_ij; break;
             }
-        }
+        }   // end of primtive pairwise loop
 
         if (vtn != 3) {
             CUDA_CALL(cudaStreamSynchronize(stream));
@@ -1231,60 +1271,26 @@ void per_intersection_core(int n_overlaps, luf* culls, i2* overlaps, int vtn, fl
             host_cuda_globals.bulk_buffer_back[tid] = bulk_back_stashed;
             host_cuda_globals.small_temporary_buffer_back[tid] = st_back_stashed;
         }
+
+
         else {
+            // vtn == 3, ccd
             *toi = std::min({ toi_by_type[0], toi_by_type[1], toi_by_type[2] });
         }
     }
     CUDA_CALL(cudaDeviceSynchronize());
 #ifdef CPU_REF
-    delete[] host_edges;
-    delete[] host_faces;
-    delete[] host_projected;
-    delete[] host_updated;
-    host_cubes = host_cubes_stashed;
+    {
+        delete[] host_edges;
+        delete[] host_faces;
+        delete[] host_projected;
+        delete[] host_updated;
+        host_cubes = host_cubes_stashed;
+    }
 #endif
 }
 
-__global__ void make_sym_kernel(
-    int lut_size,
-    i2* lut,
-    int n_cubes)
-{
-    int tid = threadIdx.x + blockIdx.x * blockDim.x;
-    int T = lut_size;
-    int n_tasks_per_thread = (T + blockDim.x - 1) / blockDim.x;
-    for (int _i = 0; _i < n_tasks_per_thread; _i++) {
-        int i = tid * n_tasks_per_thread + _i;
-        if (i < T) {
-        auto ij = lut[i];
-        i2 ji = { ij[1], ij[0] };
-        lut[i + lut_size] = ji;
-        }
-    }
-    T = n_cubes;
-    n_tasks_per_thread = (T + blockDim.x - 1) / blockDim.x;
-    for (int _i = 0; _i < n_tasks_per_thread; _i++) {
-        int i = tid * n_tasks_per_thread + _i;
-        if (i < T) {
-            i2 ii = { i, i };
-            lut[i + 2 * lut_size] = ii;
-        }
-    }
-}
-
-void make_lut(int n_overlaps, i2* overlaps)
-{
-    int n_cubes = host_cuda_globals.n_cubes;
-    auto& g{ host_cuda_globals };
-    make_sym_kernel<<<1, n_cuda_threads_per_block>>>(n_overlaps, overlaps, n_cubes);
-
-    g.lut_size = n_overlaps * 2 + n_cubes;
-    CUDA_CALL(cudaDeviceSynchronize());
-    g.lut = thrust::device_vector<i2>(overlaps, overlaps + g.lut_size);
-    thrust::sort(g.lut.begin(), g.lut.end());
-    // g.lut.resize(lut_size + n_cubes);
-}
-
+// called by "cuda_intersection" option
 void cuda_culling_glue(
     int vtn,
     thrust::device_vector<luf>& aabbs,

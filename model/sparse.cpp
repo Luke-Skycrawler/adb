@@ -12,8 +12,6 @@ using namespace Eigen;
 using namespace utils;
 
 
-void build_csr(int n_cubes, const thrust::device_vector<i2>& lut, CsrSparseMatrix& sparse_matrix);
-void gpuCholSolver(CsrSparseMatrix& hess, float* x, float *b);
 
 void map_to_thrust_vector(map<array<int, 2>, int>& lut, thrust::host_vector<i2>& host_lut)
 {
@@ -77,7 +75,7 @@ void to_csr(Eigen::SparseMatrix<double>& hess, CsrSparseMatrix& ret)
      ret.values = thrust::device_vector<float>{ values.data(), values.data() + nnz };
 }
 
-void cuda_solve(Eigen::VectorXd &_dq, Eigen::SparseMatrix<double>& sparse_hess, Eigen::VectorXd &r)
+void cuda_solve_glue(Eigen::VectorXd &_dq, Eigen::SparseMatrix<double>& sparse_hess, Eigen::VectorXd &r)
 {
     auto& hess{ host_cuda_globals.hess };
     if (host_cuda_globals.params["solve_with_cuda_matrix"]) {

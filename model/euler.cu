@@ -265,16 +265,6 @@ __global__ void update_newton_kernel(int n_cubes, cudaAffineBody* cubes, float* 
 }
 
 
-float iaabb_brute_force_cuda_pt_only(
-    int n_cubes,
-    cudaAffineBody* cubes,
-    luf* aabbs,
-    int vtn,
-    std::vector<std::array<int, 4>>& idx
-    // std::vector<std::array<int, 4>>& eidx,
-    // std::vector<std::array<int, 2>>& vidx
-    );
-
 // void implicit_euler_cuda()
 // {
 //     auto &g {host_cuda_globals};
@@ -338,7 +328,7 @@ float iaabb_brute_force_cuda_pt_only(
 //     update_timestep_kernel<<<1, n_cuda_threads_per_block>>>(n_cubes, host_cuda_globals.cubes);
 // }
 
-void hess_cuda(int n_cubes, float dt, float *grads, float * hess) {
+void cuda_inert_hess_glue(int n_cubes, float dt, float *grads, float * hess) {
     auto &cubes{ host_cuda_globals.cubes };
 
     //project_vt1_kernel<<<1, n_cuda_threads_per_block>>>(n_cubes, host_cuda_globals.cubes, host_cuda_globals.projected_vertices);

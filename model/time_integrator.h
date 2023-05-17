@@ -53,12 +53,6 @@ inline int stride(int j, int* outers)
 
 
 
-void gen_empty_sm_glue(
-    int n_cubes,
-    std::vector<std::array<int, 4>>& idx,
-    std::vector<std::array<int, 4>>& eidx,
-    SparseMatrix<double>& sparse_hess,
-    std::map<std::array<int, 2>, int>& lut);
 
 namespace utils {
 

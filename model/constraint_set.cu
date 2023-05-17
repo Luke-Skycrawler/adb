@@ -23,121 +23,6 @@ __host__ __device__ i2 offset_and_stride(int I, const i2* lut, int* outers)
     return { sub_mat_start, stride };
 }
 
-__global__ void fill_inner_outers_kernel(int n_cubes, int lut_size, const i2 * lut, int *inners, int *outers) {
-    // TESTED
-    auto tid = threadIdx.x;
-    auto n_task_per_thread = (lut_size+ blockDim.x - 1)/ blockDim.x;  
-    // precondition: lut contains all the symmetric pairs (i, j) and (j, i), sorted in ascending order
-
-    for (int _i = 0; _i < n_task_per_thread; _i ++) {
-        // detect stairs, fill outers
-        auto I = _i + n_task_per_thread * tid;
-        if (I < lut_size) {
-            int i = lut[I][0];
-            int last = I == 0 ? -1: lut[I - 1][0];
-            
-            if (last != i) {
-                inners[i] = I;
-                // temporary storage, outers should be filled according to this later
-            }
-        }
-    }
-    __syncthreads();
-    int n_cols_per_thread = (n_cubes + blockDim.x - 1) / blockDim.x;
-    for (int _i = 0; _i < n_cols_per_thread; _i ++) {
-        auto I = _i + n_cols_per_thread * tid;
-        if (I < n_cubes) {
-            auto next = I == n_cubes - 1 ? lut_size: inners[I + 1];
-            auto stride = next - inners[I];
-            auto start = inners[I] * 12 * 12;
-
-            for (int i =0; i < 12; i ++) {
-                outers[I * 12 + i] = start + 12 * (i * stride);
-            }
-        }
-    }
-    if (tid == 0) outers[n_cubes * 12] = lut_size * 12 * 12;
-    __syncthreads(); // wait until finish, then break inners array
-
-    int n_block_per_thread = (lut_size + blockDim.x - 1) / blockDim.x;
-    for (int _i = 0; _i < n_block_per_thread; _i ++) {
-        // fiil inners
-        auto I = _i + n_block_per_thread * tid;
-        if (I < lut_size) {
-
-            i2 os = offset_and_stride(I, lut, outers);
-            // int i = lut[I][0];
-            // int j = lut[I][1];
-            // int col_start = outers[i * 12] / (12 * 12);
-            // int sub_mat_offset = I - col_start;
-            // int sub_mat_start = outers[i * 12] + sub_mat_offset * 12;
-            // int stride = outers[i * 12 + 1] - outers[i * 12];
-            int sub_mat_start = os[0];
-            int stride = os[1];
-            int j = lut[I][1];
-            for (int c = 0; c < 12; c++) {
-                for (int r = 0; r < 12; r++) {
-                    inners[sub_mat_start + stride * c + r] = j * 12 + r;
-                }
-            }
-        }
-    }
-
-}
-void build_csr(int n_cubes, const thrust::device_vector<i2> &lut, CsrSparseMatrix & sparse_matrix) {
-    // TESTED
-    int lut_size = lut.size();
-    int nnz = lut_size * 12 * 12;
-    sparse_matrix.rows = n_cubes * 12;
-    sparse_matrix.cols = n_cubes * 12;
-    sparse_matrix.nnz = nnz;
-
-    sparse_matrix.outer_start.resize(n_cubes * 12 + 1);
-    sparse_matrix.inner.resize(nnz);
-    sparse_matrix.values.resize(nnz);
-    
-    thrust::device_vector<int> dev_inner(nnz), dev_outer(n_cubes * 12 + 1);
-    
-    thrust::fill(sparse_matrix.values.begin(), sparse_matrix.values.end(), 0.0f);
-    
-    auto lut_ptr = thrust::raw_pointer_cast(lut.data());
-    auto inner_ptr = thrust::raw_pointer_cast(dev_inner.data());
-    auto outer_ptr = thrust::raw_pointer_cast(dev_outer.data());
-    
-    fill_inner_outers_kernel<<<1, n_cuda_threads_per_block>>>(n_cubes, lut_size, lut_ptr, inner_ptr, outer_ptr);
-    
-    sparse_matrix.inner = dev_inner;
-    sparse_matrix.outer_start = dev_outer;
-    CUDA_CALL(cudaGetLastError());
-}
-
-
-__host__ __device__ void pt_grad_hess12x12(vec3f *pt, 
-    float *pt_grad, float *pt_hess, bool psd, 
-    float *buf  // for local grad and hess return
-)
-{
-
-    int type;
-    auto dist = vf_distance(pt[0], Facef{pt[1], pt[2], pt[3]}, type);
-    dev::point_triangle_distance_gradient(pt[0], pt[1], pt[2], pt[3], pt_grad, type, buf);
-    dev::point_triangle_distance_hessian(pt[0], pt[1], pt[2], pt[3], pt_hess, type, buf);
-
-    auto B_ = dev::barrier_derivative_d(dist);
-    auto B__ = dev::barrier_second_derivative(dist);
-
-    // pt_hess = pt_hess * B_ + pt_grad * pt_grad.transpose() * B__;
-    for (int i = 0; i < 12; i++)
-       for (int j = 0; j < 12; j++) {
-           pt_hess[j * 12 + i] = B_ * pt_hess[j * 12 + i] + pt_grad[i] * pt_grad[j] * B__;
-           // column major
-       }
-    for (int i = 0; i < 12; i++)
-       pt_grad[i] *= B_;
-
-    if (psd)
-       dev_project_to_psd(12, pt_hess);
-}
 
 __host__ __device__ int binary_search(int lut_size, i2* lut, i2 value)
 {
@@ -156,30 +41,6 @@ __host__ __device__ int binary_search(int lut_size, i2* lut, i2 value)
 __forceinline__ int __device__ __host__ rc_to_1d(int r, int c)
 {
     return c * 12 + r;
-}
-
-// void ipc_term_pt(int npt, i2 *ij, i2 *body_index, int lut_size, i2 * lut)
-// __global__ void ipc_pt_batch_kernel(int npt, vec3f *p, Facef * t) {
-// }
-
-// __device__ void JTJ(vec3f a, float* ipc_hess)
-// {
-// }
-
-__device__ void plain_matrix_product(int ar, int ac, int bc, float* a, float* b, float* c)
-{
-    // assume all in column major
-    for (int i = 0; i < ar; i++) {
-        for (int j = 0; j < bc; j++) {
-            float cij = 0.0f;
-
-            for (int k = 0; k < ac; k++) {
-                // cij += aik * bkj
-                cij += a[i + k * ar] * b[k + j * ac];
-            }
-            c[i + j * ar] = cij;
-        }
-    }
 }
 
 __device__ void put(float* values, i2 offset_stride, float* mat12x12)
@@ -227,25 +88,32 @@ __host__ __device__ i2 to_os(i2 ij, int lut_size, i2* lut, int* outers)
     return offset_and_stride(k, lut, outers);
 }
 
-void get_submat_glue(
-    int ii, int jj, 
-    float *submat12x12
-) 
+
+__host__ __device__ void pt_grad_hess12x12(vec3f *pt, 
+    float *pt_grad, float *pt_hess, bool psd, 
+    float *buf  // for local grad and hess return
+)
 {
-    auto &g{host_cuda_globals};
-    auto &h {g.hess};
-    auto outers = from_thrust(h.outer_start);
-    auto values = from_thrust(h.values);
-    auto lut = from_thrust(g.lut);
-    auto inners = from_thrust(h.inner);
-    auto os = to_os(i2{ii, jj}, g.lut_size, lut.data(), outers.data());
-    int offset = os[0], stride = os[1];
-    for (int c = 0; c < 12; c++) for (int r = 0; r < 12; r ++){
-        submat12x12[c * 12 + r] = values[offset + c * stride + r];
-        if (inners[offset + c * stride + r] != jj * 12 + r) {
-            printf("index error, should be (%d %d) but inner index = %d\n", jj * 12 + r, ii * 12 + c, inners[offset + c * stride + r]);
-        }
-    }
+
+    int type;
+    auto dist = vf_distance(pt[0], Facef{pt[1], pt[2], pt[3]}, type);
+    dev::point_triangle_distance_gradient(pt[0], pt[1], pt[2], pt[3], pt_grad, type, buf);
+    dev::point_triangle_distance_hessian(pt[0], pt[1], pt[2], pt[3], pt_hess, type, buf);
+
+    auto B_ = dev::barrier_derivative_d(dist);
+    auto B__ = dev::barrier_second_derivative(dist);
+
+    // pt_hess = pt_hess * B_ + pt_grad * pt_grad.transpose() * B__;
+    for (int i = 0; i < 12; i++)
+       for (int j = 0; j < 12; j++) {
+           pt_hess[j * 12 + i] = B_ * pt_hess[j * 12 + i] + pt_grad[i] * pt_grad[j] * B__;
+           // column major
+       }
+    for (int i = 0; i < 12; i++)
+       pt_grad[i] *= B_;
+
+    if (psd)
+       dev_project_to_psd(12, pt_hess);
 }
 
 __global__ void ipc_pt_kernel(
@@ -446,31 +314,6 @@ __host__ __device__ void ee_grad_hess12x12(vec3f *ee, float *ee_grad, float *ipc
     }
     dev_project_to_psd(12, ipc_hess);
 }
-
-__global__ void put_inertia_kernel(
-    int n_cubes, 
-    cudaAffineBody *cubes,
-    int lut_size, i2 *lut,
-    float *values, int *outers,
-    float *b,
-    float *diag
-) {
-    int tid = threadIdx.x + blockIdx.x * blockDim.x;
-    int n_tasks_per_thread = (n_cubes + blockDim.x - 1) / blockDim.x;
-    for (int _i =0; _i < n_tasks_per_thread; _i ++) {
-        int I = _i + tid * n_tasks_per_thread;
-        if (I < n_cubes){
-            auto osii = to_os({ I, I }, lut_size, lut, outers);
-            int offset = osii[0], stride = osii[1];
-
-            for (int c = 0; c < 12; c++)
-                for (int r =0; r < 12; r ++) {
-                    values[offset + c * stride + r] += diag[I * 144 + c * 12 + r];
-                }
-            // grad is already added to globals.b
-        }
-    }
-}
 __global__ void ipc_ee_kernel(
     int nee, 
     i2 *ee, i2 *ij, 
@@ -577,6 +420,31 @@ __global__ void ipc_ee_kernel(
                 }
             }
 
+        }
+    }
+}
+
+__global__ void put_inertia_kernel(
+    int n_cubes, 
+    cudaAffineBody *cubes,
+    int lut_size, i2 *lut,
+    float *values, int *outers,
+    float *b,
+    float *diag
+) {
+    int tid = threadIdx.x + blockIdx.x * blockDim.x;
+    int n_tasks_per_thread = (n_cubes + blockDim.x - 1) / blockDim.x;
+    for (int _i =0; _i < n_tasks_per_thread; _i ++) {
+        int I = _i + tid * n_tasks_per_thread;
+        if (I < n_cubes){
+            auto osii = to_os({ I, I }, lut_size, lut, outers);
+            int offset = osii[0], stride = osii[1];
+
+            for (int c = 0; c < 12; c++)
+                for (int r =0; r < 12; r ++) {
+                    values[offset + c * stride + r] += diag[I * 144 + c * 12 + r];
+                }
+            // grad is already added to globals.b
         }
     }
 }
@@ -709,8 +577,7 @@ void ipc_pt_cpu(
 }
 
 #endif
-void project_glue(int vtn);
-void cuda_ipc_glue()
+void cuda_ipc()
 {
     auto& g{ host_cuda_globals };
     auto& lt{ g.leader_thread_buffer_back };
@@ -797,3 +664,148 @@ void cuda_ipc_glue()
     }
     lt = lt_stashed;
 }
+
+__global__ void make_sym_kernel(
+    int lut_size,
+    i2* lut,
+    int n_cubes)
+{
+    int tid = threadIdx.x + blockIdx.x * blockDim.x;
+    int T = lut_size;
+    int n_tasks_per_thread = (T + blockDim.x - 1) / blockDim.x;
+    for (int _i = 0; _i < n_tasks_per_thread; _i++) {
+        int i = tid * n_tasks_per_thread + _i;
+        if (i < T) {
+        auto ij = lut[i];
+        i2 ji = { ij[1], ij[0] };
+        lut[i + lut_size] = ji;
+        }
+    }
+    T = n_cubes;
+    n_tasks_per_thread = (T + blockDim.x - 1) / blockDim.x;
+    for (int _i = 0; _i < n_tasks_per_thread; _i++) {
+        int i = tid * n_tasks_per_thread + _i;
+        if (i < T) {
+            i2 ii = { i, i };
+            lut[i + 2 * lut_size] = ii;
+        }
+    }
+}
+
+void make_lut(int n_overlaps, i2* overlaps)
+{
+    int n_cubes = host_cuda_globals.n_cubes;
+    auto& g{ host_cuda_globals };
+    make_sym_kernel<<<1, n_cuda_threads_per_block>>>(n_overlaps, overlaps, n_cubes);
+
+    g.lut_size = n_overlaps * 2 + n_cubes;
+    CUDA_CALL(cudaDeviceSynchronize());
+    g.lut = thrust::device_vector<i2>(overlaps, overlaps + g.lut_size);
+    thrust::sort(g.lut.begin(), g.lut.end());
+    // g.lut.resize(lut_size + n_cubes);
+}
+
+__global__ void fill_inner_outers_kernel(int n_cubes, int lut_size, const i2 * lut, int *inners, int *outers) {
+    // TESTED
+    auto tid = threadIdx.x;
+    auto n_task_per_thread = (lut_size+ blockDim.x - 1)/ blockDim.x;  
+    // precondition: lut contains all the symmetric pairs (i, j) and (j, i), sorted in ascending order
+
+    for (int _i = 0; _i < n_task_per_thread; _i ++) {
+        // detect stairs, fill outers
+        auto I = _i + n_task_per_thread * tid;
+        if (I < lut_size) {
+            int i = lut[I][0];
+            int last = I == 0 ? -1: lut[I - 1][0];
+            
+            if (last != i) {
+                inners[i] = I;
+                // temporary storage, outers should be filled according to this later
+            }
+        }
+    }
+    __syncthreads();
+    int n_cols_per_thread = (n_cubes + blockDim.x - 1) / blockDim.x;
+    for (int _i = 0; _i < n_cols_per_thread; _i ++) {
+        auto I = _i + n_cols_per_thread * tid;
+        if (I < n_cubes) {
+            auto next = I == n_cubes - 1 ? lut_size: inners[I + 1];
+            auto stride = next - inners[I];
+            auto start = inners[I] * 12 * 12;
+
+            for (int i =0; i < 12; i ++) {
+                outers[I * 12 + i] = start + 12 * (i * stride);
+            }
+        }
+    }
+    if (tid == 0) outers[n_cubes * 12] = lut_size * 12 * 12;
+    __syncthreads(); // wait until finish, then break inners array
+
+    int n_block_per_thread = (lut_size + blockDim.x - 1) / blockDim.x;
+    for (int _i = 0; _i < n_block_per_thread; _i ++) {
+        // fiil inners
+        auto I = _i + n_block_per_thread * tid;
+        if (I < lut_size) {
+
+            i2 os = offset_and_stride(I, lut, outers);
+            int sub_mat_start = os[0];
+            int stride = os[1];
+            int j = lut[I][1];
+            for (int c = 0; c < 12; c++) {
+                for (int r = 0; r < 12; r++) {
+                    inners[sub_mat_start + stride * c + r] = j * 12 + r;
+                }
+            }
+        }
+    }
+
+}
+void build_csr(int n_cubes, const thrust::device_vector<i2> &lut, CsrSparseMatrix & sparse_matrix) {
+    // TESTED
+    int lut_size = lut.size();
+    int nnz = lut_size * 12 * 12;
+    sparse_matrix.rows = n_cubes * 12;
+    sparse_matrix.cols = n_cubes * 12;
+    sparse_matrix.nnz = nnz;
+
+    sparse_matrix.outer_start.resize(n_cubes * 12 + 1);
+    sparse_matrix.inner.resize(nnz);
+    sparse_matrix.values.resize(nnz);
+    
+    thrust::device_vector<int> dev_inner(nnz), dev_outer(n_cubes * 12 + 1);
+    
+    thrust::fill(sparse_matrix.values.begin(), sparse_matrix.values.end(), 0.0f);
+    
+    auto lut_ptr = thrust::raw_pointer_cast(lut.data());
+    auto inner_ptr = thrust::raw_pointer_cast(dev_inner.data());
+    auto outer_ptr = thrust::raw_pointer_cast(dev_outer.data());
+    
+    fill_inner_outers_kernel<<<1, n_cuda_threads_per_block>>>(n_cubes, lut_size, lut_ptr, inner_ptr, outer_ptr);
+    
+    sparse_matrix.inner = dev_inner;
+    sparse_matrix.outer_start = dev_outer;
+    CUDA_CALL(cudaGetLastError());
+}
+
+
+void get_submat_glue(
+    int ii, int jj, 
+    float *submat12x12
+) 
+{
+    auto &g{host_cuda_globals};
+    auto &h {g.hess};
+    auto outers = from_thrust(h.outer_start);
+    auto values = from_thrust(h.values);
+    auto lut = from_thrust(g.lut);
+    auto inners = from_thrust(h.inner);
+    auto os = to_os(i2{ii, jj}, g.lut_size, lut.data(), outers.data());
+    int offset = os[0], stride = os[1];
+    for (int c = 0; c < 12; c++) for (int r = 0; r < 12; r ++){
+        submat12x12[c * 12 + r] = values[offset + c * stride + r];
+        if (inners[offset + c * stride + r] != jj * 12 + r) {
+            printf("index error, should be (%d %d) but inner index = %d\n", jj * 12 + r, ii * 12 + c, inners[offset + c * stride + r]);
+        }
+    }
+}
+

@@ -64,22 +64,38 @@ void initialize_aabbs(
     const std::vector<lu>& aabbs
 );
 
-// template <typename T>
-// thrust::device_vector<T> to_thrust(std::vector<T> &b);
+// glue function declarations---------------------------------------------
+// defined in constraint_set.cu
 void project_glue(int vtn);
-void cuda_ipc_glue();
-void hess_cuda(int n_cubes, float dt, float* grads, float* hess);
-void cuda_solve(Eigen::VectorXd& dq, Eigen::SparseMatrix<double>& sparse_hess, Eigen::VectorXd& r);
+// called by "cuda_intersection" option, defined in iaabb.cu
+void cuda_culling_glue(
+    int vtn,
+    thrust::device_vector<luf>& aabbs,
+    thrust::device_vector<luf>& ret_culls);
 
-void glue_vf_col_set(
+// called by "cuda_hess", wrapped by anothe layer of locally defined "cuda_hess_glue"
+void cuda_inert_hess_glue(int n_cubes, float dt, float* grads, float* hess);
+// called by "cuda_solver" option, defined in sparse.cpp
+void cuda_solve_glue(Eigen::VectorXd& dq, Eigen::SparseMatrix<double>& sparse_hess, Eigen::VectorXd& r);
+
+// deprecated
+void vf_col_set_glue(
     std::vector<int>& vilist, std::vector<int>& fjlist,
     const std::vector<std::unique_ptr<AffineBody>>& cubes,
     int I, int J,
     std::vector<std::array<vec3, 4>>& pts,
     std::vector<std::array<int, 4>>& idx,
     int tid = 0);
-
+// called by "submat_compare" option
 void get_submat_glue(
     int ii, int jj,
     float* submat12x12);
+
+// called by "cuda_sm_test"
+void gen_empty_sm_glue(
+    int n_cubes,
+    std::vector<std::array<int, 4>>& idx,
+    std::vector<std::array<int, 4>>& eidx,
+    SparseMatrix<double>& sparse_hess,
+    std::map<std::array<int, 2>, int>& lut);
 #endif
