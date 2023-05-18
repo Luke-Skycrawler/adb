@@ -1153,6 +1153,15 @@ void prepare_vifj(
     }
 }
 
+int aabb_intersection_test_host(const vector<luf>& aabbs, int nvi, int nfj, vector<i2>& ret_ij) {
+    ret_ij.clear();
+    for (int i = 0; i < nvi; i ++) for (int j = 0; j < nfj; j ++) {
+        if (intersects(aabbs[i], aabbs[nvi + j])) 
+            ret_ij.push_back(i2{i, j});
+    }
+    return ret_ij.size();
+}
+
 std::vector<cudaAffineBody> get_host_cubes_copy(
     vec3f*& projected, vec3f*& updated, vec3f*& vertices,
     int*& edges, int*& faces)
@@ -1332,25 +1341,36 @@ void per_intersection_core(int n_overlaps, luf* culls, i2* overlaps, int vtn, fl
         bool all_sizes_match = true;
         for (int type = 0; type < MAX_TYPES; type++) {
             all_sizes_match &= (sizes[type * 2] == host_prmts[type][0].size() && sizes[type * 2 + 1] == host_prmts[type][1].size());
-
-            // perhaps sorting not required
-
-            // auto &a = host_prmts[type][0], &b = host_prmts[type][1];
-            // sort(a.begin(), a.end());
-            // sort(b.begin(), b.end());
+            // sorting not required for cpu reference
         }
         thrust::device_vector<int> d_vi(vlist, vlist + sizes[0]);
         thrust::device_vector<int> d_vj(vlist + sizes[0], vlist + sizes[0] + sizes[1]);
         thrust::device_vector<int> d_fi(flist, flist + sizes[2]);
         thrust::device_vector<int> d_fj(flist + sizes[2], flist + sizes[2] + sizes[3]);
+
+
+
         auto _vi = from_thrust(d_vi), _vj = from_thrust(d_vj), _fi = from_thrust(d_fi), _fj = from_thrust(d_fj);
         auto vi = _vi, vj = _vj, fi = _fi, fj = _fj;
+        vector<int> garbage;
+
+        #ifndef PT_ONLY
+        thrust::device_vector<int> d_ei(elist, elist + sizes[4]);
+        thrust::device_vector<int> d_ej(elist + sizes[4], elist + sizes[4] + sizes[5]);
+        auto _ei = from_thrust(d_ei), _ej = from_thrust(d_ej);
+        auto ei = _ei, ej = _ej;
+        sort(_ei.begin(), _ei.end());
+        sort(_ej.begin(), _ej.end());
+        set_difference(_ei.begin(), _ei.end(), host_prmts[2][0].begin(), host_prmts[2][0].end(), back_inserter(garbage));
+        set_difference(_ej.begin(), _ej.end(), host_prmts[2][1].begin(), host_prmts[2][1].end(), back_inserter(garbage));
+
+
+        #endif
 
         sort(_vi.begin(), _vi.end());
         sort(_vj.begin(), _vj.end());
         sort(_fi.begin(), _fi.end());
         sort(_fj.begin(), _fj.end());
-        vector<int> garbage;
         set_difference(_vi.begin(), _vi.end(), host_prmts[0][0].begin(), host_prmts[0][0].end(), back_inserter(garbage));
         set_difference(_vj.begin(), _vj.end(), host_prmts[0][1].begin(), host_prmts[0][1].end(), back_inserter(garbage));
         set_difference(_fi.begin(), _fi.end(), host_prmts[1][0].begin(), host_prmts[1][0].end(), back_inserter(garbage));
@@ -1499,6 +1519,20 @@ void per_intersection_core(int n_overlaps, luf* culls, i2* overlaps, int vtn, fl
             int host_ret_cnt;
             cudaMemcpy(&host_ret_cnt, ret_cnt, sizeof(int), cudaMemcpyDeviceToHost);
             auto host_culled_pairs{ from_thrust(thrust::device_vector<i2>(ret_ij, ret_ij + host_ret_cnt)) };
+            vector<i2> host_ij;
+            aabb_intersection_test_host(host_joint_aabbs, nvi, nfj, host_ij);
+            if (host_ret_cnt != host_ij.size()) {
+                spdlog::error("ret_cnt mismatch\n");
+            }
+            else {
+                sort(host_culled_pairs.begin(), host_culled_pairs.end());
+                sort(host_ij.begin(), host_ij.end());
+                for (int i = 0; i < host_ret_cnt; i++) {
+                    if (host_ij[i] != host_culled_pairs[i]) {
+                        spdlog::error("ret_ij mismatch\n");
+                    }
+                }
+            }
 
 #endif
             if (vtn == 2) {

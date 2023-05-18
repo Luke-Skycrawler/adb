@@ -151,7 +151,7 @@ __device__ __host__ luf compute_aabb(const Edgef& e, float d_hat_sqrt)
         CUDA_MAX(e.e0.x, e.e1.x),
         CUDA_MAX(e.e0.y, e.e1.y),
         CUDA_MAX(e.e0.z, e.e1.z));
-    return { l, u };
+    return { l - d_hat_sqrt , u + d_hat_sqrt};
 }
 
 __device__ __host__ luf compute_aabb(const Facef& f, float d_hat_sqrt)
@@ -165,7 +165,7 @@ __device__ __host__ luf compute_aabb(const Facef& f, float d_hat_sqrt)
         CUDA_MAX3(f.t0.x, f.t1.x, f.t2.x),
         CUDA_MAX3(f.t0.y, f.t1.y, f.t2.y),
         CUDA_MAX3(f.t0.z, f.t1.z, f.t2.z));
-    return { l, u };
+    return { l - d_hat_sqrt, u + d_hat_sqrt };
 }
 
 
