@@ -124,6 +124,8 @@ __device__ __host__ float ee_collision_time(
     const Edgef& ej1);
 
 __global__ void aggregate_barrier_kernel(
+    int type,
+    // 0, 1: pt, 2: ee
     i2* ijs,
     int* cnt,
     vec3f* vifjs,
@@ -148,11 +150,22 @@ __global__ void aggregate_barrier_kernel(
             // int fj = fjlist[j];
 
             // compute the distance and type
-            auto v{ vifjs[i] };
-            Facef f{ vifjs[j * 3 + nvi], vifjs[j * 3 + 1 + nvi], vifjs[j * 3 + 2 + nvi] };
-            int pt_type;
-            auto d = vf_distance(v, f, pt_type);
-            barriers[tid] += dev::barrier_function(d);
+            if (type < 2) {
+                // point triangle
+                auto v{ vifjs[i] };
+                Facef f{ vifjs[j * 3 + nvi], vifjs[j * 3 + 1 + nvi], vifjs[j * 3 + 2 + nvi] };
+                int pt_type;
+                auto d = vf_distance(v, f, pt_type);
+                barriers[tid] += dev::barrier_function(d);
+            }
+            else {
+                // edge edge
+                Edgef ei{ vifjs[i * 2], vifjs[i * 2 + 1] };
+                Edgef ej{ vifjs[j * 2 + nvi * 2], vifjs[j * 2 + 1 + nvi * 2] };
+                int  ee_type = dev::edge_edge_distance_type(ei.e0, ei.e1, ej.e0, ej.e1);
+                auto d = dev::edge_edge_distance(ei.e0, ei.e1, ej.e0, ej.e1, type);
+                barriers[tid] += dev::barrier_function(d);
+            }
         }
     }
     __syncthreads();
@@ -164,6 +177,46 @@ __global__ void aggregate_barrier_kernel(
         *ret_barrier = barrier;
     }
 }
+
+__global__ void ee_toi_decision_kernel(
+    i2 * ijs,
+    int *cnt,
+    vec3f *eiejs,
+    int _nei,
+    float *ret_toi
+) {
+    // NOTE: can only launched with n_cuda_threads_per_block threads
+    int tid = threadIdx.x + blockIdx.x * blockDim.x;
+    int n_tasks = *cnt;
+    int n_task_per_thread = (n_tasks + blockDim.x - 1) / blockDim.x;
+    int nei = _nei * 4;
+    __shared__ float tois[n_cuda_threads_per_block];
+    tois[tid] = 1.0f;
+    for (int _i = 0; _i < n_task_per_thread; _i ++) {
+        int idx = tid *  n_task_per_thread + _i;
+        if (idx < n_tasks) {
+            auto ij = ijs[idx];
+            int i= ij[0];
+            int j = ij[1];
+            Edgef eit1 {vifjs[i * 4], vifjs[i * 4 + 1]};
+            Edgef eit2 {vifjs[i * 4 + 2], vifjs[i * 4 + 3]};
+            Edgef ejt1 {vifjs[j * 4 + nei], vifjs[j * 4 + 1 + nei]};
+            Edgef ejt2 {vifjs[j * 4 + 2 + nei], vifjs[j * 4 + 3 + nei]};
+
+            auto toi = ee_collision_time(eit1, ejt1, eit2, ejt2);
+            tois[tid] = CUDA_MIN(tois[tid], toi);
+        }
+    }
+    __syncthreads();
+    if (tid == 0){
+        float toi_min = 1.0f;
+        for(int i = 0; i < blockDim.x; i ++) {
+            toi_min = CUDA_MIN(toi_min, tois[i]);
+        }
+        *ret_toi = toi_min;
+    }
+}
+
 __global__ void toi_decision_kernel(
     i2 *ijs, 
     int *cnt,
@@ -227,7 +280,55 @@ float toi_decision_host(
 }
 
 #endif
-__global__ void filter_distance_kernel_atomic(i2* buf_ij, i2* io_tmp,
+
+__global__ void ee_filter_distance_kernel_atomic(
+    i2 * buf_ij, i2* io_tmp,
+    int *io_cnt,
+    vec3f *eiejs, 
+    int *eilist, int *ejlist,
+    int *ret_ee_types,
+    float dhat  = 1e-4f,
+    int _nei = 0
+) {
+    int tid = threadIdx.x + blockIdx.x * blockDim.x;
+    int n_tasks = *io_cnt;
+    int n_task_per_thread = (n_tasks + blockDim.x - 1) / blockDim.x;
+    __shared__ int n;
+    n =0;
+    int nei = 2 * _nei;
+    for (int _i = 0; _i < n_task_per_thread; _i ++) {
+        int idx = tid * n_task_per_thread + _i ;
+        if (idx < n_tasks) {
+            auto ij {io_tmp[idx]};
+            int i = ij[0];
+            int j = ij[1]; 
+
+            Edgef ei {eiejs[i * 2], eiejs[i * 2 + 1]};
+            Edgef ej {eiejs[j * 2 + nei], eiejs[j * 2 + 1 + nei]};
+            int ee_type = dev::edge_edge_distance_type(ei.e0, ei.e1, ej.e0, ej.e1);
+            auto d = dev::edge_edge_distance(ei.e0, ei.e1, ej.e0, ej.e1, ee_type); 
+            if (d < d_hat) {
+                auto put = atomicAdd(&n, 1);
+                buf_ij[put] = {eilist[i], ejlist[j]};
+                ret_ee_types[put] = ee_type;
+            }
+        }
+    }
+    __syncthreads();
+    n_tasks = n;
+    n_task_per_thread = (n_tasks + blockDim.x - 1) / blockDim.x;
+    for (int _i = 0; _i < n_task_per_thread; _i ++) {
+        int idx = tid * n_task_per_thread + _i ;
+        if (idx < n_tasks) {
+            io_tmp[idx] = buf_ij[idx];
+        }
+    }
+    *io_cnt = n;
+}
+
+
+__global__ void filter_distance_kernel_atomic(
+    i2* buf_ij, i2* io_tmp,
     int* io_cnt, 
     vec3f* vis, Facef* fjs,
 
@@ -1360,22 +1461,33 @@ void per_intersection_core(int n_overlaps, luf* culls, i2* overlaps, int vtn, fl
             auto _flist = flist + f_offset;
             auto _vlist = vlist + v_offset;
 
-            if (vtn != 3) {
-                filter_distance_kernel_atomic<<<1, n_cuda_threads_per_block, 0, stream>>>(
-                    buf_ij, ret_ij, ret_cnt, vifjs, nullptr,
-                    _vlist, _flist,
-                    pt_types,
-                    1e-4f,
-                    nvi);
+            if (vtn == 2) {
+                // only called in line search,
+                // aggregate the barrier function
+
+                // FIXME: leave vilist and fjlist as nullptr to ensure the barrier kernel gets the right data, 
+                // solution: just put barrier compute in front
+                // since it doesn't tamper the ij array
+
+                aggregate_barrier_kernel<<<1, n_cuda_threads_per_block, 0, stream>>>(type, ret_ij, ret_cnt, vifjs, nvi, ret_barrier);
                 CUDA_CALL(cudaGetLastError());
                 CUDA_CALL(cudaStreamSynchronize(stream));
-                if (vtn == 2) {
-                    // only called in line search,
-                    // aggregate the barrier function
-                    aggregate_barrier_kernel<<<1, n_cuda_threads_per_block, 0, stream>>>(ret_ij, ret_cnt, vifjs, nvi, ret_barrier);
-                    CUDA_CALL(cudaGetLastError());
-                    CUDA_CALL(cudaStreamSynchronize(stream));
+            }
+            if (vtn != 3) {
+                if (type < 2) {
+                    filter_distance_kernel_atomic<<<1, n_cuda_threads_per_block, 0, stream>>>(
+                        buf_ij, ret_ij, ret_cnt, vifjs, nullptr,
+                        _vlist, _flist,
+                        pt_types,
+                        1e-4f,
+                        nvi);
                 }
+                else {
+                    // edge_edge
+                    ee_filter_distance_kernel_atomic<<<1 , n_cuda_threads_per_block, 0, stream>>>(buf_ij, ret_ij, ret_cnt, vifjs, _vilist, _fjlist, pt_types, 1e-4f, nvi);
+                }
+                CUDA_CALL(cudaGetLastError());
+                CUDA_CALL(cudaStreamSynchronize(stream));
 
 #ifdef CPU_REF
                 cudaMemcpy(&host_ret_cnt, ret_cnt, sizeof(int), cudaMemcpyDeviceToHost);
@@ -1390,7 +1502,12 @@ void per_intersection_core(int n_overlaps, luf* culls, i2* overlaps, int vtn, fl
                 }
             }
             else {
-                toi_decision_kernel<<<1, n_cuda_threads_per_block, 0, stream>>>(ret_ij, ret_cnt, vifjs, nvi, ret_toi);
+                if (vtn < 3) {
+                    toi_decision_kernel<<<1, n_cuda_threads_per_block, 0, stream>>>(ret_ij, ret_cnt, vifjs, nvi, ret_toi);
+                }
+                else {
+                    ee_toi_decision_kernel<<<1, n_cuda_threads_per_block, 0, stream >>>(ret_ij, ret_cnt, vifjs, nvi, ret_toi);
+                }
 
                 CUDA_CALL(cudaGetLastError());
                 CUDA_CALL(cudaStreamSynchronize(stream));
