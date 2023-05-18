@@ -80,7 +80,7 @@ struct CudaGlobals {
     // thrust::device_vector<int> pt_types, pt_types_update;
     int npt, nee;
     int n_cubes, lut_size;
-    CollisionSets collision_sets;
+    //CollisionSets collision_sets;
     CsrSparseMatrix hess;
     // FIXME: __device__ refer lan's imple
     // thrust::device_vector<float> b;
@@ -175,7 +175,8 @@ float iaabb_brute_force_cuda_pt_only(
     cudaAffineBody* cubes,
     luf* aabbs,
     int vtn,
-    std::vector<std::array<int, 4>>& idx);
+    std::vector<std::array<int, 4>>& idx,
+    std::vector<std::array<int, 4>>& eidx);
 
 // build csr matrix from look up table
 void build_csr(int n_cubes, const thrust::device_vector<i2>& lut, CsrSparseMatrix& sparse_matrix);

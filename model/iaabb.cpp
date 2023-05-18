@@ -1296,7 +1296,7 @@ double iaabb_brute_force(
         eidx,
         vidx);
     if (globals.params_int["cuda_pt"]) {
-        vector<array<int, 4>> idx_cuda, int_ref;
+        vector<array<int, 4>> idx_cuda, int_ref, eidx_cuda;
         for (int i = 0; i < n_cubes; i++) {
             auto& b{ host_cuda_globals.host_cubes[i] };
             auto& a{ *cubes[i] };
@@ -1309,17 +1309,22 @@ double iaabb_brute_force(
         }
         cudaMemcpy(host_cuda_globals.cubes, host_cuda_globals.host_cubes.data(), sizeof(cudaAffineBody) * n_cubes, cudaMemcpyHostToDevice);
         project_glue(vtn);
-        float toif = iaabb_brute_force_cuda_pt_only(n_cubes, host_cuda_globals.cubes, host_cuda_globals.aabbs, vtn, idx_cuda);
+        float toif = iaabb_brute_force_cuda_pt_only(n_cubes, host_cuda_globals.cubes, host_cuda_globals.aabbs, vtn, idx_cuda, eidx_cuda);
 
         bool compare = true;
         if (compare) {
-            sort(idx.begin(), idx.end());
-            sort(idx_cuda.begin(), idx_cuda.end());
-            set_intersection(idx.begin(), idx.end(), idx_cuda.begin(), idx_cuda.end(), std::back_inserter(int_ref));
-            if (vtn != 3) {
+            const auto int_compare = [](vector<array<int ,4>> &idx, vector<array<int, 4>>& idx_cuda, vector<array<int,4>>& int_ref, string title = "pt") {
+                sort(idx.begin(), idx.end());
+                sort(idx_cuda.begin(), idx_cuda.end());
+                set_intersection(idx.begin(), idx.end(), idx_cuda.begin(), idx_cuda.end(), std::back_inserter(int_ref));
                 if (idx.size() != idx_cuda.size() || int_ref.size() != idx.size()) {
-                    spdlog::warn("size : ref = {}, cuda = {}, intersection(ref, cuda) = {}", idx.size(), idx_cuda.size(), int_ref.size());
-                }
+                    spdlog::warn("{} size : ref = {}, cuda = {}, intersection(ref, cuda) = {}", title, idx.size(), idx_cuda.size(), int_ref.size());
+                }                
+            };
+            if (vtn != 3) {
+                int_compare(idx, idx_cuda, int_ref);
+                int_ref.clear();
+                int_compare(eidx, eidx_cuda, int_ref, "ee");
             }
             else 
             if (abs(toi - toif) > 1e-4) {
