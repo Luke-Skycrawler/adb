@@ -11,34 +11,34 @@ using i4 = std::array<int ,4>;
 using i2 = cuda::std::array<int, 2>;
 using i4 = cuda::std::array<int, 4>;
 #endif
-struct CollisionSets {
-    int pt_cnt[7], ee_cnt[9];
-    i2* pt_set[7];
-    i2* pt_set_body_index[7];
-    /* corresponds to enum class PointTriangleDistanceType {
-        P_T0, 
-        P_T1, 
-        P_T2, 
-        P_E0, 
-        P_E1, 
-        P_E2, 
-        P_T
-    };*/
-    i2* ee_set[9];
-    i2* ee_set_body_index[9];
-    /* corresponds to enum class EdgeEdgeDistanceType {
-        EA0_EB0, 
-        EA0_EB1, 
-        EA1_EB0, 
-        EA1_EB1, 
-        EA_EB0,
-        EA_EB1,
-        EA0_EB,
-        EA1_EB,
-        EA_EB
-    }; */
+// struct CollisionSets {
+//     int pt_cnt[7], ee_cnt[9];
+//     i2* pt_set[7];
+//     i2* pt_set_body_index[7];
+//     /* corresponds to enum class PointTriangleDistanceType {
+//         P_T0, 
+//         P_T1, 
+//         P_T2, 
+//         P_E0, 
+//         P_E1, 
+//         P_E2, 
+//         P_T
+//     };*/
+//     i2* ee_set[9];
+//     i2* ee_set_body_index[9];
+//     /* corresponds to enum class EdgeEdgeDistanceType {
+//         EA0_EB0, 
+//         EA0_EB1, 
+//         EA1_EB0, 
+//         EA1_EB1, 
+//         EA_EB0,
+//         EA_EB1,
+//         EA0_EB,
+//         EA1_EB,
+//         EA_EB
+//     }; */
     
-};
+// };
 
 struct CsrSparseMatrix
 {
@@ -103,8 +103,8 @@ struct CudaGlobals {
     vec3f *vertices_at_rest, *projected_vertices, *updated_vertices;
     int n_vertices, n_edges, n_faces;
     int *edges, *faces;
-    CollisionSet pt, ee;
-
+    CollisionSet pt, ee, pt_line_search, ee_line_search;
+    int npt_line_search, nee_line_search;
     cudaStream_t* streams;
     float3 gravity;
     CudaGlobals(int n_cubes = 0);

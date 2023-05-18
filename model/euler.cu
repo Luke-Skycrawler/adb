@@ -358,6 +358,14 @@ void CudaGlobals::allocate_buffers()
 {
     cudaMallocManaged(&pt.p, max_pairs_per_block * n_blocks * sizeof(i2));
     cudaMallocManaged(&pt.b, max_pairs_per_block * n_blocks * sizeof(i2));
+    cudaMallocManaged(&ee.p, max_pairs_per_block * n_blocks * sizeof(i2));
+    cudaMallocManaged(&ee.b, max_pairs_per_block * n_blocks * sizeof(i2));
+
+    cudaMallocManaged(&pt_line_search.p, max_pairs_per_block * n_blocks * sizeof(i2));
+    cudaMallocManaged(&pt_line_search.b, max_pairs_per_block * n_blocks * sizeof(i2));
+    cudaMallocManaged(&ee_line_search.p, max_pairs_per_block * n_blocks * sizeof(i2));
+    cudaMallocManaged(&ee_line_search.b, max_pairs_per_block * n_blocks * sizeof(i2));
+
     cudaMallocManaged(&cubes, n_cubes * sizeof(cudaAffineBody));
     cudaMallocManaged(&b, 12 * n_cubes * sizeof(float));
     cudaMallocManaged(&dq, 12 * n_cubes * sizeof(float));
@@ -410,6 +418,12 @@ void CudaGlobals::free_buffers()
     cudaFree(cubes);
     cudaFree(pt.p);
     cudaFree(pt.b);
+    cudaFree(ee.p);
+    cudaFree(ee.b);
+    cudaFree(pt_line_search.p);
+    cudaFree(pt_line_search.b);
+    cudaFree(ee_line_search.p);
+    cudaFree(ee_line_search.b);
     delete[] small_temporary_buffer;
     delete[] small_temporary_buffer_back;
     delete[] bulk_buffer;
