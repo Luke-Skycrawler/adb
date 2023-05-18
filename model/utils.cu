@@ -188,6 +188,15 @@ __host__ __device__ void cudaAffineBody::q_minus_qtiled(float3 dq[4])
     }
 }
 
+__host__ __device__ float orthogonal_energy(float3 q[4], float dt) {
+    float E = 0;
+    for (int i = 1; i < 4; i ++)
+        for (int j = 1; j < 4; j ++) {
+            float t = dot(q[i], q[j]) - kronecker(i, j);
+            E += t * t;
+        }
+    return E * kappa * dt * dt;
+}
 
 __host__ __device__ void orthogonal_grad(float3 q[4], float dt, float ret[12])
 {
@@ -243,6 +252,19 @@ __host__ __device__ void orthogonal_hess(float3 q[4], float dt, float ret[144])
                     ret[(i * 3 + ii) + (j * 3 + jj) * 12] = scale * h[ii + jj * 3];
                 }
         }
+}
+
+__host__ __device__ float inertia(cudaAffineBody &c, float dt) {
+    if (c.mass < 0) return 0.0f;
+    float ret;
+
+    float3 dq[4];
+    c.q_minus_qtiled(dq);
+    for (int i= 0; i < 4; i ++) {
+        float w = 0.5 * (i == 0 ? c.mass : c.Ic);
+        ret += w * dot(dq[i], dq[i]);
+    }
+    return ret + orthogonal_energy( c.q_update, dt);
 }
 __host__ __device__ void inertia_grad(cudaAffineBody& c, float dt, float ret[12])
 {

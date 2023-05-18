@@ -159,7 +159,9 @@ __forceinline__ __device__ __host__ float kronecker(int i, int j)
 {
     return i == j ? 1.0f : 0.0f;
 }
-
+__host__ __device__ float inertia(cudaAffineBody &c, float dt);
+__host__ __device__ void inertia_grad(cudaAffineBody& c, float dt, float ret[12]);
+__host__ __device__ void inertia_hess(cudaAffineBody& c, float ret[144]);
 
 // seen in all cuda files & glued files-----------------------------------------
 // high-level functions, can be directly called outside of cuda environment

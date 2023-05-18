@@ -32,6 +32,13 @@ __host__ __device__ luf merge(luf a, luf b);
 void make_lut(int n_overlaps, i2* overlaps);
 
 void per_intersection_core(int n_overlaps, luf* culls, i2* overlaps, int vtn, float* toi = nullptr, float *E_barrier = nullptr);
+__global__ void compute_inertia_energy_kernel(
+    int n_cubes, 
+    cudaAffineBody *cubes,
+    float *ret_energy,
+    float dt = 1e-2f
+);
+
 
 /* NOTE: kernel argument convention:
     buf_: device buffer
@@ -125,6 +132,7 @@ __global__ void aggregate_barrier_kernel(
     float d_hat = 1e-4f)
 {
     // NOTE: can only be called with n_cuda_threads_per_block threads
+    // thus blockIdx.x and n_cuda_threads_per_block are interchangeable
     int tid = threadIdx.x + blockIdx.x * blockDim.x;
     int n_tasks = *cnt;
     int n_task_per_thread = (n_tasks + n_cuda_threads_per_block - 1) / n_cuda_threads_per_block;
@@ -745,7 +753,9 @@ float iaabb_brute_force_cuda_pt_only(
     luf *culls = (luf *)lt_back;
     lt_back += sizeof(luf) * max_overlap_size;
     
-    
+    float *ret_energy = (float *)lt_back;
+    lt_back += sizeof(float);
+
     culling_kernel_atomic <<<1, n_cuda_threads_per_block>>>(n_cubes, cubes, aabbs, vtn, dev_n_overlaps, overlaps, culls);
     CUDA_CALL(cudaGetLastError());
     cudaMemcpy(&n_overlaps, dev_n_overlaps, sizeof(int), cudaMemcpyDeviceToHost);
@@ -754,6 +764,12 @@ float iaabb_brute_force_cuda_pt_only(
 
     float ret_toi = 1.0f;
     float E_barrier = 0.0f;
+    float E_inert = 0.0f;
+    if(vtn == 2) {
+        compute_inertia_energy_kernel<<<1, n_cuda_threads_per_block>>>(n_cubes, cubes, ret_energy);
+        CUDA_CALL(cudaDeviceSynchronize());
+        cudaMemcpy(&E_inert, ret_energy, sizeof(float), cudaMemcpyDeviceToHost);        
+    }
     per_intersection_core(n_overlaps, culls, overlaps, vtn, &ret_toi, &E_barrier);
 
     lt_back = stashed_lt_back;
@@ -769,7 +785,7 @@ float iaabb_brute_force_cuda_pt_only(
     }
     delete[] plist;
     delete[] blist;
-    return vtn == 3? ret_toi : E_barrier;
+    return vtn == 3? ret_toi : E_barrier  + E_inert;
 }
 
 __global__ void strided_memset_kernel(
@@ -1052,6 +1068,7 @@ void per_intersection_core(int n_overlaps, luf* culls, i2* overlaps, int vtn, fl
 {
 
     *toi = 1.0f;
+    *E_barrier = 0;
     static vector<i2> host_overlaps;
     host_overlaps.resize(n_overlaps);
     cudaMemcpy(host_overlaps.data(), overlaps, sizeof(i2) * n_overlaps, cudaMemcpyDeviceToHost);
@@ -1499,6 +1516,35 @@ void cuda_culling_glue(
     };
     
     lt_back = stashed_lt_back; 
+}
+
+__global__ void compute_inertia_energy_kernel(
+    int n_cubes, 
+    cudaAffineBody *cubes,
+    float *ret_energy,
+    float dt
+) {
+    // FIXME: missing barrier for ground
+    int tid = threadIdx.x + blockIdx.x * blockDim.x;
+    int n_tasks_per_thread = (n_cubes + blockDim.x - 1) / blockDim.x;
+    __shared__ float energy[n_cuda_threads_per_block];
+    energy[tid] = 0;
+    for (int _i = 0; _i < n_tasks_per_thread; _i++) {
+        int i = tid * n_tasks_per_thread + _i;
+        if (i < n_cubes) {
+            auto& c{ cubes[i] };
+            auto e = inertia(c, dt);
+            energy[tid] += e;
+        }
+    }
+    __syncthreads();
+    if (tid == 0) {
+        float e = 0;
+        for (int i = 0; i <n_cuda_threads_per_block; i ++) {
+            e += energy[i];
+        }
+        *ret_energy = e;
+    }
 }
 /*
 // deprecated
