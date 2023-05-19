@@ -1,7 +1,8 @@
 #include "cuda_glue.h"
 #include <vector>
+#include <spdlog/spdlog.h>
 using namespace std;
-
+using namespace Eigen;
 void initialize_aabbs(const vector<lu> &aabbs) {
     cudaMallocManaged(&host_cuda_globals.aabbs, aabbs.size() * sizeof(luf));
     vector<luf> host_aabbs;
@@ -89,4 +90,37 @@ void init_dev_cubes(
         }
     }
     cudaMemcpy(host_cuda_globals.cubes, host_cuda_globals.host_cubes.data(), sizeof(cudaAffineBody) * n_cubes, cudaMemcpyHostToDevice);
+}
+
+static bool strict = false;
+void cuda_hess_glue(
+    int n_cubes,
+    const vector<unique_ptr<AffineBody>>& cubes,
+    float dt)
+{
+    vector<cudaAffineBody> cabs(n_cubes);
+    float* grads = new float[n_cubes * 12];
+    float* hess = new float[n_cubes * 144];
+    for (int i = 0; i < n_cubes; i++) cabs[i] = to_cabd(*cubes[i]);
+    cudaMemcpy(host_cuda_globals.cubes, cabs.data(), sizeof(cudaAffineBody) * cabs.size(), cudaMemcpyHostToDevice);
+    cuda_inert_hess_glue(n_cubes, dt, grads, hess);
+    for (int k = 0; k < n_cubes; k++) {
+        auto& c{ *cubes[k] };
+        vec12 ref = c.grad, act = Map<Vector<float, 12>>(grads + k * 12).cast<double>();
+        mat12 h_ref = c.hess, h_act = Map<Matrix<float, 12, 12>>(hess + k * 144).cast<double>();
+        auto norm = (ref - act).norm();
+        auto h_norm = (h_ref - h_act).norm();
+        if (!strict) {
+            if (!act.isApprox(ref, 1e-3))
+                spdlog::warn("grad norm too large: diff = {}, ref_norm = {}", norm, ref.norm());
+            if (!h_act.isApprox(h_ref, 1e-3))
+                spdlog::warn("hess norm too large: {}", h_norm);
+        }
+        else {
+            assert(norm < 1e-2);
+            assert(h_norm < 1e-2);
+        }
+    }
+    delete[] grads;
+    delete[] hess;
 }

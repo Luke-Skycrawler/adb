@@ -13,7 +13,10 @@
 #include <cuda/std/array>
 #include <thrust/host_vector.h>
 #include <type_traits>
+#define CUDA_PROJECT
+#ifdef CUDA_PROJECT
 #include "cuda_glue.h"
+#endif
 
 // #define _FULL_PARALLEL_
 
@@ -1103,68 +1106,72 @@ double primitive_brute_force(
             auto& ejlist{ p.ej };
             auto& filist{ p.fi };
             auto& fjlist{ p.fj };
-
-            ee_col_set(eilist, ejlist, cubes, I, J, ees_private[tid], eidx_private[tid]);
-            // else
-            if (!globals.params_int["cuda_direct"])
-            {
-
+            if (globals.ee) {
+                ee_col_set(eilist, ejlist, cubes, I, J, ees_private[tid], eidx_private[tid]);
+            }
+            if (globals.pt) {
                 vf_col_set(vilist, fjlist, cubes, I, J, pts_private[tid], idx_private[tid]);
                 vf_col_set(vjlist, filist, cubes, J, I, pts_private[tid], idx_private[tid]);
             }
-            else {
-                vf_col_set_glue(vilist, fjlist, cubes, I, J, pts_private[tid], idx_private[tid], tid);
-                vf_col_set_glue(vjlist, filist, cubes, J, I, pts_private[tid], idx_private[tid], tid);
-            }
-            if (globals.params_int["cuda_supervised"]) {
-                vector<array<int, 4>>&idx_ref{ idx_private[tid] }, idx_cuda{}, diff{}, cuda_ref{};
-                vf_col_set_glue(vilist, fjlist, cubes, I, J, pts_private[tid], idx_cuda, tid);
-                vf_col_set_glue(vjlist, filist, cubes, J, I, pts_private[tid], idx_cuda, tid);
-                sort(idx_cuda.begin(), idx_cuda.end());
-                sort(idx_ref.begin(), idx_ref.end());
+            // if (!globals.params_int["cuda_direct"])
+            // {
 
-                set_difference(idx_ref.begin(), idx_ref.end(), idx_cuda.begin(), idx_cuda.end(), back_inserter(diff));
-                set_difference(idx_cuda.begin(), idx_cuda.end(), idx_ref.begin(), idx_ref.end(), back_inserter(cuda_ref));
-                if (globals.params_int["strict"]) {
-                    assert(idx_cuda.size() == idx_ref.size());
-                    assert(diff.size() == 0);
-                }
-                else if (diff.size() > 0 || idx_cuda.size() != idx_ref.size()) {
-                    spdlog::error("diff size = {}, cuda size = {}, ref size = {}", diff.size(), idx_cuda.size(), idx_ref.size());
-                    for (auto a : diff) {
-                        Face f{ *cubes[a[2]], unsigned(a[3]), true, true };
-                        Facef ff{ to_facef(f) };
-                        vec3 p{
-                            cubes[a[0]]->v_transformed[a[1]]
-                        };
-                        vec3f pf{ to_vec3f(
-                            cubes[a[0]]->v_transformed[a[1]]) };
-                        int ptt;
-                        auto d = vf_distance(pf, ff, ptt);
-                        auto [d_ref, type_ref] = vf_distance(p, f);
-                        auto [d_ref2, type_ref2] = vf_distance(pf, ff);
-                        spdlog::error("in diff set: pt distance = {}, ref = {}, ref2 = {}", d, d_ref, d_ref2);
+            //     vf_col_set(vilist, fjlist, cubes, I, J, pts_private[tid], idx_private[tid]);
+            //     vf_col_set(vjlist, filist, cubes, J, I, pts_private[tid], idx_private[tid]);
+            // }
+            // else {
+            //     vf_col_set_glue(vilist, fjlist, cubes, I, J, pts_private[tid], idx_private[tid], tid);
+            //     vf_col_set_glue(vjlist, filist, cubes, J, I, pts_private[tid], idx_private[tid], tid);
+            // }
+            // if (globals.params_int["cuda_supervised"]) {
+            //     vector<array<int, 4>>&idx_ref{ idx_private[tid] }, idx_cuda{}, diff{}, cuda_ref{};
+            //     vf_col_set_glue(vilist, fjlist, cubes, I, J, pts_private[tid], idx_cuda, tid);
+            //     vf_col_set_glue(vjlist, filist, cubes, J, I, pts_private[tid], idx_cuda, tid);
+            //     sort(idx_cuda.begin(), idx_cuda.end());
+            //     sort(idx_ref.begin(), idx_ref.end());
 
-                        spdlog::error ("type, cuda = {}, ref = {}", ptt, static_cast<underlying_type_t<ipc::PointTriangleDistanceType>>(type_ref));
-                    }
-                    for (auto a: cuda_ref) {
-                        Face f{ *cubes[a[2]], unsigned(a[3]), true, true };
-                        Facef ff{ to_facef(f) };
-                        vec3 p{
-                            cubes[a[0]]->v_transformed[a[1]]
-                        };
-                        vec3f pf{ to_vec3f(
-                            cubes[a[0]]->v_transformed[a[1]]) };
-                        int ptt;
-                        auto d = vf_distance(pf, ff, ptt);
-                        auto [d_ref, type_ref] = vf_distance(p, f);
-                        auto [d_ref2, type_ref2] = vf_distance(pf, ff);
-                        spdlog::error("in diff (cuda - ref): pt distance = {}, ref = {}, ref2 = {}", d, d_ref, d_ref2);
-                        spdlog::error ("type, cuda = {}, ref = {}", ptt, static_cast<underlying_type_t<ipc::PointTriangleDistanceType>>(type_ref));
+            //     set_difference(idx_ref.begin(), idx_ref.end(), idx_cuda.begin(), idx_cuda.end(), back_inserter(diff));
+            //     set_difference(idx_cuda.begin(), idx_cuda.end(), idx_ref.begin(), idx_ref.end(), back_inserter(cuda_ref));
+            //     if (globals.params_int["strict"]) {
+            //         assert(idx_cuda.size() == idx_ref.size());
+            //         assert(diff.size() == 0);
+            //     }
+            //     else if (diff.size() > 0 || idx_cuda.size() != idx_ref.size()) {
+            //         spdlog::error("diff size = {}, cuda size = {}, ref size = {}", diff.size(), idx_cuda.size(), idx_ref.size());
+            //         for (auto a : diff) {
+            //             Face f{ *cubes[a[2]], unsigned(a[3]), true, true };
+            //             Facef ff{ to_facef(f) };
+            //             vec3 p{
+            //                 cubes[a[0]]->v_transformed[a[1]]
+            //             };
+            //             vec3f pf{ to_vec3f(
+            //                 cubes[a[0]]->v_transformed[a[1]]) };
+            //             int ptt;
+            //             auto d = vf_distance(pf, ff, ptt);
+            //             auto [d_ref, type_ref] = vf_distance(p, f);
+            //             auto [d_ref2, type_ref2] = vf_distance(pf, ff);
+            //             spdlog::error("in diff set: pt distance = {}, ref = {}, ref2 = {}", d, d_ref, d_ref2);
 
-                    }
-                }
-            }
+            //             spdlog::error ("type, cuda = {}, ref = {}", ptt, static_cast<underlying_type_t<ipc::PointTriangleDistanceType>>(type_ref));
+            //         }
+            //         for (auto a: cuda_ref) {
+            //             Face f{ *cubes[a[2]], unsigned(a[3]), true, true };
+            //             Facef ff{ to_facef(f) };
+            //             vec3 p{
+            //                 cubes[a[0]]->v_transformed[a[1]]
+            //             };
+            //             vec3f pf{ to_vec3f(
+            //                 cubes[a[0]]->v_transformed[a[1]]) };
+            //             int ptt;
+            //             auto d = vf_distance(pf, ff, ptt);
+            //             auto [d_ref, type_ref] = vf_distance(p, f);
+            //             auto [d_ref2, type_ref2] = vf_distance(pf, ff);
+            //             spdlog::error("in diff (cuda - ref): pt distance = {}, ref = {}, ref2 = {}", d, d_ref, d_ref2);
+            //             spdlog::error ("type, cuda = {}, ref = {}", ptt, static_cast<underlying_type_t<ipc::PointTriangleDistanceType>>(type_ref));
+
+            //         }
+            //     }
+            // }
         }
         #pragma omp critical
         {
@@ -1246,6 +1253,7 @@ double iaabb_brute_force(
     vector<Intersection> ret;
     intersect_sort(n_cubes, cubes, aabbs, ret, vtn);
     double toi;
+#ifdef CUDA_PROJECT
     if (globals.params_int["cuda_intersection"]) {
         thrust::device_vector<luf> ret_culls, dev_aabbs;
         thrust::host_vector<luf> host_aabbs, host_culls;
@@ -1283,6 +1291,8 @@ double iaabb_brute_force(
             spdlog::warn("size : ref = {}, lut = {}, intersection(ref, lut) = {}", ref.size(), lut.size(), ref_it.size());
         }
     }
+
+#endif
     toi = primitive_brute_force(n_cubes, ret, cubes, vtn,
 #ifdef TESTING
         pt_tois, ee_tois,
@@ -1295,19 +1305,10 @@ double iaabb_brute_force(
         ees,
         eidx,
         vidx);
+
+#ifdef CUDA_PROJECT
     if (globals.params_int["cuda_pt"]) {
         vector<array<int, 4>> idx_cuda, int_ref, eidx_cuda;
-        // for (int i = 0; i < n_cubes; i++) {
-        //     auto& b{ host_cuda_globals.host_cubes[i] };
-        //     auto& a{ *cubes[i] };
-        //     for (int i = 0; i < 4; i++) {
-        //         b.q[i] = to_vec3f(a.q[i]);
-        //         b.q0[i] = to_vec3f(a.q0[i]);
-        //         b.dqdt[i] = to_vec3f(a.dqdt[i]);
-        //         b.q_update[i] = to_vec3f(a.q[i] + a.dq.segment<3>(i * 3));
-        //     }
-        // }
-        // cudaMemcpy(host_cuda_globals.cubes, host_cuda_globals.host_cubes.data(), sizeof(cudaAffineBody) * n_cubes, cudaMemcpyHostToDevice);
 
         init_dev_cubes(n_cubes, cubes);
         project_glue(vtn);
@@ -1325,22 +1326,30 @@ double iaabb_brute_force(
                 }                
             };
             if (vtn != 3) {
-                int_compare(idx, idx_cuda, int_ref);
-                int_ref.clear();
-                int_compare(eidx, eidx_cuda, int_ref, "ee");
-            }
-            else 
-            if (abs(toi - toif) > 1e-4) {
-                spdlog::error("toi : ref = {}, cuda = {}", toi, toif);
-            } else {
-                if (toi < 1.0f) {
-                    spdlog::error("correct toi = {}, toif = {} < 1.0f", toi, toif);
+                if (globals.pt) {
+                    int_compare(idx, idx_cuda, int_ref);
+                    int_ref.clear();
                 }
-            }
-        }
+                if (globals.ee) {
+                    int_compare(eidx, eidx_cuda, int_ref, "ee");
+                }
+            } // end of vtn != 3
+            else {
+                // vtn == 3
+                if (abs(toi - toif) > 1e-4) {
+                    spdlog::error("toi : ref = {}, cuda = {}", toi, toif);
+                }
+                else {
+                    if (toi < 1.0f) {
+                        spdlog::error("correct toi = {}, toif = {} < 1.0f", toi, toif);
+                    }
+                }
+            } // end of vtn == 3
+        } // end of collision set & toi compare
         if (vtn != 3 && globals.params_int["cuda_pt_direct"]) idx = idx_cuda;
         if (vtn == 2 && globals.params_int["cuda_barrier_plus_inert"]) toi = toif; 
     }
+#endif
     auto t = DURATION_TO_DOUBLE(start);
     spdlog::info("time: {} = {:0.6f} ms", vtn == 3 ? "iaabb upper bound" : "iAABB", t * 1000);
     return toi;

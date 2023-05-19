@@ -80,6 +80,11 @@ void cuda_culling_glue(
 
 // called by "cuda_hess", wrapped by anothe layer of locally defined "cuda_hess_glue"
 void cuda_inert_hess_glue(int n_cubes, float dt, float* grads, float* hess);
+void cuda_hess_glue(
+    int n_cubes,
+    const std::vector<std::unique_ptr<AffineBody>>& cubes,
+    float dt);
+
 // called by "cuda_solver" option, defined in sparse.cpp
 void cuda_solve_glue(Eigen::VectorXd& dq, Eigen::SparseMatrix<double>& sparse_hess, Eigen::VectorXd& r);
 

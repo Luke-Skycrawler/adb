@@ -33,6 +33,8 @@ void reset(bool init)
     globals.dense = data["solver"] != "sparse";
     globals.ee = data["ee"];
     globals.pt = data["pt"];
+    host_cuda_globals.params["ee"] = globals.ee;
+    host_cuda_globals.params["pt"] = globals.pt;
     globals.ground = data["ground"];
     globals.psd = data["psd"];
     globals.damp = data["damping"]["enable"];

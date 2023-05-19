@@ -17,7 +17,10 @@
 #include <Eigen/PardisoSupport>
 #endif
 #include <ipc/distance/edge_edge_mollifier.hpp>
+#define CUDA_PROJECT
+#ifdef CUDA_PROJECT
 #include "cuda_glue.h"
+#endif
 
 // #define IAABB_COMPARING
 //  #define IAABB_INTERNSHIP
@@ -34,45 +37,6 @@ using namespace utils;
 #define __CCD__ 2
 #define __LINE_SEARCH__ 3
 static const bool strict = false;
-void cuda_hess_glue(
-    int n_cubes,
-    const vector<unique_ptr<AffineBody>>& cubes,
-    float dt)
-{
-    vector<cudaAffineBody> cabs(n_cubes);
-    float* grads = new float[n_cubes * 12];
-    float* hess = new float[n_cubes * 144];
-    for (int i = 0; i < n_cubes; i++) cabs[i] = to_cabd(*cubes[i]);
-    cudaMemcpy(host_cuda_globals.cubes, cabs.data(), sizeof(cudaAffineBody) * cabs.size(), cudaMemcpyHostToDevice);
-    cuda_inert_hess_glue(n_cubes, dt, grads, hess);
-#pragma omp parallel for schedule(static)
-    for (int k = 0; k < n_cubes; k++) {
-        auto& c(*cubes[k]);
-        c.grad = grad_residue_per_body(c, dt);
-        c.hess = hess_inertia_per_body(c, dt);
-        c.project_vt1();
-    }
-
-    for (int k = 0; k < n_cubes; k++) {
-        auto& c{ *cubes[k] };
-        vec12 ref = c.grad, act = Map<Vector<float, 12>>(grads + k * 12).cast<double>();
-        mat12 h_ref = c.hess, h_act = Map<Matrix<float, 12, 12>>(hess + k * 144).cast<double>();
-        auto norm = (ref - act).norm();
-        auto h_norm = (h_ref - h_act).norm();
-        if (!strict) {
-            if (!act.isApprox(ref, 1e-3))
-                spdlog::warn("grad norm too large: diff = {}, ref_norm = {}", norm, ref.norm());
-            if (!h_act.isApprox(h_ref, 1e-3))
-                spdlog::warn("hess norm too large: {}", h_norm);
-        }
-        else {
-            assert(norm < 1e-2);
-            assert(h_norm < 1e-2);
-        }
-    }
-    delete[] grads;
-    delete[] hess;
-}
 
 double E_global(const VectorXd& q_plus_dq, const VectorXd& dq, int n_cubes, int n_pt, int n_ee, int n_g,
     const vector<array<int, 4>>& idx,
@@ -133,6 +97,7 @@ double line_search(const VectorXd& dq, const VectorXd& grad, VectorXd& q0, doubl
             pt_contact_forces, ee_contact_forces, g_contact_forces,
             cubes, dt);
 
+#ifdef CUDA_PROJECT
     if (globals.params_int["cuda_barrier_plus_inert"]) {
         auto& g{ host_cuda_globals };
         for (int i = 0; i < n_cubes; i++) {
@@ -148,6 +113,7 @@ double line_search(const VectorXd& dq, const VectorXd& grad, VectorXd& q0, doubl
             spdlog::error("correct line search E0 = {}, e0 = {}", E0, e0);
         }
     }
+#endif
     double qdg = dq.dot(grad);
     VectorXd q1;
     static vector<array<vec3, 4>> pts_new, pts_iaab;
@@ -166,11 +132,15 @@ double line_search(const VectorXd& dq, const VectorXd& grad, VectorXd& q0, doubl
             auto& c(*cubes[i]);
             c.dq = dqk.segment<12>(i * 12);
         }
+
+#ifdef CUDA_PROJECT
         if (globals.params_int["cuda_barrier_plus_inert"]) {
             // c.dq is already set
             init_dev_cubes(n_cubes, cubes);
         }
         double ebi = 0.0;
+
+#endif
         if (globals.iaabb % 2)
             ebi = iaabb_brute_force(n_cubes, cubes, globals.aabbs, 2,
 #ifdef IAABB_COMPARING
@@ -196,11 +166,14 @@ double line_search(const VectorXd& dq, const VectorXd& grad, VectorXd& q0, doubl
 
         double ef1 = 0.0, E2 = 0.0, ef2 = 0.0;
         double E3 = E_barrier_plus_inert(q1, dqk, n_cubes, idx_new, eidx_new, vidx_new, cubes, dt);
+
+#ifdef CUDA_PROJECT
         if (globals.params_int["cuda_barrier_plus_inert"]) {
             if (abs(E3 - ebi) / E3 > 1e-3f && E3 > 1e-3f && ebi > 1e-3f)
                 spdlog::error("line search energy E1 error: E1 ref = {}, cuda = {}, margin = {}", E3, ebi, abs(E3 - ebi) / E3);
             else spdlog::error("corect line search E1 = {}, e1 = {}", E3, ebi);
         }
+#endif
         double ef = E_fric(dqk, n_cubes, n_pt, n_ee, n_g, idx, eidx, vidx, pt_tk, ee_tk, pt_contact_forces, ee_contact_forces, g_contact_forces, cubes, dt);
         E1 = E3 + ef;
         wolfe = E1 <= E0 + c1 * alpha * qdg;
@@ -364,25 +337,29 @@ void implicit_euler(vector<unique_ptr<AffineBody>>& cubes, double dt)
 #endif
         auto newton_iter_start = high_resolution_clock::now();
 
+#pragma omp parallel for schedule(static)
+        for (int k = 0; k < n_cubes; k++) {
+            auto& c(*cubes[k]);
+            c.grad = grad_residue_per_body(c, dt);
+            c.hess = hess_inertia_per_body(c, dt);
+            c.project_vt1();
+        }
+#ifdef CUDA_PROJECT
         if (globals.params_int["cuda_hess"]) {
             cuda_hess_glue(n_cubes, cubes, dt);
         }
-        else
-#pragma omp parallel for schedule(static)
-            for (int k = 0; k < n_cubes; k++) {
-                auto& c(*cubes[k]);
-                c.grad = grad_residue_per_body(c, dt);
-                c.hess = hess_inertia_per_body(c, dt);
-                c.project_vt1();
-            }
+#endif
 
 #ifdef _SM_
         {
             lut.clear();
             sparse_hess.setZero();
+
+#ifdef CUDA_PROJECT
             if (globals.params_int["gen_sm_test"])
                 gen_empty_sm_glue(n_cubes, idx, eidx, sparse_hess, lut);
             else
+#endif
                 gen_empty_sm(n_cubes, idx, eidx, sparse_hess, lut);
 
             n_pt = idx.size();
@@ -564,22 +541,12 @@ void implicit_euler(vector<unique_ptr<AffineBody>>& cubes, double dt)
         }
 
         // before adding the ee term
-
+#ifdef CUDA_PROJECT
         if (globals.params_int["cuda_ipc_pt"]) {
-            for (int i = 0; i < n_cubes; i++) {
-                auto& b{ host_cuda_globals.host_cubes[i] };
-                auto& a{ *cubes[i] };
-                for (int i = 0; i < 4; i++) {
-                    b.q[i] = to_vec3f(a.q[i]);
-                    b.q0[i] = to_vec3f(a.q0[i]);
-                    b.dqdt[i] = to_vec3f(a.dqdt[i]);
-                    b.q_update[i] = to_vec3f(a.q[i] + a.dq.segment<3>(i * 3));
-                }
-            }
-            cudaMemcpy(host_cuda_globals.cubes, host_cuda_globals.host_cubes.data(), sizeof(cudaAffineBody) * n_cubes, cudaMemcpyHostToDevice);
-
+            init_dev_cubes(n_cubes, cubes);
             cuda_ipc();
         }
+#endif
 #pragma omp parallel for schedule(static)
         for (int k = 0; k < n_ee; k++) {
             // auto& ee(ees[k]);
@@ -828,7 +795,11 @@ void implicit_euler(vector<unique_ptr<AffineBody>>& cubes, double dt)
 #endif
             }
         }
-
+#ifdef CUDA_PROJECT
+   /*     if (globals.params_int["cuda_ipc_ee"]) {
+            cuda_ipc_ee();
+        }*/
+#endif
         for (int k = 0; k < n_g; k++) {
             auto& _v{ vidx[k] };
             int i = _v[0], v = _v[1];
@@ -890,7 +861,7 @@ void implicit_euler(vector<unique_ptr<AffineBody>>& cubes, double dt)
 #endif
             if (globals.damp)
                 damping_sparse(sparse_hess, dt, n_cubes);
-
+#ifdef CUDA_PROJECT
             if (globals.params_int["submat_compare"]) {
                 float submat[144];
                 // grad comparison not available
@@ -916,6 +887,7 @@ void implicit_euler(vector<unique_ptr<AffineBody>>& cubes, double dt)
                 }
                 delete [] dev_grad;
             }
+#endif
             auto solver_start = high_resolution_clock::now();
 
             if (globals.dense)

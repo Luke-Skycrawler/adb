@@ -897,15 +897,28 @@ float iaabb_brute_force_cuda_pt_only(
     cudaMemcpy(blist, ptb_src, sizeof(i2) * npt, cudaMemcpyDeviceToHost);
     cudaMemcpy(eeplist, eep_src, sizeof(i2) * nee, cudaMemcpyDeviceToHost);
     cudaMemcpy(eeblist, eeb_src, sizeof(i2) * nee, cudaMemcpyDeviceToHost);
+    if (g.params["pt"]) {
+        // pt is set as globals.pt in control.cpp
+        for (int i = 0; i < npt; i++) {
+            auto p = plist[i], b = blist[i];
+            idx.push_back({ b[0], p[0], b[1], p[1] });
+        }
+    }
+    else {
+        g.npt = 0;
+    }
 
-    for (int i = 0; i < npt; i++) {
-        auto p = plist[i], b = blist[i];
-        idx.push_back({ b[0], p[0], b[1], p[1] });
+    if (g.params["ee"]) {
+        // ee is set as globals.ee in control.cpp
+        for (int i = 0; i < nee; i++) {
+            auto p = eeplist[i], b = eeblist[i];
+            eidx.push_back({ b[0], p[0], b[1], p[1] });
+        }
     }
-    for (int i = 0; i < nee; i++) {
-        auto p = eeplist[i], b = eeblist[i];
-        eidx.push_back({ b[0], p[0], b[1], p[1] });
+    else {
+        g.nee = 0;
     }
+
     delete[] eeplist;
     delete[] eeblist;
     delete[] plist;
