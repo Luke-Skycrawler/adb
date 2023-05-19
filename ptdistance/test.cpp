@@ -33,7 +33,6 @@ TEST(ipctkref, random) {
 
         double dself = vf_distance(pt[0], f, pt_type);
         EXPECT_TRUE(abs(dipc - dself) < 1e-6) << pt[0].transpose() << " " << pt[1].transpose() << " " << pt[2].transpose() << " " << pt[3].transpose();
-       ;
     }
 
 }
@@ -167,6 +166,53 @@ TEST(ipctkref, random_ee) {
     }
     cout << "encountered types: ";
     for (int i = 0; i < 9; i ++) if (encountered_types[i]) cout << i << " ";
+    cout << "\n";
+}
+
+TEST(ipctkref, random_pt) {
+    static const int n_pts = 100;
+    array<vec3, 4> pts[n_pts];
+    default_random_engine gen;
+    uniform_real_distribution<double> dist(0.0, 1.0);
+    for (int i = 0; i < n_pts; i++)
+        for (int j = 0; j < 12; j++) {
+            pts[i][j / 3](j % 3) = dist(gen);
+        }
+
+    bool encountered_types[7] {false}; 
+    for (int i = 0; i < n_pts; i++) {
+        auto& pt{ pts[i] };
+        auto tipc = ipc::point_triangle_distance_type(pt[0], pt[1], pt[2], pt[3]);
+        auto iipc = static_cast<int>(tipc);
+        vec3f ptf[4];
+
+        for (int j = 0; j < 4; j++)
+            ptf[j] = to_vec3f(pt[j]);
+        int tself = dev::point_triangle_distance_type(ptf[0], ptf[1], ptf[2], ptf[3]);
+        EXPECT_TRUE(iipc == tself) << "ipc type = " << iipc << ", self = " << tself <<"\n";
+        auto dist_ipc = ipc::point_triangle_distance(pt[0], pt[1], pt[2], pt[3], tipc);
+        auto dist_self = dev::point_triangle_distance(ptf[0], ptf[1], ptf[2], ptf[3], tself);
+        EXPECT_TRUE(abs(dist_ipc - dist_self) < 1e-6) << "pt distance error";
+
+        vec12 grad_ipc;
+        ipc::point_triangle_distance_gradient(pt[0], pt[1], pt[2], pt[3], grad_ipc, tipc);
+        float gradf[12], buf[300];
+        dev::point_triangle_distance_gradient(ptf[0], ptf[1], ptf[2], ptf[3], gradf, tself, buf);
+        auto grad_self = Map<Vector<float , 12>>(gradf).cast<double>();
+        EXPECT_TRUE(grad_self.isApprox(grad_ipc, 1e-3)) << "type " << tself <<  "pt grad error, diff norm = " << (grad_ipc - grad_self).norm() << ", margin = " << (grad_ipc - grad_self).norm() / grad_ipc.norm();
+        
+        mat12 hess_ipc;
+        ipc::point_triangle_distance_hessian(pt[0], pt[1], pt[2], pt[3], hess_ipc, tipc);
+        float hessf[144];
+        dev::point_triangle_distance_hessian(ptf[0], ptf[1], ptf[2], ptf[3], hessf, tself, buf);
+        auto hess_self = Map<Matrix<float , 12, 12>>(hessf).cast<double>();
+        EXPECT_TRUE(hess_self.isApprox(hess_ipc, 1e-3)) << "type" << tself << " pt hess error, diff norm = " << (hess_ipc - hess_self).norm() << ", margin = " << (hess_ipc - hess_self).norm() / hess_ipc.norm();
+
+        
+        encountered_types[tself] =true;
+    }
+    cout << "encountered types: ";
+    for (int i = 0; i < 7; i ++) if (encountered_types[i]) cout << i << " ";
     cout << "\n";
 }
 //TEST(distance_type, random)

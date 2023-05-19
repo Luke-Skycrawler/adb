@@ -13,7 +13,7 @@
     "gravity": true, 
     "line_search": true,
     "col_set": true,
-    "ee": true,
+    "ee": false,
     "pt": true,
     "ground": false,
     "safe_factor": 1.0,

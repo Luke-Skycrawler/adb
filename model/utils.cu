@@ -383,8 +383,8 @@ __host__ __device__ void point_triangle_distance_gradient(vec3f p, vec3f t0, vec
         autogen::point_line_distance_gradient_3D(p, t2, t0, local_grad);
         for (int i = 0; i < 3; i++) {
             pt_grad[i] = local_grad[i];
-            pt_grad[i + 3] = local_grad[i + 3];
-            pt_grad[i + 9] = local_grad[i + 6];
+            pt_grad[i + 9] = local_grad[i + 3];
+            pt_grad[i + 3] = local_grad[i + 6];
         }
         break;
     case 6:

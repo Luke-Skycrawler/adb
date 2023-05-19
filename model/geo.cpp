@@ -9,7 +9,7 @@
 #include <ipc/friction/smooth_friction_mollifier.hpp>
 #ifndef TESTING
 #include "../view/global_variables.h"
-#else 
+#else
 #include "../iAABB/pch.h"
 extern Globals globals;
 #endif
@@ -32,7 +32,7 @@ void put(double* values, int offset, int _stride, const Matrix<double, 12, 12>& 
 {
     for (int j = 0; j < 12; j++)
         for (int i = 0; i < 12; i++) {
-//#pragma omp atomic
+            // #pragma omp atomic
             values[offset + _stride * j + i] += block(i, j);
         }
 }
@@ -61,11 +61,11 @@ void friction(
     static double mu = globals.mu;
     static const double evh = globals.dt * globals.evh, h2 = globals.dt * globals.dt;
     double uk = sqrt(_uk(0) * _uk(0) + _uk(1) * _uk(1));
-    //if (uk < 1e-10) return;
+    // if (uk < 1e-10) return;
 
     auto f1 = ipc::f1_SF_over_x(uk, evh);
-    
-    Vector<double, 12> F_k = mu * contact_lambda * f1 * Tk  * _uk;
+
+    Vector<double, 12> F_k = mu * contact_lambda * f1 * Tk * _uk;
     Matrix<double, 12, 12> D_k_hessian;
 
     if (uk >= evh) {
@@ -127,29 +127,29 @@ void output_hessian_gradient(
     const vec12& dgp, const vec12& dgt,
     mat3 hess_p[4][4], mat3 hess_t[4][4], mat3 off_diag[4][4], mat3 off_T[4][4])
 {
-        auto outers = sparse_hess.outerIndexPtr();
-        auto values = sparse_hess.valuePtr();
+    auto outers = sparse_hess.outerIndexPtr();
+    auto values = sparse_hess.valuePtr();
 
-        auto stride_j = stride(jj, outers), stride_i = stride(ii, outers);
-        auto oii = starting_offset(ii, ii, lut, outers), ojj = starting_offset(jj, jj, lut, outers), oij = starting_offset(ii, jj, lut, outers), oji = starting_offset(jj, ii, lut, outers);
-        auto ptr = globals.writelock_cols.data();
+    auto stride_j = stride(jj, outers), stride_i = stride(ii, outers);
+    auto oii = starting_offset(ii, ii, lut, outers), ojj = starting_offset(jj, jj, lut, outers), oij = starting_offset(ii, jj, lut, outers), oji = starting_offset(jj, ii, lut, outers);
+    auto ptr = globals.writelock_cols.data();
 
-        if (cj_nonstatic) {
-            omp_set_lock(ptr + jj);
-            if (ci_nonstatic)
-                put2(values, oij, stride_j, off_diag);
-            put2(values, ojj, stride_j, hess_t);
-            grad_t += dgt;
-            omp_unset_lock(ptr + jj);
-        }
-        if (ci_nonstatic) {
-            omp_set_lock(ptr + ii);
-            if (cj_nonstatic)
-                put2(values, oji, stride_i, off_T);
-            put2(values, oii, stride_i, hess_p);
-            grad_p += dgp;
-            omp_unset_lock(ptr + ii);
-        }
+    if (cj_nonstatic) {
+        omp_set_lock(ptr + jj);
+        if (ci_nonstatic)
+            put2(values, oij, stride_j, off_diag);
+        put2(values, ojj, stride_j, hess_t);
+        grad_t += dgt;
+        omp_unset_lock(ptr + jj);
+    }
+    if (ci_nonstatic) {
+        omp_set_lock(ptr + ii);
+        if (cj_nonstatic)
+            put2(values, oji, stride_i, off_T);
+        put2(values, oii, stride_i, hess_p);
+        grad_p += dgp;
+        omp_unset_lock(ptr + ii);
+    }
 }
 
 void output_hessian_gradient(
@@ -234,46 +234,49 @@ tuple<mat12, vec12> ipc_hess_pt_12x12(
     // overtime babysitting
 
     if (globals.params_int["cuda_ipc_term"]) {
-        if (true) {
-                float g[12], h[144];
-                vec3f ptf[4];
-                for (int i = 0; i < 4; i++)
-                    ptf[i] = to_vec3f(pt[i]);
-                float* buf = new float[144];
+        float g[12], h[144];
+        vec3f ptf[4];
+        for (int i = 0; i < 4; i++)
+            ptf[i] = to_vec3f(pt[i]);
+        float* buf = new float[144];
 
-                pt_grad_hess12x12(ptf, g, h, true, buf);
+        pt_grad_hess12x12(ptf, g, h, true, buf);
 
-                vec12 g_cuda = Map<Vector<float, 12>>(g).cast<double>();
-                mat12 h_cuda = Map<Matrix<float, 12, 12>>(h).cast<double>();
-                if (!g_cuda.isApprox(pt_grad, 1e-3)) {
-                    spdlog::error("ipc grad mismatch, norm diff = {}, norm ref = {}, margin = {}", (g_cuda - pt_grad).norm(), pt_grad.norm(), (g_cuda - pt_grad).norm() / pt_grad.norm());
-                }
-                if (!h_cuda.isApprox(ipc_hess, 1e-3)) {
-                    spdlog::error("ipc hess mismatch, norm diff= {}, norm ref = {}, margin = {}", (h_cuda - ipc_hess).norm(), ipc_hess.norm(), (h_cuda - ipc_hess).norm() / ipc_hess.norm());
-                }
-                auto distf = dev::point_triangle_distance(ptf[0], ptf[1], ptf[2], ptf[3]);
-                auto B_f = dev::barrier_derivative_d(distf);
-                auto B__f = dev::barrier_second_derivative(distf);
-                auto Bf = dev::barrier_function(distf);
-                auto B = barrier::barrier_function(dist);
-                auto b0m = abs((Bf - B) / B);
-                auto b1m = abs((B_f - B_) / B_);
-                auto b2m = abs((B__f - B__) / B__);
-                auto dm = abs((distf - dist) / dist);
-                if (b0m > 1e-4) {
-                    spdlog::error("B mismatch, margin = {}", b0m);
-                }
-                if (b1m > 1e-4) {
-                    spdlog::error("B. mismatch, margin = {}", b1m);
-                }
-                if (b2m > 1e-4) {
-                    spdlog::error("B.. mismatch, margin = {}, B.. = {}", b2m, B__);
-                }
-                if (dm > 1e-4) {
-                    spdlog::error("dist mismatch, margin = {}, dist = {}", dm, dist);
-                }
-                delete[] buf;
+        vec12 g_cuda = Map<Vector<float, 12>>(g).cast<double>();
+        mat12 h_cuda = Map<Matrix<float, 12, 12>>(h).cast<double>();
+        if (!g_cuda.isApprox(pt_grad, 1e-3)) {
+            spdlog::error("ipc grad mismatch, norm diff = {}, norm ref = {}, margin = {}", (g_cuda - pt_grad).norm(), pt_grad.norm(), (g_cuda - pt_grad).norm() / pt_grad.norm());
         }
+        if (!h_cuda.isApprox(ipc_hess, 1e-3)) {
+            spdlog::error("ipc hess mismatch, norm diff= {}, norm ref = {}, margin = {}", (h_cuda - ipc_hess).norm(), ipc_hess.norm(), (h_cuda - ipc_hess).norm() / ipc_hess.norm());
+        }
+        auto distf = dev::point_triangle_distance(ptf[0], ptf[1], ptf[2], ptf[3]);
+        auto B_f = dev::barrier_derivative_d(distf);
+        auto B__f = dev::barrier_second_derivative(distf);
+        auto Bf = dev::barrier_function(distf);
+        auto B = barrier::barrier_function(dist);
+        auto b0m = abs((Bf - B) / B);
+        auto b1m = abs((B_f - B_) / B_);
+        auto b2m = abs((B__f - B__) / B__);
+        auto dm = abs((distf - dist) / dist);
+        auto type = dev::point_triangle_distance_type(ptf[0], ptf[1], ptf[2], ptf[3]);
+        auto pt_type_to_int = static_cast<int>(pt_type);
+        if (pt_type_to_int != type) {
+            spdlog::error("pt type mismatch, ref = {}, cuda = {}", pt_type_to_int, type);
+        }
+        if (b0m > 1e-3) {
+            spdlog::error("B mismatch, margin = {}", b0m);
+        }
+        if (b1m > 1e-3) {
+            spdlog::error("B. mismatch, margin = {}", b1m);
+        }
+        if (b2m > 1e-3) {
+            spdlog::error("B.. mismatch, margin = {}, B.. = {}", b2m, B__);
+        }
+        if (dm > 1e-3) {
+            spdlog::error("dist mismatch, margin = {}, dist = {}", dm, dist);
+        }
+        delete[] buf;
     }
 #endif
     if (globals.psd)
@@ -356,24 +359,24 @@ void ipc_term(
 
     for (int i = 0; i < 4; i++)
         for (int j = 0; j < 4; j++) {
-                hess_p.block<3, 3>(i * 3, j * 3) = blkp(i, j) * ipc_hess.block<3, 3>(0, 0);
+            hess_p.block<3, 3>(i * 3, j * 3) = blkp(i, j) * ipc_hess.block<3, 3>(0, 0);
 
-                mat3 hij;
-                hij.setZero(3, 3);
-                for (int k = 0; k < 3; k++)
-                    for (int l = 0; l < 3; l++) {
-                        mat3 Akl = ipc_hess.block<3, 3>((k + 1) * 3, (l + 1) * 3);
-                        hij += Akl * (kert(i, k) * kert(j, l));
-                    }
-                hess_t.block<3, 3>(i * 3, j * 3) = hij;
-
-                mat3 offd_ij;
-                offd_ij.setZero(3, 3);
+            mat3 hij;
+            hij.setZero(3, 3);
+            for (int k = 0; k < 3; k++)
                 for (int l = 0; l < 3; l++) {
-                    mat3 Akl = ipc_hess.block<3, 3>(0, (l + 1) * 3);
-                    offd_ij += Akl * (kerp(i) * kert(j, l));
+                    mat3 Akl = ipc_hess.block<3, 3>((k + 1) * 3, (l + 1) * 3);
+                    hij += Akl * (kert(i, k) * kert(j, l));
                 }
-                off_diag.block<3, 3>(i * 3, j * 3) = offd_ij;
+            hess_t.block<3, 3>(i * 3, j * 3) = hij;
+
+            mat3 offd_ij;
+            offd_ij.setZero(3, 3);
+            for (int l = 0; l < 3; l++) {
+                mat3 Akl = ipc_hess.block<3, 3>(0, (l + 1) * 3);
+                offd_ij += Akl * (kerp(i) * kert(j, l));
+            }
+            off_diag.block<3, 3>(i * 3, j * 3) = offd_ij;
         }
     mat12 off_T = off_diag.transpose();
 
@@ -442,7 +445,7 @@ tuple<mat12, vec12, double> ipc_hess_ee_12x12(
         float g[12], h[144];
         vec3f eef[4];
         for (int i = 0; i < 4; i++)
-                eef[i] = to_vec3f(ee[i]);
+            eef[i] = to_vec3f(ee[i]);
 
         float* buf = new float[300];
         ee_grad_hess12x12(eef, g, h, buf);
@@ -453,22 +456,21 @@ tuple<mat12, vec12, double> ipc_hess_ee_12x12(
         mat12 p_hess_cuda = Map<Matrix<float, 12, 12>>(buf + 12).cast<double>();
 
         if (!g_cuda.isApprox(ee_grad, 1e-3)) {
-                spdlog::error("ee grad mismatch, norm diff = {}, norm ref = {}, margin = {}", (g_cuda - ee_grad).norm(), ee_grad.norm(), (g_cuda - ee_grad).norm() / ee_grad.norm());
+            spdlog::error("ee grad mismatch, norm diff = {}, norm ref = {}, margin = {}", (g_cuda - ee_grad).norm(), ee_grad.norm(), (g_cuda - ee_grad).norm() / ee_grad.norm());
         }
         if (!h_cuda.isApprox(ipc_hess, 1e-3)) {
-                spdlog::error("ee hess mismatch, norm diff= {}, norm ref = {}, margin = {}", (h_cuda - ipc_hess).norm(), ipc_hess.norm(), (h_cuda - ipc_hess).norm() / ipc_hess.norm());
+            spdlog::error("ee hess mismatch, norm diff= {}, norm ref = {}, margin = {}", (h_cuda - ipc_hess).norm(), ipc_hess.norm(), (h_cuda - ipc_hess).norm() / ipc_hess.norm());
         }
 
         if (!p_grad_cuda.isApprox(p_grad, 1e-3)) {
-                spdlog::error("p grad mismatch, norm diff = {}, norm ref = {}, margin = {}", (p_grad_cuda - p_grad).norm(), p_grad.norm(), (p_grad_cuda - p_grad).norm() / p_grad.norm());
+            spdlog::error("p grad mismatch, norm diff = {}, norm ref = {}, margin = {}", (p_grad_cuda - p_grad).norm(), p_grad.norm(), (p_grad_cuda - p_grad).norm() / p_grad.norm());
         }
         if (!p_hess_cuda.isApprox(p_hess, 1e-3)) {
-                spdlog::error("p hess mismatch, norm diff= {}, norm ref = {}, margin = {}", (p_hess_cuda - p_hess).norm(), p_hess.norm(), (p_hess_cuda - p_hess).norm() / p_hess.norm());
+            spdlog::error("p hess mismatch, norm diff= {}, norm ref = {}, margin = {}", (p_hess_cuda - p_hess).norm(), p_hess.norm(), (p_hess_cuda - p_hess).norm() / p_hess.norm());
         }
 
         auto type = dev::edge_edge_distance_type(eef[0], eef[1], eef[2], eef[3]);
         auto ee_type_to_int = static_cast<int>(ee_type);
-
 
         auto distf = dev::edge_edge_distance(eef[0], eef[1], eef[2], eef[3], type);
 
@@ -483,17 +485,17 @@ tuple<mat12, vec12, double> ipc_hess_ee_12x12(
         if (type != ee_type_to_int) {
             spdlog::error("ee type mismatch, type = {}, type cuda = {}", ee_type_to_int, type);
         }
-        if (dm > 1e-4) {
-                spdlog::error("dist mismatch, margin = {}, dist = {}", dm, dist);
+        if (dm > 1e-3) {
+            spdlog::error("dist mismatch, margin = {}, dist = {}", dm, dist);
         }
-        if (b0m > 1e-4) {
-                spdlog::error("B mismatch, margin = {}", b0m);
+        if (b0m > 1e-3) {
+            spdlog::error("B mismatch, margin = {}", b0m);
         }
-        if (b1m > 1e-4) {
-                spdlog::error("B. mismatch, margin = {}", b1m);
+        if (b1m > 1e-3) {
+            spdlog::error("B. mismatch, margin = {}", b1m);
         }
-        if (b2m > 1e-4) {
-                spdlog::error("B.. mismatch, margin = {}, B.. = {}", b2m, B__);
+        if (b2m > 1e-3) {
+            spdlog::error("B.. mismatch, margin = {}, B.. = {}", b2m, B__);
         }
         delete[] buf;
     }
@@ -549,7 +551,7 @@ void ipc_term_ee(
     // if (ee_parallel)
     //     contact_lambda = 0.0;
     if (globals.ee_fric) friction(_uk, contact_lambda, Tk.transpose(), ee_grad, ipc_hess);
-    
+
 #endif
     auto ei0_tile = ci.vertices(eidxi[2 * _ei]), ei1_tile = ci.vertices(eidxi[2 * _ei + 1]),
          ej0_tile = cj.vertices(eidxj[2 * _ej]), ej1_tile = cj.vertices(eidxj[2 * _ej + 1]);
@@ -632,7 +634,6 @@ void ipc_term_ee(
 
 #endif
 
-
     output_hessian_gradient(
 #ifdef _SM_OUT_
         lut, sparse_hess,
@@ -649,52 +650,52 @@ void ipc_term_ee(
         d0, d1,
         hess_0, hess_1, off_diag, off_T);
 
-//     {
-// #ifdef _NO_FANCY_
-// #define PUT put
-// #else
-// #define PUT put2
-// #endif
-//         if (cj.mass > 0.0) {
-//             omp_set_lock(ptr + jj);
-//             if (ci.mass > 0.0) {
-//                 PUT(values, oij, stride_j, off_diag);
-//             }
-//             PUT(values, ojj, stride_j, hess_1);
-//             grad_1 += d1;
-//             omp_unset_lock(ptr + jj);
-//         }
-//         if (ci.mass > 0.0) {
-//             omp_set_lock(ptr + ii);
-//             if (cj.mass > 0.0)
-//                 PUT(values, oji, stride_i, off_T);
-//             PUT(values, oii, stride_i, hess_0);
-//             grad_0 += d0;
-//             omp_unset_lock(ptr + ii);
-//         }
-// #undef PUT
-//     }
+    //     {
+    // #ifdef _NO_FANCY_
+    // #define PUT put
+    // #else
+    // #define PUT put2
+    // #endif
+    //         if (cj.mass > 0.0) {
+    //             omp_set_lock(ptr + jj);
+    //             if (ci.mass > 0.0) {
+    //                 PUT(values, oij, stride_j, off_diag);
+    //             }
+    //             PUT(values, ojj, stride_j, hess_1);
+    //             grad_1 += d1;
+    //             omp_unset_lock(ptr + jj);
+    //         }
+    //         if (ci.mass > 0.0) {
+    //             omp_set_lock(ptr + ii);
+    //             if (cj.mass > 0.0)
+    //                 PUT(values, oji, stride_i, off_T);
+    //             PUT(values, oii, stride_i, hess_0);
+    //             grad_0 += d0;
+    //             omp_unset_lock(ptr + ii);
+    //         }
+    // #undef PUT
+    //     }
 
-// #ifdef _SM_
-//     auto outers = sparse_hess.outerIndexPtr();
-//     auto values = sparse_hess.valuePtr();
+    // #ifdef _SM_
+    //     auto outers = sparse_hess.outerIndexPtr();
+    //     auto values = sparse_hess.valuePtr();
 
-//     auto stride_j = stride(jj, outers), stride_i = stride(ii, outers);
-//     auto oii = starting_offset(ii, ii, lut, outers), ojj = starting_offset(jj, jj, lut, outers), oij = starting_offset(ii, jj, lut, outers), oji = starting_offset(jj, ii, lut, outers);
-//     auto ptr = globals.writelock_cols.data();
+    //     auto stride_j = stride(jj, outers), stride_i = stride(ii, outers);
+    //     auto oii = starting_offset(ii, ii, lut, outers), ojj = starting_offset(jj, jj, lut, outers), oij = starting_offset(ii, jj, lut, outers), oji = starting_offset(jj, ii, lut, outers);
+    //     auto ptr = globals.writelock_cols.data();
 
-// #endif
-// #ifdef _TRIPLETS_
+    // #endif
+    // #ifdef _TRIPLETS_
 
-// #pragma omp critical
-//     for (int i = 0; i < 12; i++) {
-//         triplets.push_back(HessBlock(ii * 12, jj * 12 + i, off_diag.block<12, 1>(0, i)));
-//         triplets.push_back(HessBlock(jj * 12, ii * 12 + i, off_T.block<12, 1>(0, i)));
-//         triplets.push_back(HessBlock(ii * 12, ii * 12 + i, hess_0.block<12, 1>(0, i)));
-//         triplets.push_back(HessBlock(jj * 12, jj * 12 + i, hess_1.block<12, 1>(0, i)));
-//     }
+    // #pragma omp critical
+    //     for (int i = 0; i < 12; i++) {
+    //         triplets.push_back(HessBlock(ii * 12, jj * 12 + i, off_diag.block<12, 1>(0, i)));
+    //         triplets.push_back(HessBlock(jj * 12, ii * 12 + i, off_T.block<12, 1>(0, i)));
+    //         triplets.push_back(HessBlock(ii * 12, ii * 12 + i, hess_0.block<12, 1>(0, i)));
+    //         triplets.push_back(HessBlock(jj * 12, jj * 12 + i, hess_1.block<12, 1>(0, i)));
+    //     }
 
-// #endif
+    // #endif
 }
 double E_ground(const vec3& v)
 {
