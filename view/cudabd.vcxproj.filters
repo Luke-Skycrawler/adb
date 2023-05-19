@@ -37,6 +37,9 @@
     <CudaCompile Include="..\model\ccd_toi.cu">
       <Filter>cuda</Filter>
     </CudaCompile>
+    <CudaCompile Include="..\model\energy.cu">
+      <Filter>cuda</Filter>
+    </CudaCompile>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="..\view\light.cpp">

@@ -73,3 +73,20 @@ void initialize_primitives(
     cudaMemcpy(host_cuda_globals.cubes, host_cubes.data(), host_cubes.size() * sizeof(cudaAffineBody), cudaMemcpyHostToDevice);
     
 }
+
+void init_dev_cubes(
+    int n_cubes,
+    const std::vector<std::unique_ptr<AffineBody>>& cubes)
+{
+    for (int i = 0; i < n_cubes; i++) {
+        auto& b{ host_cuda_globals.host_cubes[i] };
+        auto& a{ *cubes[i] };
+        for (int i = 0; i < 4; i++) {
+            b.q[i] = to_vec3f(a.q[i]);
+            b.q0[i] = to_vec3f(a.q0[i]);
+            b.dqdt[i] = to_vec3f(a.dqdt[i]);
+            b.q_update[i] = to_vec3f(a.q[i] + a.dq.segment<3>(i * 3));
+        }
+    }
+    cudaMemcpy(host_cuda_globals.cubes, host_cuda_globals.host_cubes.data(), sizeof(cudaAffineBody) * n_cubes, cudaMemcpyHostToDevice);
+}

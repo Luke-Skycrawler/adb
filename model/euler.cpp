@@ -132,6 +132,22 @@ double line_search(const VectorXd& dq, const VectorXd& grad, VectorXd& q0, doubl
             pt_tk, ee_tk,
             pt_contact_forces, ee_contact_forces, g_contact_forces,
             cubes, dt);
+
+    if (globals.params_int["cuda_barrier_plus_inert"]) {
+        auto& g{ host_cuda_globals };
+        for (int i = 0; i < n_cubes; i++) {
+            auto& c{ *cubes[i] };
+            c.dq.setZero(12);
+        }
+        init_dev_cubes(n_cubes, cubes);
+        project_glue(2);
+        float e0 = barrier_plus_inert_glue(1e-2f);
+        if (abs(e0 - E0) / E0 > 1e-2 && E0 > 1e-3f && e0 > 1e-3f) {
+            spdlog::error("line search E0 error : cuda E0 = {}, ref E0 = {}, margin = {}", e0, E0, abs(e0 - E0) / E0);
+        } else {
+            spdlog::error("correct line search E0 = {}, e0 = {}", E0, e0);
+        }
+    }
     double qdg = dq.dot(grad);
     VectorXd q1;
     static vector<array<vec3, 4>> pts_new, pts_iaab;
@@ -150,9 +166,13 @@ double line_search(const VectorXd& dq, const VectorXd& grad, VectorXd& q0, doubl
             auto& c(*cubes[i]);
             c.dq = dqk.segment<12>(i * 12);
         }
-
+        if (globals.params_int["cuda_barrier_plus_inert"]) {
+            // c.dq is already set
+            init_dev_cubes(n_cubes, cubes);
+        }
+        double ebi = 0.0;
         if (globals.iaabb % 2)
-            iaabb_brute_force(n_cubes, cubes, globals.aabbs, 2,
+            ebi = iaabb_brute_force(n_cubes, cubes, globals.aabbs, 2,
 #ifdef IAABB_COMPARING
                 pts_iaab,
                 idx_iaab,
@@ -173,8 +193,14 @@ double line_search(const VectorXd& dq, const VectorXd& grad, VectorXd& q0, doubl
             ees_new,
             eidx_new,
             vidx_new);
+
         double ef1 = 0.0, E2 = 0.0, ef2 = 0.0;
         double E3 = E_barrier_plus_inert(q1, dqk, n_cubes, idx_new, eidx_new, vidx_new, cubes, dt);
+        if (globals.params_int["cuda_barrier_plus_inert"]) {
+            if (abs(E3 - ebi) / E3 > 1e-3f && E3 > 1e-3f && ebi > 1e-3f)
+                spdlog::error("line search energy E1 error: E1 ref = {}, cuda = {}, margin = {}", E3, ebi, abs(E3 - ebi) / E3);
+            else spdlog::error("corect line search E1 = {}, e1 = {}", E3, ebi);
+        }
         double ef = E_fric(dqk, n_cubes, n_pt, n_ee, n_g, idx, eidx, vidx, pt_tk, ee_tk, pt_contact_forces, ee_contact_forces, g_contact_forces, cubes, dt);
         E1 = E3 + ef;
         wolfe = E1 <= E0 + c1 * alpha * qdg;

@@ -23,7 +23,6 @@ using namespace std;
 
 static const int max_overlap_size = 1024;
 
-__device__ __host__ float vf_distance(vec3f _v, Facef f, int& pt_type);
 __device__ luf intersection(const luf &a, const luf &b);
 __device__ luf affine(luf aabb, cudaAffineBody &c, int vtn);
 __device__ __host__ luf compute_aabb(const Facef& f, float d_hat_sqrt);
@@ -1226,27 +1225,6 @@ void per_intersection_core(int n_overlaps, luf* culls, i2* overlaps, int vtn, fl
     auto host_cubes = get_host_cubes_copy(
         host_projected, host_updated, host_vertices,
         host_edges, host_faces);
-    // static vector<cudaAffineBody> host_cubes_stashed;
-    // host_cubes_stashed = host_cuda_globals.host_cubes;
-    // auto& host_cubes{ host_cuda_globals.host_cubes };
-    // vec3f* host_projected = new vec3f[host_cuda_globals.n_vertices],
-    //  * host_updated = new vec3f[host_cuda_globals.n_vertices];
-    // int* host_edges = new int[host_cuda_globals.n_edges * 2];
-    // int* host_faces = new int[host_cuda_globals.n_faces * 3];
-
-    // cudaMemcpy(host_projected, host_cuda_globals.projected_vertices, sizeof(vec3f) * host_cuda_globals.n_vertices, cudaMemcpyDeviceToHost);
-    // cudaMemcpy(host_updated, host_cuda_globals.updated_vertices, sizeof(vec3f) * host_cuda_globals.n_vertices, cudaMemcpyDeviceToHost);
-    // cudaMemcpy(host_edges, host_cuda_globals.edges, sizeof(int) * host_cuda_globals.n_edges * 2, cudaMemcpyDeviceToHost);
-    // cudaMemcpy(host_faces, host_cuda_globals.faces, sizeof(int) * host_cuda_globals.n_faces * 3, cudaMemcpyDeviceToHost);
-
-    // int start = 0;
-    // for (int i = 0; i < host_cubes.size(); i++) {
-    //     host_cubes[i].projected = host_projected + start;
-    //     host_cubes[i].updated = host_updated + start;
-    //     start += host_cubes[i].n_vertices;
-    //     host_cubes[i].edges = host_cubes[i].edges - host_cuda_globals.edges + host_edges;
-    //     host_cubes[i].faces = host_cubes[i].faces - host_cuda_globals.faces + host_faces;
-    // }
 
 #endif
 

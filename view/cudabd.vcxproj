@@ -129,6 +129,9 @@
     <CudaCompile Include="..\model\cubic_roots.cu">
       <FileType>CppCode</FileType>
     </CudaCompile>
+    <CudaCompile Include="..\model\energy.cu">
+      <FileType>CppCode</FileType>
+    </CudaCompile>
     <CudaCompile Include="..\model\euler.cu">
       <FileType>CppCode</FileType>
     </CudaCompile>

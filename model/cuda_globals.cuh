@@ -162,6 +162,7 @@ __forceinline__ __device__ __host__ float kronecker(int i, int j)
 __host__ __device__ float inertia(cudaAffineBody &c, float dt);
 __host__ __device__ void inertia_grad(cudaAffineBody& c, float dt, float ret[12]);
 __host__ __device__ void inertia_hess(cudaAffineBody& c, float ret[144]);
+__device__ __host__ float vf_distance(vec3f _v, Facef f, int& pt_type);
 
 // seen in all cuda files & glued files-----------------------------------------
 // high-level functions, can be directly called outside of cuda environment
@@ -186,3 +187,4 @@ void gpuCholSolver(CsrSparseMatrix& hess, float* x, float *b);
 
 // defined in constraint_set.cu
 void project_glue(int vtn);
+

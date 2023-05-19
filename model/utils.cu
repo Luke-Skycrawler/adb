@@ -169,15 +169,6 @@ __device__ __host__ luf compute_aabb(const Facef& f, float d_hat_sqrt)
 }
 
 
-
-//__device__ void cudaAffineBody::q_minus_qtiled(float3 dq[4])
-//{
-//    __constant__ float  h =  cuda_globals->dt;
-//    __constant__ float h2 = h * h;
-//    for (int i = 0; i < 4; i++) {
-//        dq[i] = q_update[i] - (q[i] + dqdt[i] * h + cuda_globals->gravity * h2);
-//    }
-//}
 __host__ __device__ void cudaAffineBody::q_minus_qtiled(float3 dq[4])
 {
     float h = dt_static;

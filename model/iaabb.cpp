@@ -1297,19 +1297,22 @@ double iaabb_brute_force(
         vidx);
     if (globals.params_int["cuda_pt"]) {
         vector<array<int, 4>> idx_cuda, int_ref, eidx_cuda;
-        for (int i = 0; i < n_cubes; i++) {
-            auto& b{ host_cuda_globals.host_cubes[i] };
-            auto& a{ *cubes[i] };
-            for (int i = 0; i < 4; i++) {
-                b.q[i] = to_vec3f(a.q[i]);
-                b.q0[i] = to_vec3f(a.q0[i]);
-                b.dqdt[i] = to_vec3f(a.dqdt[i]);
-                b.q_update[i] = to_vec3f(a.q[i] + a.dq.segment<3>(i * 3));
-            }
-        }
-        cudaMemcpy(host_cuda_globals.cubes, host_cuda_globals.host_cubes.data(), sizeof(cudaAffineBody) * n_cubes, cudaMemcpyHostToDevice);
+        // for (int i = 0; i < n_cubes; i++) {
+        //     auto& b{ host_cuda_globals.host_cubes[i] };
+        //     auto& a{ *cubes[i] };
+        //     for (int i = 0; i < 4; i++) {
+        //         b.q[i] = to_vec3f(a.q[i]);
+        //         b.q0[i] = to_vec3f(a.q0[i]);
+        //         b.dqdt[i] = to_vec3f(a.dqdt[i]);
+        //         b.q_update[i] = to_vec3f(a.q[i] + a.dq.segment<3>(i * 3));
+        //     }
+        // }
+        // cudaMemcpy(host_cuda_globals.cubes, host_cuda_globals.host_cubes.data(), sizeof(cudaAffineBody) * n_cubes, cudaMemcpyHostToDevice);
+
+        init_dev_cubes(n_cubes, cubes);
         project_glue(vtn);
         float toif = iaabb_brute_force_cuda_pt_only(n_cubes, host_cuda_globals.cubes, host_cuda_globals.aabbs, vtn, idx_cuda, eidx_cuda);
+
 
         bool compare = true;
         if (compare) {
@@ -1336,6 +1339,7 @@ double iaabb_brute_force(
             }
         }
         if (vtn != 3 && globals.params_int["cuda_pt_direct"]) idx = idx_cuda;
+        if (vtn == 2 && globals.params_int["cuda_barrier_plus_inert"]) toi = toif; 
     }
     auto t = DURATION_TO_DOUBLE(start);
     spdlog::info("time: {} = {:0.6f} ms", vtn == 3 ? "iaabb upper bound" : "iAABB", t * 1000);
