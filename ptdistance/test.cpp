@@ -118,9 +118,12 @@ TEST(ipctkref, random) {
 //     }
 //     return default_case;
 // }
-
+void pt_grad_hess12x12(vec3f* pt, float* pt_grad, float* pt_hess, bool psd, float* buf);
+// buf is not optional
+void ee_grad_hess12x12(vec3f* ee, float* ee_grad, float* ipc_hess, float* buf);
+using namespace Eigen;
 TEST(ipctkref, random_ee) {
-    static const int n_ees = 1000;
+    static const int n_ees = 100;
     array<vec3, 4> ees[n_ees];
     default_random_engine gen;
     uniform_real_distribution<double> dist(0.0, 1.0);
@@ -144,6 +147,22 @@ TEST(ipctkref, random_ee) {
         auto dist_ipc = ipc::edge_edge_distance(ee[0], ee[1], ee[2], ee[3], tipc);
         auto dist_self = dev::edge_edge_distance(eef[0], eef[1], eef[2], eef[3], tself);
         EXPECT_TRUE(abs(dist_ipc - dist_self) < 1e-6) << "ee distance error";
+
+        vec12 grad_ipc;
+        ipc::edge_edge_distance_gradient(ee[0], ee[1], ee[2], ee[3], grad_ipc, tipc);
+        float gradf[12], buf[300];
+        dev::edge_edge_distance_gradient(eef[0], eef[1], eef[2], eef[3], gradf, tself, buf);
+        auto grad_self = Map<Vector<float , 12>>(gradf).cast<double>();
+        EXPECT_TRUE(grad_self.isApprox(grad_ipc, 1e-3)) << "type " << tself <<  "ee grad error, diff norm = " << (grad_ipc - grad_self).norm() << ", margin = " << (grad_ipc - grad_self).norm() / grad_ipc.norm();
+        
+        mat12 hess_ipc;
+        ipc::edge_edge_distance_hessian(ee[0], ee[1], ee[2], ee[3], hess_ipc, tipc);
+        float hessf[144];
+        dev::edge_edge_distance_hessian(eef[0], eef[1], eef[2], eef[3], hessf, tself, buf);
+        auto hess_self = Map<Matrix<float , 12, 12>>(hessf).cast<double>();
+        EXPECT_TRUE(hess_self.isApprox(hess_ipc, 1e-3)) << "type" << tself << " ee hess error, diff norm = " << (hess_ipc - hess_self).norm() << ", margin = " << (hess_ipc - hess_self).norm() / hess_ipc.norm();
+
+        
         encountered_types[tself] =true;
     }
     cout << "encountered types: ";

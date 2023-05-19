@@ -308,7 +308,7 @@ __host__ __device__ void ee_grad_hess12x12(vec3f *ee, float *ee_grad, float *ipc
 
     for (int I = 0; I < 144; I++) {
         int i = I % 12, j = I / 12; // column major
-        ipc_hess[i] = mollifier_hess[i] * B + B_ * (mollifier_grad[i] * ee_grad[j] + mollifier_grad[j] * ee_grad[i]) + p * (B__ * ee_grad[i] * ee_grad[j] + B_ * ipc_hess[i]);
+        ipc_hess[I] = mollifier_hess[I] * B + B_ * (mollifier_grad[i] * ee_grad[j] + mollifier_grad[j] * ee_grad[i]) + p * (B__ * ee_grad[i] * ee_grad[j] + B_ * ipc_hess[I]);
     }
     for (int i = 0; i < 12; i++) {
         ee_grad[i] = ee_grad[i] * B_ + mollifier_grad[i] * B;

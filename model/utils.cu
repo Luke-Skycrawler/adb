@@ -512,7 +512,7 @@ __host__ __device__ void point_point_distance_hessian(vec3f p, vec3f q, float* p
 {
     for (int i = 0; i < 6; i++)
         for (int j = 0; j < 6; j++) {
-            pp_hess[i + j * 6] = i == j ? i < 3 ? 2.0f : -2.0f : 0.0f;
+            pp_hess[i + j * 6] = i == j ? 2.0f : (i - j == 3 || i - j == - 3) ? -2.0f : 0.0f;
             // column major
         }
 }
@@ -634,6 +634,7 @@ __host__ __device__ float edge_edge_distance(vec3f ea0, vec3f ea1, vec3f eb0, ve
 __host__ __device__ void edge_edge_distance_gradient(vec3f ea0, vec3f ea1, vec3f eb0, vec3f eb1, float* ee_grad, int type, float *local_grad) {
     for(int i = 0; i < 12; i++) {
         local_grad[i] = 0.0f;
+        ee_grad[i] = 0;
     }
     switch (type) {
         case 0: // EA0_EB0
@@ -707,6 +708,7 @@ __host__ __device__ void edge_edge_distance_gradient(vec3f ea0, vec3f ea1, vec3f
 __host__ __device__ void edge_edge_distance_hessian(vec3f ea0, vec3f ea1, vec3f eb0, vec3f eb1, float* ee_hess, int type, float *local_hess) {
     for(int i = 0; i < 144; i++) {
         local_hess[i] = 0.0f;
+        ee_hess[i] = 0.0f;
     }
     switch (type) {
     case 0: // EA0_EB0
