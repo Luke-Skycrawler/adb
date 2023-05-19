@@ -69,6 +69,24 @@
     <ClInclude Include="..\model\cuda_header.cuh">
       <FileType>CppHeader</FileType>
     </ClInclude>
+    <ClCompile Include="..\model\utils.cu">
+      <FileType>CppCode</FileType>
+    </ClCompile>
+    <ClInclude Include="..\model\autogen\autogen.cuh">
+      <FileType>CppHeader</FileType>
+    </ClInclude>
+    <ClCompile Include="..\model\autogen\line_line.cu">
+      <FileType>CppCode</FileType>
+    </ClCompile>
+    <ClCompile Include="..\model\autogen\mollifier.cu">
+      <FileType>CppCode</FileType>
+    </ClCompile>
+    <ClCompile Include="..\model\autogen\point_line.cu">
+      <FileType>CppCode</FileType>
+    </ClCompile>
+    <ClCompile Include="..\model\autogen\point_plane.cu">
+      <FileType>CppCode</FileType>
+    </ClCompile>
     <None Include="packages.config" />
   </ItemGroup>
   <ItemDefinitionGroup />

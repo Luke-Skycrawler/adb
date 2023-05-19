@@ -18,7 +18,14 @@ extern Globals globals;
 #include <omp.h>
 #include <tuple>
 #include "cuda_globals.cuh"
+#define CUDA_PROJECT
+#ifdef CUDA_PROJECT
 #include "cuda_glue.h"
+
+void pt_grad_hess12x12(vec3f* pt, float* pt_grad, float* pt_hess, bool psd, float* buf);
+// buf is not optional
+void ee_grad_hess12x12(vec3f* ee, float* ee_grad, float* ipc_hess, float* buf);
+#endif
 using namespace std;
 using mat12 = Matrix<double, 12, 12>;
 void put(double* values, int offset, int _stride, const Matrix<double, 12, 12>& block)
@@ -199,9 +206,6 @@ void ipc_term_vg(AffineBody& c, int v
             J.transpose() * Tk, c.grad, c.hess);
 #endif
 };
-void pt_grad_hess12x12(vec3f *pt, float *pt_grad, float *pt_hess, bool psd , float *buf);
-// buf is not optional
-
 
 tuple<mat12, vec12> ipc_hess_pt_12x12(
     array<vec3, 4> pt, array<int, 4> ij, ipc::PointTriangleDistanceType pt_type, double dist)
@@ -226,52 +230,52 @@ tuple<mat12, vec12> ipc_hess_pt_12x12(
 
     pt_grad *= B_;
 
-
+#ifdef CUDA_PROJECT
     // overtime babysitting
 
     if (globals.params_int["cuda_ipc_term"]) {
         if (true) {
-            float g[12], h [144];
-            vec3f ptf[4];
-            for (int i =0; i < 4;i++) 
-                ptf[i]  = to_vec3f(pt[i]);
-            float * buf = new float[144];
-            pt_grad_hess12x12(ptf, g, h, true, buf);
-            vec12 g_cuda = Map<Vector<float, 12>>(g).cast<double>();
-            mat12 h_cuda = Map<Matrix<float, 12, 12>>(h).cast<double>();
-            if (!g_cuda.isApprox(pt_grad, 1e-3)) {
-                spdlog::error("ipc grad mismatch, norm diff = {}, norm ref = {}, margin = {}", (g_cuda - pt_grad).norm(), pt_grad.norm(), (g_cuda - pt_grad).norm() / pt_grad.norm());
-            }
-            if (!h_cuda.isApprox(ipc_hess, 1e-3)) {
-                spdlog::error("ipc hess mismatch, norm diff= {}, norm ref = {}, margin = {}", (h_cuda - ipc_hess).norm(), ipc_hess.norm(), (h_cuda - ipc_hess).norm() / ipc_hess.norm());
-            }
-            auto distf = dev::point_triangle_distance(ptf[0], ptf[1], ptf[2], ptf[3]);
-            auto B_f = dev::barrier_derivative_d(distf);
-            auto B__f = dev::barrier_second_derivative(distf);
-            auto Bf = dev::barrier_function(distf);
-            auto B = barrier::barrier_function(dist);
-            auto b0m = abs((Bf - B)/ B);
-            auto b1m = abs((B_f - B_) / B_);
-            auto b2m = abs((B__f - B__) / B__);
-            auto dm = abs((distf - dist) / dist);
-            if ( b0m> 1e-4) {
-                spdlog::error("B mismatch, margin = {}", b0m);
-            }
-            if (b1m > 1e-4) {
-                spdlog::error("B. mismatch, margin = {}", b1m);
-            }
-            if (b2m > 1e-4) {
-                spdlog::error("B.. mismatch, margin = {}, B.. = {}", b2m, B__);
-            }
-            if (dm > 1e-4) {
-                spdlog::error("dist mismatch, margin = {}, dist = {}", dm, dist);
-            }
-            delete[] buf;
+                float g[12], h[144];
+                vec3f ptf[4];
+                for (int i = 0; i < 4; i++)
+                    ptf[i] = to_vec3f(pt[i]);
+                float* buf = new float[144];
 
+                pt_grad_hess12x12(ptf, g, h, true, buf);
+
+                vec12 g_cuda = Map<Vector<float, 12>>(g).cast<double>();
+                mat12 h_cuda = Map<Matrix<float, 12, 12>>(h).cast<double>();
+                if (!g_cuda.isApprox(pt_grad, 1e-3)) {
+                    spdlog::error("ipc grad mismatch, norm diff = {}, norm ref = {}, margin = {}", (g_cuda - pt_grad).norm(), pt_grad.norm(), (g_cuda - pt_grad).norm() / pt_grad.norm());
+                }
+                if (!h_cuda.isApprox(ipc_hess, 1e-3)) {
+                    spdlog::error("ipc hess mismatch, norm diff= {}, norm ref = {}, margin = {}", (h_cuda - ipc_hess).norm(), ipc_hess.norm(), (h_cuda - ipc_hess).norm() / ipc_hess.norm());
+                }
+                auto distf = dev::point_triangle_distance(ptf[0], ptf[1], ptf[2], ptf[3]);
+                auto B_f = dev::barrier_derivative_d(distf);
+                auto B__f = dev::barrier_second_derivative(distf);
+                auto Bf = dev::barrier_function(distf);
+                auto B = barrier::barrier_function(dist);
+                auto b0m = abs((Bf - B) / B);
+                auto b1m = abs((B_f - B_) / B_);
+                auto b2m = abs((B__f - B__) / B__);
+                auto dm = abs((distf - dist) / dist);
+                if (b0m > 1e-4) {
+                    spdlog::error("B mismatch, margin = {}", b0m);
+                }
+                if (b1m > 1e-4) {
+                    spdlog::error("B. mismatch, margin = {}", b1m);
+                }
+                if (b2m > 1e-4) {
+                    spdlog::error("B.. mismatch, margin = {}, B.. = {}", b2m, B__);
+                }
+                if (dm > 1e-4) {
+                    spdlog::error("dist mismatch, margin = {}, dist = {}", dm, dist);
+                }
+                delete[] buf;
         }
-        
     }
-
+#endif
     if (globals.psd)
         ipc_hess = project_to_psd(ipc_hess);
 
@@ -309,11 +313,11 @@ void ipc_term(
     auto [ipc_hess, pt_grad] = ipc_hess_pt_12x12(pt, ij, pt_type, dist);
 
 #ifdef _FRICTION_
-        if (globals.pt_fric)
+    if (globals.pt_fric)
         friction(_uk, contact_lambda, Tk.transpose(), pt_grad, ipc_hess);
 #endif
 
-        auto p_tile = ci.vertices(v), t0_tile = cj.vertices(tidx[3 * f]), t1_tile = cj.vertices(tidx[3 * f + 1]), t2_tile = cj.vertices(tidx[3 * f + 2]);
+    auto p_tile = ci.vertices(v), t0_tile = cj.vertices(tidx[3 * f]), t1_tile = cj.vertices(tidx[3 * f + 1]), t2_tile = cj.vertices(tidx[3 * f + 2]);
 
 #define _NO_FANCY_
 #ifdef _NO_FANCY_
@@ -352,24 +356,24 @@ void ipc_term(
 
     for (int i = 0; i < 4; i++)
         for (int j = 0; j < 4; j++) {
-            hess_p.block<3, 3>(i * 3, j * 3) = blkp(i, j) * ipc_hess.block<3, 3>(0, 0);
+                hess_p.block<3, 3>(i * 3, j * 3) = blkp(i, j) * ipc_hess.block<3, 3>(0, 0);
 
-            mat3 hij;
-            hij.setZero(3, 3);
-            for (int k = 0; k < 3; k++)
+                mat3 hij;
+                hij.setZero(3, 3);
+                for (int k = 0; k < 3; k++)
+                    for (int l = 0; l < 3; l++) {
+                        mat3 Akl = ipc_hess.block<3, 3>((k + 1) * 3, (l + 1) * 3);
+                        hij += Akl * (kert(i, k) * kert(j, l));
+                    }
+                hess_t.block<3, 3>(i * 3, j * 3) = hij;
+
+                mat3 offd_ij;
+                offd_ij.setZero(3, 3);
                 for (int l = 0; l < 3; l++) {
-                    mat3 Akl = ipc_hess.block<3, 3>((k + 1) * 3, (l + 1) * 3);
-                    hij += Akl * (kert(i, k) * kert(j, l));
+                    mat3 Akl = ipc_hess.block<3, 3>(0, (l + 1) * 3);
+                    offd_ij += Akl * (kerp(i) * kert(j, l));
                 }
-            hess_t.block<3, 3>(i * 3, j * 3) = hij;
-
-            mat3 offd_ij;
-            offd_ij.setZero(3, 3);
-            for (int l = 0; l < 3; l++) {
-                mat3 Akl = ipc_hess.block<3, 3>(0, (l + 1) * 3);
-                offd_ij += Akl * (kerp(i) * kert(j, l));
-            }
-            off_diag.block<3, 3>(i * 3, j * 3) = offd_ij;
+                off_diag.block<3, 3>(i * 3, j * 3) = offd_ij;
         }
     mat12 off_T = off_diag.transpose();
 
@@ -398,8 +402,6 @@ void ipc_term(
         grad_p, grad_t,
         dgp, dgt,
         hess_p, hess_t, off_diag, off_T);
-
-
 }
 tuple<mat12, vec12, double> ipc_hess_ee_12x12(
     array<vec3, 4> ee, array<int, 4> ij,
@@ -435,6 +437,67 @@ tuple<mat12, vec12, double> ipc_hess_ee_12x12(
     // ipc_hess = B__ * ee_grad * ee_grad.transpose() + project_to_psd(B_ * ee_hess);
 
     ee_grad = p * ee_grad * B_ + p_grad * B;
+#ifdef CUDA_PROJECT
+    if (globals.params_int["cuda_ipc_term"]) {
+        float g[12], h[144];
+        vec3f eef[4];
+        for (int i = 0; i < 4; i++)
+                eef[i] = to_vec3f(ee[i]);
+
+        float* buf = new float[300];
+        ee_grad_hess12x12(eef, g, h, buf);
+
+        vec12 g_cuda = Map<Vector<float, 12>>(g).cast<double>();
+        mat12 h_cuda = Map<Matrix<float, 12, 12>>(h).cast<double>();
+        vec12 p_grad_cuda = Map<Vector<float, 12>>(buf).cast<double>();
+        mat12 p_hess_cuda = Map<Matrix<float, 12, 12>>(buf + 12).cast<double>();
+
+        if (!g_cuda.isApprox(ee_grad, 1e-3)) {
+                spdlog::error("ee grad mismatch, norm diff = {}, norm ref = {}, margin = {}", (g_cuda - ee_grad).norm(), ee_grad.norm(), (g_cuda - ee_grad).norm() / ee_grad.norm());
+        }
+        if (!h_cuda.isApprox(ipc_hess, 1e-3)) {
+                spdlog::error("ee hess mismatch, norm diff= {}, norm ref = {}, margin = {}", (h_cuda - ipc_hess).norm(), ipc_hess.norm(), (h_cuda - ipc_hess).norm() / ipc_hess.norm());
+        }
+
+        if (!p_grad_cuda.isApprox(p_grad, 1e-3)) {
+                spdlog::error("p grad mismatch, norm diff = {}, norm ref = {}, margin = {}", (p_grad_cuda - p_grad).norm(), p_grad.norm(), (p_grad_cuda - p_grad).norm() / p_grad.norm());
+        }
+        if (!p_hess_cuda.isApprox(p_hess, 1e-3)) {
+                spdlog::error("p hess mismatch, norm diff= {}, norm ref = {}, margin = {}", (p_hess_cuda - p_hess).norm(), p_hess.norm(), (p_hess_cuda - p_hess).norm() / p_hess.norm());
+        }
+
+        auto type = dev::edge_edge_distance_type(eef[0], eef[1], eef[2], eef[3]);
+        auto ee_type_to_int = static_cast<int>(ee_type);
+
+
+        auto distf = dev::edge_edge_distance(eef[0], eef[1], eef[2], eef[3], type);
+
+        auto B_f = dev::barrier_derivative_d(distf);
+        auto B__f = dev::barrier_second_derivative(distf);
+        auto Bf = dev::barrier_function(distf);
+        auto B = barrier::barrier_function(dist);
+        auto b0m = abs((Bf - B) / B);
+        auto b1m = abs((B_f - B_) / B_);
+        auto b2m = abs((B__f - B__) / B__);
+        auto dm = abs((distf - dist) / dist);
+        if (type != ee_type_to_int) {
+            spdlog::error("ee type mismatch, type = {}, type cuda = {}", ee_type_to_int, type);
+        }
+        if (dm > 1e-4) {
+                spdlog::error("dist mismatch, margin = {}, dist = {}", dm, dist);
+        }
+        if (b0m > 1e-4) {
+                spdlog::error("B mismatch, margin = {}", b0m);
+        }
+        if (b1m > 1e-4) {
+                spdlog::error("B. mismatch, margin = {}", b1m);
+        }
+        if (b2m > 1e-4) {
+                spdlog::error("B.. mismatch, margin = {}, B.. = {}", b2m, B__);
+        }
+        delete[] buf;
+    }
+#endif
 
     if (globals.psd)
         ipc_hess = project_to_psd(ipc_hess);

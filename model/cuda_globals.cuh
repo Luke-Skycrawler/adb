@@ -3,14 +3,7 @@
 #include <vector>
 #include <string>
 #include <map>
-#ifdef TESTING
-#include <array>
-using i2 = std::array<int, 2>;
-using i4 = std::array<int ,4>;
-#else
-using i2 = cuda::std::array<int, 2>;
-using i4 = cuda::std::array<int, 4>;
-#endif
+
 // struct CollisionSets {
 //     int pt_cnt[7], ee_cnt[9];
 //     i2* pt_set[7];
@@ -116,53 +109,7 @@ struct CudaGlobals {
     std::map<std::string, int> params;
 };
 
-// __constant__ CudaGlobals *cuda_globals;
 extern CudaGlobals host_cuda_globals;
-namespace dev {
-__device__ __constant__ static const float kappa = 1e-4f, d_hat = 1e-4f, d_hat_sqr = 1e-2f, eps = 1e-3f;
-
-__host__ __device__ float barrier_function(float d);
-__host__ __device__ float barrier_derivative_d(float x);
-__host__ __device__ float barrier_second_derivative(float d);
-
-__host__ __device__ float point_triangle_distance(vec3f p, vec3f t0, vec3f t1, vec3f t2, int type = 7);
-__host__ __device__ void point_triangle_distance_gradient(vec3f p, vec3f t0, vec3f t1, vec3f t2, float* pt_grad, int type = 7, float *local_grad = nullptr);
-__host__ __device__ void point_triangle_distance_hessian(vec3f p, vec3f t0, vec3f t1, vec3f t2, float* pt_hess, int type = 7, float *local_hess = nullptr);
-__host__ __device__ void point_point_distance_gradient(vec3f p, vec3f t0, float* pt_hess);
-__host__ __device__ void point_point_distance_hessian(vec3f p, vec3f t0, float* pt_hess);
-__host__ __device__ float edge_edge_distance(vec3f ea0, vec3f ea1, vec3f eb0, vec3f eb1, int type = 9);
-__host__ __device__ void edge_edge_distance_gradient(vec3f ea0, vec3f ea1, vec3f eb0, vec3f eb1, float* ee_grad, int type = 9, float *local_grad = nullptr);
-__host__ __device__ void edge_edge_distance_hessian(vec3f ea0, vec3f ea1, vec3f eb0, vec3f eb1, float* ee_hess, int type = 9, float *local_hess = nullptr);
-
-__host__ __device__ int point_triangle_distance_type(vec3f p, vec3f t0, vec3f t1, vec3f t2);
-__host__ __device__ int edge_edge_distance_type(vec3f ea0, vec3f ea1, vec3f eb0, vec3f eb1);
-__host__ __device__ float edge_edge_mollifier(vec3f ea0, vec3f ea1, vec3f eb0, vec3f eb1, float eps_x);
-__host__ __device__ void edge_edge_mollifier_gradient(vec3f ea0, vec3f ea1, vec3f eb0, vec3f eb1, float eps_x, float* grad);
-__host__ __device__ void edge_edge_mollifier_hessian(vec3f ea0, vec3f ea1, vec3f eb0, vec3f eb1, float eps_x, float *grad_input, float* hess);
-__host__ __device__ float edge_edge_mollifier(float x, float eps_x);
-__host__ __device__ float edge_edge_mollifier_gradient(float x, float eps_x);
-__host__ __device__ float edge_edge_mollifier_hessian(float x, float eps_x);
-__host__ __device__ float edge_edge_cross_squarednorm(vec3f ea0, vec3f ea1, vec3f eb0, vec3f eb1);
-}
-
-__forceinline__ __device__ float3 matmul(float3 _q[4], float3 x)
-{
-    float3* q = _q + 1;
-    float3 ret = make_float3(
-        x.x * q[0].x + x.y * q[1].x + x.z * q[2].x,
-        x.x * q[0].y + x.y * q[1].y + x.z * q[2].y,
-        x.x * q[0].z + x.y * q[1].z + x.z * q[2].z);
-    return ret + _q[0];
-}
-
-__forceinline__ __device__ __host__ float kronecker(int i, int j)
-{
-    return i == j ? 1.0f : 0.0f;
-}
-__host__ __device__ float inertia(cudaAffineBody &c, float dt);
-__host__ __device__ void inertia_grad(cudaAffineBody& c, float dt, float ret[12]);
-__host__ __device__ void inertia_hess(cudaAffineBody& c, float ret[144]);
-__device__ __host__ float vf_distance(vec3f _v, Facef f, int& pt_type);
 
 // seen in all cuda files & glued files-----------------------------------------
 // high-level functions, can be directly called outside of cuda environment

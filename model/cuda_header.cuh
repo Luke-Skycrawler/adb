@@ -4,6 +4,7 @@
 #define __device__ 
 #define __forceinline__ inline 
 #define __global__
+#define __constant__ 
 struct float3 {
     float x, y, z;
 };
@@ -12,6 +13,11 @@ inline float3 make_float3(float x, float y, float z) {
 }
 #define USE_DOUBLE_PRECISION
 #include <cmath>
+#include <cstdio>
+#include <array>
+using i2 = std::array<int, 2>;
+using i4 = std::array<int, 4>;
+
 #else 
 #include <cuda_runtime.h>
 #include "device_launch_parameters.h"
@@ -24,7 +30,8 @@ inline float3 make_float3(float x, float y, float z) {
 #include <thrust/scan.h>
 #include <thrust/execution_policy.h>
 
-
+using i2 = cuda::std::array<int, 2>;
+using i4 = cuda::std::array<int, 4>;
 template <typename T>
 std::vector<T> from_thrust(thrust::device_vector<T> &a)
 {
@@ -249,6 +256,55 @@ __forceinline__ __host__ __device__ bool is_obtuse_triangle(vec3f e0, vec3f e1, 
     auto ca = ab_sqr(e0, p);
     return CUDA_ABS(ca - bc) > ab;
 }
+
+
+__forceinline__ __device__ float3 matmul(float3 _q[4], float3 x)
+{
+    float3* q = _q + 1;
+    float3 ret = make_float3(
+        x.x * q[0].x + x.y * q[1].x + x.z * q[2].x,
+        x.x * q[0].y + x.y * q[1].y + x.z * q[2].y,
+        x.x * q[0].z + x.y * q[1].z + x.z * q[2].z);
+    return ret + _q[0];
+}
+
+
+__forceinline__ __device__ __host__ float kronecker(int i, int j)
+{
+    return i == j ? 1.0f : 0.0f;
+}
+namespace dev {
+__device__ __constant__ static const float kappa = 1e-4f, d_hat = 1e-4f, d_hat_sqr = 1e-2f, eps = 1e-3f;
+
+__host__ __device__ float barrier_function(float d);
+__host__ __device__ float barrier_derivative_d(float x);
+__host__ __device__ float barrier_second_derivative(float d);
+
+__host__ __device__ float point_triangle_distance(vec3f p, vec3f t0, vec3f t1, vec3f t2, int type = 7);
+__host__ __device__ void point_triangle_distance_gradient(vec3f p, vec3f t0, vec3f t1, vec3f t2, float* pt_grad, int type = 7, float *local_grad = nullptr);
+__host__ __device__ void point_triangle_distance_hessian(vec3f p, vec3f t0, vec3f t1, vec3f t2, float* pt_hess, int type = 7, float *local_hess = nullptr);
+__host__ __device__ void point_point_distance_gradient(vec3f p, vec3f t0, float* pt_hess);
+__host__ __device__ void point_point_distance_hessian(vec3f p, vec3f t0, float* pt_hess);
+__host__ __device__ float edge_edge_distance(vec3f ea0, vec3f ea1, vec3f eb0, vec3f eb1, int type = 9);
+__host__ __device__ void edge_edge_distance_gradient(vec3f ea0, vec3f ea1, vec3f eb0, vec3f eb1, float* ee_grad, int type = 9, float *local_grad = nullptr);
+__host__ __device__ void edge_edge_distance_hessian(vec3f ea0, vec3f ea1, vec3f eb0, vec3f eb1, float* ee_hess, int type = 9, float *local_hess = nullptr);
+
+__host__ __device__ int point_triangle_distance_type(vec3f p, vec3f t0, vec3f t1, vec3f t2);
+__host__ __device__ int edge_edge_distance_type(vec3f ea0, vec3f ea1, vec3f eb0, vec3f eb1);
+__host__ __device__ float edge_edge_mollifier(vec3f ea0, vec3f ea1, vec3f eb0, vec3f eb1, float eps_x);
+__host__ __device__ void edge_edge_mollifier_gradient(vec3f ea0, vec3f ea1, vec3f eb0, vec3f eb1, float eps_x, float* grad);
+__host__ __device__ void edge_edge_mollifier_hessian(vec3f ea0, vec3f ea1, vec3f eb0, vec3f eb1, float eps_x, float *grad_input, float* hess);
+__host__ __device__ float edge_edge_mollifier(float x, float eps_x);
+__host__ __device__ float edge_edge_mollifier_gradient(float x, float eps_x);
+__host__ __device__ float edge_edge_mollifier_hessian(float x, float eps_x);
+__host__ __device__ float edge_edge_cross_squarednorm(vec3f ea0, vec3f ea1, vec3f eb0, vec3f eb1);
+}
+__host__ __device__ float inertia(cudaAffineBody &c, float dt);
+__host__ __device__ void inertia_grad(cudaAffineBody& c, float dt, float ret[12]);
+__host__ __device__ void inertia_hess(cudaAffineBody& c, float ret[144]);
+__device__ __host__ float vf_distance(vec3f _v, Facef f, int& pt_type);
+
+
 
 static const int n_cuda_threads_per_block = 256;
 #define PTR(x) thrust::raw_pointer_cast((x).data())

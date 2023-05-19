@@ -279,6 +279,7 @@ __global__ void ipc_pt_kernel(
 }
 
 __host__ __device__ void ee_grad_hess12x12(vec3f *ee, float *ee_grad, float *ipc_hess, float * buf_start) {
+    // buf size is at least 144 * 2 + 12 = 300
     int type;
     
     float *buf = buf_start;
