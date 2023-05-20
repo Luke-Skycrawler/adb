@@ -13,7 +13,7 @@
     "gravity": true, 
     "line_search": true,
     "col_set": true,
-    "ee": false,
+    "ee": true,
     "pt": true,
     "ground": false,
     "safe_factor": 1.0,
@@ -27,7 +27,7 @@
         "beta": 2.5e-2
     },
     "eps_x": 1e-3,
-    "psd": false,
+    "psd": true,
     "_spatial hashing": {
         "min_xyz": -5.0,
         "max_xyz": 5.0,

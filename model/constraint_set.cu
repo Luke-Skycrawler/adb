@@ -4,10 +4,11 @@
 #include <thrust/unique.h>
 #include "autogen/autogen.cuh"
 using namespace std;
-
+__host__ __device__ float makePD(float* S, float* E);
 __device__ __host__ float vf_distance(vec3f _v, Facef f, int& _pt_type);
 __host__ __device__ void dev_project_to_psd(int dim, float* A){
-
+    float buf[144];
+    makePD(A, buf);
 }
 
 __host__ __device__ i2 offset_and_stride(int I, const i2* lut, int* outers)

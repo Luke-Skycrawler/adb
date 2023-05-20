@@ -230,6 +230,9 @@ tuple<mat12, vec12> ipc_hess_pt_12x12(
 
     pt_grad *= B_;
 
+    if (globals.psd)
+        ipc_hess = project_to_psd(ipc_hess);
+
 #ifdef CUDA_PROJECT
     // overtime babysitting
 
@@ -279,8 +282,6 @@ tuple<mat12, vec12> ipc_hess_pt_12x12(
         delete[] buf;
     }
 #endif
-    if (globals.psd)
-        ipc_hess = project_to_psd(ipc_hess);
 
     return { ipc_hess, pt_grad };
 }
@@ -440,6 +441,10 @@ tuple<mat12, vec12, double> ipc_hess_ee_12x12(
     // ipc_hess = B__ * ee_grad * ee_grad.transpose() + project_to_psd(B_ * ee_hess);
 
     ee_grad = p * ee_grad * B_ + p_grad * B;
+    
+    if (globals.psd)
+        ipc_hess = project_to_psd(ipc_hess);
+
 #ifdef CUDA_PROJECT
     if (globals.params_int["cuda_ipc_term"]) {
         float g[12], h[144];
@@ -500,9 +505,6 @@ tuple<mat12, vec12, double> ipc_hess_ee_12x12(
         delete[] buf;
     }
 #endif
-
-    if (globals.psd)
-        ipc_hess = project_to_psd(ipc_hess);
 
     return { ipc_hess, ee_grad, p };
 }

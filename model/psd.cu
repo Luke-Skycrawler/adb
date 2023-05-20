@@ -1,6 +1,6 @@
 #include "cuda_header.cuh"
-using T = float;
-__device__ __forceinline__ int maxind(int k, T* S, int n)
+// using float = float;
+__host__ __device__ __forceinline__ int maxind(int k, float* S, int n)
 {
     int m = k + 1;
     for (int i = k + 2; i < n; ++i)
@@ -9,7 +9,7 @@ __device__ __forceinline__ int maxind(int k, T* S, int n)
     return m;
 }
 
-__device__ __forceinline__ void update(int k, T t, T& y, int& state, T* e, int* change)
+__host__ __device__ __forceinline__ void update(int k, float t, float& y, int& state, float* e, int* change)
 {
     y = e[k];
     e[k] = y + t;
@@ -23,19 +23,19 @@ __device__ __forceinline__ void update(int k, T t, T& y, int& state, T* e, int* 
     }
 }
 
-__device__ __forceinline__ void rotate(int k, int l, int i, int j, T s, T c, T* S, int n)
+__host__ __device__ __forceinline__ void rotate(int k, int l, int i, int j, float s, float c, float* S, int n)
 {
-    T Skl = S[k * n + l], Sij = S[i * n + j];
+    float Skl = S[k * n + l], Sij = S[i * n + j];
     S[k * n + l] = c * Skl - s * Sij;
     S[i * n + j] = s * Skl + c * Sij;
 }
 
-__device__ __forceinline__
-    T
-    makePD(T* S, T* E)
+__host__ __device__
+    float
+    makePD(float* S, float* E)
 {
     const int n = 12;
-    T max_S = 0;
+    float max_S = 0;
 #pragma unroll 12
     for (int i = 0; i < n; ++i)
 #pragma unroll 12
@@ -44,9 +44,9 @@ __device__ __forceinline__
     if (max_S < 1e-12)
         return 0;
 
-    T e[12];
+    float e[12];
     int k, l, m, state;
-    T s, c, t, p, y, d, r;
+    float s, c, t, p, y, d, r;
 
     int ind[12], changed[12];
 #pragma unroll 12
@@ -95,7 +95,7 @@ __device__ __forceinline__
             rotate(k, i, l, i, s, c, S, n);
 #pragma unroll 12
         for (int i = 0; i < n; ++i) {
-            T Eik = E[i * n + k], Eil = E[i * n + l];
+            float Eik = E[i * n + k], Eil = E[i * n + l];
             E[i * n + k] = c * Eik - s * Eil;
             E[i * n + l] = s * Eik + c * Eil;
         }
@@ -122,7 +122,7 @@ __device__ __forceinline__
 #pragma unroll 12
             for (int k = 0; k < n; ++k)
                 S[i * n + k] += E[i * n + j] * e[j] * E[k * n + j];
-    T max_e = e[0];
+    float max_e = e[0];
 #pragma unroll 12
     for (int i = 0; i < n; ++i)
         max_e = CUDA_MAX(max_e, e[i]);

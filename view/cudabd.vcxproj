@@ -138,6 +138,9 @@
     <CudaCompile Include="..\model\iaabb.cu">
       <FileType>CppCode</FileType>
     </CudaCompile>
+    <CudaCompile Include="..\model\psd.cu">
+      <FileType>CppCode</FileType>
+    </CudaCompile>
     <CudaCompile Include="..\model\solver.cu">
       <FileType>CppCode</FileType>
     </CudaCompile>
