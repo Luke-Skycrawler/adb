@@ -330,7 +330,29 @@ __host__ __device__ void point_triangle_closest_point(
     vec3f p, vec3f t0, vec3f t1, vec3f t2, float &a, float &b
 );
 
-
-
+__host__ __device__ void ee_uktk(
+    #ifndef TESTING
+    cudaAffineBody &ci, cudaAffineBody &cj,
+    i2 p,
+    #else 
+    vec3f ees[4], float &dist_ret,
+    #endif
+    int ee_type,
+    float *ret_Tk_float8,   // float8 format
+    float &ux, float &uy
+    // float dist , float dt
+);
+__host__ __device__ void pt_uktk(
+    #ifdef TESTING
+    vec3f pts[4], float& dist_ret,
+    #else
+    cudaAffineBody &ci, cudaAffineBody &cj,
+    i2 p,
+    #endif
+    int pt_type,
+    float *ret_Tk_float8,   // float8 format
+    float &ux, float &uy
+    // float dist , float dt
+);
 static const int n_cuda_threads_per_block = 256;
 #define PTR(x) thrust::raw_pointer_cast((x).data())

@@ -75,11 +75,12 @@ __host__ __device__ void edge_edge_closest_point(
 __host__ __device__ void point_triangle_closest_point(
     vec3f p, vec3f t0, vec3f t1, vec3f t2, float &a, float &b
 ) {
-    auto ae1 = area_x2(p, t1, t2);
-    auto ae2 = area_x2(p, t2, t0);
-    auto at = area_x2(t0, t1, t2);
-    a = ae1 / at;
-    b = ae2 / at;
+    auto normal = cross(t1 - t0, t2 - t0);
+    auto at1 = CUDA_ABS(dot(normal, cross(t2 - t0, p - t0)));
+    auto at2 = CUDA_ABS(dot(normal, cross(t0 - t1, p - t0)));
+    auto at = dot(normal, normal);
+    a = at1 / at;
+    b = at2 / at;
 }
 
 __forceinline__ __host__ __device__ void to_float8(
@@ -150,18 +151,28 @@ __host__ __device__ void ee_ustack(cudaAffineBody &ci, cudaAffineBody &cj, int e
 
 
 __host__ __device__ void pt_uktk(
+    #ifdef TESTING
+    vec3f pts[4], float& dist_ret,
+    #else
     cudaAffineBody &ci, cudaAffineBody &cj,
     i2 p,
+    #endif
     int pt_type,
     float *ret_Tk_float8,   // float8 format
     float &ux, float &uy
+    
     // float dist , float dt
 ) {
+    #ifndef TESTING
     float3 u[4];
     pt_ustack(ci, cj, p[0], p[1], u );
 
     vec3f v {ci.updated[p[0]]};
     Facef f {cj.triangle_updated(p[1])};
+    #else 
+    vec3f v {pts[0]};
+    Facef f {pts[1], pts[2], pts[3]};
+    #endif
     float lams[3] {0.0f};
     vec3f b0, b1;
     float a,b;
@@ -211,6 +222,11 @@ __host__ __device__ void pt_uktk(
             lams[2] = b;
             point_triangle_tangent_basis(v, f.t0, f.t1, f.t2, b0, b1);
     }
+    #ifdef TESTING
+    auto tp = f.t0 * lams[0] + f.t1 * lams[1] + f.t2 * lams[2];
+    auto closest = dot(v - tp, v - tp);
+    dist_ret = closest;
+    #else 
     // Tk^T = 
     // [[ -b0, l0 b0, l1 b0, l2 b0 ]
     // [  -b1, l0 b1, l1 b1, l2 b1 ]]
@@ -218,20 +234,30 @@ __host__ __device__ void pt_uktk(
     // uk = Tk^T * (u0, u1, u2, u3)^T
     ux = -dot(b0, u[0])  + lams[0] * dot(b0, u[1]) + lams[1] * dot(b0, u[2]) + lams[2] * dot(b0, u[3]);
     uy = -dot(b1, u[0])  + lams[0] * dot(b1, u[1]) + lams[1] * dot(b1, u[2]) + lams[2] * dot(b1, u[3]);
+    #endif
 }
 
 __host__ __device__ void ee_uktk(
+    #ifndef TESTING
     cudaAffineBody &ci, cudaAffineBody &cj,
     i2 p,
+    #else 
+    vec3f ees[4], float &dist_ret,
+    #endif
     int ee_type,
     float *ret_Tk_float8,   // float8 format
     float &ux, float &uy
     // float dist , float dt
 ) {
+
+    #ifndef TESTING
     float3 u[4];
     ee_ustack(ci, cj, p[0], p[1], u );
 
     Edgef ei{ci.edge_updated(p[0])}, ej {cj.edge_updated(p[1])};
+    #else 
+    Edgef ei{ees[0], ees[1]}, ej{ees[2], ees[3]};
+    #endif
     float lams[2] {0.0f};
     vec3f b0, b1;
     float a,b;
@@ -290,10 +316,15 @@ __host__ __device__ void ee_uktk(
         lams[0] = a;
         lams[1] = b;
     }
-    lams[0] = CUDA_MAX(CUDA_MIN(lams[0], 1.0f), 0.0f);
-    lams[1] = CUDA_MAX(CUDA_MIN(lams[1], 1.0f), 0.0f);
+    // lams[0] = CUDA_MAX(CUDA_MIN(lams[0], 1.0f), 0.0f);
+    // lams[1] = CUDA_MAX(CUDA_MIN(lams[1], 1.0f), 0.0f);
 
-    
+    #ifdef TESTING
+    auto pei = ei.e0 * (1.0f - lams[0]) + ei.e1 * lams[0];
+    auto pej = ej.e0 * (1.0f - lams[1]) + ej.e1 * lams[1];
+    auto closest = dot(pei - pej, pei - pej);
+    dist_ret = closest;
+    #else 
     // Tk^T = 
     // [[ -(1 - l0)b0, -l0 b0, (1 - l1) b0, l1 b0 ]
     // [  -(1 - l0)b1, -l0 b1, (1 - l1) b1, l1 b1 ]]
@@ -302,4 +333,5 @@ __host__ __device__ void ee_uktk(
     // uk = Tk^T * (u0, u1, u2, u3)^T
     ux = -(1.0f - lams[0])  * dot(b0, u[0])  - lams[0] * dot(b0, u[1]) + (1.0f - lams[1]) * dot(b0, u[2]) + lams[1] * dot(b0, u[3]);
     uy = -(1.0f - lams[0]) * dot(b1, u[0])  - lams[0] * dot(b1, u[1]) + (1.0f - lams[1]) * dot(b1, u[2]) + lams[1] * dot(b1, u[3]);
+    #endif
 }

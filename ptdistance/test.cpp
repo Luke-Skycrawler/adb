@@ -3,12 +3,15 @@
 #include <Eigen/Geometry>
 #include <ipc/distance/point_triangle.hpp>
 #include <ipc/distance/edge_edge.hpp>
+#include <ipc/friction/closest_point.hpp>
+
 #include "../model/affine_body.h"
 #include "../model/geometry.h"
 #include <random>
 #include <array>
 #include "../model/cuda_header.cuh"
 #include "../model/collision.h"
+
 //#include "../model/cuda_glue.h"
 using namespace std;
 
@@ -161,7 +164,17 @@ TEST(ipctkref, random_ee) {
         auto hess_self = Map<Matrix<float , 12, 12>>(hessf).cast<double>();
         EXPECT_TRUE(hess_self.isApprox(hess_ipc, 1e-3)) << "type" << tself << " ee hess error, diff norm = " << (hess_ipc - hess_self).norm() << ", margin = " << (hess_ipc - hess_self).norm() / hess_ipc.norm();
 
-        
+        float closest, ux, uy;
+        ee_uktk(eef, closest, tself, nullptr, ux, uy);
+        EXPECT_TRUE(abs(closest - dist_self) < 1e-6) << "pt distance error, closest = " << closest << ", dist = " << dist_self << " type = " << tself;
+        if (tself == 8) {
+            auto lams = ipc::edge_edge_closest_point(ee[0], ee[1], ee[2], ee[3]);
+            float a, b;
+            edge_edge_closest_point(eef[0], eef[1], eef[2], eef[3], a, b);
+            EXPECT_TRUE(abs(a - lams[0]) < 1e-6) << "closest point error, a = " << a << ", lams[0] = " << lams[0];
+            EXPECT_TRUE(abs(b - lams[1]) < 1e-6) << "closest point error, b = " << b << ", lams[1] = " << lams[1];
+        }
+
         encountered_types[tself] =true;
     }
     cout << "encountered types: ";
@@ -208,7 +221,9 @@ TEST(ipctkref, random_pt) {
         auto hess_self = Map<Matrix<float , 12, 12>>(hessf).cast<double>();
         EXPECT_TRUE(hess_self.isApprox(hess_ipc, 1e-3)) << "type" << tself << " pt hess error, diff norm = " << (hess_ipc - hess_self).norm() << ", margin = " << (hess_ipc - hess_self).norm() / hess_ipc.norm();
 
-        
+        float closest, ux, uy;
+        pt_uktk(ptf, closest, tself, nullptr, ux, uy);
+        EXPECT_TRUE(abs(closest - dist_self) < 1e-6) << "ee distance error, closest = " << closest << ", dist = " << dist_self << " type = " << tself;
         encountered_types[tself] =true;
     }
     cout << "encountered types: ";
