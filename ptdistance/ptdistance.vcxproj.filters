@@ -17,6 +17,12 @@
     <ClCompile Include="..\model\autogen\point_plane.cu">
       <Filter>cuda</Filter>
     </ClCompile>
+    <ClCompile Include="..\model\autogen\line_line.cu" />
+    <ClCompile Include="..\model\autogen\mollifier.cu" />
+    <ClCompile Include="..\model\autogen\point_line.cu" />
+    <ClCompile Include="..\model\friction.cu">
+      <Filter>cuda</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\model\affine_body.h" />
@@ -32,15 +38,6 @@
   </ItemGroup>
   <ItemGroup>
     <None Include="packages.config" />
-    <None Include="..\model\autogen\line_line.cu">
-      <Filter>cuda</Filter>
-    </None>
-    <None Include="..\model\autogen\mollifier.cu">
-      <Filter>cuda</Filter>
-    </None>
-    <None Include="..\model\autogen\point_line.cu">
-      <Filter>cuda</Filter>
-    </None>
   </ItemGroup>
   <ItemGroup>
     <Filter Include="cuda">

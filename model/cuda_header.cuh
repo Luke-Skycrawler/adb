@@ -304,6 +304,32 @@ __host__ __device__ void inertia_grad(cudaAffineBody& c, float dt, float ret[12]
 __host__ __device__ void inertia_hess(cudaAffineBody& c, float ret[144]);
 __device__ __host__ float vf_distance(vec3f _v, Facef f, int& pt_type);
 
+__host__ __device__ void point_point_tangent_basis(
+    vec3f p0, vec3f p1, 
+    float3& b0, float3& b1
+);
+__host__ __device__ void point_edge_tangent_basis(
+    vec3f p, vec3f e0, vec3f e1, 
+    float3 &b0, float3 &b1
+);
+__host__ __device__ void edge_edge_tangent_basis(
+    vec3f ei0, vec3f ei1, vec3f ej0, vec3f ej1,
+    float3 &b0, float3 &b1
+);
+__host__ __device__ void point_triangle_tangent_basis(
+    vec3f p, vec3f t0, vec3f t1, vec3f t2,
+    float3 &b0, float3 &b1
+);
+__host__ __device__ float point_edge_closest_point(
+    vec3f p, vec3f e0, vec3f e1
+);
+__host__ __device__ void edge_edge_closest_point(
+    vec3f ei0, vec3f ei1, vec3f ej0, vec3f ej1, float &a, float &b
+);
+__host__ __device__ void point_triangle_closest_point(
+    vec3f p, vec3f t0, vec3f t1, vec3f t2, float &a, float &b
+);
+
 
 
 static const int n_cuda_threads_per_block = 256;

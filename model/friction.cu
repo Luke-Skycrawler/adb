@@ -1,4 +1,4 @@
-#include "cuda_globals.cuh"
+#include "cuda_header.cuh"
 
 // return basis are all 3x2 
 __host__ __device__ void point_point_tangent_basis(
@@ -6,8 +6,8 @@ __host__ __device__ void point_point_tangent_basis(
     float3& b0, float3& b1
 ) {
     auto p01 = p1 - p0;
-    auto ex = make_flaot3(1.0f, 0.0f, 0.0f);
-    auto ey = make_flaot3(0.0f, 1.0f, 0.0f);
+    auto ex = make_float3(1.0f, 0.0f, 0.0f);
+    auto ey = make_float3(0.0f, 1.0f, 0.0f);
     auto cx = cross(p01, ex);
     auto cy = cross(p01, ey);
     auto nx = dot(cx, cx);
@@ -55,7 +55,7 @@ __host__ __device__ float point_edge_closest_point(
     return dot(p - e0, e) / dot(e, e);
 }
 
-__host__ __device__ edge_edge_closest_point(
+__host__ __device__ void edge_edge_closest_point(
     vec3f ei0, vec3f ei1, vec3f ej0, vec3f ej1, float &a, float &b
 ) {
     auto eij = ei0 - ej0;
@@ -72,7 +72,7 @@ __host__ __device__ edge_edge_closest_point(
     a = (b0 * a11 - b1 * a01) / J;
     b = (a00 * b1 - b0 * a01) / J;
 }
-__host__ __device__ point_triangle_closest_point(
+__host__ __device__ void point_triangle_closest_point(
     vec3f p, vec3f t0, vec3f t1, vec3f t2, float &a, float &b
 ) {
     auto ae1 = area_x2(p, t1, t2);
@@ -99,7 +99,7 @@ __forceinline__ __host__ __device__ void to_float8(
 }
 
 __forceinline__ __host__ __device__ void Tk_pt_from_float8(
-    float *Tk_float8, float3 *ret[8]
+    float *Tk_float8, float3 ret[8]
 ){
     
     // Tk^T = 
@@ -108,30 +108,30 @@ __forceinline__ __host__ __device__ void Tk_pt_from_float8(
     auto b0 = make_float3(Tk_float8[0], Tk_float8[1], Tk_float8[2]);
     auto b1 = make_float3(Tk_float8[3], Tk_float8[4], Tk_float8[5]);
     auto lams = Tk_float8 + 6;
-    lams2 = 1.0f - lams[0] - lams[1];
-    ret[0] = -b0; ret[2] = b0 * lams[0]; ret[4] = b0 * lams[1]; ret[6] = b0 * lams2;
-    ret[1] = -b1; ret[3] = b1 * lams[0]; ret[5] = b1 * lams[1]; ret[7] = b1 * lams2;
+    float lams2 = 1.0f - lams[0] - lams[1];
+    ret[0] = b0 * -1.0f; ret[2] = b0 * lams[0]; ret[4] = b0 * lams[1]; ret[6] = b0 * lams2;
+    ret[1] = b1 * -1.0f; ret[3] = b1 * lams[0]; ret[5] = b1 * lams[1]; ret[7] = b1 * lams2;
 }
 
 __forceinline__ __host__ __device__ void Tk_ee_from_float8(
-    float *Tk_float8, float3 *ret[8]
+    float *Tk_float8, float3 ret[8]
 ){
     // Tk^T = 
     // [[ -(1 - l0)b0, -l0 b0, (1 - l1) b0, l1 b0 ]
     // [  -(1 - l0)b1, -l0 b1, (1 - l1) b1, l1 b1 ]]
     auto b0 = make_float3(Tk_float8[0], Tk_float8[1], Tk_float8[2]);
+    auto b1 = make_float3(Tk_float8[3], Tk_float8[4], Tk_float8[5]);
     auto lams = Tk_float8 + 6;
-    ret[0] = -(1.0f - lams[0]) * b0; ret[2] = - lams[0] * b0; ret[4] = (1.0f - lams[1]) * b0; ret[6] = lams[1] * b0;
-    b0 = make_float3(Tk_float8[3], Tk_float8[4], Tk_float8[5]);
-    ret[1] = -(1.0f - lams[0]) * b0; ret[3] = - lams[0] * b0; ret[5] = (1.0f - lams[1]) * b0; ret[7] = lams[1] * b0;
+    ret[0] = b0 * -(1.0f - lams[0]); ret[2] = b0 * - lams[0]; ret[4] = b0 * (1.0f - lams[1]); ret[6] = b0 * lams[1];
+    ret[1] = b1 * -(1.0f - lams[0]); ret[3] = b1 * - lams[0]; ret[5] = b1 * (1.0f - lams[1]); ret[7] = b1 * lams[1];
 }
 
-__host__ __device__ pt_ustack(cudaAffineBody  &ci, cudaAffineBody &cj, int vi, int fj, float3 u[4]) {
+__host__ __device__ void pt_ustack(cudaAffineBody  &ci, cudaAffineBody &cj, int vi, int fj, float3 u[4]) {
     // NOTE: should call project vt2 then project vt0 before calling this function
     Facef tt2{cj.triangle_updated(fj)};
     Facef tt0{cj.triangle(fj)};
-    vec3f pt2{ci.updated(vi)};
-    vec3f pt0{ci.projected(pt2)};
+    vec3f pt2{ci.updated[vi]};
+    vec3f pt0{ci.projected[vi]};
 
     u[0] = pt2 - pt0;
     u[1] = tt2.t0 - tt0.t0;
@@ -139,7 +139,7 @@ __host__ __device__ pt_ustack(cudaAffineBody  &ci, cudaAffineBody &cj, int vi, i
     u[3] = tt2.t2 - tt0.t2;
 } 
 
-__host__ __device__ ee_ustack(cudaAffineBody &ci, cudaAffineBody &cj, int ei, int ej, flaot3 u[4]) {
+__host__ __device__ void ee_ustack(cudaAffineBody &ci, cudaAffineBody &cj, int ei, int ej, float3 u[4]) {
     Edgef ei0{ci.edge(ei)}, ei2{ci.edge_updated(ei)};
     Edgef ej0{cj.edge(ej)}, ej2{cj.edge_updated(ej)};
     u[0] = ei2.e0 - ei0.e0;
@@ -290,8 +290,8 @@ __host__ __device__ void ee_uktk(
         lams[0] = a;
         lams[1] = b;
     }
-    lams[0] = CUDA_MAX(CUDAS_MIN(lams[0], 1.0f), 0.0f);
-    lams[1] = CUDA_MAX(CUDAS_MIN(lams[1], 1.0f), 0.0f);
+    lams[0] = CUDA_MAX(CUDA_MIN(lams[0], 1.0f), 0.0f);
+    lams[1] = CUDA_MAX(CUDA_MIN(lams[1], 1.0f), 0.0f);
 
     
     // Tk^T = 

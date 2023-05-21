@@ -87,6 +87,9 @@
     <ClCompile Include="..\model\autogen\point_plane.cu">
       <FileType>CppCode</FileType>
     </ClCompile>
+    <ClCompile Include="..\model\friction.cu">
+      <FileType>CppCode</FileType>
+    </ClCompile>
     <None Include="packages.config" />
   </ItemGroup>
   <ItemDefinitionGroup />
