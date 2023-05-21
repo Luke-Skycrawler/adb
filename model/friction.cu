@@ -51,22 +51,39 @@ __host__ __device__ void point_triangle_tangent_basis(
 __host__ __device__ float point_edge_closest_point(
     vec3f p, vec3f e0, vec3f e1
 ) {
-    
+    auto e = e1 - e0;
+    return dot(p - e0, e) / dot(e, e);
 }
 
 __host__ __device__ edge_edge_closest_point(
     vec3f ei0, vec3f ei1, vec3f ej0, vec3f ej1, float &a, float &b
 ) {
+    auto eij = ei0 - ej0;
+    auto ei = ei1 - ei0;
+    auto ej = ej1 - ej0;
 
+    auto a00= dot(ei, ei);
+    auto a01= -dot(ei, ej);
+    auto a11 = dot(ej, ej);
+
+    auto b0 = -dot(ei, eij);
+    auto b1 = dot(ej, eij);
+    float J = a00 * a11 - a01 * a01;
+    a = (b0 * a11 - b1 * a01) / J;
+    b = (a00 * b1 - b0 * a01) / J;
 }
 __host__ __device__ point_triangle_closest_point(
     vec3f p, vec3f t0, vec3f t1, vec3f t2, float &a, float &b
 ) {
-
+    auto ae1 = area_x2(p, t1, t2);
+    auto ae2 = area_x2(p, t2, t0);
+    auto at = area_x2(t0, t1, t2);
+    a = ae1 / at;
+    b = ae2 / at;
 }
 
-__forceinline__ __host__ __device__ void to_float9(
-    vec3f b0, vec3f b1, float lams[3],
+__forceinline__ __host__ __device__ void to_float8(
+    vec3f b0, vec3f b1, float lams[2],
     float *ret
 ) {
     // pack to save bandwidth
@@ -78,21 +95,35 @@ __forceinline__ __host__ __device__ void to_float9(
     ret[5] = b1.z;
     ret[6] = lams[0];
     ret[7] = lams[1];
-    ret[8] = lams[2];
+    // ret[8] = lams[2];
 }
 
-__forceinline__ __host__ __device__ void Tk_from_float9(
-    float *Tk_float9, float3 *ret[8]
+__forceinline__ __host__ __device__ void Tk_pt_from_float8(
+    float *Tk_float8, float3 *ret[8]
 ){
     
     // Tk^T = 
     // [[ -b0, l0 b0, l1 b0, l2 b0 ]
     // [  -b1, l0 b1, l1 b1, l2 b1 ]]
-    auto b0 = make_float3(Tk_float9[0], Tk_float9[1], Tk_float9[2]);
-    auto b1 = make_float3(Tk_float9[3], Tk_float9[4], Tk_float9[5]);
-    auto lams = Tk_float9 + 6;
-    ret[0] = -b0; ret[2] = lams[0] * b0; ret[4] = lams[1] * b0; ret[6] = lams[2] * b0;
-    ret[1] = -b1; ret[3] = lams[0] * b1; ret[5] = lams[1] * b1; ret[7] = lams[2] * b1;
+    auto b0 = make_float3(Tk_float8[0], Tk_float8[1], Tk_float8[2]);
+    auto b1 = make_float3(Tk_float8[3], Tk_float8[4], Tk_float8[5]);
+    auto lams = Tk_float8 + 6;
+    lams2 = 1.0f - lams[0] - lams[1];
+    ret[0] = -b0; ret[2] = b0 * lams[0]; ret[4] = b0 * lams[1]; ret[6] = b0 * lams2;
+    ret[1] = -b1; ret[3] = b1 * lams[0]; ret[5] = b1 * lams[1]; ret[7] = b1 * lams2;
+}
+
+__forceinline__ __host__ __device__ void Tk_ee_from_float8(
+    float *Tk_float8, float3 *ret[8]
+){
+    // Tk^T = 
+    // [[ -(1 - l0)b0, -l0 b0, (1 - l1) b0, l1 b0 ]
+    // [  -(1 - l0)b1, -l0 b1, (1 - l1) b1, l1 b1 ]]
+    auto b0 = make_float3(Tk_float8[0], Tk_float8[1], Tk_float8[2]);
+    auto lams = Tk_float8 + 6;
+    ret[0] = -(1.0f - lams[0]) * b0; ret[2] = - lams[0] * b0; ret[4] = (1.0f - lams[1]) * b0; ret[6] = lams[1] * b0;
+    b0 = make_float3(Tk_float8[3], Tk_float8[4], Tk_float8[5]);
+    ret[1] = -(1.0f - lams[0]) * b0; ret[3] = - lams[0] * b0; ret[5] = (1.0f - lams[1]) * b0; ret[7] = lams[1] * b0;
 }
 
 __host__ __device__ pt_ustack(cudaAffineBody  &ci, cudaAffineBody &cj, int vi, int fj, float3 u[4]) {
@@ -122,7 +153,7 @@ __host__ __device__ void pt_uktk(
     cudaAffineBody &ci, cudaAffineBody &cj,
     i2 p,
     int pt_type,
-    float *ret_Tk_float9,   // float9 format
+    float *ret_Tk_float8,   // float8 format
     float &ux, float &uy
     // float dist , float dt
 ) {
@@ -183,8 +214,92 @@ __host__ __device__ void pt_uktk(
     // Tk^T = 
     // [[ -b0, l0 b0, l1 b0, l2 b0 ]
     // [  -b1, l0 b1, l1 b1, l2 b1 ]]
-    to_float9(b0, b1, lams, ret_Tk_float9);
+    to_float8(b0, b1, lams, ret_Tk_float8);
     // uk = Tk^T * (u0, u1, u2, u3)^T
     ux = -dot(b0, u[0])  + lams[0] * dot(b0, u[1]) + lams[1] * dot(b0, u[2]) + lams[2] * dot(b0, u[3]);
     uy = -dot(b1, u[0])  + lams[0] * dot(b1, u[1]) + lams[1] * dot(b1, u[2]) + lams[2] * dot(b1, u[3]);
+}
+
+__host__ __device__ void ee_uktk(
+    cudaAffineBody &ci, cudaAffineBody &cj,
+    i2 p,
+    int ee_type,
+    float *ret_Tk_float8,   // float8 format
+    float &ux, float &uy
+    // float dist , float dt
+) {
+    float3 u[4];
+    ee_ustack(ci, cj, p[0], p[1], u );
+
+    Edgef ei{ci.edge_updated(p[0])}, ej {cj.edge_updated(p[1])};
+    float lams[2] {0.0f};
+    vec3f b0, b1;
+    float a,b;
+
+    switch (ee_type) {
+        case 0: 
+        // EA0_EB0
+        point_point_tangent_basis(ei.e0, ej.e0, b0, b1);
+        break;
+        case 1:
+        // EA0_EB1
+        point_point_tangent_basis(ei.e0, ej.e1, b0, b1);
+        lams[1] = 1.0f;
+        break;
+        case 2:
+        // EA1_EB0
+        point_point_tangent_basis(ei.e1, ej.e0, b0, b1);
+        lams[0] = 1.0f;
+        break;
+        case 3:
+        // EA1_EB1
+        point_point_tangent_basis(ei.e1, ej.e1, b0, b1);
+        lams[0] = 1.0f;
+        lams[1] = 1.0f;
+        break;
+        case 4:
+        // EA_EB0
+        point_edge_tangent_basis(ej.e0, ei.e0, ei.e1, b0, b1);
+        a = point_edge_closest_point(ej.e0, ei.e0, ei.e1);
+        lams[0] = a;
+        break;
+        case 5:
+        // EA_EB1
+        point_edge_tangent_basis(ej.e1, ei.e0, ei.e1, b0, b1);
+        a = point_edge_closest_point(ej.e1, ei.e0, ei.e1);
+        lams[0] = a;
+        lams[1] = 1.0f;
+        break;
+        case 6:
+        // EA0_EB
+        point_edge_tangent_basis(ei.e0, ej.e0, ej.e1, b0, b1);
+        a = point_edge_closest_point(ei.e0, ej.e0, ej.e1);
+        lams[1] = a;
+        break;
+        case 7:
+        // EA1_EB
+        point_edge_tangent_basis(ei.e1, ej.e0, ej.e1, b0, b1);
+        a = point_edge_closest_point(ei.e1, ej.e0, ej.e1);
+        lams[0] = 1.0f;
+        lams[1] = a;
+        break;
+        case 8:
+        // EA_EB
+        edge_edge_tangent_basis(ei.e0, ei.e1, ej.e0, ej.e1, b0, b1);
+        edge_edge_closest_point(ei.e0, ei.e1, ej.e0, ej.e1, a, b);
+        lams[0] = a;
+        lams[1] = b;
+    }
+    lams[0] = CUDA_MAX(CUDAS_MIN(lams[0], 1.0f), 0.0f);
+    lams[1] = CUDA_MAX(CUDAS_MIN(lams[1], 1.0f), 0.0f);
+
+    
+    // Tk^T = 
+    // [[ -(1 - l0)b0, -l0 b0, (1 - l1) b0, l1 b0 ]
+    // [  -(1 - l0)b1, -l0 b1, (1 - l1) b1, l1 b1 ]]
+    to_float8(b0, b1, lams, ret_Tk_float8);
+
+    // uk = Tk^T * (u0, u1, u2, u3)^T
+    ux = -(1.0f - lams[0])  * dot(b0, u[0])  - lams[0] * dot(b0, u[1]) + (1.0f - lams[1]) * dot(b0, u[2]) + lams[1] * dot(b0, u[3]);
+    uy = -(1.0f - lams[0]) * dot(b1, u[0])  - lams[0] * dot(b1, u[1]) + (1.0f - lams[1]) * dot(b1, u[2]) + lams[1] * dot(b1, u[3]);
 }
