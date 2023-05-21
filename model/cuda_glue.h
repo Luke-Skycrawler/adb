@@ -1,9 +1,10 @@
 #pragma once
 // works in conjunction with eigen and cuda environment
 #include "affine_body.h"
-#include "cuda_globals.cuh"
 #include <vector>
 #include <memory>
+#ifdef CUDA_PROJECT
+#include "cuda_globals.cuh"
 using lu = std::array<vec3, 2>;
 
 inline luf to_luf(const lu& a)
@@ -108,4 +109,5 @@ void gen_empty_sm_glue(
     std::vector<std::array<int, 4>>& eidx,
     Eigen::SparseMatrix<double>& sparse_hess,
     std::map<std::array<int, 2>, int>& lut);
+#endif
 #endif

@@ -17,7 +17,7 @@
 #include <Eigen/PardisoSupport>
 #endif
 #include <ipc/distance/edge_edge_mollifier.hpp>
-#define CUDA_PROJECT
+// #define CUDA_PROJECT
 #ifdef CUDA_PROJECT
 #include "cuda_glue.h"
 #endif
@@ -138,9 +138,9 @@ double line_search(const VectorXd& dq, const VectorXd& grad, VectorXd& q0, doubl
             // c.dq is already set
             init_dev_cubes(n_cubes, cubes);
         }
-        double ebi = 0.0;
 
 #endif
+        double ebi = 0.0;
         if (globals.iaabb % 2)
             ebi = iaabb_brute_force(n_cubes, cubes, globals.aabbs, 2,
 #ifdef IAABB_COMPARING
@@ -893,11 +893,13 @@ void implicit_euler(vector<unique_ptr<AffineBody>>& cubes, double dt)
             if (globals.dense)
                 dq = -big_hess.ldlt().solve(r);
             else if (globals.sparse) {
-
+                #ifdef CUDA_PROJECT
                 if (globals.params_int["cuda_solver"]) {
                     cuda_solve_glue(dq, sparse_hess, r);
                 }
-                else {
+                else 
+                    #endif
+                {
 
 #ifdef EIGEN_USE_MKL_ALL
                     PardisoLLT<SparseMatrix<double>> ldlt_solver;

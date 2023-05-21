@@ -12,7 +12,6 @@
 #include <fstream>
 #include <nlohmann/json.hpp>
 #include <omp.h>
-#include "../model/cuda_globals.cuh"
 //#define FEATURE_MODEL
 using namespace std;
 //------------------ optional features ----------------------------

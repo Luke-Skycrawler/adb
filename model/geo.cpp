@@ -17,8 +17,7 @@ extern Globals globals;
 #include "time_integrator.h"
 #include <omp.h>
 #include <tuple>
-#include "cuda_globals.cuh"
-#define CUDA_PROJECT
+// #define CUDA_PROJECT
 #ifdef CUDA_PROJECT
 #include "cuda_glue.h"
 

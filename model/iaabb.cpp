@@ -10,10 +10,8 @@
 #include <omp.h>
 #include <tbb/parallel_sort.h>
 
-#include <cuda/std/array>
-#include <thrust/host_vector.h>
 #include <type_traits>
-#define CUDA_PROJECT
+// #define CUDA_PROJECT
 #ifdef CUDA_PROJECT
 #include "cuda_glue.h"
 #endif
@@ -35,10 +33,10 @@ using namespace utils;
 using namespace std::chrono;
 #define DURATION_TO_DOUBLE(X) duration_cast<duration<double>>(high_resolution_clock::now() - (X)).count()
 
+#ifdef CUDA_PROJECT
 
 float vf_distance(vec3f _v, Facef f, int &pt_type);
 tuple<float, ipc::PointTriangleDistanceType> vf_distance(vec3f vf, Facef ff); 
-
 void vf_col_set_cuda(
     int nvi, int nfj,
     const thrust::host_vector<luf>& aabbs,
@@ -82,6 +80,18 @@ void vf_col_set_glue(
     vf_col_set_cuda(nvi, nfj, aabbs, vis, fjs, vilist, fjlist, idx, I, J, tid);
     pts.resize(idx.size()); 
 }
+
+
+
+tuple<float, ipc::PointTriangleDistanceType> vf_distance(vec3f vf, Facef ff){
+    Eigen::Vector3f v {vf.x, vf.y, vf.z};
+    Eigen::Vector3f f[3] {{ff.t0.x, ff.t0.y, ff.t0.z}, {ff.t1.x, ff.t1.y, ff.t1.z}, {ff.t2.x, ff.t2.y, ff.t2.z}};
+    auto pt_type = ipc::point_triangle_distance_type(v, f[0], f[1], f[2]);
+    float d = ipc::point_triangle_distance(v, f[0], f[1], f[2], pt_type);
+    return {d, pt_type};
+}
+
+#endif
 inline bool les(const Intersection& a, const Intersection& b)
 {
     return a.i < b.i || (a.i == b.i && a.j < b.j);
@@ -1353,13 +1363,5 @@ double iaabb_brute_force(
     auto t = DURATION_TO_DOUBLE(start);
     spdlog::info("time: {} = {:0.6f} ms", vtn == 3 ? "iaabb upper bound" : "iAABB", t * 1000);
     return toi;
-}
-
-tuple<float, ipc::PointTriangleDistanceType> vf_distance(vec3f vf, Facef ff){
-    Eigen::Vector3f v {vf.x, vf.y, vf.z};
-    Eigen::Vector3f f[3] {{ff.t0.x, ff.t0.y, ff.t0.z}, {ff.t1.x, ff.t1.y, ff.t1.z}, {ff.t2.x, ff.t2.y, ff.t2.z}};
-    auto pt_type = ipc::point_triangle_distance_type(v, f[0], f[1], f[2]);
-    float d = ipc::point_triangle_distance(v, f[0], f[1], f[2], pt_type);
-    return {d, pt_type};
 }
 

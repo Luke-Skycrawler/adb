@@ -34,9 +34,12 @@ void reset(bool init)
     globals.ee = data["ee"];
     globals.pt = data["pt"];
     globals.psd = data["psd"];
+    #ifdef CUDA_PROJECT
     host_cuda_globals.params["ee"] = globals.ee;
     host_cuda_globals.params["pt"] = globals.pt;
     host_cuda_globals.params["psd"] = globals.psd;
+
+    #endif
     globals.ground = data["ground"];
     globals.damp = data["damping"]["enable"];
     globals.backoff = data["backoff"];
@@ -126,16 +129,20 @@ void reset(bool init)
     auto &params_int {data["params_int"]};
     for (auto p: params_int.items()) {
         globals.params_int[p.key()] = p.value();
-        host_cuda_globals.params[p.key()] = p.value();
     }
     barrier::kappa = globals.kappa;
     for (int i = 0; i < 9; i++) {
         globals.params_int["ee error " + to_string(i)] = 0;
     }
+#ifdef CUDA_PROJECT
+    for (auto p : params_int.items()) {
+        host_cuda_globals.params[p.key()] = p.value();
+    }
     host_cuda_globals.n_cubes = n_cubes;
     host_cuda_globals.allocate_buffers();
     initialize_primitives(globals.cubes);
     initialize_aabbs(globals.aabbs);
+    #endif
 }
 // process all input: query GLFW whether relevant keys are pressed/released this frame and react accordingly
 // ---------------------------------------------------------------------------------------------------------

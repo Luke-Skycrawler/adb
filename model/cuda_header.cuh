@@ -1,5 +1,8 @@
 #pragma once 
 #ifdef TESTING
+#undefine CUDA_PROJECT
+#endif
+#ifndef CUDA_PROJECT
 #define __host__ 
 #define __device__ 
 #define __forceinline__ inline 

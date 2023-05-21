@@ -6,13 +6,15 @@
 #include <set>
 #include <spdlog/spdlog.h>
 #include <assert.h>
+#ifdef CUDA_PROJECT
 #include "cuda_globals.cuh"
+#endif
 using namespace std;
 using namespace Eigen;
 using namespace utils;
 
 
-
+#ifdef CUDA_PROJECT
 void map_to_thrust_vector(map<array<int, 2>, int>& lut, thrust::host_vector<i2>& host_lut)
 {
     host_lut.resize(lut.size());
@@ -152,6 +154,8 @@ void gen_empty_sm_glue(
         build_csr(n_cubes, host_cuda_globals.lut, host_cuda_globals.hess);
     }
 }
+#endif
+
 namespace utils {
 
 void gen_empty_sm(
