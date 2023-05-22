@@ -19,7 +19,9 @@ using namespace std;
 // #define FEATURE_EDGE
 // #define FEATURE_POSTRENDER
 //-----------------------------------------------------------------
-
+#ifdef CUDA_PROJECT
+void implicit_euler_cuda(float dt);
+#endif
 vector<unsigned> Cube::_edges {}, Cube::_indices {};
 void render_cubes(Shader shader, vector<unique_ptr<AffineBody>> &cubes)
 {
@@ -277,7 +279,9 @@ int main()
         std::string trace_folder = globals.trace_folder;
         bool init = globals.ts == 0;
         if (!globals.player) {
-            for (int i = 0; i < 1; i++)
+            if (globals.params_int["cuda_euler"])
+                implicit_euler_cuda(globals.dt);
+            else 
                 implicit_euler(globals.cubes, globals.dt);
             player_save(trace_folder, globals.ts, globals.cubes, init);
             if (globals.ending_ts > 0 && globals.ts >= globals.ending_ts) 

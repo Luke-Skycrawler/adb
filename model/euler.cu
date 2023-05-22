@@ -154,7 +154,6 @@ float line_search_cuda(int n_cubes, float* dq, float toi, float dt = 1e-2f)
     float alpha = toi;
     auto& bulk{ g.leader_thread_buffer_back };
     auto bulk_stashed = bulk;
-    float* buf = (float*)buf;
 
     barrier_plus_inert_glue(dt);
     // TODO: add friction energy here
@@ -283,7 +282,7 @@ __global__ void update_newton_kernel(int n_cubes, cudaAffineBody* cubes, float* 
 //         }
 //     }
 // }
-void implicit_euler_cuda(float dt = 1e-2f)
+void implicit_euler_cuda(float dt)
 {
     auto& g{ host_cuda_globals };
     auto& hess{ g.hess };
