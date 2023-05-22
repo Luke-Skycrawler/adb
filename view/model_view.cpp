@@ -19,12 +19,40 @@ using namespace std;
 // #define FEATURE_EDGE
 // #define FEATURE_POSTRENDER
 //-----------------------------------------------------------------
+#define CUDA_PROJECT
 #ifdef CUDA_PROJECT
+#include "../model/cuda_globals.cuh"
 void implicit_euler_cuda(float dt);
 #endif
 vector<unsigned> Cube::_edges {}, Cube::_indices {};
 void render_cubes(Shader shader, vector<unique_ptr<AffineBody>> &cubes)
 {
+#ifdef CUDA_PROJECT
+    auto& g{ host_cuda_globals };
+    const auto from_float3s = [](float3 q[4]) ->glm::mat4 {
+        float m[]{
+            q[1].x, q[1].y, q[1].z,
+            q[2].x, q[2].y, q[2].z,
+            q[3].x, q[3].y, q[3].z
+        };
+        glm::mat3 a = glm::make_mat3(m);
+        glm::mat4 ret(a);
+        ret[3][0] = q[0].x;
+        ret[3][1] = q[0].y;
+        ret[3][2] = q[0].z;
+        return ret;
+    };
+    if (globals.params_int["cuda_euler"]) {
+        cudaMemcpy(g.host_cubes.data(), g.cubes, g.n_cubes * sizeof(cudaAffineBody), cudaMemcpyDeviceToHost);
+        for (int i = 0; i < cubes.size(); i++) {
+            auto& c{ *cubes[i] };
+            glm::mat4 A(from_float3s(g.host_cubes[i].q0));
+            shader.setMat4("model", A);
+            c.draw(shader);
+        }
+        return;
+    }
+#endif
     for (int i = 0; i < cubes.size(); i++)
     {
         auto& c {*cubes[i]};
@@ -279,9 +307,13 @@ int main()
         std::string trace_folder = globals.trace_folder;
         bool init = globals.ts == 0;
         if (!globals.player) {
-            if (globals.params_int["cuda_euler"])
+            #ifdef CUDA_PROJECT
+            if (globals.params_int["cuda_euler"]){
                 implicit_euler_cuda(globals.dt);
+                globals.ts ++;
+            }
             else 
+            #endif
                 implicit_euler(globals.cubes, globals.dt);
             player_save(trace_folder, globals.ts, globals.cubes, init);
             if (globals.ending_ts > 0 && globals.ts >= globals.ending_ts) 

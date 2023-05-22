@@ -249,7 +249,7 @@ __host__ __device__ void orthogonal_hess(float3 q[4], float dt, float ret[144])
 
 __host__ __device__ float inertia(cudaAffineBody &c, float dt) {
     if (c.mass < 0) return 0.0f;
-    float ret;
+    float ret = 0.0f;
 
     float3 dq[4];
     c.q_minus_qtiled(dq);

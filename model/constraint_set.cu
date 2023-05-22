@@ -787,6 +787,7 @@ void build_csr(int n_cubes, const thrust::device_vector<i2> &lut, CsrSparseMatri
     sparse_matrix.inner = dev_inner;
     sparse_matrix.outer_start = dev_outer;
     CUDA_CALL(cudaGetLastError());
+    CUDA_CALL(cudaDeviceSynchronize());
 }
 
 

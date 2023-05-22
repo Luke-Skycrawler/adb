@@ -119,6 +119,7 @@ float barrier_plus_inert_glue(
         dt);
 
     float host_energy[3];
+    cudaDeviceSynchronize();
     cudaMemcpy(host_energy, ebpt, 3 * sizeof(float), cudaMemcpyDeviceToHost);
     lt = lt_stashed;
     return host_energy[0] + host_energy[1] + host_energy[2];
