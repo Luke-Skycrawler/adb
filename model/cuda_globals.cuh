@@ -68,16 +68,9 @@ struct CudaGlobals {
     cudaAffineBody* cubes;
     std::vector<cudaAffineBody> host_cubes;
     luf* aabbs;
-    // thrust::device_vector<i2> prim_idx, body_idx;
-    // thrust::device_vector<i2> prim_idx_update, body_idx_update;
-    // thrust::device_vector<int> pt_types, pt_types_update;
     int npt, nee;
     int n_cubes, lut_size;
-    //CollisionSets collision_sets;
     CsrSparseMatrix hess;
-    // FIXME: __device__ refer lan's imple
-    // thrust::device_vector<float> b;
-
     // permenant designated buffers
     float *b, *hess_diag, *dq; //, *float_buffer;
     // float3 *float3_buffer;
@@ -134,4 +127,6 @@ void gpuCholSolver(CsrSparseMatrix& hess, float* x, float *b);
 
 // defined in constraint_set.cu
 void project_glue(int vtn);
+
+float barrier_plus_inert_glue(float dt);
 

@@ -1,6 +1,6 @@
 #pragma once 
 #ifdef TESTING
-#undefine CUDA_PROJECT
+#undef CUDA_PROJECT
 #endif
 #ifndef CUDA_PROJECT
 #define __host__ 
