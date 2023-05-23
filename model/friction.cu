@@ -362,16 +362,20 @@ __forceinline__ __host__ __device__ float2 Tki(
 __forceinline__ __host__ __device__ float dot(float2 x, float2 y) {
     return x.x * y.x + x.y * y.y;
 }
-__host__ __device__ void friciton (
+__host__ __device__ void friction (
     float2 u,
     float lam,
+    #ifdef TESTING
+    float3 Tk[8],
+    #else
     float _Tk[8],
+    #endif
     int pt_1_ee_0,
     float *g, float *H
 ) {
     float uk = CUDA_SQRT(u.x * u.x + u.y * u.y);
     auto f1 = f1_over_x(uk, evh);
-    
+    #ifndef TESTING
     float3 Tk[8];
     if (pt_1_ee_0) {
         Tk_pt_from_float8(_Tk, Tk);
@@ -379,6 +383,7 @@ __host__ __device__ void friciton (
     else {
         Tk_ee_from_float8(_Tk, Tk);
     }
+    #endif
     auto scale = lam * mu * f1;
     for (int i = 0; i < 12; i++) {
         // g += F_k = mu * contact_lambda * f1 * Tk * uk;

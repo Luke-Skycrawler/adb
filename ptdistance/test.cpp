@@ -365,7 +365,7 @@ void friction(
     Vector<double, 12>& g, Matrix<double, 12, 12>& H,
     Matrix<double, 2, 2>& M_ret)
 {
-    static double mu = 0.0;
+    static double mu = 0.2;
     static const double evh = 1e-5, h2 = 1e-4;
     double uk = sqrt(_uk(0) * _uk(0) + _uk(1) * _uk(1));
     // if (uk < 1e-10) return;
@@ -399,8 +399,19 @@ void friction(
     H += D_k_hessian;
 }
 
+
+void friction(
+    float2 u,
+    float lam,
+#ifdef TESTING
+    float3 Tk[8],
+#else
+    float _Tk[8],
+#endif
+    int pt_1_ee_0,
+    float* g, float* H);
 TEST(random_uk, friction) {
-    static const int n_u = 1000;
+    static const int n_u = 1;
     default_random_engine gen;
     static const double evh = 1e-5;
     uniform_real_distribution<double> dist(0.0, 1.0);
@@ -411,11 +422,28 @@ TEST(random_uk, friction) {
         auto len = dist(gen);
         u[i] = u[i].normalized() * len * evh;
     }
-    vec12 foo = Vector<double, 12>::Zero();
-    mat12 bar = Matrix<double, 12, 12>::Zero();
+    Matrix<double, 3, 2> tk;
+    tk << 1, 0, 0, 0, 1, 0;
+    Matrix<double, 12, 2> Tk;
+    for (int i = 0; i < 4; i++) {
+        Tk.block<3, 2>(3 * i, 0) = tk;
+    }
     for (int i = 0; i < n_u; i ++) {
         Matrix<double, 2, 2> M;
-        friction(u[i], 1.0f, Matrix<double, 12, 2>::Zero(), foo, bar, M);
+        vec12 foo = Vector<double, 12>::Zero();
+        mat12 bar = Matrix<double, 12, 12>::Zero();
+        Vector<float, 12> g;
+        Matrix<float, 12, 12> H;
+        g.setZero(12);
+        H.setZero(12, 12);
+        float3 float8[8] {
+            {1, 0, 0}, {0, 1, 0}, {1, 0, 0}, {0, 1, 0},
+            {1, 0, 0}, {0, 1, 0}, {1, 0, 0}, {0, 1, 0}
+        };
+        friction(u[i], 1.0f, Tk, foo, bar, M);
+        friction(make_float2(u[i](0), u[i](1)), 1.0f, float8, 1, g.data(), H.data());
+        EXPECT_TRUE(foo.isApprox(g.cast<double>()), 1e-3) << "diff norm = " << ((foo - g.cast<double>())).norm() << " norm ref = " << foo.norm(); 
+        EXPECT_TRUE(bar.isApprox(H.cast<double>()), 1e-3) << "diff norm = " << ((bar - H.cast<double>())).norm() << " norm ref = " << bar.norm();
     }
 
 }
