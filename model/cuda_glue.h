@@ -70,7 +70,7 @@ void init_dev_cubes(
     const std::vector<std::unique_ptr<AffineBody>>& cubes);
 
 // glue function declarations---------------------------------------------
-// called by "cuda_barrier_plus_inert" option, defined in energy.cu
+// called by "cuda_compute_energy" option, defined in energy.cu
 float barrier_plus_inert_glue(float dt);
 
 // called by "cuda_intersection" option, defined in iaabb.cu

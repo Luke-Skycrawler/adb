@@ -612,15 +612,12 @@ void cuda_ipc()
         }
 
         thrust::host_vector<float> ret_values = g.hess.values;
-        if (g.params["pt_enable"])
         ipc_pt_cpu(g.npt, ps.data(), bs.data(),
             host_cubes.data(),
             g.lut_size, from_thrust(g.lut).data(),
             ret_values.data(), from_thrust(g.hess.outer_start).data(),
             b, buf,
             nullptr, nullptr);
-        // if (g.params["ee_enable"])
-        // ipc_ee_cpu(g.nee, from_thrust)
 
         g.hess.values = ret_values;
 
@@ -631,14 +628,12 @@ void cuda_ipc()
 
     }
     else {
-        if (g.params["pt_enable"])
         ipc_pt_kernel<<<1, 1>>>(g.npt, g.pt.p, g.pt.b,
             g.cubes,
             g.lut_size, PTR(g.lut),
             PTR(g.hess.values), PTR(g.hess.outer_start),
             g.b, (float*)lt,
             nullptr, nullptr);
-        if (g.params["ee_enable"]) 
         ipc_ee_kernel<<<1, 1>>>(g.nee, g.ee.p, g.ee.b,
             g.cubes,
             g.lut_size, PTR(g.lut),

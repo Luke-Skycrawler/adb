@@ -1,6 +1,6 @@
 {
     "player": false,
-    "starting_ts": -1,
+    "starting_ts": 4,
     "ending_ts": 500,
     "dt": 1e-2,
     "max_iter": 1000,
@@ -79,10 +79,9 @@
         "cuda_ipc_pt": 1,
         "ipc_cpu_debug": 0,
         "test_placeholder": 0,
-        "pt_enable": 1,
-        "ee_enable": 0,
         "submat_compare": 1,
-        "cuda_barrier_plus_inert": 1,
-        "cuda_euler": 1
+        "cuda_compute_energy": 1,
+        "cuda_euler": 0,
+        "line_search_with_cuda_energy": 1
     }
 }

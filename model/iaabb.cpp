@@ -1357,7 +1357,7 @@ double iaabb_brute_force(
             } // end of vtn == 3
         } // end of collision set & toi compare
         if (vtn != 3 && globals.params_int["cuda_pt_direct"]) idx = idx_cuda;
-        if (vtn == 2 && globals.params_int["cuda_barrier_plus_inert"]) toi = toif; 
+        if (vtn == 2 && globals.params_int["cuda_compute_energy"]) toi = toif; 
     }
 #endif
     auto t = DURATION_TO_DOUBLE(start);

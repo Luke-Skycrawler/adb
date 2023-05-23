@@ -101,13 +101,14 @@ float line_search_cuda(int n_cubes, float* dq, float toi, float dt = 1e-2f)
     auto& bulk{ g.leader_thread_buffer_back };
     auto bulk_stashed = bulk;
     update_line_search_kernel<<<1, n_cuda_threads_per_block>>>(n_cubes, g.cubes, dq, 0.0f);
-    project_glue(2);
+    project_glue(3);
+    // vtn = 3 to prepare for friction
     E0 = barrier_plus_inert_glue(dt);
     // TODO: add friction energy here
     vector<array<int, 4>> foo, bar;
     do {
         update_line_search_kernel<<<1, n_cuda_threads_per_block>>>(n_cubes, g.cubes, dq, alpha);
-        project_glue(2);
+        project_glue(3);
         
         int npt_new, nee_new;
         CUDA_CALL(cudaDeviceSynchronize());
@@ -249,20 +250,18 @@ void implicit_euler_cuda(float dt)
         project_glue(1);
         inertia_grad_hess_kernel<<<1, n_cuda_threads_per_block>>>(n_cubes, g.cubes, dt, g.b, g.hess_diag);
 
-        if (g.params["pt_enable"])
-            ipc_pt_kernel<<<1, 1>>>(g.npt, g.pt.p, g.pt.b,
-                g.cubes,
-                g.lut_size, PTR(g.lut),
-                PTR(g.hess.values), PTR(g.hess.outer_start),
-                g.b, (float*)lt,
-                nullptr, nullptr);
-        if (g.params["ee_enable"])
-            ipc_ee_kernel<<<1, 1>>>(g.nee, g.ee.p, g.ee.b,
-                g.cubes,
-                g.lut_size, PTR(g.lut),
-                PTR(g.hess.values), PTR(g.hess.outer_start),
-                g.b, (float*)lt,
-                nullptr, nullptr);
+        ipc_pt_kernel<<<1, 1>>>(g.npt, g.pt.p, g.pt.b,
+            g.cubes,
+            g.lut_size, PTR(g.lut),
+            PTR(g.hess.values), PTR(g.hess.outer_start),
+            g.b, (float*)lt,
+            nullptr, nullptr);
+        ipc_ee_kernel<<<1, 1>>>(g.nee, g.ee.p, g.ee.b,
+            g.cubes,
+            g.lut_size, PTR(g.lut),
+            PTR(g.hess.values), PTR(g.hess.outer_start),
+            g.b, (float*)lt,
+            nullptr, nullptr);
         put_inertia_kernel<<<1, 1>>>(
             g.n_cubes,
             g.cubes,

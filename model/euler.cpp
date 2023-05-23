@@ -17,7 +17,7 @@
 #include <Eigen/PardisoSupport>
 #endif
 #include <ipc/distance/edge_edge_mollifier.hpp>
-// #define CUDA_PROJECT
+#define CUDA_PROJECT
 #ifdef CUDA_PROJECT
 #include "cuda_glue.h"
 #endif
@@ -98,19 +98,22 @@ double line_search(const VectorXd& dq, const VectorXd& grad, VectorXd& q0, doubl
             cubes, dt);
 
 #ifdef CUDA_PROJECT
-    if (globals.params_int["cuda_barrier_plus_inert"]) {
+    if (globals.params_int["cuda_compute_energy"]) {
         auto& g{ host_cuda_globals };
         for (int i = 0; i < n_cubes; i++) {
             auto& c{ *cubes[i] };
             c.dq.setZero(12);
         }
         init_dev_cubes(n_cubes, cubes);
-        project_glue(2);
+        project_glue(3);
         float e0 = barrier_plus_inert_glue(1e-2f);
         if (abs(e0 - E0) / E0 > 1e-2 && E0 > 1e-3f && e0 > 1e-3f) {
             spdlog::error("line search E0 error : cuda E0 = {}, ref E0 = {}, margin = {}", e0, E0, abs(e0 - E0) / E0);
         } else {
             spdlog::error("correct line search E0 = {}, e0 = {}", E0, e0);
+        }
+        if (g.params["line_search_with_cuda_energy"]) {
+            E0 = e0;
         }
     }
 #endif
@@ -134,7 +137,7 @@ double line_search(const VectorXd& dq, const VectorXd& grad, VectorXd& q0, doubl
         }
 
 #ifdef CUDA_PROJECT
-        if (globals.params_int["cuda_barrier_plus_inert"]) {
+        if (globals.params_int["cuda_compute_energy"]) {
             // c.dq is already set
             init_dev_cubes(n_cubes, cubes);
         }
@@ -168,10 +171,13 @@ double line_search(const VectorXd& dq, const VectorXd& grad, VectorXd& q0, doubl
         double E3 = E_barrier_plus_inert(q1, dqk, n_cubes, idx_new, eidx_new, vidx_new, cubes, dt);
 
 #ifdef CUDA_PROJECT
-        if (globals.params_int["cuda_barrier_plus_inert"]) {
+        if (globals.params_int["cuda_compute_energy"]) {
             if (abs(E3 - ebi) / E3 > 1e-3f && E3 > 1e-3f && ebi > 1e-3f)
                 spdlog::error("line search energy E1 error: E1 ref = {}, cuda = {}, margin = {}", E3, ebi, abs(E3 - ebi) / E3);
             else spdlog::error("corect line search E1 = {}, e1 = {}", E3, ebi);
+            if (host_cuda_globals.params["line_search_with_cuda_energy"]) {
+                E3 = ebi;
+            }
         }
 #endif
         double ef = E_fric(dqk, n_cubes, n_pt, n_ee, n_g, idx, eidx, vidx, pt_tk, ee_tk, pt_contact_forces, ee_contact_forces, g_contact_forces, cubes, dt);

@@ -872,7 +872,7 @@ float iaabb_brute_force_cuda_pt_only(
     float E_inert = 0.0f;
     if(vtn == 2) {
         compute_inertia_energy_kernel<<<1, n_cuda_threads_per_block>>>(n_cubes, cubes, ret_energy);
-        CUDA_CALL(cudaDeviceSynchronize());
+        // CUDA_CALL(cudaDeviceSynchronize());
         cudaMemcpy(&E_inert, ret_energy, sizeof(float), cudaMemcpyDeviceToHost);        
     }
     per_intersection_core(n_overlaps, culls, overlaps, vtn, &ret_toi, &E_barrier);
@@ -1618,16 +1618,19 @@ void per_intersection_core(int n_overlaps, luf* culls, i2* overlaps, int vtn, fl
 #ifndef PT_ONLY
             strided_memset_kernel<<<1, n_cuda_threads_per_block, 0, stream>>>(eeb + ee_put, ij, neiej);
 #endif
-
+            cudaStreamSynchronize(stream);
             if (vtn  ==2) {
                 // line search step, calculate barrier energy
                 cudaMemcpyAsync(barrier_by_type, ret_barriers, sizeof(float) * 3, cudaMemcpyDeviceToHost, stream);
                 CUDA_CALL(cudaStreamSynchronize(stream));
-                #ifdef PT_ONLY
+#ifdef PT_ONLY
                 float barrier_per_overlap = barrier_by_type[0] + barrier_by_type[1];
-                #else 
-                float barrier_per_overlap = barrier_by_type[0] + barrier_by_type[1] + barrier_by_type[2];
-                #endif
+#else
+                float barrier_per_overlap = 0.0;
+                if (host_cuda_globals.params["pt"]) barrier_per_overlap += barrier_by_type[0] + barrier_by_type[1];
+                if (host_cuda_globals.params["ee"]) barrier_per_overlap += barrier_by_type[2];
+
+#endif
                 #pragma omp critical
                 {
                     *E_barrier += barrier_per_overlap;
@@ -1643,7 +1646,14 @@ void per_intersection_core(int n_overlaps, luf* culls, i2* overlaps, int vtn, fl
             #ifdef PT_ONLY
             float toi_per_overlap = std::min({ toi_by_type[0], toi_by_type[1] });
             #else 
-            float toi_per_overlap = std::min({ toi_by_type[0], toi_by_type[1], toi_by_type[2] });
+            
+            float toi_per_overlap = 1.0f;
+            if (host_cuda_globals.params["pt"]) {
+                toi_per_overlap = std::min({toi_per_overlap, toi_by_type[0], toi_by_type[1]});
+            } 
+            if (host_cuda_globals.params["ee"]) {
+                toi_per_overlap = std::min({toi_per_overlap, toi_by_type[2]});
+            } 
             #endif
 
             #pragma omp critical

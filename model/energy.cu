@@ -100,6 +100,7 @@ float barrier_plus_inert_glue(
     float* ebpt = (float*)lt;
     float* ebee = ebpt + 1;
     float* ei = ebee + 1;
+
     pt_barrier_kernel<<<1, n_cuda_threads_per_block>>>(
         g.npt,
         g.pt.b,
