@@ -1,4 +1,5 @@
 #include "cuda_header.cuh"
+static __constant__ float mu = 0.2f, evh = 1e-3f * 1e-2f;
 
 // return basis are all 3x2 
 __host__ __device__ void point_point_tangent_basis(
@@ -334,4 +335,102 @@ __host__ __device__ void ee_uktk(
     ux = -(1.0f - lams[0])  * dot(b0, u[0])  - lams[0] * dot(b0, u[1]) + (1.0f - lams[1]) * dot(b0, u[2]) + lams[1] * dot(b0, u[3]);
     uy = -(1.0f - lams[0]) * dot(b1, u[0])  - lams[0] * dot(b1, u[1]) + (1.0f - lams[1]) * dot(b1, u[2]) + lams[1] * dot(b1, u[3]);
     #endif
+}
+
+__host__ __device__ float f1_over_x(float x, float epsv_times_h) {
+    if (CUDA_ABS(x) >= epsv_times_h) {
+        return 1 / x;
+    }
+    return (-x / epsv_times_h + 2) / epsv_times_h;    
+} 
+
+__forceinline__ __host__ __device__ float2 Tki(
+    float3 Tk[8],
+    int I
+)  {
+    int i = I  / 3, j = i % 3;
+    auto t0 {u[i *2 ]}, t1 {u[i * 2 + 1]};
+    switch (j) {
+        case 0:
+        return make_float2(t0.x, t1.x);
+        case 1:
+        return make_float2(t0.y, t1.y);
+        case 2:
+        return make_float2(t0.z, t1.z);
+    }
+}
+__forceinline__ __host__ __device__ dot(float2 x, float2 y) {
+    return x.x * y.x + x.y * y.y;
+}
+__host__ __device__ void friciton (
+    float2 u,
+    float lam,
+    float Tk[8],
+    int pt_1_ee_0,
+    float *g, float *H,
+) {
+    float uk = CUDA_SQRT(u.x * u.x + u.y * u.y);
+    auto f1 = f1_over_x(uk, evh);
+    
+    float3 Tk[8];
+    if (pt_1_ee_0) {
+        Tk_pt_from_float8(Tk);
+    }
+    else {
+        Tk_ee_from_float8(Tk);
+    }
+    auto scale = lam * mu * f1;
+    for (int i = 0; i < 12; i++) {
+        // g += F_k = mu * contact_lambda * f1 * Tk * uk;
+        auto ti = Tki(Tk, i);
+        g[i] += scale * dot(ti, u);
+    }
+
+    if (uk >= evh) {
+        
+        float2 ut = make_float2(-u.y, u.x);
+        auto scale_by_uk_square = scale / (uk * uk);
+        // Dk_hessian = scale / (uk * uk) * Tk * ut * ut^T * Tk^T
+        // = scale / (uk * uk) * f * f^T, where f_12x1 = Tk * ut
+        for (int j = 0; j < 12; j ++) {
+            auto tj = Tki(Tk, j);
+            auto fj = dot(tj, ut);
+            
+            for (int i = 0 ; i < 12; i++) {
+                int I = i + j * 12;
+                auto ti = Tki(Tk, i);
+                auto fi = dot(ti, ut);
+                H[I] += scale_by_uk_square * fi * fj;
+            }
+        }
+    }
+    else if (uk == 0) {
+        // Dk_hessian = scale * Tk * Tk^T
+        for (int j = 0; j < 12; j ++) {
+            auto tj = Tki(Tk, j);
+            for (int i = 0; i < 12; i ++){
+                int I = i + j * 12;
+                auto ti = Tki(Tk, i);
+                H[I] += scale * dot(ti, tj);
+            }
+        }
+    } else {
+        float f2_term = -1.0f / (evh * evh);
+
+        // Dk_hessian = Tk * M2x2 * Tk^T
+
+        float M2x2 {
+            f1 + u.x * u.x * f2_term / uk, u.x * u.y * f2_term / uk,
+            u.x * u.y * f2_term / uk, f1 + u.y * u.y * f2_term / uk
+        };
+        // don't apply psd projection since ac - b^2 > 0 forall eph < 0.5
+        for (int j = 0; j <12; j ++) {
+            auto tj = Tki(Tk, j);
+            for (int i = 0; i < 12; i ++) {
+                auto ti = Tki(Tk, i);
+                int I = i + j * 12;
+                H[I] += M2x2[0] * ti.x * tj.x + M2x2[2] * ti.y * tj.x  + M2x2[1] * ti.x * tj.y + M2x2[3] * ti.y * tj.y;
+            }
+        }
+    }
 }

@@ -650,53 +650,6 @@ void ipc_term_ee(
         grad_0, grad_1,
         d0, d1,
         hess_0, hess_1, off_diag, off_T);
-
-    //     {
-    // #ifdef _NO_FANCY_
-    // #define PUT put
-    // #else
-    // #define PUT put2
-    // #endif
-    //         if (cj.mass > 0.0) {
-    //             omp_set_lock(ptr + jj);
-    //             if (ci.mass > 0.0) {
-    //                 PUT(values, oij, stride_j, off_diag);
-    //             }
-    //             PUT(values, ojj, stride_j, hess_1);
-    //             grad_1 += d1;
-    //             omp_unset_lock(ptr + jj);
-    //         }
-    //         if (ci.mass > 0.0) {
-    //             omp_set_lock(ptr + ii);
-    //             if (cj.mass > 0.0)
-    //                 PUT(values, oji, stride_i, off_T);
-    //             PUT(values, oii, stride_i, hess_0);
-    //             grad_0 += d0;
-    //             omp_unset_lock(ptr + ii);
-    //         }
-    // #undef PUT
-    //     }
-
-    // #ifdef _SM_
-    //     auto outers = sparse_hess.outerIndexPtr();
-    //     auto values = sparse_hess.valuePtr();
-
-    //     auto stride_j = stride(jj, outers), stride_i = stride(ii, outers);
-    //     auto oii = starting_offset(ii, ii, lut, outers), ojj = starting_offset(jj, jj, lut, outers), oij = starting_offset(ii, jj, lut, outers), oji = starting_offset(jj, ii, lut, outers);
-    //     auto ptr = globals.writelock_cols.data();
-
-    // #endif
-    // #ifdef _TRIPLETS_
-
-    // #pragma omp critical
-    //     for (int i = 0; i < 12; i++) {
-    //         triplets.push_back(HessBlock(ii * 12, jj * 12 + i, off_diag.block<12, 1>(0, i)));
-    //         triplets.push_back(HessBlock(jj * 12, ii * 12 + i, off_T.block<12, 1>(0, i)));
-    //         triplets.push_back(HessBlock(ii * 12, ii * 12 + i, hess_0.block<12, 1>(0, i)));
-    //         triplets.push_back(HessBlock(jj * 12, jj * 12 + i, hess_1.block<12, 1>(0, i)));
-    //     }
-
-    // #endif
 }
 double E_ground(const vec3& v)
 {
