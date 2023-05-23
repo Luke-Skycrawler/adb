@@ -345,7 +345,7 @@ __host__ __device__ float f1_over_x(float x, float epsv_times_h) {
 } 
 
 __forceinline__ __host__ __device__ float2 Tki(
-    float3 Tk[8],
+    float3 u[8],
     int I
 )  {
     int i = I  / 3, j = i % 3;
@@ -359,25 +359,25 @@ __forceinline__ __host__ __device__ float2 Tki(
         return make_float2(t0.z, t1.z);
     }
 }
-__forceinline__ __host__ __device__ dot(float2 x, float2 y) {
+__forceinline__ __host__ __device__ float dot(float2 x, float2 y) {
     return x.x * y.x + x.y * y.y;
 }
 __host__ __device__ void friciton (
     float2 u,
     float lam,
-    float Tk[8],
+    float _Tk[8],
     int pt_1_ee_0,
-    float *g, float *H,
+    float *g, float *H
 ) {
     float uk = CUDA_SQRT(u.x * u.x + u.y * u.y);
     auto f1 = f1_over_x(uk, evh);
     
     float3 Tk[8];
     if (pt_1_ee_0) {
-        Tk_pt_from_float8(Tk);
+        Tk_pt_from_float8(_Tk, Tk);
     }
     else {
-        Tk_ee_from_float8(Tk);
+        Tk_ee_from_float8(_Tk, Tk);
     }
     auto scale = lam * mu * f1;
     for (int i = 0; i < 12; i++) {
@@ -419,7 +419,7 @@ __host__ __device__ void friciton (
 
         // Dk_hessian = Tk * M2x2 * Tk^T
 
-        float M2x2 {
+        float M2x2[] {
             f1 + u.x * u.x * f2_term / uk, u.x * u.y * f2_term / uk,
             u.x * u.y * f2_term / uk, f1 + u.y * u.y * f2_term / uk
         };

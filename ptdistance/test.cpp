@@ -4,6 +4,7 @@
 #include <ipc/distance/point_triangle.hpp>
 #include <ipc/distance/edge_edge.hpp>
 #include <ipc/friction/closest_point.hpp>
+#include <ipc/friction/smooth_friction_mollifier.hpp>
 
 #include "../model/affine_body.h"
 #include "../model/geometry.h"
@@ -355,6 +356,68 @@ TEST(random_ptf, cy_ref)
         EXPECT_TRUE(abs(ticcdt - selft) < 1e-4) << "computed = " << selft << " truth = " << ticcdt << "\n"
                                                 << pt[0].transpose() << " " << pt[1].transpose() << " " << pt[2].transpose() << " " << pt[3].transpose();
     }
+}
+
+Matrix2d project_to_psd(const Matrix2d& A);
+
+void friction(
+    const Vector2d& _uk, double contact_lambda, const Matrix<double, 12, 2>& Tk,
+    Vector<double, 12>& g, Matrix<double, 12, 12>& H,
+    Matrix<double, 2, 2>& M_ret)
+{
+    static double mu = 0.0;
+    static const double evh = 1e-5, h2 = 1e-4;
+    double uk = sqrt(_uk(0) * _uk(0) + _uk(1) * _uk(1));
+    // if (uk < 1e-10) return;
+
+    auto f1 = ipc::f1_SF_over_x(uk, evh);
+
+    Vector<double, 12> F_k = mu * contact_lambda * f1 * Tk * _uk;
+    Matrix<double, 12, 12> D_k_hessian;
+
+    if (uk >= evh) {
+        Vector2d ut{ -_uk(1), _uk(0) };
+        D_k_hessian = mu * contact_lambda * f1 / (uk * uk) * Tk * ut * (ut.transpose() * Tk.transpose());
+    }
+    else if (uk <= 0) {
+        D_k_hessian = mu * contact_lambda * f1 * Tk * Tk.transpose();
+    }
+    else {
+        double f2_term = -1.0 / (evh * evh);
+        Matrix2d M2x2 = f2_term / uk * _uk * _uk.transpose();
+        // Matrix2d M2x2 = (df1_term * _uk * _uk.transpose());
+        M2x2 += f1 * Matrix2d::Identity(2, 2);
+        M2x2 *= mu * contact_lambda;
+        auto M2x2_psd = project_to_psd(M2x2);
+        EXPECT_TRUE(M2x2.determinant() >= 0.0);
+        EXPECT_TRUE(M2x2_psd.isApprox(M2x2)) << "M2x2 = \n" << M2x2 << "\nM2x2_psd = \n" << M2x2_psd;
+        D_k_hessian = Tk * M2x2 * Tk.transpose();
+        
+        M_ret=  M2x2;
+    }
+    g += F_k;
+    H += D_k_hessian;
+}
+
+TEST(random_uk, friction) {
+    static const int n_u = 1000;
+    default_random_engine gen;
+    static const double evh = 1e-5;
+    uniform_real_distribution<double> dist(0.0, 1.0);
+    Vector2d u[n_u];
+    for (int i = 0; i < n_u; i ++) {
+        u[i] = Vector2d{ dist(gen),
+            dist(gen) };
+        auto len = dist(gen);
+        u[i] = u[i].normalized() * len * evh;
+    }
+    vec12 foo = Vector<double, 12>::Zero();
+    mat12 bar = Matrix<double, 12, 12>::Zero();
+    for (int i = 0; i < n_u; i ++) {
+        Matrix<double, 2, 2> M;
+        friction(u[i], 1.0f, Matrix<double, 12, 2>::Zero(), foo, bar, M);
+    }
+
 }
 int main(int argc, char** argv)
 {

@@ -23,6 +23,7 @@
     <ClCompile Include="..\model\friction.cu">
       <Filter>cuda</Filter>
     </ClCompile>
+    <ClCompile Include="psd.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\model\affine_body.h" />

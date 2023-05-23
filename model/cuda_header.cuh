@@ -11,8 +11,14 @@
 struct float3 {
     float x, y, z;
 };
+struct float2 {
+    float x, y;
+};
 inline float3 make_float3(float x, float y, float z) {
     return { x, y, z };
+}
+inline float2 make_float2(float x, float y) {
+    return { x, y };
 }
 #define USE_DOUBLE_PRECISION
 #include <cmath>
