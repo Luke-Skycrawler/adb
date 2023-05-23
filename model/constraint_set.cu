@@ -647,9 +647,9 @@ void cuda_ipc()
             PTR(g.hess.values), PTR(g.hess.outer_start),
             g.b, g.hess_diag
         );
+        CUDA_CALL(cudaDeviceSynchronize());
     }
     
-    CUDA_CALL(cudaDeviceSynchronize());
     const auto all_zero = [](vector<float> values, int n) {
         for (int i = 0; i < n; i++) {
             if (values[i] != 0.0f) return false;
@@ -657,7 +657,7 @@ void cuda_ipc()
         return true;
     };
     if (g.npt && all_zero(from_thrust(g.hess.values), g.hess.nnz)) {
-    printf("\nerror: all zero in sparse matrix\n");
+        printf("\nerror: all zero in sparse matrix\n");
     }
     lt = lt_stashed;
 }

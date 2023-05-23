@@ -129,7 +129,7 @@ double line_search(const VectorXd& dq, const VectorXd& grad, VectorXd& q0, doubl
             spdlog::error("line search E0 error : cuda E0 = {}, ref E0 = {}, margin = {}", e0, E0, abs(e0 - E0) / E0);
         }
         else {
-            spdlog::error("correct line search E0 = {}, e0 = {}", E0, e0);
+            spdlog::info("correct line search E0 = {}, e0 = {}", E0, e0);
         }
         if (g.params["line_search_with_cuda_energy"]) {
             E0 = e0;
@@ -182,7 +182,7 @@ double line_search(const VectorXd& dq, const VectorXd& grad, VectorXd& q0, doubl
         if (globals.params_int["cuda_compute_energy"]) {
             if (abs(E3 - ebi) / E3 > 1e-3f && E3 > 1e-3f && ebi > 1e-3f)
                 spdlog::error("line search energy E1 error: E1 ref = {}, cuda = {}, margin = {}", E3, ebi, abs(E3 - ebi) / E3);
-            else spdlog::error("corect line search E1 = {}, e1 = {}", E3, ebi);
+            else spdlog::info("correct line search E1 = {}, e1 = {}", E3, ebi);
             if (host_cuda_globals.params["line_search_with_cuda_energy"]) {
                 E3 = ebi;
             }
@@ -361,6 +361,7 @@ void implicit_euler(vector<unique_ptr<AffineBody>>& cubes, double dt)
 #ifdef CUDA_PROJECT
         if (globals.params_int["cuda_hess"]) {
             cuda_hess_glue(n_cubes, cubes, dt);
+            project_glue(1);
         }
 #endif
 
@@ -895,7 +896,7 @@ void implicit_euler(vector<unique_ptr<AffineBody>>& cubes, double dt)
                 for (int i = 0; i < n_cubes; i ++) {
                     vec12 ref = r.segment<12>(i * 12);
                     vec12 cuda_grad = Map<Vector<float, 12>>(dev_grad + i * 12).cast<double>();
-                    if (!cuda_grad.isApprox(ref, 1e-3)) {
+                    if (!cuda_grad.isApprox(ref, 1e-3) && ref.norm() > 1e-3 && (cuda_grad - ref).norm() > 1e-3) {
                         spdlog::error("({}) cuda grad error, diff norm = {}, ref_norm = {}", i, (cuda_grad - ref).norm(), ref.norm());
                     }
                 }

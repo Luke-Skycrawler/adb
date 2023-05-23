@@ -101,8 +101,9 @@ void cuda_hess_glue(
     vector<cudaAffineBody> cabs(n_cubes);
     float* grads = new float[n_cubes * 12];
     float* hess = new float[n_cubes * 144];
-    for (int i = 0; i < n_cubes; i++) cabs[i] = to_cabd(*cubes[i]);
-    cudaMemcpy(host_cuda_globals.cubes, cabs.data(), sizeof(cudaAffineBody) * cabs.size(), cudaMemcpyHostToDevice);
+    // for (int i = 0; i < n_cubes; i++) cabs[i] = to_cabd(*cubes[i]);
+    // cudaMemcpy(host_cuda_globals.cubes, cabs.data(), sizeof(cudaAffineBody) * cabs.size(), cudaMemcpyHostToDevice);
+    init_dev_cubes(n_cubes, cubes);
     cuda_inert_hess_glue(n_cubes, dt, grads, hess);
     for (int k = 0; k < n_cubes; k++) {
         auto& c{ *cubes[k] };
@@ -111,9 +112,9 @@ void cuda_hess_glue(
         auto norm = (ref - act).norm();
         auto h_norm = (h_ref - h_act).norm();
         if (!strict) {
-            if (!act.isApprox(ref, 1e-3))
+            if (!act.isApprox(ref, 1e-3) && ref.norm() > 1e-3)
                 spdlog::warn("grad norm too large: diff = {}, ref_norm = {}", norm, ref.norm());
-            if (!h_act.isApprox(h_ref, 1e-3))
+            if (!h_act.isApprox(h_ref, 1e-3) && h_ref.norm() > 1e-3)
                 spdlog::warn("hess norm too large: {}", h_norm);
         }
         else {

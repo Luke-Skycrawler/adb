@@ -49,10 +49,7 @@ mat3 rotation(double a, double b, double c)
     // R = R.transpose();
     return R;
 }
-__forceinline__ __device__ __host__ float kronecker(int i, int j)
-{
-    return i == j ? 1.0f : 0.0f;
-}
+
 
 static const double kappa = 1e9;
 __host__ __device__ void orthogonal_grad(float3 q[4], float dt, float ret[12])

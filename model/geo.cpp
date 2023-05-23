@@ -246,12 +246,7 @@ tuple<mat12, vec12> ipc_hess_pt_12x12(
 
         vec12 g_cuda = Map<Vector<float, 12>>(g).cast<double>();
         mat12 h_cuda = Map<Matrix<float, 12, 12>>(h).cast<double>();
-        if (!g_cuda.isApprox(pt_grad, 1e-3)) {
-            spdlog::error("ipc grad mismatch, norm diff = {}, norm ref = {}, margin = {}", (g_cuda - pt_grad).norm(), pt_grad.norm(), (g_cuda - pt_grad).norm() / pt_grad.norm());
-        }
-        if (!h_cuda.isApprox(ipc_hess, 1e-3)) {
-            spdlog::error("ipc hess mismatch, norm diff= {}, norm ref = {}, margin = {}", (h_cuda - ipc_hess).norm(), ipc_hess.norm(), (h_cuda - ipc_hess).norm() / ipc_hess.norm());
-        }
+       
         auto distf = dev::point_triangle_distance(ptf[0], ptf[1], ptf[2], ptf[3]);
         auto B_f = dev::barrier_derivative_d(distf);
         auto B__f = dev::barrier_second_derivative(distf);
@@ -277,6 +272,12 @@ tuple<mat12, vec12> ipc_hess_pt_12x12(
         }
         if (dm > 1e-3) {
             spdlog::error("dist mismatch, margin = {}, dist = {}", dm, dist);
+        }
+        if (!g_cuda.isApprox(pt_grad, 1e-3)) {
+            spdlog::error("ipc grad mismatch, norm diff = {}, norm ref = {}, margin = {}", (g_cuda - pt_grad).norm(), pt_grad.norm(), (g_cuda - pt_grad).norm() / pt_grad.norm());
+        }
+        if (!h_cuda.isApprox(ipc_hess, 1e-3)) {
+            spdlog::error("ipc hess mismatch, norm diff= {}, norm ref = {}, margin = {}", (h_cuda - ipc_hess).norm(), ipc_hess.norm(), (h_cuda - ipc_hess).norm() / ipc_hess.norm());
         }
         delete[] buf;
     }

@@ -5,7 +5,7 @@ using namespace othogonal_energy;
 #define TEST_PYTHON
 namespace othogonal_energy {
 
-    static const double kappa = 1e9;
+    static const double kappa = 1e7;
 
 #ifdef TEST_PYTHON
     inline double kronecker(int i, int j)

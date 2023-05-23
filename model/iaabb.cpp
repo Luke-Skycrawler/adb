@@ -11,7 +11,7 @@
 #include <tbb/parallel_sort.h>
 
 #include <type_traits>
-// #define CUDA_PROJECT
+#define CUDA_PROJECT
 #ifdef CUDA_PROJECT
 #include "cuda_glue.h"
 #endif
@@ -1327,13 +1327,40 @@ double iaabb_brute_force(
 
         bool compare = true;
         if (compare) {
-            const auto int_compare = [](vector<array<int ,4>> &idx, vector<array<int, 4>>& idx_cuda, vector<array<int,4>>& int_ref, string title = "pt") {
+            const auto i4_to_dist_pt = [&](array<int, 4>& ij) -> double {
+                Face f(*cubes[ij[2]], ij[3], true, true);
+                vec3 v(cubes[ij[0]]->v_transformed[ij[1]]);
+                auto [d, pt_type] = vf_distance(v, f);
+                return d;
+            };
+            const auto i4_to_dist_ee = [&](array<int, 4>& ij) -> double {
+                Edge ei(*cubes[ij[0]], ij[1], true, true), ej(*cubes[ij[2]], ij[3], true, true);
+                double d = ipc::edge_edge_distance(ei.e0, ei.e1, ej.e0, ej.e1);
+                return d;
+            };
+            const auto int_compare = [&](vector<array<int ,4>> &idx, vector<array<int, 4>>& idx_cuda, vector<array<int,4>>& int_ref, string title = "pt") {
                 sort(idx.begin(), idx.end());
                 sort(idx_cuda.begin(), idx_cuda.end());
                 set_intersection(idx.begin(), idx.end(), idx_cuda.begin(), idx_cuda.end(), std::back_inserter(int_ref));
                 if (idx.size() != idx_cuda.size() || int_ref.size() != idx.size()) {
                     spdlog::warn("{} size : ref = {}, cuda = {}, intersection(ref, cuda) = {}", title, idx.size(), idx_cuda.size(), int_ref.size());
-                }                
+                }
+                vector<array<int, 4>> borders;
+                set_difference(idx.begin(), idx.end(), idx_cuda.begin(), idx_cuda.end(), std::back_inserter(borders));
+                set_difference(idx_cuda.begin(), idx_cuda.end(), idx.begin(), idx.end(), std::back_inserter(borders));
+                
+                for (auto& a : borders)
+                {
+                    double d;
+                    if (title == "pt") {
+                        d = i4_to_dist_pt(a);
+                    } else {
+                        d = i4_to_dist_ee(a);
+                    }
+                    if (abs (d - barrier::d_hat) > 1e-6) {
+                        spdlog::error ("collision set error, margin = {}, dist = {}", abs(d - barrier::d_hat), d);
+                    }
+                }
             };
             if (vtn != 3) {
                 if (globals.pt) {
@@ -1351,7 +1378,7 @@ double iaabb_brute_force(
                 }
                 else {
                     if (toi < 1.0f) {
-                        spdlog::error("correct toi = {}, toif = {} < 1.0f", toi, toif);
+                        spdlog::info("correct toi = {}, toif = {} < 1.0f", toi, toif);
                     }
                 }
             } // end of vtn == 3

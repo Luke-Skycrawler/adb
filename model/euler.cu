@@ -100,12 +100,14 @@ float line_search_cuda(int n_cubes, float* dq, float toi, float dt = 1e-2f)
     float alpha = toi;
     auto& bulk{ g.leader_thread_buffer_back };
     auto bulk_stashed = bulk;
+    vector<array<int, 4>> foo, bar;
     update_line_search_kernel<<<1, n_cuda_threads_per_block>>>(n_cubes, g.cubes, dq, 0.0f);
     project_glue(3);
     // vtn = 3 to prepare for friction
-    E0 = barrier_plus_inert_glue(dt);
+    // E0 = barrier_plus_inert_glue(dt);
+    E0 = iaabb_brute_force_cuda_pt_only(
+        n_cubes, g.cubes, g.aabbs, 2, foo, bar);
     // TODO: add friction energy here
-    vector<array<int, 4>> foo, bar;
     do {
         update_line_search_kernel<<<1, n_cuda_threads_per_block>>>(n_cubes, g.cubes, dq, alpha);
         project_glue(3);

@@ -7,22 +7,22 @@ __host__ __device__ float eval(const float coef[4], float x)
     return coef[0] + x * (coef[1] + x * (coef[2] + x * coef[3]));
 }
 
-inline __host__ __device__ float multi_sign(float a, float b)
+__forceinline__ __host__ __device__ float multi_sign(float a, float b)
 {
     return a * ((b < 0.0f) ? -1.0f : 1.0f);
 }
-inline __host__ __device__ int is_different_sign(float y0, float yr)
+__forceinline__ __host__ __device__ int is_different_sign(float y0, float yr)
 {
     return y0 * yr < 0.0f;
 }
-inline void deflate(float defpoly[3], float coef[4], float root)
+__forceinline__ __host__ __device__ void deflate(float defpoly[3], float coef[4], float root)
 {
     defpoly[2] = coef[3];
     for (int i = 2; i > 0; i--) {
         defpoly[i - 1] = coef[i] + root * defpoly[i];
     }
 }
-inline __host__ __device__ float find_closed(const float coef[4], const float deriv[4], float x0, float x1, float y0, float y1)
+__forceinline__ __host__ __device__ float find_closed(const float coef[4], const float deriv[4], float x0, float x1, float y0, float y1)
 {
 
     const float x_error = 1e-10f;
