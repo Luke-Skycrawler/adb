@@ -97,26 +97,6 @@ double line_search(const VectorXd& dq, const VectorXd& grad, VectorXd& q0, doubl
             pt_contact_forces, ee_contact_forces, g_contact_forces,
             cubes, dt);
 
-#ifdef CUDA_PROJECT
-    if (globals.params_int["cuda_compute_energy"]) {
-        auto& g{ host_cuda_globals };
-        for (int i = 0; i < n_cubes; i++) {
-            auto& c{ *cubes[i] };
-            c.dq.setZero(12);
-        }
-        init_dev_cubes(n_cubes, cubes);
-        project_glue(3);
-        float e0 = barrier_plus_inert_glue(1e-2f);
-        if (abs(e0 - E0) / E0 > 1e-2 && E0 > 1e-3f && e0 > 1e-3f) {
-            spdlog::error("line search E0 error : cuda E0 = {}, ref E0 = {}, margin = {}", e0, E0, abs(e0 - E0) / E0);
-        } else {
-            spdlog::error("correct line search E0 = {}, e0 = {}", E0, e0);
-        }
-        if (g.params["line_search_with_cuda_energy"]) {
-            E0 = e0;
-        }
-    }
-#endif
     double qdg = dq.dot(grad);
     VectorXd q1;
     static vector<array<vec3, 4>> pts_new, pts_iaab;
@@ -128,6 +108,34 @@ double line_search(const VectorXd& dq, const VectorXd& grad, VectorXd& q0, doubl
     static vector<array<int, 2>> vidx_new, vidx_iaab;
 
     auto dq_norm = dq.norm();
+
+#ifdef CUDA_PROJECT
+    if (globals.params_int["cuda_compute_energy"]) {
+        auto& g{ host_cuda_globals };
+        for (int i = 0; i < n_cubes; i++) {
+            auto& c{ *cubes[i] };
+            c.dq.setZero(12);
+        }
+        init_dev_cubes(n_cubes, cubes);
+        project_glue(3);
+        // float e0 = barrier_plus_inert_glue(1e-2f);
+        float e0 = iaabb_brute_force(n_cubes, cubes, globals.aabbs, 2,
+            pts_new,
+            idx_new,
+            ees_new,
+            eidx_new,
+            vidx_new);
+        if (abs(e0 - E0) / E0 > 1e-2 && E0 > 1e-3f && e0 > 1e-3f) {
+            spdlog::error("line search E0 error : cuda E0 = {}, ref E0 = {}, margin = {}", e0, E0, abs(e0 - E0) / E0);
+        }
+        else {
+            spdlog::error("correct line search E0 = {}, e0 = {}", E0, e0);
+        }
+        if (g.params["line_search_with_cuda_energy"]) {
+            E0 = e0;
+        }
+    }
+#endif
     do {
         q1 = q0 + dq * alpha;
         auto dqk = dq * alpha;

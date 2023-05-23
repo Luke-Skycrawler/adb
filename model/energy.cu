@@ -1,5 +1,5 @@
 #include "cuda_globals.cuh"
-
+#include <spdlog/spdlog.h>
 __global__ void pt_barrier_kernel(
     int npt,
     i2* b,
@@ -123,5 +123,17 @@ float barrier_plus_inert_glue(
     cudaDeviceSynchronize();
     cudaMemcpy(host_energy, ebpt, 3 * sizeof(float), cudaMemcpyDeviceToHost);
     lt = lt_stashed;
+    #define CPU_REF
+    #ifdef CPU_REF
+    auto cubes = g.host_cubes;
+
+    cudaMemcpy(cubes.data(), g.cubes, g.n_cubes * sizeof(cudaAffineBody), cudaMemcpyDeviceToHost);
+    float host_inertia = 0;
+    for (int  i = 0; i < g.n_cubes; i ++) {
+        host_inertia += inertia(cubes[i], 1e-2f);
+    }
+    if (abs(host_inertia - host_energy[2]) > 1e-4f) 
+        spdlog::error("inertia energy mismatch: ref {} vs {}", host_inertia, host_energy[2]);
+    #endif
     return host_energy[0] + host_energy[1] + host_energy[2];
 }
