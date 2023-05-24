@@ -61,7 +61,7 @@ void gpuCholSolver(CsrSparseMatrix& hess, float* x, float *b)
     {
         printf("WARNING: the matrix is singular at row %d under tol (%E)\n", singularity, tol);
     }
-
+	auto x_host = from_thrust(thrust::device_vector<float>(x, x + hess.rows));
     //checkNumericalPrecisionHost(m_activeDims, x);
 }
 

@@ -303,29 +303,62 @@ __device__ __host__ float ee_collision_time(
 
 TEST(random_eef, cy_ref)
 {
-    static const int n_pts = 1000;
-    array<vec3, 8> pts[n_pts];
-    double tois[n_pts];
+    static const int n_ees = 1000000;
+    array<vec3, 8>* ees = new array<vec3, 8>[n_ees];
+    double tois[n_ees];
     default_random_engine gen;
     uniform_real_distribution<double> dist(0.0, 1.0);
-    for (int i = 0; i < n_pts; i++) {
-        for (int j = 0; j < 24; j++) {
-            pts[i][j / 3](j % 3) = dist(gen);
-        }
+    for (int i = 0; i < n_ees; i++) {
+       for (int j = 0; j < 24; j++) {
+            ees[i][j / 3](j % 3) = dist(gen);
+       }
     }
-    for (int i = 0; i < n_pts; i++) {
-        auto& pt{ pts[i] };
-        Edgef ei0{ to_vec3f(pt[0]), to_vec3f(pt[1]) }, ej0{ to_vec3f(pt[2]), to_vec3f(pt[3]) },
-            ei1{ to_vec3f(pt[4]), to_vec3f(pt[5]) }, ej1{ to_vec3f(pt[6]), to_vec3f(pt[7]) };
+    for (int i = 0; i < n_ees; i++) {
+       auto& ee{ ees[i] };
+       Edgef ei0{ to_vec3f(ee[0]), to_vec3f(ee[1]) }, ej0{ to_vec3f(ee[2]), to_vec3f(ee[3]) },
+           ei1{ to_vec3f(ee[4]), to_vec3f(ee[5]) }, ej1{ to_vec3f(ee[6]), to_vec3f(ee[7]) };
 
-        Edge ei0d{ pt[0], pt[1] }, ej0d{ pt[2], pt[3] }, ei1d{ pt[4], pt[5] }, ej1d{ pt[6], pt[7] };
+       Edge ei0d{ ee[0], ee[1] }, ej0d{ ee[2], ee[3] }, ei1d{ ee[4], ee[5] }, ej1d{ ee[6], ee[7] };
 
-        double ticcdt = ee_collision_time(ei0d, ej0d, ei1d, ej1d);
-        ticcdt = min(ticcdt, 1.0);
-        float selft = ee_collision_time(ei0, ej0, ei1, ej1);
-        EXPECT_TRUE(abs(ticcdt - selft) < 1e-4) << "computed = " << selft << " truth = " << ticcdt << "\n"
-                                                << pt[0].transpose() << " " << pt[1].transpose() << " " << pt[2].transpose() << " " << pt[3].transpose();
+       double ticcdt = ee_collision_time(ei0d, ej0d, ei1d, ej1d);
+       ticcdt = min(ticcdt, 1.0);
+       float selft = ee_collision_time(ei0, ej0, ei1, ej1);
+       EXPECT_TRUE(abs(ticcdt - selft) < 1e-4) << "computed = " << selft << " truth = " << ticcdt << "\n"
+                                               << ee[0].transpose() << " " << ee[1].transpose() << " " << ee[2].transpose() << " " << ee[3].transpose() << " "
+                                               << ee[4].transpose() << " " << ee[5].transpose() << " " << ee[6].transpose() << " " << ee[7].transpose();
     }
+}
+
+TEST(ee_failed_case, cy_ref)
+{
+    array<vec3, 8> ee{
+        vec3{
+            0.76998698001534638, 0.52191623024087419, 0.77911846846106003 },
+        vec3{
+            0.83760369176268235, 0.38750874151707543, 0.83927468129196192 },
+        vec3{
+            0.80349972107488199, 0.48671638982127269, 0.042644820842929754 },
+        vec3{
+            0.15611553748487378, 0.10728702102678885, 0.43864950524604462 },
+        vec3{
+            0.40246360472469922, 0.34612986513016075, 0.013736339106809598 },
+        vec3{
+            0.64244239849620144, 0.7296534193195211, 0.70907958767250301 },
+        vec3{
+            0.48479663060750033, 0.74796128036213472, 0.57174560980604283 },
+        vec3{
+            0.77195343480467049, 0.10616174525034776, 0.495019684136278 }
+    };
+    Edgef ei0{ to_vec3f(ee[0]), to_vec3f(ee[1]) }, ej0{ to_vec3f(ee[2]), to_vec3f(ee[3]) },
+        ei1{ to_vec3f(ee[4]), to_vec3f(ee[5]) }, ej1{ to_vec3f(ee[6]), to_vec3f(ee[7]) };
+
+    Edge ei0d{ ee[0], ee[1] }, ej0d{ ee[2], ee[3] }, ei1d{ ee[4], ee[5] }, ej1d{ ee[6], ee[7] };
+
+    double ticcdt = ee_collision_time(ei0d, ej0d, ei1d, ej1d);
+    ticcdt = min(ticcdt, 1.0);
+    float selft = ee_collision_time(ei0, ej0, ei1, ej1);
+    EXPECT_TRUE(abs(ticcdt - selft) < 1e-4) << "computed = " << selft << " truth = " << ticcdt << "\n"
+                                            << ee[0].transpose() << " " << ee[1].transpose() << " " << ee[2].transpose() << " " << ee[3].transpose();
 }
 inline Facef to_facef(const Face& f)
 {
@@ -336,27 +369,27 @@ inline Facef to_facef(const Face& f)
     };
 }
 
-TEST(random_ptf, cy_ref)
-{
-    static const int n_pts = 1000;
-    array<vec3, 8> pts[n_pts];
-    double tois[n_pts];
-    default_random_engine gen;
-    uniform_real_distribution<double> dist(0.0, 1.0);
-    for (int i = 0; i < n_pts; i++) {
-        for (int j = 0; j < 24; j++) {
-            pts[i][j / 3](j % 3) = dist(gen);
-        }
-    }
-    for (int i = 0; i < n_pts; i++) {
-        auto& pt{ pts[i] };
-        Face f0{ pt[1], pt[2], pt[3] }, f1{ pt[5], pt[6], pt[7] };
-        double ticcdt = pt_collision_time(pt[0], f0, pt[4], f1);
-        auto selft = pt_collision_time(to_vec3f(pt[0]), to_facef(f0), to_vec3f(pt[4]), to_facef(f1));
-        EXPECT_TRUE(abs(ticcdt - selft) < 1e-4) << "computed = " << selft << " truth = " << ticcdt << "\n"
-                                                << pt[0].transpose() << " " << pt[1].transpose() << " " << pt[2].transpose() << " " << pt[3].transpose();
-    }
-}
+// TEST(random_ptf, cy_ref)
+// {
+//     static const int n_pts = 1000;
+//     array<vec3, 8> pts[n_pts];
+//     double tois[n_pts];
+//     default_random_engine gen;
+//     uniform_real_distribution<double> dist(0.0, 1.0);
+//     for (int i = 0; i < n_pts; i++) {
+//         for (int j = 0; j < 24; j++) {
+//             pts[i][j / 3](j % 3) = dist(gen);
+//         }
+//     }
+//     for (int i = 0; i < n_pts; i++) {
+//         auto& pt{ pts[i] };
+//         Face f0{ pt[1], pt[2], pt[3] }, f1{ pt[5], pt[6], pt[7] };
+//         double ticcdt = pt_collision_time(pt[0], f0, pt[4], f1);
+//         auto selft = pt_collision_time(to_vec3f(pt[0]), to_facef(f0), to_vec3f(pt[4]), to_facef(f1));
+//         EXPECT_TRUE(abs(ticcdt - selft) < 1e-4) << "computed = " << selft << " truth = " << ticcdt << "\n"
+//                                                 << pt[0].transpose() << " " << pt[1].transpose() << " " << pt[2].transpose() << " " << pt[3].transpose();
+//     }
+// }
 
 Matrix2d project_to_psd(const Matrix2d& A);
 

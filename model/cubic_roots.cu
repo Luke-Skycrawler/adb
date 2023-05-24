@@ -159,7 +159,8 @@ __host__ __device__ int cubic_roots(float roots[3], float coef[4], float x0, flo
                     float defpoly[3];
                     deflate(defpoly, coef, roots[0]);
                     return quadratic_roots(roots + 1, defpoly, xb, x1) + 1;
-                } else return 1;
+                } 
+                else return 1;
             } 
             if (is_different_sign(yb, y1)){
                 roots[0] = find_closed(coef, deriv, xb, x1, yb, y1);

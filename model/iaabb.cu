@@ -12,7 +12,7 @@
 #include <thrust/set_operations.h>
 #include <algorithm>
 using namespace std;
-#define CPU_REF
+//#define CPU_REF
 // #define PT_ONLY
 #ifdef PT_ONLY
 #define MAX_TYPES 2
@@ -162,7 +162,7 @@ __global__ void aggregate_barrier_kernel(
                 Edgef ei{ vifjs[i * 2], vifjs[i * 2 + 1] };
                 Edgef ej{ vifjs[j * 2 + nvi * 2], vifjs[j * 2 + 1 + nvi * 2] };
                 int  ee_type = dev::edge_edge_distance_type(ei.e0, ei.e1, ej.e0, ej.e1);
-                auto d = dev::edge_edge_distance(ei.e0, ei.e1, ej.e0, ej.e1, type);
+                auto d = dev::edge_edge_distance(ei.e0, ei.e1, ej.e0, ej.e1, ee_type);
                 barriers[tid] += dev::barrier_function(d);
             }
         }
@@ -187,7 +187,7 @@ __global__ void ee_toi_decision_kernel(
     // NOTE: can only launched with n_cuda_threads_per_block threads
     int tid = threadIdx.x + blockIdx.x * blockDim.x;
     int n_tasks = *cnt;
-    int n_task_per_thread = (n_tasks + blockDim.x - 1) / blockDim.x;
+    int n_task_per_thread = (n_tasks + n_cuda_threads_per_block - 1) / n_cuda_threads_per_block;
     int nei = _nei * 4;
     __shared__ float tois[n_cuda_threads_per_block];
     tois[tid] = 1.0f;
@@ -209,7 +209,7 @@ __global__ void ee_toi_decision_kernel(
     __syncthreads();
     if (tid == 0){
         float toi_min = 1.0f;
-        for(int i = 0; i < blockDim.x; i ++) {
+        for(int i = 0; i < n_cuda_threads_per_block; i ++) {
             toi_min = CUDA_MIN(toi_min, tois[i]);
         }
         *ret_toi = toi_min;
@@ -851,6 +851,7 @@ float iaabb_brute_force_cuda_pt_only(
     }
     
     idx.resize(0);
+    eidx.resize(0);
 
     i2 * overlaps = (i2 *)lt_back;
     lt_back += sizeof(i2) * max_overlap_size;

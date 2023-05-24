@@ -154,6 +154,7 @@ __host__ __device__ int build_and_solve_4_points_coplanar(
 
     double root = 1.0;
     int found = cubic_roots(roots, ret_polynomial, 0.0, 1.0);
+    if (found < 0 || found > 3) found = 3;
     return found;
 }
 
@@ -193,11 +194,11 @@ __device__ __host__ float pt_collision_time(
     const vec3f &p1,
     const Facef &t1
 ){
-    float roots[3];
+    float roots[3] {0.0f, 0.0f, 0.0f};
     int found = build_and_solve_4_points_coplanar(p0, t0.t0, t0.t1, t0.t2, p1, t1.t0, t1.t1, t1.t2, roots);
     bool true_root = false;
     float root;
-    for (int i = 0; i < found && !true_root; i ++) {
+    for (int i = 0; (i < found) && !true_root; i++) {
         root = roots[i];
         true_root = verify_root_pt(linerp(p1, p0, root), linerp(t1, t0, root));
     }
@@ -210,7 +211,7 @@ __device__ __host__ float ee_collision_time(
     const Edgef &ei1,
     const Edgef &ej1
 ){
-    float roots[3];
+    float roots[3]{0.0f, 0.0f, 0.0f};
     int found = build_and_solve_4_points_coplanar(
         ei0.e0, ei0.e1, ej0.e0, ej0.e1,
         ei1.e0, ei1.e1, ej1.e0, ej1.e1,
@@ -218,7 +219,7 @@ __device__ __host__ float ee_collision_time(
     );
     float root = 1.0f;
     bool true_root = false;
-    for (int i = 0; i < found && !true_root; i ++) {
+    for (int i = 0; (i < found) && !true_root; i++) {
         root = roots[i];
         true_root = verify_root_ee(linerp(ei1, ei0, root), linerp(ej1, ej0, root));
     }

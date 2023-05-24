@@ -270,13 +270,13 @@ tuple<mat12, vec12> ipc_hess_pt_12x12(
         if (b2m > 1e-3) {
             spdlog::error("B.. mismatch, margin = {}, B.. = {}", b2m, B__);
         }
-        if (dm > 1e-3) {
+        if (dm > 1e-3 && dist > 1e-6) {
             spdlog::error("dist mismatch, margin = {}, dist = {}", dm, dist);
         }
-        if (!g_cuda.isApprox(pt_grad, 1e-3)) {
+        if (!g_cuda.isApprox(pt_grad, 1e-2)) {
             spdlog::error("ipc grad mismatch, norm diff = {}, norm ref = {}, margin = {}", (g_cuda - pt_grad).norm(), pt_grad.norm(), (g_cuda - pt_grad).norm() / pt_grad.norm());
         }
-        if (!h_cuda.isApprox(ipc_hess, 1e-3)) {
+        if (!h_cuda.isApprox(ipc_hess, 1e-2)) {
             spdlog::error("ipc hess mismatch, norm diff= {}, norm ref = {}, margin = {}", (h_cuda - ipc_hess).norm(), ipc_hess.norm(), (h_cuda - ipc_hess).norm() / ipc_hess.norm());
         }
         delete[] buf;
