@@ -42,7 +42,7 @@ void render_cubes(Shader shader, vector<unique_ptr<AffineBody>> &cubes)
         ret[3][2] = q[0].z;
         return ret;
     };
-    if (globals.params_int["cuda_euler"]) {
+    if (globals.params_int["cuda_euler"] && !globals.player) {
         cudaMemcpy(g.host_cubes.data(), g.cubes, g.n_cubes * sizeof(cudaAffineBody), cudaMemcpyDeviceToHost);
         for (int i = 0; i < cubes.size(); i++) {
             auto& c{ *cubes[i] };

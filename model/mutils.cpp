@@ -7,6 +7,10 @@
 #include <ipc/friction/closest_point.hpp>
 #include <ipc/friction/tangent_basis.hpp>
 #include <ipc/distance/edge_edge_mollifier.hpp>
+#define CUDA_PROJECT
+#ifdef CUDA_PROJECT
+#include "cuda_glue.h"
+#endif
 using namespace std;
 using namespace Eigen;
 using namespace utils;
@@ -531,6 +535,30 @@ void player_save(
 
     string filename = path + "/" + to_string(timestep);
     ofstream out(filename, ios::out | ios::binary | ios::trunc);
+
+    #ifdef CUDA_PROJECT
+    auto &g {host_cuda_globals};
+    if (g.params["cuda_euler"]) {
+        cudaMemcpy(g.host_cubes.data(), g.cubes, sizeof(cudaAffineBody) * g.n_cubes, cudaMemcpyDeviceToHost);
+        for (int i  = 0; i < g.n_cubes; i++) {
+            auto c{g.host_cubes[i]};
+            for (int j = 0; j < 4; j ++) {
+                double q[3] {
+                    c.q0[j].x, c.q0[j].y, c.q0[j].z
+                };
+                out.write((char*) q, 3 * sizeof(double));
+            }
+            for (int j = 0; j < 4; j ++) {
+                double dq[3] {
+                    c.dqdt[j].x, c.dqdt[j].y, c.dqdt[j].z
+                };
+                out.write((char*) dq, 3 * sizeof(double));
+            }
+        }
+        out.close();
+        return;
+    }
+    #endif
     int n_cubes = cubes.size();
     for (int i = 0; i < n_cubes; i++) {
         auto& c{ *cubes[i] };
