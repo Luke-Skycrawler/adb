@@ -1,5 +1,7 @@
 #include "cuda_globals.cuh"
 #include <omp.h>
+#include "timer.h"
+#include <spdlog/spdlog.h>
 
 using namespace std;
 
@@ -102,7 +104,7 @@ float line_search_cuda(int n_cubes, float* dq, float toi, float dt = 1e-2f)
     auto bulk_stashed = bulk;
     vector<array<int, 4>> foo, bar;
     update_line_search_kernel<<<1, n_cuda_threads_per_block>>>(n_cubes, g.cubes, dq, 0.0f);
-    project_glue(3);
+    project_glue(2);
     // vtn = 3 to prepare for friction
     // E0 = barrier_plus_inert_glue(dt);
     E0 = iaabb_brute_force_cuda_pt_only(
@@ -110,7 +112,7 @@ float line_search_cuda(int n_cubes, float* dq, float toi, float dt = 1e-2f)
     // TODO: add friction energy here
     do {
         update_line_search_kernel<<<1, n_cuda_threads_per_block>>>(n_cubes, g.cubes, dq, alpha);
-        project_glue(3);
+        project_glue(2);
         
         int npt_new, nee_new;
         CUDA_CALL(cudaDeviceSynchronize());
@@ -128,11 +130,15 @@ float line_search_cuda(int n_cubes, float* dq, float toi, float dt = 1e-2f)
         g.npt = g.npt_line_search;
         g.nee = g.nee_line_search;
         // swap pt and pt_line_search pointers
-        auto tmp_pt = g.pt, tmp_ee = g.ee;
-        g.pt = g.pt_line_search;
-        g.ee = g.ee_line_search;
-        g.pt_line_search = tmp_pt;
-        g.ee_line_search = tmp_ee;
+        // auto tmp_pt = g.pt, tmp_ee = g.ee;
+        // g.pt = g.pt_line_search;
+        // g.ee = g.ee_line_search;
+        // g.pt_line_search = tmp_pt;
+        // g.ee_line_search = tmp_ee;
+        cudaMemcpy(g.pt.b, g.pt_line_search.b, sizeof(i2) * g.npt, cudaMemcpyDeviceToDevice);
+        cudaMemcpy(g.pt.p, g.pt_line_search.p, sizeof(i2) * g.npt, cudaMemcpyDeviceToDevice);
+        cudaMemcpy(g.ee.b, g.ee_line_search.b, sizeof(i2) * g.nee, cudaMemcpyDeviceToDevice);
+        cudaMemcpy(g.ee.p, g.ee_line_search.p, sizeof(i2) * g.nee, cudaMemcpyDeviceToDevice);
     }
     return alpha;
 }
@@ -223,12 +229,12 @@ __global__ void update_newton_kernel(int n_cubes, cudaAffineBody* cubes, float* 
         if (I < n_cubes) {
             auto& c{ cubes[I] };
             for (int i = 0; i < 4; i++) {
-                c.q[i] = c.q[i] - make_float3(dq[I * 12 + i * 3 + 0], dq[I * 12 + i * 3 + 1], dq[I * 12 + i * 3 + 2]);
+                c.q[i] = c.q[i] - make_float3(dq[I * 12 + i * 3 + 0], dq[I * 12 + i * 3 + 1], dq[I * 12 + i * 3 + 2]) * alpha;
             }
         }
     }
 }
-void implicit_euler_cuda(float dt)
+void implicit_euler_cuda(float dt, int& ts)
 {
     auto& g{ host_cuda_globals };
     auto& hess{ g.hess };
@@ -237,17 +243,23 @@ void implicit_euler_cuda(float dt)
     auto st0_stashed = st0;
     auto bulk0_stashed = bulk0;
 
+    auto frame_start = high_resolution_clock::now();
+
+    int iter = 0;
     int n_cubes = g.n_cubes;
     float tol = 1e-2;
     set_q_to_q0_kernel<<<1, n_cuda_threads_per_block>>>(n_cubes, g.cubes);
     CUDA_CALL(cudaDeviceSynchronize());
     vector<array<int, 4>> foo, bar;
+    project_glue(1);
     iaabb_brute_force_cuda_pt_only(
         n_cubes, g.cubes, g.aabbs, 1, foo, bar);
     // contains make_lut step
     auto& lt{ g.leader_thread_buffer_back };
     auto lt_stashed = lt;
     do {
+        auto newton_iter_start = high_resolution_clock::now();
+
         build_csr(g.n_cubes, g.lut, g.hess);
         project_glue(1);
         inertia_grad_hess_kernel<<<1, n_cuda_threads_per_block>>>(n_cubes, g.cubes, dt, g.b, g.hess_diag);
@@ -271,6 +283,12 @@ void implicit_euler_cuda(float dt)
             PTR(g.hess.values), PTR(g.hess.outer_start),
             g.b, g.hess_diag);
 
+        auto t = from_thrust(g.hess.values);
+        auto b_host = from_thrust(thrust::device_vector<float>(g.b, g.b + n_cubes * 12));
+        auto dq_host = from_thrust(thrust::device_vector<float>(g.dq, g.dq + n_cubes * 12));
+        auto cubes_host = from_thrust(thrust::device_vector<cudaAffineBody>(g.cubes, g.cubes + n_cubes));
+        
+
         CUDA_CALL(cudaDeviceSynchronize());
         gpuCholSolver(g.hess, g.dq, g.b);
         float* ret_norm = (float*)lt;
@@ -282,6 +300,8 @@ void implicit_euler_cuda(float dt)
 
         update_line_search_kernel<<<1, n_cuda_threads_per_block>>>(n_cubes, g.cubes, g.dq, 1.0f);
         CUDA_CALL(cudaDeviceSynchronize());
+        // cubes_host = from_thrust(thrust::device_vector<cudaAffineBody>(g.cubes, g.cubes + n_cubes));
+
         // q_update = q + dq
         project_glue(3);
         
@@ -291,13 +311,34 @@ void implicit_euler_cuda(float dt)
         toi = toi == 1.0f ? 1.0f : 0.8f * toi;
         float alpha = line_search_cuda(n_cubes, g.dq, toi, dt);
         update_newton_kernel<<<1, n_cuda_threads_per_block>>>(n_cubes, g.cubes, g.dq, alpha);
+        // cubes_host = from_thrust(thrust::device_vector<cudaAffineBody>(g.cubes, g.cubes + n_cubes));
+
         cudaDeviceSynchronize();
         bool term_cond = sup_dq < tol;
         // cudaDeviceSynchronize();
+        auto iter_duration = DURATION_TO_DOUBLE(newton_iter_start);
+        spdlog::warn("Newton iter #{}, time = {} ms, upper bound = {}, line search = {}", iter + 1, iter_duration, toi, alpha);
+        iter++;
         if (term_cond) break;
     } while (true);
+
     update_timestep_kernel<<<1, n_cuda_threads_per_block>>>(n_cubes, g.cubes, dt);
     cudaDeviceSynchronize();
+    double frame_duration = DURATION_TO_DOUBLE(frame_start);
+
+    spdlog::warn("converge #iter {}, ts = {}, time = {} ms\n\n\n\n\n\\",
+        // time breakdown :\n\\
+    // \tipc: {:.3f} ms, percentage = {:.3f}% \n\\
+    // \tsolver: {:.3f}, percentage = {:.3f}%\n\\
+    // \tccd: {:.3f}, percentage = {:.3f}%\n\\
+    // \tline search: {:.3f}, percentage = {:.3f}%\n\n\n",
+        iter, ts++, frame_duration);
+    // frame_duration * 100.0,
+    // times[__IPC__],
+    // times[__IPC__] / frame_duration,
+    // times[__SOLVER__], times[__SOLVER__] / frame_duration,
+    // times[__CCD__], times[__CCD__] / frame_duration,
+    // times[__LINE_SEARCH__], times[__LINE_SEARCH__] / frame_duration);
 }
 
 void cuda_inert_hess_glue(int n_cubes, float dt, float *grads, float * hess) {

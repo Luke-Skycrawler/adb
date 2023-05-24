@@ -883,46 +883,53 @@ float iaabb_brute_force_cuda_pt_only(
     if (vtn == 3) return ret_toi;
 
     // vtn != 3
-    int npt = vtn == 2? g.npt_line_search: g.npt, nee = vtn == 2? g.nee_line_search: g.nee;
+    int &npt = vtn == 2? g.npt_line_search: g.npt, &nee = vtn == 2? g.nee_line_search: g.nee;
     
-    i2 *plist = new i2[npt], *blist = new i2[npt];
-    i2 *eeplist = new i2[nee], *eeblist = new i2[nee];
+    if (!g.params["cuda_euler"]) {
 
-    auto ptp_src = vtn == 1? g.pt.p : g.pt_line_search.p;
-    auto ptb_src = vtn == 1? g.pt.b : g.pt_line_search.b;
-    auto eep_src = vtn == 1? g.ee.p : g.ee_line_search.p;
-    auto eeb_src = vtn == 1? g.ee.b : g.ee_line_search.b;
+        i2 *plist = new i2[npt], *blist = new i2[npt];
+        i2 *eeplist = new i2[nee], *eeblist = new i2[nee];
 
-    cudaMemcpy(plist, ptp_src, sizeof(i2) * npt, cudaMemcpyDeviceToHost);
-    cudaMemcpy(blist, ptb_src, sizeof(i2) * npt, cudaMemcpyDeviceToHost);
-    cudaMemcpy(eeplist, eep_src, sizeof(i2) * nee, cudaMemcpyDeviceToHost);
-    cudaMemcpy(eeblist, eeb_src, sizeof(i2) * nee, cudaMemcpyDeviceToHost);
-    if (g.params["pt"]) {
-        // pt is set as globals.pt in control.cpp
-        for (int i = 0; i < npt; i++) {
-            auto p = plist[i], b = blist[i];
-            idx.push_back({ b[0], p[0], b[1], p[1] });
+        auto ptp_src = vtn == 1? g.pt.p : g.pt_line_search.p;
+        auto ptb_src = vtn == 1? g.pt.b : g.pt_line_search.b;
+        auto eep_src = vtn == 1? g.ee.p : g.ee_line_search.p;
+        auto eeb_src = vtn == 1? g.ee.b : g.ee_line_search.b;
+
+        cudaMemcpy(plist, ptp_src, sizeof(i2) * npt, cudaMemcpyDeviceToHost);
+        cudaMemcpy(blist, ptb_src, sizeof(i2) * npt, cudaMemcpyDeviceToHost);
+        cudaMemcpy(eeplist, eep_src, sizeof(i2) * nee, cudaMemcpyDeviceToHost);
+        cudaMemcpy(eeblist, eeb_src, sizeof(i2) * nee, cudaMemcpyDeviceToHost);
+        if (g.params["pt"]) {
+            // pt is set as globals.pt in control.cpp
+            for (int i = 0; i < npt; i++) {
+                auto p = plist[i], b = blist[i];
+                idx.push_back({ b[0], p[0], b[1], p[1] });
+            }
         }
+        else {
+            npt = 0;
+        }
+
+        if (g.params["ee"]) {
+            // ee is set as globals.ee in control.cpp
+            for (int i = 0; i < nee; i++) {
+                auto p = eeplist[i], b = eeblist[i];
+                eidx.push_back({ b[0], p[0], b[1], p[1] });
+            }
+        }
+        else {
+            nee = 0;
+        }
+        delete[] eeplist;
+        delete[] eeblist;
+        delete[] plist;
+        delete[] blist;
     }
     else {
-        g.npt = 0;
+        if (!g.params["pt"]) npt = 0;
+        if (!g.params["ee"]) nee = 0; 
     }
-
-    if (g.params["ee"]) {
-        // ee is set as globals.ee in control.cpp
-        for (int i = 0; i < nee; i++) {
-            auto p = eeplist[i], b = eeblist[i];
-            eidx.push_back({ b[0], p[0], b[1], p[1] });
-        }
-    }
-    else {
-        g.nee = 0;
-    }
-
-    delete[] eeplist;
-    delete[] eeblist;
-    delete[] plist;
-    delete[] blist;
+    
     return E_barrier  + E_inert;
 }
 

@@ -7,8 +7,9 @@
     "predefined_case" : {
         "enable": false,
         "id" : 2,
-        "custom": "../test_cases/case_pt.json"
+        "custom": "../test_cases/friction_pt.json"
     },
+    "camera": [0.0, 1.0, 5.0],
     "solver": "sparse",
     "gravity": true, 
     "line_search": true,
@@ -81,7 +82,8 @@
         "test_placeholder": 0,
         "submat_compare": 1,
         "cuda_compute_energy": 1,
-        "cuda_euler": 0,
-        "line_search_with_cuda_energy": 1
+        "cuda_euler": 1,
+        "line_search_with_cuda_energy": 1,
+        "use_cuda_toi": 1
     }
 }

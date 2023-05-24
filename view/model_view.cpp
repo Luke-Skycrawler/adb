@@ -22,7 +22,7 @@ using namespace std;
 #define CUDA_PROJECT
 #ifdef CUDA_PROJECT
 #include "../model/cuda_globals.cuh"
-void implicit_euler_cuda(float dt);
+void implicit_euler_cuda(float dt, int &ts);
 #endif
 vector<unsigned> Cube::_edges {}, Cube::_indices {};
 void render_cubes(Shader shader, vector<unique_ptr<AffineBody>> &cubes)
@@ -309,8 +309,7 @@ int main()
         if (!globals.player) {
             #ifdef CUDA_PROJECT
             if (globals.params_int["cuda_euler"]){
-                implicit_euler_cuda(globals.dt);
-                globals.ts ++;
+                implicit_euler_cuda(globals.dt, globals.ts);
             }
             else 
             #endif

@@ -34,6 +34,8 @@ void reset(bool init)
     globals.ee = data["ee"];
     globals.pt = data["pt"];
     globals.psd = data["psd"];
+    auto camera_pos = data["camera"];
+    globals.camera.Position = glm::vec3{camera_pos[0], camera_pos[1], camera_pos[2]};
     #ifdef CUDA_PROJECT
     host_cuda_globals.params["ee"] = globals.ee;
     host_cuda_globals.params["pt"] = globals.pt;
