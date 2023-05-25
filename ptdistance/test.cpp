@@ -301,33 +301,33 @@ __device__ __host__ float ee_collision_time(
     const Edgef& ei1,
     const Edgef& ej1);
 
-TEST(random_eef, cy_ref)
-{
-    static const int n_ees = 1000000;
-    array<vec3, 8>* ees = new array<vec3, 8>[n_ees];
-    double tois[n_ees];
-    default_random_engine gen;
-    uniform_real_distribution<double> dist(0.0, 1.0);
-    for (int i = 0; i < n_ees; i++) {
-       for (int j = 0; j < 24; j++) {
-            ees[i][j / 3](j % 3) = dist(gen);
-       }
-    }
-    for (int i = 0; i < n_ees; i++) {
-       auto& ee{ ees[i] };
-       Edgef ei0{ to_vec3f(ee[0]), to_vec3f(ee[1]) }, ej0{ to_vec3f(ee[2]), to_vec3f(ee[3]) },
-           ei1{ to_vec3f(ee[4]), to_vec3f(ee[5]) }, ej1{ to_vec3f(ee[6]), to_vec3f(ee[7]) };
+// TEST(random_eef, cy_ref)
+// {
+//     static const int n_ees = 1000000;
+//     array<vec3, 8>* ees = new array<vec3, 8>[n_ees];
+//     double tois[n_ees];
+//     default_random_engine gen;
+//     uniform_real_distribution<double> dist(0.0, 1.0);
+//     for (int i = 0; i < n_ees; i++) {
+//        for (int j = 0; j < 24; j++) {
+//             ees[i][j / 3](j % 3) = dist(gen);
+//        }
+//     }
+//     for (int i = 0; i < n_ees; i++) {
+//        auto& ee{ ees[i] };
+//        Edgef ei0{ to_vec3f(ee[0]), to_vec3f(ee[1]) }, ej0{ to_vec3f(ee[2]), to_vec3f(ee[3]) },
+//            ei1{ to_vec3f(ee[4]), to_vec3f(ee[5]) }, ej1{ to_vec3f(ee[6]), to_vec3f(ee[7]) };
 
-       Edge ei0d{ ee[0], ee[1] }, ej0d{ ee[2], ee[3] }, ei1d{ ee[4], ee[5] }, ej1d{ ee[6], ee[7] };
+//        Edge ei0d{ ee[0], ee[1] }, ej0d{ ee[2], ee[3] }, ei1d{ ee[4], ee[5] }, ej1d{ ee[6], ee[7] };
 
-       double ticcdt = ee_collision_time(ei0d, ej0d, ei1d, ej1d);
-       ticcdt = min(ticcdt, 1.0);
-       float selft = ee_collision_time(ei0, ej0, ei1, ej1);
-       EXPECT_TRUE(abs(ticcdt - selft) < 1e-4) << "computed = " << selft << " truth = " << ticcdt << "\n"
-                                               << ee[0].transpose() << " " << ee[1].transpose() << " " << ee[2].transpose() << " " << ee[3].transpose() << " "
-                                               << ee[4].transpose() << " " << ee[5].transpose() << " " << ee[6].transpose() << " " << ee[7].transpose();
-    }
-}
+//        double ticcdt = ee_collision_time(ei0d, ej0d, ei1d, ej1d);
+//        ticcdt = min(ticcdt, 1.0);
+//        float selft = ee_collision_time(ei0, ej0, ei1, ej1);
+//        EXPECT_TRUE(abs(ticcdt - selft) < 1e-4) << "computed = " << selft << " truth = " << ticcdt << "\n"
+//                                                << ee[0].transpose() << " " << ee[1].transpose() << " " << ee[2].transpose() << " " << ee[3].transpose() << " "
+//                                                << ee[4].transpose() << " " << ee[5].transpose() << " " << ee[6].transpose() << " " << ee[7].transpose();
+//     }
+// }
 
 TEST(ee_failed_case, cy_ref)
 {

@@ -121,7 +121,21 @@ void cuda_hess_glue(
             assert(norm < 1e-2);
             assert(h_norm < 1e-2);
         }
+        if (host_cuda_globals.params["use_cuda_inertia"]){
+            c.grad = act;
+            c.hess = h_act;
+        }
     }
+    if (!host_cuda_globals.params["use_cuda_inertia"]) {
+        for (int i = 0; i < n_cubes; i++) {
+            // copy c.hess and c.grad to grads and hess
+            for (int j = 0; j < 12; j++) grads[i * 12 + j] = cubes[i]->grad(j);
+            for (int j = 0; j < 12; j++)
+                for (int k = 0; k < 12; k++) hess[i * 144 + j + k * 12] = cubes[i]->hess(j, k);
+        }
+        cudaMemcpy(host_cuda_globals.b, grads, sizeof(float) * 12 * n_cubes, cudaMemcpyHostToDevice);
+        cudaMemcpy(host_cuda_globals.hess_diag, hess, sizeof(float) * 144 * n_cubes, cudaMemcpyHostToDevice);
+    } 
     delete[] grads;
     delete[] hess;
 }

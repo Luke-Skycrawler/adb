@@ -1,6 +1,5 @@
 #include "cuda_header.cuh"
 
-static const float x_error;
 
 __host__ __device__ float eval(const float coef[4], float x)
 {
@@ -25,7 +24,7 @@ __forceinline__ __host__ __device__ void deflate(float defpoly[3], float coef[4]
 __forceinline__ __host__ __device__ float find_closed(const float coef[4], const float deriv[4], float x0, float x1, float y0, float y1)
 {
 
-    const float x_error = 1e-10f;
+    const float x_error = 1e-15f;
     float xr = (x0 + x1) / 2;
     float yr = eval(coef, xr);
     float xb0 = x0, xb1 = x1;

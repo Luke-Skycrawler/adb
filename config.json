@@ -71,7 +71,7 @@
         "strict": 0,
         "gen_sm_test": 1,
         "cuda_solver": 1,
-        "solve_with_cuda_matrix": 1,
+        "solve_with_cuda_matrix": 0,
         "cuda_hess": 1,
         "cuda_intersection": 0,
         "cuda_pt": 1,
@@ -84,6 +84,7 @@
         "cuda_compute_energy": 1,
         "cuda_euler": 0,
         "line_search_with_cuda_energy": 1,
-        "use_cuda_toi": 1
+        "use_cuda_toi": 1,
+        "use_cuda_inertia": 1
     }
 }
