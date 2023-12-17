@@ -1,6 +1,6 @@
 #include "geometry.h"
 #include <Eigen/Geometry>
-#include <cmath>
+// #include <cmath>
 
 using namespace std;
 Edge::Edge(const AffineBody& c, unsigned id, bool b, bool batch)

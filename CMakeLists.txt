@@ -1,89 +1,99 @@
-cmake_minimum_required(VERSION 3.16.0 FATAL_ERROR)
+cmake_minimum_required(VERSION 3.12)
+set(CMAKE_CXX_STANDARD 17)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
+project(abd)
+# set(IPC_TOOLKIT_BUILD_PYTHON ON)
+find_package(glad CONFIG REQUIRED)
+find_package(glm CONFIG REQUIRED)
+find_package(glfw3 CONFIG REQUIRED)
+find_package(assimp CONFIG REQUIRED)
+find_package (Eigen3 CONFIG REQUIRED)
+# find_package(spdlog CONFIG REQUIRED)
+find_package(nlohmann_json CONFIG REQUIRED)
 
-set(CMAKE_SYSTEM_VERSION 10.0 CACHE STRING "" FORCE)
+include(FetchContent)
+FetchContent_Declare(
+    ipc_toolkit
+    GIT_REPOSITORY https://github.com/ipc-sim/ipc-toolkit.git
+    GIT_TAG main
+)
+FetchContent_GetProperties(ipc_toolkit)
+FetchContent_MakeAvailable(ipc_toolkit)
 
-project(adb C CXX)
-
-################################################################################
-# Set target arch type if empty. Visual studio solution generator provides it.
-################################################################################
-if(NOT CMAKE_VS_PLATFORM_NAME)
-    set(CMAKE_VS_PLATFORM_NAME "x64")
-endif()
-message("${CMAKE_VS_PLATFORM_NAME} architecture in use")
-
-if(NOT ("${CMAKE_VS_PLATFORM_NAME}" STREQUAL "x64"
-     OR "${CMAKE_VS_PLATFORM_NAME}" STREQUAL "x86"))
-    message(FATAL_ERROR "${CMAKE_VS_PLATFORM_NAME} arch is not supported!")
-endif()
-
-################################################################################
-# Global configuration types
-################################################################################
-set(CMAKE_CONFIGURATION_TYPES
-    "Debug"
-    "Release"
-    CACHE STRING "" FORCE
+set(HEADERS 
+    cyCodeBase/cyCore.h
+    cyCodeBase/cyPolynomial.h
+    model/affine_body.h
+    model/affine_obj.h
+    model/cube.h
+    model/FrictionUtils.h
+    model/glue.h
+    model/iaabb.h
+    model/IpcCollisionConstraint.h
+    model/IpcFrictionConstraint.h
+    model/psd.h
+    model/othogonal_energy.h
+    model/time_integrator.h
+    model/barrier.h
+    model/collision.h
+    model/spatial_hashing.h
+    model/geometry.h
+    test_cases/tests.h
+    view/camera.h
+    view/env.h
+    view/global_variables.h
+    view/light.h
+    view/mesh.h
+    view/model.h
+    view/shader.h
+    view/stb_image.h
 )
 
-################################################################################
-# Global compiler options
-################################################################################
-if(MSVC)
-    # remove default flags provided with CMake for MSVC
-    set(CMAKE_C_FLAGS "")
-    set(CMAKE_C_FLAGS_DEBUG "")
-    set(CMAKE_C_FLAGS_RELEASE "")
-    set(CMAKE_CXX_FLAGS "")
-    set(CMAKE_CXX_FLAGS_DEBUG "")
-    set(CMAKE_CXX_FLAGS_RELEASE "")
-endif()
+set(SOURCE 
+    model/affine_obj.cpp
+    model/col_set.cpp
+    model/geo.cpp
+    model/iaabb.cpp
+    model/IpcCollisionConstraint.cpp
+    model/IpcFrictionConstraint.cpp
+    model/othogonal_energy.cpp
+    model/barrier.cpp
+    model/euler.cpp
+    model/collision.cpp
+    model/sparse.cpp
+    model/spatial_hashing.cpp
+    model/geometry.cpp
+    model/mutils.cpp
+    model/upper_bound.cpp
+    model/energy.cpp
+    test_cases/spinning_cube.cpp
+    view/control.cpp
+    view/light.cpp
+    view/utils.cpp
+    )
 
-################################################################################
-# Global linker options
-################################################################################
-if(MSVC)
-    # remove default flags provided with CMake for MSVC
-    set(CMAKE_EXE_LINKER_FLAGS "")
-    set(CMAKE_MODULE_LINKER_FLAGS "")
-    set(CMAKE_SHARED_LINKER_FLAGS "")
-    set(CMAKE_STATIC_LINKER_FLAGS "")
-    set(CMAKE_EXE_LINKER_FLAGS_DEBUG "${CMAKE_EXE_LINKER_FLAGS}")
-    set(CMAKE_MODULE_LINKER_FLAGS_DEBUG "${CMAKE_MODULE_LINKER_FLAGS}")
-    set(CMAKE_SHARED_LINKER_FLAGS_DEBUG "${CMAKE_SHARED_LINKER_FLAGS}")
-    set(CMAKE_STATIC_LINKER_FLAGS_DEBUG "${CMAKE_STATIC_LINKER_FLAGS}")
-    set(CMAKE_EXE_LINKER_FLAGS_RELEASE "${CMAKE_EXE_LINKER_FLAGS}")
-    set(CMAKE_MODULE_LINKER_FLAGS_RELEASE "${CMAKE_MODULE_LINKER_FLAGS}")
-    set(CMAKE_SHARED_LINKER_FLAGS_RELEASE "${CMAKE_SHARED_LINKER_FLAGS}")
-    set(CMAKE_STATIC_LINKER_FLAGS_RELEASE "${CMAKE_STATIC_LINKER_FLAGS}")
-endif()
+add_executable(abd view/model_view.cpp
+    ${HEADERS}
+    ${SOURCE}
+    )
 
-################################################################################
-# Nuget packages function stub.
-################################################################################
-function(use_package TARGET PACKAGE VERSION)
-    message(WARNING "No implementation of use_package. Create yours. "
-                    "Package \"${PACKAGE}\" with version \"${VERSION}\" "
-                    "for target \"${TARGET}\" is ignored!")
-endfunction()
+source_group(src FILES view/model_view.cpp ${SOURCE})
+source_group(include FILES ${HEADERS})
 
-################################################################################
-# Common utils
-################################################################################
-include(CMake/Utils.cmake)
+target_include_directories(abd PRIVATE    
+    ${CMAKE_CURRENT_SOURCE_DIR}
+    ${CMAKE_CURRENT_SOURCE_DIR}/cyCodeBase
+    ${CMAKE_CURRENT_SOURCE_DIR}/iAABB
+    ${CMAKE_CURRENT_SOURCE_DIR}/model
+    ${CMAKE_CURRENT_SOURCE_DIR}/test_cases
+    ${CMAKE_CURRENT_SOURCE_DIR}/view
+)
 
-################################################################################
-# Additional Global Settings(add specific info there)
-################################################################################
-include(CMake/GlobalSettingsInclude.cmake OPTIONAL)
+# Now, link the ipc_toolkit to your target (replace 'your_target' with your actual target)
+target_include_directories(abd PRIVATE ${ipc_toolkit_SOURCE_DIR}/src)
 
-################################################################################
-# Use solution folders feature
-################################################################################
-set_property(GLOBAL PROPERTY USE_FOLDERS ON)
-
-################################################################################
-# Sub-projects
-################################################################################
-add_subdirectory(view)
-
+target_link_libraries(abd PRIVATE ipc::toolkit glfw assimp::assimp glad::glad glm::glm Eigen3::Eigen nlohmann_json::nlohmann_json)
+# if(MSVC) 
+#     set_property(TARGET abd PROPERTY CUDA_SEPARABLE_COMPILATION ON)
+#     set_property(TARGET abd PROPERTY CUDA_ARCHITECTURES 86)
+# endif()

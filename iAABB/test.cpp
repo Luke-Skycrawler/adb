@@ -10,7 +10,7 @@
 #define _USE_MATH_DEFINES
 //#define _FAILED_
 //#define _LOAD_
-#include <math.h>
+#include <psd.h>
 #include <random>
 
 #include <iostream>

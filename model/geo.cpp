@@ -1,4 +1,4 @@
-#include "math.h"
+#include "psd.h"
 #include "cube.h"
 // #include "geometry.h"
 #include "barrier.h"
@@ -208,8 +208,8 @@ tuple<mat12, vec12> ipc_hess_pt_12x12(
 
     Vector<double, 12> pt_grad;
     Matrix<double, 12, 12> pt_hess;
-    ipc::point_triangle_distance_gradient(p, t0, t1, t2, pt_grad, pt_type);
-    ipc::point_triangle_distance_hessian(p, t0, t1, t2, pt_hess, pt_type);
+    pt_grad = ipc::point_triangle_distance_gradient(p, t0, t1, t2, pt_type);
+    pt_hess = ipc::point_triangle_distance_hessian(p, t0, t1, t2, pt_type);
 
     double B_ = barrier::barrier_derivative_d(dist);
     double B__ = barrier::barrier_second_derivative(dist);
@@ -365,11 +365,11 @@ tuple<mat12, vec12, double> ipc_hess_ee_12x12(
     // 1e-3 * edge length square
 
     double p = ipc::edge_edge_mollifier(ei0, ei1, ej0, ej1, eps_x);
-    ipc::edge_edge_mollifier_gradient(ei0, ei1, ej0, ej1, eps_x, p_grad);
-    ipc::edge_edge_mollifier_hessian(ei0, ei1, ej0, ej1, eps_x, p_hess);
+    p_grad = ipc::edge_edge_mollifier_gradient(ei0, ei1, ej0, ej1, eps_x);
+    p_hess = ipc::edge_edge_mollifier_hessian(ei0, ei1, ej0, ej1, eps_x);
 
-    ipc::edge_edge_distance_gradient(ei0, ei1, ej0, ej1, ee_grad, ee_type);
-    ipc::edge_edge_distance_hessian(ei0, ei1, ej0, ej1, ee_hess, ee_type);
+    ee_grad = ipc::edge_edge_distance_gradient(ei0, ei1, ej0, ej1, ee_type);
+    ee_hess = ipc::edge_edge_distance_hessian(ei0, ei1, ej0, ej1, ee_type);
 
     double B_ = barrier::barrier_derivative_d(dist);
     double B__ = barrier::barrier_second_derivative(dist);

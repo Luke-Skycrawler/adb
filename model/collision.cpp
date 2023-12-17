@@ -1,3 +1,4 @@
+#include "../cyCodeBase/cyPolynomial.h"
 #include "collision.h"
 #include "barrier.h"
 #include "geometry.h"
@@ -196,7 +197,6 @@ bool verify_root_ee(
     };
     return cross(ei, ej) && cross(ej, ei);
 }
-#include "../cyCodeBase/cyPolynomial.h"
 
 inline vec3 linerp(const vec3& p_t1, const vec3& p_t0, double t)
 {

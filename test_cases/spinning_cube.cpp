@@ -1,9 +1,9 @@
+#define _USE_MATH_DEFINES
+#include <cmath>
 #include "tests.h"
 #include "../model/geometry.h"
 #include <nlohmann/json.hpp>
 #include <fstream>
-#define _USE_MATH_DEFINES
-#include <math.h>
 #include <iostream>
 using namespace std;
 using json = nlohmann::json;

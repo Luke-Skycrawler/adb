@@ -1,4 +1,4 @@
-#include "math.h"
+#include "psd.h"
 #include "IpcCollisionConstraint.h"
 #include <ipc/distance/edge_edge_mollifier.hpp>
 namespace AIPC {
@@ -23,7 +23,7 @@ void mollifier_gradient(const int ei0, const int ei1, const int ej0, const int e
     const Vector<T, dim>& ea1_rest = surface_X[ei1];
     const Vector<T, dim>& eb0_rest = surface_X[ej0];
     const Vector<T, dim>& eb1_rest = surface_X[ej1];
-    ::ipc::edge_edge_mollifier_gradient(surface_x[ei0], surface_x[ei1], surface_x[ej0], surface_x[ej1], eps, gm);
+    gm = ::ipc::edge_edge_mollifier_gradient(surface_x[ei0], surface_x[ei1], surface_x[ej0], surface_x[ej1], eps);
 }
 
 void mollifier_hessian(const int ei0, const int ei1, const int ej0, const int ej1, const Field<Vector<T, dim>>& surface_x, const Field<Vector<T, dim>>& surface_X, T& eps, Matrix<T, dim * 4, dim * 4>& hm)
@@ -32,7 +32,7 @@ void mollifier_hessian(const int ei0, const int ei1, const int ej0, const int ej
     const Vector<T, dim>& ea1_rest = surface_X[ei1];
     const Vector<T, dim>& eb0_rest = surface_X[ej0];
     const Vector<T, dim>& eb1_rest = surface_X[ej1];
-    ::ipc::edge_edge_mollifier_hessian(surface_x[ei0], surface_x[ei1], surface_x[ej0], surface_x[ej1], eps, hm);
+    hm = ::ipc::edge_edge_mollifier_hessian(surface_x[ei0], surface_x[ei1], surface_x[ej0], surface_x[ej1], eps);
 }
 
 bool is_mollifier(const int ei0, const int ei1, const int ej0, const int ej1, const Field<Vector<T, dim>>& surface_x, const Field<Vector<T, dim>>& surface_X, T& eps)
@@ -49,8 +49,8 @@ void mollifier_info(const int ei0, const int ei1, const int ej0, const int ej1, 
     const Vector<T, dim>& eb1_rest = surface_X[ej1];
     T eps_x = ::ipc::edge_edge_mollifier_threshold(ea0_rest, ea1_rest, eb0_rest, eb1_rest);
     m = ::ipc::edge_edge_mollifier(surface_x[ei0], surface_x[ei1], surface_x[ej0], surface_x[ej1], eps_x);
-    ::ipc::edge_edge_mollifier_gradient(surface_x[ei0], surface_x[ei1], surface_x[ej0], surface_x[ej1], eps_x, gm);
-    ::ipc::edge_edge_mollifier_hessian(surface_x[ei0], surface_x[ei1], surface_x[ej0], surface_x[ej1], eps_x, hm);
+    gm = ::ipc::edge_edge_mollifier_gradient(surface_x[ei0], surface_x[ei1], surface_x[ej0], surface_x[ej1], eps_x);
+    hm = ::ipc::edge_edge_mollifier_hessian(surface_x[ei0], surface_x[ei1], surface_x[ej0], surface_x[ej1], eps_x);
 }
 
 T IpcPPConstraint::energy(const Field<Vector<T, dim>>& dof_x, const Field<Vector<T, dim>>& surface_x, const Field<Vector<T, dim>>& surface_X, const Field<Vector<T, dim>>& surface_xhat, const std::map<int, T>& snode_area)
@@ -61,7 +61,7 @@ T IpcPPConstraint::energy(const Field<Vector<T, dim>>& dof_x, const Field<Vector
 void IpcPPConstraint::gradient(const Field<Vector<T, dim>>& dof_x, const Field<Vector<T, dim>>& surface_x, const Field<Vector<T, dim>>& surface_X, const Field<Vector<T, dim>>& surface_xhat, const std::map<int, T>& snode_area, VectorXd& ga, VectorXd& gb)
 {
     T dE = scale * barrier_gradient;
-    ::ipc::point_point_distance_gradient(surface_x[c_nodes[0]], surface_x[c_nodes[1]], PP_grad);
+    PP_grad = ::ipc::point_point_distance_gradient(surface_x[c_nodes[0]], surface_x[c_nodes[1]]);
 
     for (int i = 0; i < 4; i++) {
         for (int j = 0; j < 3; j++) {
@@ -74,7 +74,7 @@ void IpcPPConstraint::gradient(const Field<Vector<T, dim>>& dof_x, const Field<V
 void IpcPPConstraint::hessian(const Field<Vector<T, dim>>& dof_x, const Field<Vector<T, dim>>& surface_x, const Field<Vector<T, dim>>& surface_X, const Field<Vector<T, dim>>& surface_xhat, const std::map<int, T>& snode_area, MatrixXd& aa_hess, MatrixXd& bb_hess, MatrixXd& ab_hess, const bool project_pd)
 {
     Matrix<T, 6, 6> PP_hess;
-    ::ipc::point_point_distance_hessian(surface_x[c_nodes[0]], surface_x[c_nodes[1]], PP_hess);
+    PP_hess = ::ipc::point_point_distance_hessian(surface_x[c_nodes[0]], surface_x[c_nodes[1]]);
 
     T dE = scale * barrier_gradient;
     T dE2 = scale * _barrier_hessian(dist2, dHat2, kappa);
@@ -160,7 +160,7 @@ T IpcPEConstraint::energy(const Field<Vector<T, dim>>& dof_x, const Field<Vector
 void IpcPEConstraint::gradient(const Field<Vector<T, dim>>& dof_x, const Field<Vector<T, dim>>& surface_x, const Field<Vector<T, dim>>& surface_X, const Field<Vector<T, dim>>& surface_xhat, const std::map<int, T>& snode_area, VectorXd& ga, VectorXd& gb)
 {
     T dE = scale * barrier_gradient;
-    ::ipc::point_edge_distance_gradient(surface_x[c_nodes[0]], surface_x[c_nodes[1]], surface_x[c_nodes[2]], PE_grad);
+    PE_grad = ::ipc::point_edge_distance_gradient(surface_x[c_nodes[0]], surface_x[c_nodes[1]], surface_x[c_nodes[2]]);
 
     for (int i = 0; i < 4; i++) {
         for (int j = 0; j < 3; j++) {
@@ -173,7 +173,7 @@ void IpcPEConstraint::gradient(const Field<Vector<T, dim>>& dof_x, const Field<V
 void IpcPEConstraint::hessian(const Field<Vector<T, dim>>& dof_x, const Field<Vector<T, dim>>& surface_x, const Field<Vector<T, dim>>& surface_X, const Field<Vector<T, dim>>& surface_xhat, const std::map<int, T>& snode_area, MatrixXd& aa_hess, MatrixXd& bb_hess, MatrixXd& ab_hess, const bool project_pd)
 {
     Eigen::Matrix<T, 9, 9> PE_hess;
-    ::ipc::point_edge_distance_hessian(surface_x[c_nodes[0]], surface_x[c_nodes[1]], surface_x[c_nodes[2]], PE_hess);
+    PE_hess = ::ipc::point_edge_distance_hessian(surface_x[c_nodes[0]], surface_x[c_nodes[1]], surface_x[c_nodes[2]]);
 
     T dE = scale * barrier_gradient;
     T dE2 = scale * _barrier_hessian(dist2, dHat2, kappa);
@@ -269,7 +269,7 @@ T IpcPTConstraint::energy(const Field<Vector<T, dim>>& dof_x, const Field<Vector
 void IpcPTConstraint::gradient(const Field<Vector<T, dim>>& dof_x, const Field<Vector<T, dim>>& surface_x, const Field<Vector<T, dim>>& surface_X, const Field<Vector<T, dim>>& surface_xhat, const std::map<int, T>& snode_area, VectorXd& ga, VectorXd& gb)
 {
     T dE = scale * barrier_gradient;
-    ::ipc::point_triangle_distance_gradient(surface_x[c_nodes[0]], surface_x[c_nodes[1]], surface_x[c_nodes[2]], surface_x[c_nodes[3]], PT_grad);
+    PT_grad = ::ipc::point_triangle_distance_gradient(surface_x[c_nodes[0]], surface_x[c_nodes[1]], surface_x[c_nodes[2]], surface_x[c_nodes[3]]);
 
     for (int i = 0; i < 4; i++) {
         for (int j = 0; j < 3; j++) {
@@ -282,7 +282,7 @@ void IpcPTConstraint::gradient(const Field<Vector<T, dim>>& dof_x, const Field<V
 void IpcPTConstraint::hessian(const Field<Vector<T, dim>>& dof_x, const Field<Vector<T, dim>>& surface_x, const Field<Vector<T, dim>>& surface_X, const Field<Vector<T, dim>>& surface_xhat, const std::map<int, T>& snode_area, MatrixXd& aa_hess, MatrixXd& bb_hess, MatrixXd& ab_hess, const bool project_pd)
 {
     Eigen::Matrix<T, 12, 12> PT_hess;
-    ::ipc::point_triangle_distance_hessian(surface_x[c_nodes[0]], surface_x[c_nodes[1]], surface_x[c_nodes[2]], surface_x[c_nodes[3]], PT_hess);
+    PT_hess = ::ipc::point_triangle_distance_hessian(surface_x[c_nodes[0]], surface_x[c_nodes[1]], surface_x[c_nodes[2]], surface_x[c_nodes[3]]);
     // Vector<T, 12> PT_grad;
     //::ipc::point_triangle_distance_gradient(surface_x[c_nodes[0]], surface_x[c_nodes[1]], surface_x[c_nodes[2]], surface_x[c_nodes[3]], PT_grad);
     // T dist2 = ::ipc::point_triangle_distance(surface_x[c_nodes[0]], surface_x[c_nodes[1]], surface_x[c_nodes[2]], surface_x[c_nodes[3]]);
@@ -386,7 +386,7 @@ T IpcEEConstraint::energy(const Field<Vector<T, dim>>& dof_x, const Field<Vector
 
 void IpcEEConstraint::gradient(const Field<Vector<T, dim>>& dof_x, const Field<Vector<T, dim>>& surface_x, const Field<Vector<T, dim>>& surface_X, const Field<Vector<T, dim>>& surface_xhat, const std::map<int, T>& snode_area, VectorXd& ga, VectorXd& gb)
 {
-    ::ipc::edge_edge_distance_gradient(surface_x[c_nodes[0]], surface_x[c_nodes[1]], surface_x[c_nodes[2]], surface_x[c_nodes[3]], EE_grad);
+    EE_grad = ::ipc::edge_edge_distance_gradient(surface_x[c_nodes[0]], surface_x[c_nodes[1]], surface_x[c_nodes[2]], surface_x[c_nodes[3]]);
 
     for (int i = 0; i < 4; i++) {
         for (int j = 0; j < 3; j++) {
@@ -400,7 +400,7 @@ void IpcEEConstraint::hessian(const Field<Vector<T, dim>>& dof_x, const Field<Ve
 {
     Matrix<T, 12, 12> EE_hess;
     T barrier_hessian = _barrier_hessian(dist2, dHat2, kappa);
-    ::ipc::edge_edge_distance_hessian(surface_x[c_nodes[0]], surface_x[c_nodes[1]], surface_x[c_nodes[2]], surface_x[c_nodes[3]], EE_hess);
+    EE_hess = ::ipc::edge_edge_distance_hessian(surface_x[c_nodes[0]], surface_x[c_nodes[1]], surface_x[c_nodes[2]], surface_x[c_nodes[3]]);
     EE_hess = scale * (barrier_hessian * EE_grad * EE_grad.transpose() + barrier_gradient * EE_hess);
 
     if (project_pd)
@@ -488,7 +488,7 @@ double IpcPPMConstraint::energy(const Field<Vector<T, dim>>& dof_x, const Field<
 
 void IpcPPMConstraint::gradient(const Field<Vector<T, dim>>& dof_x, const Field<Vector<T, dim>>& surface_x, const Field<Vector<T, dim>>& surface_X, const Field<Vector<T, dim>>& surface_xhat, const std::map<int, T>& snode_area, VectorXd& ga, VectorXd& gb)
 {
-    ::ipc::point_point_distance_gradient(surface_x[c_nodes[0]], surface_x[c_nodes[2]], PP_grad);
+    PP_grad = ::ipc::point_point_distance_gradient(surface_x[c_nodes[0]], surface_x[c_nodes[2]]);
     mollifier_gradient(c_nodes[0], c_nodes[1], c_nodes[2], c_nodes[3], surface_x, surface_X, eps_x, mollifier_grad);
 
     for (int i = 0; i < 4; i++) {
@@ -503,7 +503,7 @@ void IpcPPMConstraint::hessian(const Field<Vector<T, dim>>& dof_x, const Field<V
 {
     Matrix<T, 6, 6> barrier_dist2_hess;
     T barrier_hessian = _barrier_hessian(dist2, dHat2, kappa);
-    ::ipc::point_point_distance_hessian(surface_x[c_nodes[0]], surface_x[c_nodes[2]], barrier_dist2_hess);
+    barrier_dist2_hess = ::ipc::point_point_distance_hessian(surface_x[c_nodes[0]], surface_x[c_nodes[2]]);
     for (int r = 0; r < 6; r++) {
         for (int c = r; c < 6; c++) {
             T val = barrier_gradient * barrier_dist2_hess.data()[6 * c + r] + barrier_hessian * PP_grad.data()[r] * PP_grad.data()[c];
@@ -620,7 +620,7 @@ T IpcPEMConstraint::energy(const Field<Vector<T, dim>>& dof_x, const Field<Vecto
 
 void IpcPEMConstraint::gradient(const Field<Vector<T, dim>>& dof_x, const Field<Vector<T, dim>>& surface_x, const Field<Vector<T, dim>>& surface_X, const Field<Vector<T, dim>>& surface_xhat, const std::map<int, T>& snode_area, VectorXd& ga, VectorXd& gb)
 {
-    ::ipc::point_edge_distance_gradient(surface_x[c_nodes[0]], surface_x[c_nodes[2]], surface_x[c_nodes[3]], PE_grad);
+    PE_grad = ::ipc::point_edge_distance_gradient(surface_x[c_nodes[0]], surface_x[c_nodes[2]], surface_x[c_nodes[3]]);
     mollifier_gradient(c_nodes[0], c_nodes[1], c_nodes[2], c_nodes[3], surface_x, surface_X, eps_x, mollifier_grad);
 
     for (int i = 0; i < 4; i++) {
@@ -636,7 +636,7 @@ void IpcPEMConstraint::hessian(const Field<Vector<T, dim>>& dof_x, const Field<V
     Matrix<T, 12, 12> PEM_hess;
     Matrix<T, 9, 9> barrier_dist2_hess;
     T barrier_hessian = _barrier_hessian(dist2, dHat2, kappa);
-    ::ipc::point_edge_distance_hessian(surface_x[c_nodes[0]], surface_x[c_nodes[2]], surface_x[c_nodes[3]], barrier_dist2_hess);
+    barrier_dist2_hess = ::ipc::point_edge_distance_hessian(surface_x[c_nodes[0]], surface_x[c_nodes[2]], surface_x[c_nodes[3]]);
     for (int r = 0; r < 9; r++) {
         for (int c = r; c < 9; c++) {
             T val = barrier_gradient * barrier_dist2_hess.data()[9 * c + r] + barrier_hessian * PE_grad.data()[r] * PE_grad.data()[c];
@@ -751,7 +751,7 @@ T IpcEEMConstraint::energy(const Field<Vector<T, dim>>& dof_x, const Field<Vecto
 
 void IpcEEMConstraint::gradient(const Field<Vector<T, dim>>& dof_x, const Field<Vector<T, dim>>& surface_x, const Field<Vector<T, dim>>& surface_X, const Field<Vector<T, dim>>& surface_xhat, const std::map<int, T>& snode_area, VectorXd& ga, VectorXd& gb)
 {
-    ::ipc::edge_edge_distance_gradient(surface_x[c_nodes[0]], surface_x[c_nodes[1]], surface_x[c_nodes[2]], surface_x[c_nodes[3]], EE_grad);
+    EE_grad = ::ipc::edge_edge_distance_gradient(surface_x[c_nodes[0]], surface_x[c_nodes[1]], surface_x[c_nodes[2]], surface_x[c_nodes[3]]);
     mollifier_gradient(c_nodes[0], c_nodes[1], c_nodes[2], c_nodes[3], surface_x, surface_X, eps_x, mollifier_grad);
 
     for (int i = 0; i < 4; i++) {
@@ -766,7 +766,7 @@ void IpcEEMConstraint::hessian(const Field<Vector<T, dim>>& dof_x, const Field<V
 {
     Matrix<T, 12, 12> barrier_dist2_hess;
     T barrier_hessian = _barrier_hessian(dist2, dHat2, kappa);
-    ::ipc::edge_edge_distance_hessian(surface_x[c_nodes[0]], surface_x[c_nodes[1]], surface_x[c_nodes[2]], surface_x[c_nodes[3]], barrier_dist2_hess);
+    barrier_dist2_hess = ::ipc::edge_edge_distance_hessian(surface_x[c_nodes[0]], surface_x[c_nodes[1]], surface_x[c_nodes[2]], surface_x[c_nodes[3]]);
     for (int r = 0; r < 12; r++) {
         for (int c = r; c < 12; c++) {
             T val = barrier_gradient * barrier_dist2_hess.data()[12 * c + r] + barrier_hessian * EE_grad.data()[r] * EE_grad.data()[c];

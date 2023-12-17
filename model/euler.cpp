@@ -7,7 +7,6 @@
 #include <assert.h>
 #include <array>
 #include "timer.h"
-#include "../iAABB/finitediff.hpp"
 
 // #include <ipc/distance/point_triangle.hpp>
 // #include <ipc/distance/edge_edge.hpp>
