@@ -82,22 +82,6 @@ std::vector<std::array<unsigned, 2>> gen_point_list(
 std::vector<std::array<unsigned, 2>> gen_triangle_list(
     std::vector<std::unique_ptr<AffineBody>>& cubes, int n_cubes);
 
-double ee_uktk(
-    AffineBody& ci, AffineBody& cj,
-    std::array<vec3, 4>& ee, std::array<int, 4>& ij, const ::ipc::EdgeEdgeDistanceType& ee_type,
-    Matrix<double, 2, 12>& Tk_T_ret, Vector2d& uk_ret, double d, double dt, double mollifier);
-
-double pt_uktk(
-    AffineBody& ci, AffineBody& cj,
-    std::array<vec3, 4>& pt, std::array<int, 4>& ij, const ::ipc::PointTriangleDistanceType& pt_type,
-    Matrix<double, 2, 12>& Tk_T_ret, Vector2d& uk_ret, double d, double dt);
-
-std::tuple<double, Eigen::Vector2d, Eigen::Matrix<double, 2, 12>> ee_uktk(
-    AffineBody& ci, AffineBody& cj,
-    std::array<vec3, 4>& ee, std::array<int, 4>& ij, const ::ipc::EdgeEdgeDistanceType& ee_type,
-    double d, double dt, double mollifier);
-
-std::tuple<double, Eigen::Vector2d, Eigen::Matrix<double, 2, 12>> pt_uktk(AffineBody& ci, AffineBody& cj, std::array<vec3, 4>& pt, std::array<int, 4>& ij, const ::ipc::PointTriangleDistanceType& pt_type, double d, double dt);
 }
 void dump_states(
     const std::vector<std::unique_ptr<AffineBody>>& cubes

@@ -15,6 +15,7 @@ Navigate to the root directory glad_framework, and type in
 cmake -B "build" -S . -DCMAKE_TOOLCHAIN_FILE=[path to vcpkg]/scripts/buildsystems/vcpkg.cmake
 cmake --build build --config=Release
 ```
+cmake -B "build" -S . -DCMAKE_TOOLCHAIN_FILE=D:/vcpkg/scripts/buildsystems/vcpkg.cmake
 
 ### Running
 

@@ -101,6 +101,9 @@
         "any": "cpp",
         "*.ipp": "cpp",
         "filesystem": "cpp",
-        "codecvt": "cpp"
+        "codecvt": "cpp",
+        "future": "cpp",
+        "shared_mutex": "cpp",
+        "*.tpp": "cpp"
     }
 }

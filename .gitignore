@@ -30,3 +30,8 @@ view/trace*
 *.recipe
 *.CopyComplete
 *.FileListAbsolute.*
+abdtk.egg-info/
+view/*.exe
+view/*.dll
+*.pyd
+.vscode/

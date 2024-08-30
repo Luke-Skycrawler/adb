@@ -255,3 +255,15 @@ double E_fric(
     }
     return ef;
 }
+
+
+double E_ground(const vec3& v)
+{
+    double e = 0.0;
+    double d = vg_distance(v);
+    d = d * d;
+    if (d < barrier::d_hat) {
+        e = barrier::barrier_function(d);
+    }
+    return e;
+};

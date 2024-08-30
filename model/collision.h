@@ -13,6 +13,11 @@
 // #define _TRIPLETS_
 // #define _PLUG_IN_LAN_
 
+#ifdef _FRICTION_
+void friction(
+    const Eigen::Vector2d& _uk, double contact_lambda, const Eigen::Matrix<double, 12, 2>& Tk,
+    Eigen::Vector<double, 12>& g, Eigen::Matrix<double, 12, 12>& H);
+#endif
 #ifdef _PLUG_IN_LAN_
 #include "IpcFrictionConstraint.h"
 #include "IpcCollisionConstraint.h"
