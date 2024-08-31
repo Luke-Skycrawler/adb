@@ -1,5 +1,5 @@
 #include "../cyCodeBase/cyPolynomial.h"
-#include "collision.h"
+// #include "collision.h"
 #include "barrier.h"
 #include "geometry.h"
 
@@ -293,4 +293,55 @@ double ee_collision_time(
         true_root = verify_root_ee(linerp(ei1, ei0, root), linerp(ej1, ej0, root));
     }
     return found && true_root ? root : 1.0;
+}
+
+double pt_collision_time(
+    vec3 p0_t0,
+    vec3 t0_t0, 
+    vec3 t1_t0,
+    vec3 t2_t0,
+    vec3 p0_t1,
+    vec3 t0_t1,
+    vec3 t1_t1,
+    vec3 t2_t1)
+
+{
+    double roots[3];
+    int found = build_and_solve_4_points_coplanar(
+        p0_t0, t0_t0, t1_t0, t2_t0,
+        p0_t1, t0_t1, t1_t1, t2_t1,
+        roots);
+    bool true_root = false;
+    double root = 1.0;
+    for (int i = 0; i < found && !true_root; i++) {
+        root = roots[i];
+        Face t0{t0_t0, t1_t0, t2_t0}, t1{t0_t1, t1_t1, t2_t1};
+        true_root = verify_root_pt(linerp(p0_t1, p0_t0, root), linerp(t1, t0, root));
+    }
+    return found && true_root ? root : 1.0;
+}
+
+double ee_collision_time(
+    vec3 ei0_t0, 
+    vec3 ei1_t0,
+    vec3 ej0_t0,
+    vec3 ej1_t0,
+    vec3 ei0_t1,
+    vec3 ei1_t1,
+    vec3 ej0_t1,
+    vec3 ej1_t1)
+{
+    double roots[3];
+    int found = build_and_solve_4_points_coplanar(
+        ei0_t0, ei1_t0, ej0_t0, ej1_t0,
+        ei0_t1, ei1_t1, ej0_t1, ej1_t1,
+        roots);
+    double root = 1.0;
+    bool true_root = false;
+    for (int i = 0; i < found && !true_root; i++) {
+        root = roots[i];
+        Edge ei0{ei0_t0, ei1_t0}, ei1{ei0_t1, ei1_t1}, ej0{ej0_t0, ej1_t0}, ej1{ej0_t1, ej1_t1};
+        true_root = verify_root_ee(linerp(ei1, ei0, root), linerp(ej1, ej0, root));
+    }
+    return found && true_root ? root : 1.0;    
 }

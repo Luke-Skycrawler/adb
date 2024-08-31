@@ -81,6 +81,7 @@ set(PYTHON_SOURCE
     model/core_ipc.cpp
     model/barrier.cpp
     model/geometry.cpp
+    model/collision.cpp
 )
 
 set(PYTHON_HEADERS
@@ -88,6 +89,9 @@ set(PYTHON_HEADERS
     model/affine_body.h
     model/barrier.h
     model/geometry.h
+    model/collision.h
+    cyCodeBase/cyCore.h
+    cyCodeBase/cyPolynomial.h
     )
     
 add_executable(abd view/model_view.cpp

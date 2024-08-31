@@ -1,6 +1,8 @@
 #include <pybind11/pybind11.h>
 #include <pybind11/eigen.h>
-#include "collision.h"
+#include <pybind11/stl.h>
+// #include "collision.h"
+#include "affine_body.h"
 #include <ipc/distance/point_triangle.hpp>
 #include <ipc/distance/edge_edge.hpp>
 #include <ipc/utils/eigen_ext.hpp>
@@ -16,6 +18,26 @@ tuple<mat12, vec12, double> ipc_hess_ee_12x12(
     array<vec3, 4> ee, array<int, 4> ij,
     ipc::EdgeEdgeDistanceType ee_type, double dist);
 
+double ee_collision_time(
+    vec3 ei0_t0, 
+    vec3 ei1_t0,
+    vec3 ej0_t0,
+    vec3 ej1_t0,
+    vec3 ei0_t1,
+    vec3 ei1_t1,
+    vec3 ej0_t1,
+    vec3 ej1_t1);
+
+
+double pt_collision_time(
+    vec3 p0_t0,
+    vec3 t0_t0, 
+    vec3 t1_t0,
+    vec3 t2_t0,
+    vec3 p0_t1,
+    vec3 t0_t1,
+    vec3 t1_t1,
+    vec3 t2_t1);
 
 PYBIND11_MODULE(abdtk, m) {
     m.doc() = R"pbdoc(
@@ -55,4 +77,7 @@ PYBIND11_MODULE(abdtk, m) {
 
     m.def("ipc_hess_pt_12x12", &ipc_hess_pt_12x12, "Computes the hessian and gradient of the point-triangle distance", py::arg("pt"), py::arg("ij"), py::arg("pt_type"), py::arg("dist"));
     m.def("ipc_hess_ee_12x12", &ipc_hess_ee_12x12, "Computes the hessian and gradient of the edge-edge distance", py::arg("ee"), py::arg("ij"), py::arg("ee_type"), py::arg("dist"));
+
+    m.def("ee_collision_time", &ee_collision_time, "Computes the collision time between two edge-edge pairs", py::arg("ei0_t0"), py::arg("ei1_t0"), py::arg("ej0_t0"), py::arg("ej1_t0"), py::arg("ei0_t1"), py::arg("ei1_t1"), py::arg("ej0_t1"), py::arg("ej1_t1"));
+    m.def("pt_collision_time", &pt_collision_time, "Computes the collision time between a point and a triangle", py::arg("p0_t0"), py::arg("t0_t0"), py::arg("t1_t0"), py::arg("t2_t0"), py::arg("p0_t1"), py::arg("t0_t1"), py::arg("t1_t1"), py::arg("t2_t1"));
 }

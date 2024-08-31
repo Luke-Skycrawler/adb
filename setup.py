@@ -117,8 +117,9 @@ class CMakeBuild(build_ext):
         if not build_temp.exists():
             build_temp.mkdir(parents=True)
         build_args += ["--target", "abdtk"]
-        subprocess.run(
-            ["cmake", ext.sourcedir, *cmake_args], cwd=build_temp, check=True
+        env = os.environ.copy()
+        subprocess.check_call(
+            ["cmake", ext.sourcedir, *cmake_args], cwd=build_temp, env = env
         )
         subprocess.run(
             ["cmake", "--build", ".", *build_args], cwd=build_temp, check=True
