@@ -8,16 +8,18 @@
  
 #include <Eigen/Eigen>
 #include "../view/shader.h"
-using mat3 = Eigen::Matrix3d;
-using vec3 = Eigen::Vector3d;
+
+using scalar = double;
+using mat3 = Eigen::Matrix<scalar, 3, 3>;
+using vec3 = Eigen::Vector<scalar, 3>;
 using q4 = std::array<vec3, 4>;
-using vec12 = Eigen::Vector<double, 12>;
-using mat12 = Eigen::Matrix<double, 12, 12>;
+using vec12 = Eigen::Vector<scalar, 12>;
+using mat12 = Eigen::Matrix<scalar, 12, 12>;
 
 struct AffineBody {
     mat3 A;
     vec3 p;
-    double mass, Ic;
+    scalar mass, Ic;
     std::vector<unsigned> indices, edges;
     virtual const vec3 vertices(int i) const = 0;
     virtual void draw(Shader& shader) const = 0;
@@ -26,7 +28,7 @@ struct AffineBody {
     vec12 dq, grad;
     mat12 hess;
     q4 q, q0, dqdt;
-    vec12 q_tile(double dt, const vec3 &f) const;
+    vec12 q_tile(scalar dt, const vec3 &f) const;
     inline vec3 vt0(int i) const {
         mat3 a;
         vec3 b = q0[0];

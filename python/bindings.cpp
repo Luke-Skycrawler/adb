@@ -13,12 +13,12 @@ namespace py = pybind11;
 using namespace std;
 
 tuple<mat12, vec12> ipc_hess_pt_12x12(
-    array<vec3, 4> pt, array<int, 4> ij, ipc::PointTriangleDistanceType pt_type, double dist);
-tuple<mat12, vec12, double> ipc_hess_ee_12x12(
+    array<vec3, 4> pt, array<int, 4> ij, ipc::PointTriangleDistanceType pt_type, scalar dist);
+tuple<mat12, vec12, scalar> ipc_hess_ee_12x12(
     array<vec3, 4> ee, array<int, 4> ij,
-    ipc::EdgeEdgeDistanceType ee_type, double dist);
+    ipc::EdgeEdgeDistanceType ee_type, scalar dist);
 
-double ee_collision_time(
+scalar ee_collision_time(
     vec3 ei0_t0, 
     vec3 ei1_t0,
     vec3 ej0_t0,
@@ -29,7 +29,7 @@ double ee_collision_time(
     vec3 ej1_t1);
 
 
-double pt_collision_time(
+scalar pt_collision_time(
     vec3 p0_t0,
     vec3 t0_t0, 
     vec3 t1_t0,

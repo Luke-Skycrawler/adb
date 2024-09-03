@@ -27,7 +27,7 @@ vec3i spatial_hashing::tovec3i(const vec3& f)
 
 spatial_hashing::spatial_hashing(
     int vec3_compressed_bits, int n_buffer,
-    double MIN_XYZ, double MAX_XYZ, double dx, int set_size)
+    scalar MIN_XYZ, scalar MAX_XYZ, scalar dx, int set_size)
     : vec3_compressed_bits(vec3_compressed_bits), n_entries(1 << (vec3_compressed_bits * 3)), n_overflow_buffer(8), n_l1_bitmap(n_entries >> 8), n_l2_bitmap(n_entries >> 3), n_buffer(n_buffer), MIN_XYZ(MIN_XYZ), MAX_XYZ(MAX_XYZ), dx(dx), count(new atomic<element_type>[n_entries]), overflow(new Primitive[n_overflow_buffer]), hashtable(new Primitive[n_entries * n_buffer]), bitmap_l1(new bool[n_l1_bitmap]), bitmap_l2(new bool[n_l2_bitmap]), set_size(set_size), count_non_atomic(new element_type[n_entries])
 {
     auto n_proc = omp_get_num_procs();
@@ -154,7 +154,7 @@ void spatial_hashing::register_edge_trajectory(
     register_interval(l, u, { pid, body });
 }
 
-void spatial_hashing::query_edge(const vec3& a, const vec3& b, element_type group_exl, double dhat,
+void spatial_hashing::query_edge(const vec3& a, const vec3& b, element_type group_exl, scalar dhat,
     std::vector<Primitive>& ret)
 {
     vec3 _u = a.cwiseMax(b).array() + dhat;
@@ -170,7 +170,7 @@ void spatial_hashing::register_vertex(const vec3& a, element_type body, element_
     register_interval(ia, ia, { pid, body });
 }
 
-void spatial_hashing::query_triangle(const vec3& a, const vec3& b, const vec3& c, element_type group_exl, double dhat,
+void spatial_hashing::query_triangle(const vec3& a, const vec3& b, const vec3& c, element_type group_exl, scalar dhat,
     std::vector<Primitive>& ret)
 {
     vec3 _u = a.cwiseMax(b).cwiseMax(c).array() + dhat;

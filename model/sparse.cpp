@@ -15,7 +15,7 @@ void gen_empty_sm(
     int n_cubes,
     vector<array<int, 4>>& idx,
     vector<array<int, 4>>& eidx,
-    SparseMatrix<double>& sparse_hess,
+    SparseMatrix<scalar>& sparse_hess,
     map<array<int, 2>, int>& lut
     )
 {
@@ -57,10 +57,10 @@ void gen_empty_sm(
     // cout << sparse_hess;
 }
 
-void clear(SparseMatrix<double>& sm)
+void clear(SparseMatrix<scalar>& sm)
 {
     for (int j = 0; j < sm.outerSize(); ++j)
-        for (SparseMatrix<double>::InnerIterator it(sm, j); it; ++it) {
+        for (SparseMatrix<scalar>::InnerIterator it(sm, j); it; ++it) {
             auto r = it.row();
             it.valueRef() = 0.0;
         }

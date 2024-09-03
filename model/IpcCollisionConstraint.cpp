@@ -481,7 +481,7 @@ void IpcEEConstraint::hessian(const Field<Vector<T, dim>>& dof_x, const Field<Ve
         }
     }
 }
-double IpcPPMConstraint::energy(const Field<Vector<T, dim>>& dof_x, const Field<Vector<T, dim>>& surface_x, const Field<Vector<T, dim>>& surface_X, const Field<Vector<T, dim>>& surface_xhat, const std::map<int, T>& snode_area)
+scalar IpcPPMConstraint::energy(const Field<Vector<T, dim>>& dof_x, const Field<Vector<T, dim>>& surface_x, const Field<Vector<T, dim>>& surface_X, const Field<Vector<T, dim>>& surface_xhat, const std::map<int, T>& snode_area)
 {
     return scale * mollifier * barrier_dist2;
 }

@@ -4,13 +4,13 @@
 #include "geometry.h"
 
 namespace barrier {
-extern double d_hat, kappa;
-extern double d_sqrt;
+extern scalar d_hat, kappa;
+extern scalar d_sqrt;
 MatrixXd barrier_hessian_q(const vec3& x, const vec3& vertex);
 MatrixXd x_jacobian_q(const vec3& x);
 vec3 barrier_gradient_x(const vec3& vertex);
 VectorXd barrier_gradient_q(const vec3& x, const vec3& vertex);
-double barrier_second_derivative(double d);
-double barrier_derivative_d(double x);
-double barrier_function(double d);
+scalar barrier_second_derivative(scalar d);
+scalar barrier_derivative_d(scalar x);
+scalar barrier_function(scalar d);
 };

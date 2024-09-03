@@ -14,22 +14,22 @@ extern Globals globals;
 #include <ipc/friction/tangent_basis.hpp>
 #include "time_integrator.h"
 using namespace utils;
-tuple<mat12, vec12, double> ipc_hess_ee_12x12(
+tuple<mat12, vec12, scalar> ipc_hess_ee_12x12(
     array<vec3, 4> ee, array<int, 4> ij,
-    ipc::EdgeEdgeDistanceType ee_type, double dist);
+    ipc::EdgeEdgeDistanceType ee_type, scalar dist);
 
-double ee_uktk(
+scalar ee_uktk(
     AffineBody& ci, AffineBody& cj,
     array<vec3, 4>& ee, array<int, 4>& ij, const ::ipc::EdgeEdgeDistanceType& ee_type,
-    Matrix<double, 2, 12>& Tk_T_ret, Vector2d& uk_ret, double d, double dt,
-    double mollifier)
+    Matrix<scalar, 2, 12>& Tk_T_ret, Vector2d& uk_ret, scalar d, scalar dt,
+    scalar mollifier)
 {
     auto v_stack = ee_vstack(ci, cj, ij[1], ij[3]);
     auto ei0 = ee[0], ei1 = ee[1], ej0 = ee[2], ej1 = ee[3];
     auto rei = ei0 - ei1, rej = ej0 - ej1;
     auto cnorm = rei.cross(rej).squaredNorm();
     auto sin2 = cnorm / rei.squaredNorm() / rej.squaredNorm();
-    Matrix<double, 3, 2> degeneracy;
+    Matrix<scalar, 3, 2> degeneracy;
     degeneracy.col(0) = rei.normalized();
     degeneracy.col(1) = (ej0 - ei0).cross(rei).normalized();
     // bool par = sin2 < 1e-8;
@@ -78,12 +78,12 @@ double ee_uktk(
         lams = { 1.0, pe };
         Pk = ::ipc::point_edge_tangent_basis(ei1, ej0, ej1);
     }
-    const auto clip = [&](double& a, double l, double u) {
+    const auto clip = [&](scalar& a, scalar l, scalar u) {
         a = max(min(u, a), l);
     };
     clip(lams(0), 0.0, 1.0);
     clip(lams(1), 0.0, 1.0);
-    array<double, 4> lambdas = { 1 - lams(0), lams(0), 1 - lams(1), lams(1) };
+    array<scalar, 4> lambdas = { 1 - lams(0), lams(0), 1 - lams(1), lams(1) };
     // if (par) {
     //     // ignore this friction, already handled in point-triangle pair
     //     lambdas = { 0.0, 0.0, 0.0, 0.0 };
@@ -101,7 +101,7 @@ double ee_uktk(
         exit(1);
     }
 
-    Matrix<double, 3, 12> gamma;
+    Matrix<scalar, 3, 12> gamma;
     gamma.setZero(3, 12);
     for (int i = 0; i < 3; i++) {
         gamma(i, i) = -lambdas[0];
@@ -109,9 +109,9 @@ double ee_uktk(
         gamma(i, i + 6) = lambdas[2];
         gamma(i, i + 9) = lambdas[3];
     }
-    Matrix<double, 2, 12> Tk_T = Pk.transpose() * gamma;
+    Matrix<scalar, 2, 12> Tk_T = Pk.transpose() * gamma;
 
-    // Matrix<double, 12, 24> jacobian;
+    // Matrix<scalar, 12, 24> jacobian;
     // auto _i0 = ci.edges[_ei * 2], _i1 = ci.edges[_ei * 2 + 1],
     //      _j0 = cj.edges[_ej * 2], _j1 = cj.edges[_ej * 2 + 1];
 
@@ -132,21 +132,21 @@ double ee_uktk(
     return contact_force;
 }
 
-tuple<double, Vector2d, Matrix<double, 2, 12>> ee_uktk(AffineBody& ci, AffineBody& cj, array<vec3, 4>& ee, array<int, 4>& ij, const ::ipc::EdgeEdgeDistanceType& ee_type, double d, double dt, double mollifier)
+tuple<scalar, Vector2d, Matrix<scalar, 2, 12>> ee_uktk(AffineBody& ci, AffineBody& cj, array<vec3, 4>& ee, array<int, 4>& ij, const ::ipc::EdgeEdgeDistanceType& ee_type, scalar d, scalar dt, scalar mollifier)
 {
     Vector2d uk;
-    Matrix<double, 2, 12> Tk;
-    double lam = ee_uktk(ci, cj, ee, ij, ee_type, Tk, uk, d, dt, mollifier);
+    Matrix<scalar, 2, 12> Tk;
+    scalar lam = ee_uktk(ci, cj, ee, ij, ee_type, Tk, uk, d, dt, mollifier);
     return { lam, uk, Tk };
 }
 
 
 
 void ipc_term_ee(
-    array<vec3, 4> ee, array<int, 4> ij, ipc::EdgeEdgeDistanceType ee_type, double dist,
+    array<vec3, 4> ee, array<int, 4> ij, ipc::EdgeEdgeDistanceType ee_type, scalar dist,
 #ifdef _SM_OUT_
     const std::map<std::array<int, 2>, int>& lut,
-    SparseMatrix<double>& sparse_hess,
+    SparseMatrix<scalar>& sparse_hess,
 #endif
 #ifdef _TRIPLETS_
     vector<HessBlock>& triplets,
@@ -154,10 +154,10 @@ void ipc_term_ee(
 #ifdef _DIRECT_OUT_
     mat12& hess_0_ret, mat12& hess_1_ret, mat12& off_diag_ret,
 #endif
-    Vector<double, 12>& grad_0, Vector<double, 12>& grad_1
+    Vector<scalar, 12>& grad_0, Vector<scalar, 12>& grad_1
 #ifdef _FRICTION_
     ,
-    double& contact_lambda, Matrix<double, 2, 12>& Tk
+    scalar& contact_lambda, Matrix<scalar, 2, 12>& Tk
 #endif
 )
 {
@@ -193,8 +193,8 @@ void ipc_term_ee(
          ej0_tile = cj.vertices(eidxj[2 * _ej]), ej1_tile = cj.vertices(eidxj[2 * _ej + 1]);
 #define _NO_FANCY_
 #ifdef _NO_FANCY_
-    Matrix<double, 6, 12> J0;
-    Matrix<double, 6, 12> J1;
+    Matrix<scalar, 6, 12> J0;
+    Matrix<scalar, 6, 12> J1;
 
     J0.block<3, 12>(0, 0) = barrier::x_jacobian_q(ei0_tile);
     J0.block<3, 12>(3, 0) = barrier::x_jacobian_q(ei1_tile);
@@ -210,7 +210,7 @@ void ipc_term_ee(
     d1 = J1.transpose() * ee_grad.segment<6>(6);
 #else
 
-    double ker0[4][2], ker1[4][2];
+    scalar ker0[4][2], ker1[4][2];
 
     for (int i = 0; i < 4; i++) {
         ker0[i][0] = i == 0 ? 1.0 : ei0_tile(i - 1);
@@ -249,7 +249,7 @@ void ipc_term_ee(
         }
     // mat12 off_T = off_diag.transpose();
 
-    Vector<double, 12> d0, d1;
+    Vector<scalar, 12> d0, d1;
     vec3 i0 = ee_grad.segment<3>(0), i1 = ee_grad.segment<3>(3);
     vec3 j0 = ee_grad.segment<3>(6), j1 = ee_grad.segment<3>(9);
     // d0 << i0 + i1,

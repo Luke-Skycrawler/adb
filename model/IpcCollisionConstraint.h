@@ -15,7 +15,7 @@
 
 namespace AIPC {
 static const int dim = 3;
-using T = double;
+using T = scalar;
 using _StorageIndex = int;
 using StorageIndex = int;
 template <typename DerivedV>

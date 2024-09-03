@@ -9,8 +9,8 @@
 using namespace std;
 using namespace std::chrono;
 using namespace utils;
-#define DURATION_TO_DOUBLE(X) duration_cast<duration<double>>(high_resolution_clock::now() - (X)).count()
-double step_size_upper_bound(VectorXd& dq, vector<unique_ptr<AffineBody>>& cubes,
+#define DURATION_TO_DOUBLE(X) duration_cast<duration<scalar>>(high_resolution_clock::now() - (X)).count()
+scalar step_size_upper_bound(VectorXd& dq, vector<unique_ptr<AffineBody>>& cubes,
     int n_cubes, int n_pt, int n_ee, int n_g,
     vector<array<vec3, 4>>& pts,
     vector<array<int, 4>>& idx,
@@ -20,7 +20,7 @@ double step_size_upper_bound(VectorXd& dq, vector<unique_ptr<AffineBody>>& cubes
 )
  {
     auto start = high_resolution_clock::now();
-    double toi = 1.0;
+    scalar toi = 1.0;
 #pragma omp parallel for schedule(static)
     for (int k = 0; k < n_cubes; k++) {
         cubes[k]->project_vt2();
@@ -30,15 +30,15 @@ double step_size_upper_bound(VectorXd& dq, vector<unique_ptr<AffineBody>>& cubes
 
 #pragma omp parallel
             {
-                double toi_private = 1.0;
+                scalar toi_private = 1.0;
 #pragma omp for schedule(static)
                 for (int i = 0; i < n_cubes; i++) {
                     // cubes[i]->project_vt1();
                     for (int v = 0; v < cubes[i]->n_vertices; v++) {
                         auto p = cubes[i]->v_transformed[v];
-                        double d = vg_distance(p);
+                        scalar d = vg_distance(p);
                         if (d < 0) {
-                            double t = collision_time(*cubes[i], v);
+                            scalar t = collision_time(*cubes[i], v);
                             toi_private = min(toi_private, t);
                         }
                     }
@@ -63,7 +63,7 @@ double step_size_upper_bound(VectorXd& dq, vector<unique_ptr<AffineBody>>& cubes
 #pragma omp parallel for schedule(static)
             for (int J = 0; J < n_cubes; J++) {
                 auto& cj(*cubes[J]);
-                double toi_private = 1.0;
+                scalar toi_private = 1.0;
                 for (unsigned f = 0; f < cj.n_faces; f++) {
                     Face f0(cj, f, false);
                     Face f1(cj, f, true, true);
@@ -76,7 +76,7 @@ double step_size_upper_bound(VectorXd& dq, vector<unique_ptr<AffineBody>>& cubes
                         vec3 p1 = cubes[I]->v_transformed[v];
                         vec3 p0 = cubes[I]->vt1(v);
 
-                        double t = pt_collision_time(p0, f0, p1, f1);
+                        scalar t = pt_collision_time(p0, f0, p1, f1);
                         toi_private = min(toi_private, t);
                     }
                 }
@@ -96,10 +96,10 @@ double step_size_upper_bound(VectorXd& dq, vector<unique_ptr<AffineBody>>& cubes
             }
             globals.sh->remove_all_entries();
 
-            double pt_toi = 1.0;
+            scalar pt_toi = 1.0;
 #pragma omp parallel
             {
-                double toi_private = 1.0;
+                scalar toi_private = 1.0;
                 vector<Primitive> & collisions {globals.sh -> collisions[omp_get_thread_num()]};
 #pragma omp for schedule(guided)
                 for (int J = 0; J < n_triangles; J++) {
@@ -120,7 +120,7 @@ double step_size_upper_bound(VectorXd& dq, vector<unique_ptr<AffineBody>>& cubes
                         vec3 p1 = cubes[I]->v_transformed[v];
                         vec3 p0 = cubes[I]->vt1(v);
 
-                        double t = pt_collision_time(p0, f0, p1, f1);
+                        scalar t = pt_collision_time(p0, f0, p1, f1);
                         toi_private = min(toi_private, t);
                     }
                 }
@@ -151,7 +151,7 @@ double step_size_upper_bound(VectorXd& dq, vector<unique_ptr<AffineBody>>& cubes
             for (int J = 0; J < n_cubes; J++) {
                 auto& cj(*cubes[J]);
 
-                double toi_private = 1.0;
+                scalar toi_private = 1.0;
                 for (unsigned ej = 0; ej < cj.n_edges; ej++) {
                     Edge e1{ cj, ej, true, true };
 
@@ -182,10 +182,10 @@ double step_size_upper_bound(VectorXd& dq, vector<unique_ptr<AffineBody>>& cubes
                 globals.sh->register_edge_trajectory(e0.e0, e0.e1, e1.e0, e1.e1, idx[0], ei);
             }
             globals.sh->remove_all_entries();
-            double ee_toi = 1.0;
+            scalar ee_toi = 1.0;
 #pragma omp parallel
             {
-                double toi_private = 1.0;
+                scalar toi_private = 1.0;
                 vector<Primitive> & collisions {globals.sh -> collisions[omp_get_thread_num()]};
 #pragma omp for schedule(guided)
                 for (int J = 0; J < n_edges; J++) {
@@ -228,13 +228,13 @@ double step_size_upper_bound(VectorXd& dq, vector<unique_ptr<AffineBody>>& cubes
 
     toi = barrier::d_sqrt / 2.0 / norm_1(dq, n_cubes) * globals.safe_factor;
     toi = min(1.0, toi);
-    vector<double> tois;
+    vector<scalar> tois;
     tois.resize(n_pt + n_ee + n_g);
 
 #pragma omp parallel for schedule(static)
     for (int k = 0; k < n_g; k++) {
         auto& v{ vidx[k] };
-        double t = collision_time(*cubes[v[0]], v[1]);
+        scalar t = collision_time(*cubes[v[0]], v[1]);
         tois[k + n_pt + n_ee] = t;
         // toi = min(t, toi);
     }
@@ -247,10 +247,10 @@ double step_size_upper_bound(VectorXd& dq, vector<unique_ptr<AffineBody>>& cubes
         // Face f(cubes[j], ij[3], true);
         vec3 p_t2 = cubes[i]->v_transformed[ij[1]];
         vec3 p_t1 = cubes[i]->vt1(ij[1]);
-        // double t = vf_collision_detect(p_t1, p_t2,
+        // scalar t = vf_collision_detect(p_t1, p_t2,
         //     *cubes[j], ij[3]);
-        double t = pt_collision_time(p_t1, Face(*cubes[j], ij[3]), p_t2, Face(*cubes[j], ij[3], true, true));
-        // double t = vf_collision_detect(p_t1, p_t2, Face(*cubes[j], ij[3]), Face(*cubes[j], ij[3], true));
+        scalar t = pt_collision_time(p_t1, Face(*cubes[j], ij[3]), p_t2, Face(*cubes[j], ij[3], true, true));
+        // scalar t = vf_collision_detect(p_t1, p_t2, Face(*cubes[j], ij[3]), Face(*cubes[j], ij[3], true));
         tois[k] = t;
         // toi = min(toi, t);
     }
@@ -260,10 +260,10 @@ double step_size_upper_bound(VectorXd& dq, vector<unique_ptr<AffineBody>>& cubes
         const auto& ij(eidx[k]);
 
         auto &ci(*cubes[ij[0]]), &cj(*cubes[ij[2]]);
-        // double t = ee_collision_detect(ci, cj, ij[1], ij[3]);
+        // scalar t = ee_collision_detect(ci, cj, ij[1], ij[3]);
         Edge ei0(ci, ij[1]), ei1(ci, ij[1], true, true);
         Edge ej0(cj, ij[3]), ej1(cj, ij[3], true, true);
-        double t = ee_collision_time(ei0, ej0, ei1, ej1);
+        scalar t = ee_collision_time(ei0, ej0, ei1, ej1);
         tois[k + n_pt] = t;
         // toi = min(toi, t);
     }

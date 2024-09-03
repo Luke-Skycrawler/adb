@@ -59,7 +59,7 @@ void customize(string file)
             _a = make_unique<Cube>();
 
         auto& a = *_a;
-        array<double, 3> omega = {0.0, 0.0, 20.0};
+        array<scalar, 3> omega = {0.0, 0.0, 20.0};
         omega = it["omega"];
         auto p = it["p"];
         auto p_dot = it["p_dot"];
@@ -67,7 +67,7 @@ void customize(string file)
 
         bool mass_ = it.find("mass") != end(it);
         if (mass_) {
-            double m = it["mass"];
+            scalar m = it["mass"];
             a.mass = m;
             a.Ic = m / 12;
         }
@@ -78,15 +78,15 @@ void customize(string file)
         for (int i = 0; i < 3; i++) a.dqdt[i + 1] = R[i];
         if (use_euler) {
             auto ds = it["euler"];
-            double  aa = ds[0] / 180.0 * M_PI, 
+            scalar  aa = ds[0] / 180.0 * M_PI, 
                     bb = ds[1] / 180.0 * M_PI, 
                     cc = ds[2] / 180.0 * M_PI;
             mat3 rotate = rotation(cc, bb, aa);
             for (int i = 0; i < 3; i++) a.q[i + 1] = rotate.col(i);
         }
         else {
-            double theta = use_euler ? 0.0 : it["theta"] / 180.0 * M_PI;
-            double s = sin(theta), c = cos(theta);
+            scalar theta = use_euler ? 0.0 : it["theta"] / 180.0 * M_PI;
+            scalar s = sin(theta), c = cos(theta);
             a.q[1](0) = c;
             a.q[2](1) = c;
             a.q[2](0) = -s;

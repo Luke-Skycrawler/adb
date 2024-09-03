@@ -14,20 +14,20 @@ using namespace barrier;
 using namespace std;
 #ifdef _TIGHT_INCLUSION_ENABLE_
 
-double vf_collision_detect(vec3& p_t0, vec3& p_t1, const AffineBody& c, int id)
+scalar vf_collision_detect(vec3& p_t0, vec3& p_t1, const AffineBody& c, int id)
 {
     Face f_t0(c, id, false), f_t1(c, id, true);
     return vf_collision_detect(p_t0, p_t1, f_t0, f_t1);
 }
 
-double vf_collision_detect(vec3& p_t0, vec3& p_t1, const Face& f_t0, const Face& f_t1)
+scalar vf_collision_detect(vec3& p_t0, vec3& p_t1, const Face& f_t0, const Face& f_t1)
 {
     // Face f_t0(c, id, false), f_t1(c, id, true);
 
     ticcd::Scalar toi = 1.0, output_tolerance;
     std::vector<ticcd::Vector3> bounding_box;
 
-    double min_distance = 1e-6, tmax = 1, adjusted_tolerance = 1e-6;
+    scalar min_distance = 1e-6, tmax = 1, adjusted_tolerance = 1e-6;
     long max_iterations = 1e6;
 
     bool is_impacting = ticcd::vertexFaceCCD(
@@ -46,18 +46,18 @@ double vf_collision_detect(vec3& p_t0, vec3& p_t1, const Face& f_t0, const Face&
     return toi;
 }
 
-double ee_collision_detect(const AffineBody& ci, const AffineBody& cj, int eid_i, int eid_j)
+scalar ee_collision_detect(const AffineBody& ci, const AffineBody& cj, int eid_i, int eid_j)
 {
     Edge ei_t1(ci, eid_i, true), ej_t1(cj, eid_j, true), ei_t0(ci, eid_i), ej_t0(cj, eid_j);
     return ee_collision_detect(
         ei_t0, ej_t0, ei_t1, ej_t1);
 }
-double ee_collision_detect(
+scalar ee_collision_detect(
     const Edge& ei_t0, const Edge& ej_t0,
     const Edge& ei_t1, const Edge& ej_t1)
 {
     ticcd::Scalar toi = 1.0, output_tolerance;
-    double min_distance = 1e-6, tmax = 1, adjusted_tolerance = 1e-6;
+    scalar min_distance = 1e-6, tmax = 1, adjusted_tolerance = 1e-6;
     long max_iterations = 1e6;
 
     bool is_impacting = ticcd::edgeEdgeCCD(
@@ -79,20 +79,20 @@ double ee_collision_detect(
 }
 #endif
 
-double collision_time(AffineBody& c, int i)
+scalar collision_time(AffineBody& c, int i)
 {
-    double toi = 1.0;
+    scalar toi = 1.0;
     const vec3 v_t2(c.v_transformed[i]);
-    double d2 = vg_distance(v_t2);
+    scalar d2 = vg_distance(v_t2);
 
     if (d2 < 0) {
         const vec3 v_t1(c.vt1(i));
-        double d1 = vg_distance(v_t1);
+        scalar d1 = vg_distance(v_t1);
         assert(d1 > 0);
 
-        double t = d1 / (d1 - d2);
+        scalar t = d1 / (d1 - d2);
         auto vtoi = v_t2 * (t * 0.8) + v_t1 * (1 - t * 0.8);
-        double dtoi = vg_distance(vtoi);
+        scalar dtoi = vg_distance(vtoi);
         if (dtoi < 0.0)
             spdlog::error("dtoi = {}, d0 = {}, d1 = {}, toi = {}", dtoi, d1, d2, t);
 
@@ -103,16 +103,16 @@ double collision_time(AffineBody& c, int i)
     return toi;
 };
 
-void cubic_binomial(const double a[3], const double b[3], double polynomial[4])
+void cubic_binomial(const scalar a[3], const scalar b[3], scalar polynomial[4])
 {
     // for (int i = 0; i < 2; i++)
     //     for (int j = 0; j < 2; j++)
     //         for (int k = 0; k < 2; k++) {
-    //             double c11 = i ? a[0] : b[0];
-    //             double c22 = j ? a[1] : b[1];
-    //             double c33 = k ? a[2] : b[2];
+    //             scalar c11 = i ? a[0] : b[0];
+    //             scalar c22 = j ? a[1] : b[1];
+    //             scalar c33 = k ? a[2] : b[2];
     //             // int I = (i<< 2) + (j << 1) + k;
-    //             double t = c11 * c22 * c33;
+    //             scalar t = c11 * c22 * c33;
     //             int J = i + k + j;
     //             polynomial[J] += t;
     //         }
@@ -125,8 +125,8 @@ void cubic_binomial(const double a[3], const double b[3], double polynomial[4])
 
 Vector4d det_polynomial(const mat3& a, const mat3& b)
 {
-    double pos_polynomial[4]{ 0.0 }, neg_polynomial[4]{ 0.0 };
-    double c11c22c33[2][3]{
+    scalar pos_polynomial[4]{ 0.0 }, neg_polynomial[4]{ 0.0 };
+    scalar c11c22c33[2][3]{
         { a(0, 0), a(1, 1), a(2, 2) },
         { b(0, 0), b(1, 1), b(2, 2) }
     },
@@ -138,7 +138,7 @@ Vector4d det_polynomial(const mat3& a, const mat3& b)
             { a(0, 2), a(1, 0), a(2, 1) },
             { b(0, 2), b(1, 0), b(2, 1) }
         };
-    double c11c23c32[2][3]{
+    scalar c11c23c32[2][3]{
         { a(0, 0), a(1, 2), a(2, 1) }, { b(0, 0), b(1, 2), b(2, 1) }
     },
         c12c21c33[2][3]{
@@ -178,7 +178,7 @@ Vector4d det_polynomial(const mat3& a, const mat3& b)
 bool verify_root_pt(const vec3& _v, const Face& f)
 {
     auto n = f.unit_normal();
-    double d = n.dot(_v - f.t0);
+    scalar d = n.dot(_v - f.t0);
 
     vec3 v = _v - d * n;
     d = d * d;
@@ -198,11 +198,11 @@ bool verify_root_ee(
     return cross(ei, ej) && cross(ej, ei);
 }
 
-inline vec3 linerp(const vec3& p_t1, const vec3& p_t0, double t)
+inline vec3 linerp(const vec3& p_t1, const vec3& p_t0, scalar t)
 {
     return t * p_t1 + (1 - t) * p_t0;
 }
-Face linerp(const Face& t_t1, const Face& t_t0, double t)
+Face linerp(const Face& t_t1, const Face& t_t0, scalar t)
 {
     return Face{
         linerp(t_t1.t0, t_t0.t0, t),
@@ -210,7 +210,7 @@ Face linerp(const Face& t_t1, const Face& t_t0, double t)
         linerp(t_t1.t2, t_t0.t2, t),
     };
 }
-Edge linerp(const Edge& e_t1, const Edge& e_t0, double t)
+Edge linerp(const Edge& e_t1, const Edge& e_t0, scalar t)
 {
     return Edge{
         linerp(e_t1.e0, e_t0.e0, t),
@@ -229,7 +229,7 @@ int build_and_solve_4_points_coplanar(
     const vec3& p2_t1,
     const vec3& p3_t1,
 
-    double roots[3])
+    scalar roots[3])
 {
     mat3 a1, a2, a3, a4;
     mat3 b1, b2, b3, b4;
@@ -250,24 +250,24 @@ int build_and_solve_4_points_coplanar(
     a4 -= b4;
 
     Vector4d t = det_polynomial(a1, b1) - det_polynomial(a2, b2) + det_polynomial(a3, b3) - det_polynomial(a4, b4);
-    double root = 1.0;
+    scalar root = 1.0;
     int found = cy::CubicRoots(roots, t.data(), 0.0, 1.0);
     return found;
 }
 
-double pt_collision_time(
+scalar pt_collision_time(
     const vec3& p0,
     const Face& t0,
     const vec3& p1,
     const Face& t1)
 {
-    double roots[3];
+    scalar roots[3];
     int found = build_and_solve_4_points_coplanar(
         p0, t0.t0, t0.t1, t0.t2,
         p1, t1.t0, t1.t1, t1.t2,
         roots);
     bool true_root = false;
-    double root = 1.0;
+    scalar root = 1.0;
     for (int i = 0; i < found && !true_root; i++) {
         root = roots[i];
         true_root = verify_root_pt(linerp(p1, p0, root), linerp(t1, t0, root));
@@ -275,18 +275,18 @@ double pt_collision_time(
     return found && true_root ? root : 1.0;
 }
 
-double ee_collision_time(
+scalar ee_collision_time(
     const Edge& ei0,
     const Edge& ej0,
     const Edge& ei1,
     const Edge& ej1)
 {
-    double roots[3];
+    scalar roots[3];
     int found = build_and_solve_4_points_coplanar(
         ei0.e0, ei0.e1, ej0.e0, ej0.e1,
         ei1.e0, ei1.e1, ej1.e0, ej1.e1,
         roots);
-    double root = 1.0;
+    scalar root = 1.0;
     bool true_root = false;
     for (int i = 0; i < found && !true_root; i++) {
         root = roots[i];
@@ -295,7 +295,7 @@ double ee_collision_time(
     return found && true_root ? root : 1.0;
 }
 
-double pt_collision_time(
+scalar pt_collision_time(
     vec3 p0_t0,
     vec3 t0_t0, 
     vec3 t1_t0,
@@ -306,13 +306,13 @@ double pt_collision_time(
     vec3 t2_t1)
 
 {
-    double roots[3];
+    scalar roots[3];
     int found = build_and_solve_4_points_coplanar(
         p0_t0, t0_t0, t1_t0, t2_t0,
         p0_t1, t0_t1, t1_t1, t2_t1,
         roots);
     bool true_root = false;
-    double root = 1.0;
+    scalar root = 1.0;
     for (int i = 0; i < found && !true_root; i++) {
         root = roots[i];
         Face t0{t0_t0, t1_t0, t2_t0}, t1{t0_t1, t1_t1, t2_t1};
@@ -321,7 +321,7 @@ double pt_collision_time(
     return found && true_root ? root : 1.0;
 }
 
-double ee_collision_time(
+scalar ee_collision_time(
     vec3 ei0_t0, 
     vec3 ei1_t0,
     vec3 ej0_t0,
@@ -331,12 +331,12 @@ double ee_collision_time(
     vec3 ej0_t1,
     vec3 ej1_t1)
 {
-    double roots[3];
+    scalar roots[3];
     int found = build_and_solve_4_points_coplanar(
         ei0_t0, ei1_t0, ej0_t0, ej1_t0,
         ei0_t1, ei1_t1, ej0_t1, ej1_t1,
         roots);
-    double root = 1.0;
+    scalar root = 1.0;
     bool true_root = false;
     for (int i = 0; i < found && !true_root; i++) {
         root = roots[i];

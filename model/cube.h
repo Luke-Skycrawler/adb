@@ -2,9 +2,9 @@
 #include "affine_body.h"
 using namespace Eigen;
 struct Cube: AffineBody {
-    double scale, toi;
+    scalar scale, toi;
     static const int n_vertices = 8, n_faces = 12, n_edges = 12;
-    Vector<double, 12> barrier_gradient;
+    Vector<scalar, 12> barrier_gradient;
     inline const vec3 vertices(int i) const {return _vertices()[i];}
     static const vec3* _vertices()
     {
@@ -33,7 +33,7 @@ struct Cube: AffineBody {
         return fs;
     }
     // FIXME: probably switch to a static function
-    Cube(double scale = 1.0f)
+    Cube(scalar scale = 1.0f)
         : scale(scale), AffineBody(8, 12, 12, _indices, _edges){
         Ic = mass * scale * scale / 12;
     }

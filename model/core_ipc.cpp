@@ -13,7 +13,7 @@ using namespace std;
 #else
 static struct CoreIPCLocalConfig{
     bool psd;
-    double eps_x;
+    scalar eps_x;
     CoreIPCLocalConfig(): psd(true), eps_x(1e-3){}
 } globals;
 #endif
@@ -25,19 +25,19 @@ extern Globals globals;
 
 
 tuple<mat12, vec12> ipc_hess_pt_12x12(
-    array<vec3, 4> pt, array<int, 4> ij, ipc::PointTriangleDistanceType pt_type, double dist)
+    array<vec3, 4> pt, array<int, 4> ij, ipc::PointTriangleDistanceType pt_type, scalar dist)
 {
     int _i = ij[0], v = ij[1], _j = ij[2], f = ij[3];
 
     auto p = pt[0], t0 = pt[1], t1 = pt[2], t2 = pt[3];
 
-    Vector<double, 12> pt_grad;
-    Matrix<double, 12, 12> pt_hess;
+    Vector<scalar, 12> pt_grad;
+    Matrix<scalar, 12, 12> pt_hess;
     pt_grad = ipc::point_triangle_distance_gradient(p, t0, t1, t2, pt_type);
     pt_hess = ipc::point_triangle_distance_hessian(p, t0, t1, t2, pt_type);
 
-    double B_ = barrier::barrier_derivative_d(dist);
-    double B__ = barrier::barrier_second_derivative(dist);
+    scalar B_ = barrier::barrier_derivative_d(dist);
+    scalar B__ = barrier::barrier_second_derivative(dist);
 
     mat12 ipc_hess;
     ipc_hess.setZero(12, 12);
@@ -51,9 +51,9 @@ tuple<mat12, vec12> ipc_hess_pt_12x12(
 
     return { ipc_hess, pt_grad };
 }
-tuple<mat12, vec12, double> ipc_hess_ee_12x12(
+tuple<mat12, vec12, scalar> ipc_hess_ee_12x12(
     array<vec3, 4> ee, array<int, 4> ij,
-    ipc::EdgeEdgeDistanceType ee_type, double dist)
+    ipc::EdgeEdgeDistanceType ee_type, scalar dist)
 {
     int _i = ij[0], _ei = ij[1], _j = ij[2], _ej = ij[3];
 
@@ -62,20 +62,20 @@ tuple<mat12, vec12, double> ipc_hess_ee_12x12(
          ej0 = ee[2], ej1 = ee[3];
     vec12 ee_grad, p_grad;
     mat12 ee_hess, p_hess;
-    double eps_x = globals.eps_x * (ei0 - ei1).squaredNorm() * (ej0 - ej1).squaredNorm();
+    scalar eps_x = globals.eps_x * (ei0 - ei1).squaredNorm() * (ej0 - ej1).squaredNorm();
 
     // 1e-3 * edge length square
 
-    double p = ipc::edge_edge_mollifier(ei0, ei1, ej0, ej1, eps_x);
+    scalar p = ipc::edge_edge_mollifier(ei0, ei1, ej0, ej1, eps_x);
     p_grad = ipc::edge_edge_mollifier_gradient(ei0, ei1, ej0, ej1, eps_x);
     p_hess = ipc::edge_edge_mollifier_hessian(ei0, ei1, ej0, ej1, eps_x);
 
     ee_grad = ipc::edge_edge_distance_gradient(ei0, ei1, ej0, ej1, ee_type);
     ee_hess = ipc::edge_edge_distance_hessian(ei0, ei1, ej0, ej1, ee_type);
 
-    double B_ = barrier::barrier_derivative_d(dist);
-    double B__ = barrier::barrier_second_derivative(dist);
-    double B = barrier::barrier_function(dist);
+    scalar B_ = barrier::barrier_derivative_d(dist);
+    scalar B__ = barrier::barrier_second_derivative(dist);
+    scalar B = barrier::barrier_function(dist);
 
     mat12 ipc_hess;
     ipc_hess.setZero(12, 12);

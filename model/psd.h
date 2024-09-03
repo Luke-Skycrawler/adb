@@ -18,7 +18,7 @@ Eigen::Matrix<_Scalar, _Rows, _Cols> project_to_psd(
     if (eigensolver.eigenvalues()[0] >= 0.0) {
         return A;
     }
-    Eigen::DiagonalMatrix<double, Eigen::Dynamic> D(eigensolver.eigenvalues());
+    Eigen::DiagonalMatrix<scalar, Eigen::Dynamic> D(eigensolver.eigenvalues());
     // Save a little time and only project the negative values
     for (int i = 0; i < A.rows(); i++) {
         if (D.diagonal()[i] < 0.0) {

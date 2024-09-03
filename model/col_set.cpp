@@ -13,7 +13,7 @@ using namespace barrier;
 using namespace Eigen;
 using namespace std::chrono;
 using namespace utils;
-#define DURATION_TO_DOUBLE(X) duration_cast<duration<double>>((X)).count()
+#define DURATION_TO_DOUBLE(X) duration_cast<duration<scalar>>((X)).count()
 
 void gen_collision_set(
     bool vt2, int n_cubes,
@@ -31,10 +31,10 @@ void gen_collision_set(
     eidx.resize(0);
     vidx.resize(0);
 
-    // const auto blend_e = [=](const vec3& x, const vec3& y, double lam) -> vec3 {
+    // const auto blend_e = [=](const vec3& x, const vec3& y, scalar lam) -> vec3 {
     //     return y * lam + (1.0 - lam) * x;
     // };
-    // const auto blend_t = [=](const vec3& x, const vec3& y, const vec3& z, double lam0, double lam1) -> vec3 {
+    // const auto blend_t = [=](const vec3& x, const vec3& y, const vec3& z, scalar lam0, scalar lam1) -> vec3 {
     //     return z * lam1 + y * lam0 + x * (1 - lam0 - lam1);
     // };
 #pragma omp parallel for schedule(static)
@@ -51,7 +51,7 @@ void gen_collision_set(
         for (int i = 0; i < n_cubes; i++) {
             for (int v = 0; v < cubes[i]->n_vertices; v++) {
                 auto p = cubes[i]->v_transformed[v];
-                double d = vg_distance(p);
+                scalar d = vg_distance(p);
                 d = d * d;
                 if (d < barrier::d_hat * (globals.safe_factor * globals.safe_factor)) {
 #pragma omp critical
@@ -173,7 +173,7 @@ void gen_collision_set(
 
                     auto pt_type = ipc::point_triangle_distance_type(p, _f.t0, _f.t1, _f.t2);
 
-                    double d = ipc::point_triangle_distance(p, _f.t0, _f.t1, _f.t2, pt_type);
+                    scalar d = ipc::point_triangle_distance(p, _f.t0, _f.t1, _f.t2, pt_type);
                     if (d < barrier::d_hat * globals.safe_factor) {
                         array<vec3, 4> pt = { p, _f.t0, _f.t1, _f.t2 };
                         array<int, 4> ij = { i, v, j, f };
@@ -225,7 +225,7 @@ void gen_collision_set(
                         if (I > J) continue;
                         Edge _ei{ *cubes[I], ei };
 
-                        double d = ipc::edge_edge_distance(_ei.e0, _ei.e1, e.e0, e.e1);
+                        scalar d = ipc::edge_edge_distance(_ei.e0, _ei.e1, e.e0, e.e1);
                         if (d < barrier::d_hat * (globals.safe_factor * globals.safe_factor)) {
                             array<vec3, 4> ee = { _ei.e0, _ei.e1, e.e0, e.e1 };
                             array<int, 4> ij = { I, ei, J, ej };
@@ -285,7 +285,7 @@ void gen_collision_set(
                     if (I > J) continue;
                     Edge _ei{ *cubes[I], ei, vt2, vt2 };
                     auto ee_type = ipc::edge_edge_distance_type(_ei.e0, _ei.e1, e.e0, e.e1);
-                    double d = ipc::edge_edge_distance(_ei.e0, _ei.e1, e.e0, e.e1, ee_type);
+                    scalar d = ipc::edge_edge_distance(_ei.e0, _ei.e1, e.e0, e.e1, ee_type);
                     if (d < barrier::d_hat * (globals.safe_factor * globals.safe_factor)) {
                         array<vec3, 4> ee = { _ei.e0, _ei.e1, e.e0, e.e1 };
                         array<int, 4> ij = { I, ei, J, ej };
@@ -319,7 +319,7 @@ void gen_collision_set(
                         if ((iu.array() >= jl.array()).all() && (ju.array() >= il.array()).all()) {}
                         else
                             continue;
-                        double d = ipc::edge_edge_distance(ei.e0, ei.e1, ej.e0, ej.e1);
+                        scalar d = ipc::edge_edge_distance(ei.e0, ei.e1, ej.e0, ej.e1);
                         if (d < barrier::d_hat * globals.safe_factor) {
                             array<vec3, 4> ee = { ei.e0, ei.e1, ej.e0, ej.e1 };
                             array<int, 4> ij = { i, _ei, j, _ej };

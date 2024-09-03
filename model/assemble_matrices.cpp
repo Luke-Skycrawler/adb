@@ -8,8 +8,7 @@
 extern Globals globals;
 #endif
 
-using mat12 = Matrix<double, 12, 12>;
-void put(double* values, int offset, int _stride, const Matrix<double, 12, 12>& block)
+void put(scalar* values, int offset, int _stride, const Matrix<scalar, 12, 12>& block)
 {
     for (int j = 0; j < 12; j++)
         for (int i = 0; i < 12; i++) {
@@ -18,11 +17,11 @@ void put(double* values, int offset, int _stride, const Matrix<double, 12, 12>& 
         }
 }
 
-void put2(double* values, int offset, int _stride, mat3 block[4][4])
+void put2(scalar* values, int offset, int _stride, mat3 block[4][4])
 {
     for (int j = 0; j < 12; j++)
         for (int i = 0; i < 12; i++) {
-            double db = block[i / 3][j / 3](i % 3, j % 3);
+            scalar db = block[i / 3][j / 3](i % 3, j % 3);
             int ofs = offset + _stride * j + i;
             // #pragma omp atomic
             values[ofs] += db;
@@ -31,7 +30,7 @@ void put2(double* values, int offset, int _stride, mat3 block[4][4])
 
 void output_hessian_gradient(
     const std::map<std::array<int, 2>, int>& lut,
-    SparseMatrix<double>& sparse_hess,
+    SparseMatrix<scalar>& sparse_hess,
     int ii, int jj, bool ci_nonstatic, bool cj_nonstatic,
     vec12& grad_p, vec12& grad_t,
     const vec12& dgp, const vec12& dgt,
@@ -63,7 +62,7 @@ void output_hessian_gradient(
 }
 void output_hessian_gradient(
     const std::map<std::array<int, 2>, int>& lut,
-    SparseMatrix<double>& sparse_hess,
+    SparseMatrix<scalar>& sparse_hess,
     int ii, int jj, bool ci_nonstatic, bool cj_nonstatic,
     vec12& grad_p, vec12& grad_t,
     const vec12& dgp, const vec12& dgt,

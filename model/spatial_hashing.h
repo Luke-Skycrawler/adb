@@ -4,6 +4,7 @@
 #include <memory>
 #include <atomic>
 #include <unordered_set>
+#include "affine_body.h"
 #define SPATIAL_HASHING_H
 using mat3 = Eigen::Matrix3d;
 using vec3 = Eigen::Vector3d;
@@ -33,7 +34,7 @@ using vec3i = Eigen::Vector<int, 3>;
 using hi = unsigned;
 struct spatial_hashing {
     spatial_hashing(int vec3_compressed_bits, int n_buffer,
-        double MIN_XYZ, double MAX_XYZ, double dx, int set_size);
+        scalar MIN_XYZ, scalar MAX_XYZ, scalar dx, int set_size);
     ~spatial_hashing() {
         delete[] count;
         delete[] hashtable;
@@ -51,7 +52,7 @@ struct spatial_hashing {
 
     bool *bitmap_l1, *bitmap_l2;
 
-    const double MIN_XYZ, MAX_XYZ, dx;
+    const scalar MIN_XYZ, MAX_XYZ, dx;
 
     // using hi = unsigned long long;
     // hashing index type
@@ -63,10 +64,10 @@ struct spatial_hashing {
 
     void remove_all_entries();
     void register_edge(const vec3& a, const vec3& b, element_type body, element_type pid);
-    void query_edge(const vec3& a, const vec3& b, element_type group_exl, double dhat,
+    void query_edge(const vec3& a, const vec3& b, element_type group_exl, scalar dhat,
         std::vector<Primitive> &ret);
     void register_vertex(const vec3& a, element_type body, element_type pid);
-    void query_triangle(const vec3& a, const vec3& b, const vec3& c, element_type group_exl, double dhat,
+    void query_triangle(const vec3& a, const vec3& b, const vec3& c, element_type group_exl, scalar dhat,
         std::vector<Primitive> &ret);
     void register_edge_trajectory(
         const vec3& a0, const vec3& b0,

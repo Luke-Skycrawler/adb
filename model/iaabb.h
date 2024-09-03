@@ -24,7 +24,7 @@ struct Intersection {
 
 struct BoundingBox {
     int body;
-    double p;
+    scalar p;
     bool true_for_l_false_for_u;
 };
 
@@ -40,7 +40,7 @@ inline lu compute_aabb(const Edge& e)
 }
 
 
-inline lu compute_aabb(const Edge& e, double d_hat_sqrt)
+inline lu compute_aabb(const Edge& e, scalar d_hat_sqrt)
 {
     vec3 l, u;
     auto e0 {e.e0.array()}, e1 {e.e1.array()};
@@ -78,11 +78,11 @@ void intersect_sort(
     int vtn);
 #ifdef TESTING
 struct double_int{
-    double d;
+    scalar d;
     int i;
 };
 #endif
-double primitive_brute_force(
+scalar primitive_brute_force(
     int n_cubes,
     std::vector<Intersection>& overlaps, // assert sorted
     const std::vector<std::unique_ptr<AffineBody>>& cubes,
@@ -104,7 +104,7 @@ double primitive_brute_force(
     std::vector<std::array<int, 2>>& vidx
 );
 
-double iaabb_brute_force(
+scalar iaabb_brute_force(
     int n_cubes,
     const std::vector<std::unique_ptr<AffineBody>>& cubes,
     const std::vector<lu>& aabbs,

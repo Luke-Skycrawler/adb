@@ -61,10 +61,10 @@ Face::Face(const AffineBody& c, unsigned id, bool b, bool batch)
     }
 }
 
-double vg_distance(const vec3& vertex) // not squared
+scalar vg_distance(const vec3& vertex) // not squared
 {
     // ground plane y = -0.5
-    double d = vertex(1) + 0.5;
+    scalar d = vertex(1) + 0.5;
     return d;
 }
 vec3 vg_distance_gradient_x(const vec3& vertex)
@@ -73,30 +73,30 @@ vec3 vg_distance_gradient_x(const vec3& vertex)
     return vec3(0.0f, 1.0f, 0.0f);
 }
 
-inline double ab(const vec3& a, const vec3& b)
+inline scalar ab(const vec3& a, const vec3& b)
 {
     return (a - b).norm();
 }
-inline double ab_sqr(const vec3& v0, const vec3& v1) {
+inline scalar ab_sqr(const vec3& v0, const vec3& v1) {
     return (v0 - v1).dot(v0 - v1);
 }
 
-inline double h(const vec3 &a, const vec3 &b, const vec3 &c) {
+inline scalar h(const vec3 &a, const vec3 &b, const vec3 &c) {
     // height of triangle
     // ab as base
     return (b-a).cross(c-a).norm() / ab(a, b);
 }
 
-inline double area(const vec3 &a, const vec3 &b, const vec3 &c) {
+inline scalar area(const vec3 &a, const vec3 &b, const vec3 &c) {
     return (c -a).cross(b- a).norm();
 }
 inline bool is_obtuse_triangle(const vec3 &a, const vec3 &b, const vec3 &c) {
     // determines if projection of c is in the span of ab
     return abs(ab_sqr(c,a) - ab_sqr(c, b)) > ab_sqr(a, b);
 }
-inline double ev_distance(const Edge& e, const vec3& v)
+inline scalar ev_distance(const Edge& e, const vec3& v)
 {
-    double d = h(e.e0, e.e1, v);
+    scalar d = h(e.e0, e.e1, v);
     bool s = is_obtuse_triangle(e.e0, e.e1, v);
     if (s) {
         d = min(ab(v, e.e0), ab(v, e.e1));
@@ -105,45 +105,45 @@ inline double ev_distance(const Edge& e, const vec3& v)
 }
 using namespace ipc;
 
-tuple<double, PointTriangleDistanceType> vf_distance(const vec3& v, const Face& f) {
+tuple<scalar, PointTriangleDistanceType> vf_distance(const vec3& v, const Face& f) {
 
 #define STEAL_IPC
 #ifndef STEAL_IPC
     PointTriangleDistanceType pt_type;
-    double d = vf_distance(v, f, pt_type);
+    scalar d = vf_distance(v, f, pt_type);
 #else
     auto pt_type = ipc::point_triangle_distance_type(v, f.t0, f.t1, f.t2);
-    double d = ipc::point_triangle_distance(v, f.t0, f.t1, f.t2, pt_type);
+    scalar d = ipc::point_triangle_distance(v, f.t0, f.t1, f.t2, pt_type);
 #endif
     return {d, pt_type};
 }
 
-double vf_distance(const vec3& _v, const Face& f, PointTriangleDistanceType &pt_type)
+scalar vf_distance(const vec3& _v, const Face& f, PointTriangleDistanceType &pt_type)
 {
     auto n = f.unit_normal();
-    double d = n.dot(_v - f.t0);
-    double a1 = area(f.t1, f.t0, f.t2);
+    scalar d = n.dot(_v - f.t0);
+    scalar a1 = area(f.t1, f.t0, f.t2);
     vec3 v = _v - d * n;
     d = d * d;
-    // double a2 = ((f.t0 - v).cross(f.t1 - v).norm() + (f.t1 - v).cross(f.t2 - v).norm() + (f.t2 - v).cross(f.t0 - v).norm());
-    double a2 = area(f.t0, f.t1, v) + area(f.t1, f.t2, v) + area(f.t2, f.t0, v);
+    // scalar a2 = ((f.t0 - v).cross(f.t1 - v).norm() + (f.t1 - v).cross(f.t2 - v).norm() + (f.t2 - v).cross(f.t0 - v).norm());
+    scalar a2 = area(f.t0, f.t1, v) + area(f.t1, f.t2, v) + area(f.t2, f.t0, v);
     if (a2 > a1 + 1e-8) {
         // projection outside of triangle
 
-        double d_ab = h(f.t0, f.t1, v);
-        double d_bc = h(f.t1, f.t2, v);
-        double d_ac = h(f.t0, f.t2, v);
+        scalar d_ab = h(f.t0, f.t1, v);
+        scalar d_bc = h(f.t1, f.t2, v);
+        scalar d_ac = h(f.t0, f.t2, v);
 
-        double d_a = ab(v, f.t0);
-        double d_b = ab(v, f.t1);
-        double d_c = ab(v, f.t2);
+        scalar d_a = ab(v, f.t0);
+        scalar d_b = ab(v, f.t1);
+        scalar d_c = ab(v, f.t2);
 
 
-        double dab = is_obtuse_triangle(f.t0, f.t1, v) ? min(d_a, d_b): d_ab;
-        double dbc = is_obtuse_triangle(f.t2, f.t1, v) ? min(d_c, d_b): d_bc;
-        double dac = is_obtuse_triangle(f.t0, f.t2, v) ? min(d_a, d_c): d_ac;
+        scalar dab = is_obtuse_triangle(f.t0, f.t1, v) ? min(d_a, d_b): d_ab;
+        scalar dbc = is_obtuse_triangle(f.t2, f.t1, v) ? min(d_c, d_b): d_bc;
+        scalar dac = is_obtuse_triangle(f.t0, f.t2, v) ? min(d_a, d_c): d_ac;
 
-        double d_projected = std::min({dab, dbc, dac});
+        scalar d_projected = std::min({dab, dbc, dac});
         d += d_projected * d_projected;
 
         if (d_projected == d_ab) pt_type = PointTriangleDistanceType::P_E0;
@@ -158,33 +158,33 @@ double vf_distance(const vec3& _v, const Face& f, PointTriangleDistanceType &pt_
 }
 
 bool inside(const Face &f, const vec3 &v){
-    double a1 = area(f.t1, f.t0, f.t2);
-    double a2 = area(f.t0, f.t1, v) + area(f.t1, f.t2, v) + area(f.t2, f.t0, v);
+    scalar a1 = area(f.t1, f.t0, f.t2);
+    scalar a2 = area(f.t0, f.t1, v) + area(f.t1, f.t2, v) + area(f.t2, f.t0, v);
     return a2 <= a1 + 1e-8;
 }
 
 // PointTriangleDistanceType pt_distance_type(const vec3& _v, const Face& f)
 // {
 //     auto n = f.unit_normal();
-//     double d = n.dot(_v - f.t0);
+//     scalar d = n.dot(_v - f.t0);
 
 //     vec3 v = _v - d * n;
 
 //     if (inside(f, v)) return PointTriangleDistanceType::P_T;
 
-//     double d_ab = h(f.t0, f.t1, v);
-//     double d_bc = h(f.t1, f.t2, v);
-//     double d_ac = h(f.t0, f.t2, v);
+//     scalar d_ab = h(f.t0, f.t1, v);
+//     scalar d_bc = h(f.t1, f.t2, v);
+//     scalar d_ac = h(f.t0, f.t2, v);
 
-//     double d_a = ab(v, f.t0);
-//     double d_b = ab(v, f.t1);
-//     double d_c = ab(v, f.t2);
+//     scalar d_a = ab(v, f.t0);
+//     scalar d_b = ab(v, f.t1);
+//     scalar d_c = ab(v, f.t2);
 
-//     double _d_ab = is_obtuse_triangle(f.t0, f.t1, v) ? min(d_a, d_b) : d_ab;
-//     double _d_bc = is_obtuse_triangle(f.t2, f.t1, v) ? min(d_c, d_b) : d_bc;
-//     double _d_ac = is_obtuse_triangle(f.t0, f.t2, v) ? min(d_a, d_c) : d_ac;
+//     scalar _d_ab = is_obtuse_triangle(f.t0, f.t1, v) ? min(d_a, d_b) : d_ab;
+//     scalar _d_bc = is_obtuse_triangle(f.t2, f.t1, v) ? min(d_c, d_b) : d_bc;
+//     scalar _d_ac = is_obtuse_triangle(f.t0, f.t2, v) ? min(d_a, d_c) : d_ac;
 
-//     double d_projected = min(_d_ab, min(_d_bc, _d_ac));
+//     scalar d_projected = min(_d_ab, min(_d_bc, _d_ac));
 //     if (d_projected == d_ab) return PointTriangleDistanceType::P_E0;
 //     if (d_projected == d_bc) return PointTriangleDistanceType::P_E1;
 //     if (d_projected == d_ac) return PointTriangleDistanceType::P_E2;
@@ -193,9 +193,9 @@ bool inside(const Face &f, const vec3 &v){
 //     return PointTriangleDistanceType::P_T2;
 // }
 
-double ee_distance(const Edge& ei, const Edge& ej)
+scalar ee_distance(const Edge& ei, const Edge& ej)
 {
-    double d = 0.0;
+    scalar d = 0.0;
     auto ei0 = ei.e0, ei1 = ei.e1, ej0 = ej.e0, ej1 = ej.e1;
     auto n = (ei1 - ei0).cross(ej1 - ej0);
 
@@ -230,7 +230,7 @@ double ee_distance(const Edge& ei, const Edge& ej)
     if (s0 && s1) {
         return d;
     }
-    double _d;
+    scalar _d;
     if (s0 || s1) {
         if (s0) {
             bool s = h(ej0, ej1, ei0) > h(ej0, ej1, ei1);
@@ -252,7 +252,7 @@ double ee_distance(const Edge& ei, const Edge& ej)
     return d;
 }
 
-mat3 rotation(double a, double b, double c)
+mat3 rotation(scalar a, scalar b, scalar c)
 {
     auto s1 = sin(a);
     auto s2 = sin(b);

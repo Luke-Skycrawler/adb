@@ -15,8 +15,8 @@
 
 #ifdef _FRICTION_
 void friction(
-    const Eigen::Vector2d& _uk, double contact_lambda, const Eigen::Matrix<double, 12, 2>& Tk,
-    Eigen::Vector<double, 12>& g, Eigen::Matrix<double, 12, 12>& H);
+    const Eigen::Vector2d& _uk, scalar contact_lambda, const Eigen::Matrix<scalar, 12, 2>& Tk,
+    Eigen::Vector<scalar, 12>& g, Eigen::Matrix<scalar, 12, 12>& H);
 #endif
 #ifdef _PLUG_IN_LAN_
 #include "IpcFrictionConstraint.h"
@@ -33,19 +33,19 @@ void friction(
 // q: affine matrix
 #ifdef _TIGHT_INCLUSION_ENABLE_
 
-double vf_collision_detect(vec3& p_t0, vec3& p_t1, const AffineBody& cube, int id);
-double vf_collision_detect(vec3& p_t0, vec3& p_t1, const Face &f_t0, const Face &f_t1);
-double ee_collision_detect(const Edge& ei_t0, const Edge& ej_t0, const Edge& ei_t1, const Edge& ej_t1);
-double ee_collision_detect(const AffineBody& ci, const AffineBody& cj, int eid_i, int eid_j);
+scalar vf_collision_detect(vec3& p_t0, vec3& p_t1, const AffineBody& cube, int id);
+scalar vf_collision_detect(vec3& p_t0, vec3& p_t1, const Face &f_t0, const Face &f_t1);
+scalar ee_collision_detect(const Edge& ei_t0, const Edge& ej_t0, const Edge& ei_t1, const Edge& ej_t1);
+scalar ee_collision_detect(const AffineBody& ci, const AffineBody& cj, int eid_i, int eid_j);
 #endif
-double D_f0(double uk, double lam);
-double collision_time(AffineBody& c, int i);
-double pt_collision_time(
+scalar D_f0(scalar uk, scalar lam);
+scalar collision_time(AffineBody& c, int i);
+scalar pt_collision_time(
     const vec3& p0,
     const Face& t0,
     const vec3& p1,
     const Face& t1);
-double ee_collision_time(
+scalar ee_collision_time(
     const Edge& ei0,
     const Edge& ej0,
     const Edge& ei1,
@@ -57,14 +57,14 @@ Eigen::Vector4d det_polynomial(const mat3& a, const mat3& b);
 void ipc_term_vg(AffineBody& c, int v
 #ifdef _FRICTION_
     ,
-    const Eigen::Vector2d& _uk, double contact_lambda, const Eigen::Matrix<double, 3, 2>& Tk
+    const Eigen::Vector2d& _uk, scalar contact_lambda, const Eigen::Matrix<scalar, 3, 2>& Tk
 #endif
 );
 
 // void output_hessian_gradient(
 // #ifdef _SM_OUT_
 //     const std::map<std::array<int, 2>, int>& lut,
-//     SparseMatrix<double>& sparse_hess,
+//     SparseMatrix<scalar>& sparse_hess,
 // #endif
 // #ifdef _TRIPLETS_
 //     vector<HessBlock>& triplets,
@@ -77,10 +77,10 @@ void ipc_term_vg(AffineBody& c, int v
 //     const mat12& hess_p, const mat12& hess_t, const mat12& off_diag, const mat12& off_T);
 
 void ipc_term(
-    std::array<vec3, 4> pt, std::array<int, 4> ij, ipc::PointTriangleDistanceType pt_type, double dist, 
+    std::array<vec3, 4> pt, std::array<int, 4> ij, ipc::PointTriangleDistanceType pt_type, scalar dist, 
 #ifdef _SM_OUT_
     const std::map<std::array<int, 2>, int>& lut,
-    Eigen::SparseMatrix<double>& sparse_hess,
+    Eigen::SparseMatrix<scalar>& sparse_hess,
 #endif
 #ifdef _TRIPLETS_
     std::vector<HessBlock>& triplets,
@@ -91,15 +91,15 @@ void ipc_term(
     vec12& grad_p, vec12& grad_t
 
 #ifdef _FRICTION_
-    , double &contact_lambda, Eigen::Matrix<double, 2, 12>& Tk
+    , scalar &contact_lambda, Eigen::Matrix<scalar, 2, 12>& Tk
 #endif
 );
 void ipc_term_ee(
-    std::array<vec3, 4> ee, std::array<int, 4> ij, ipc::EdgeEdgeDistanceType ee_type, double dist, 
+    std::array<vec3, 4> ee, std::array<int, 4> ij, ipc::EdgeEdgeDistanceType ee_type, scalar dist, 
 
 #ifdef _SM_OUT_
     const std::map<std::array<int, 2>, int>& lut,
-    Eigen::SparseMatrix<double>& sparse_hess,
+    Eigen::SparseMatrix<scalar>& sparse_hess,
 #endif
 #ifdef _TRIPLETS_
     std::vector<HessBlock>& triplets,
@@ -111,13 +111,13 @@ void ipc_term_ee(
 
 #ifdef _FRICTION_
     ,
-    double& contact_lambda, Eigen::Matrix<double, 2, 12>& Tk
+    scalar& contact_lambda, Eigen::Matrix<scalar, 2, 12>& Tk
 #endif
 );
 
 void output_hessian_gradient(
     const std::map<std::array<int, 2>, int>& lut,
-    Eigen::SparseMatrix<double>& sparse_hess,
+    Eigen::SparseMatrix<scalar>& sparse_hess,
     int ii, int jj, bool ci_nonstatic, bool cj_nonstatic,
     vec12& grad_p, vec12& grad_t,
     const vec12& dgp, const vec12& dgt,

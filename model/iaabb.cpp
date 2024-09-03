@@ -27,7 +27,7 @@ using namespace Eigen;
 using namespace utils;
 using namespace std::chrono;
 using lu = std::array<vec3, 2>;
-#define DURATION_TO_DOUBLE(X) duration_cast<duration<double>>(high_resolution_clock::now() - (X)).count()
+#define DURATION_TO_DOUBLE(X) duration_cast<duration<scalar>>(high_resolution_clock::now() - (X)).count()
 inline bool les(const Intersection& a, const Intersection& b){
     return a.i < b.i || (a.i == b.i && a.j < b.j);
 };
@@ -78,7 +78,7 @@ inline lu compute_aabb(const Face& f1, const Face& f2)
 }
 lu affine(const lu& aabb, q4& q)
 {
-    Matrix<double, 3, 8> cull, _cull;
+    Matrix<scalar, 3, 8> cull, _cull;
     vec3 l{ aabb[0] }, u{ aabb[1] };
     for (int i = 0; i < 2; i++)
         for (int j = 0; j < 2; j++)
@@ -289,7 +289,7 @@ inline void ee_col_set_task(
     bool ee_intersects = intersects(aabb_i, aabb_j);
     if (!ee_intersects) return;
     auto ee_type = ipc::edge_edge_distance_type(eii.e0, eii.e1, ejj.e0, ejj.e1);
-    double d = ipc::edge_edge_distance(eii.e0, eii.e1, ejj.e0, ejj.e1, ee_type);
+    scalar d = ipc::edge_edge_distance(eii.e0, eii.e1, ejj.e0, ejj.e1, ee_type);
     if (d < barrier::d_hat) {
         array<vec3, 4> ee = { eii.e0, eii.e1, ejj.e0, ejj.e1 };
         array<int, 4> ij = { I, ei, J, ej };
@@ -301,7 +301,7 @@ inline void ee_col_set_task(
     }
 };
 
-double primitive_brute_force(
+scalar primitive_brute_force(
     int n_cubes,
     std::vector<Intersection>& overlaps, // assert sorted
     const std::vector<std::unique_ptr<AffineBody>>& cubes,
@@ -319,7 +319,7 @@ double primitive_brute_force(
     vector<array<int, 2>>& vidx)
 {
 
-    double toi_global = 1.0, toi_ee_pt = 1.0;
+    scalar toi_global = 1.0, toi_ee_pt = 1.0;
     bool cull_trajectory = vtn == 3;
     int n_overlap = overlaps.size();
     if (!cull_trajectory) {
@@ -377,7 +377,7 @@ double primitive_brute_force(
     if (globals.ground)
     // #pragma omp parallel
     {
-        double toi_thread_local = 1.0;
+        scalar toi_thread_local = 1.0;
         auto tid = omp_get_thread_num();
         vidx_thread_local[tid].resize(0);
 // #pragma omp for schedule(static)
@@ -387,14 +387,14 @@ double primitive_brute_force(
                 auto& p{ c.v_transformed[v] };
                 // handling vertex-ground collision
                 if (!cull_trajectory) {
-                    double d = vg_distance(p);
+                    scalar d = vg_distance(p);
                     d = d * d;
                     if (d < barrier::d_hat) {
                         vidx_thread_local[tid].push_back({ I, v });
                     }
                 }
                 else {
-                    double t = collision_time(c, v);
+                    scalar t = collision_time(c, v);
                     toi_thread_local = min(toi_thread_local, t);
                 }
             }
@@ -699,7 +699,7 @@ double primitive_brute_force(
                 auto &eii{ eis[i] }, &ejj{ ejs[j] };
                 int ei = eilist[i], ej = ejlist[j];
                 auto ee_type = ipc::edge_edge_distance_type(eii.e0, eii.e1, ejj.e0, ejj.e1);
-                double d = ipc::edge_edge_distance(eii.e0, eii.e1, ejj.e0, ejj.e1, ee_type);
+                scalar d = ipc::edge_edge_distance(eii.e0, eii.e1, ejj.e0, ejj.e1, ee_type);
                 if (d < barrier::d_hat) {
                     array<vec3, 4> ee = { eii.e0, eii.e1, ejj.e0, ejj.e1 };
                     array<int, 4> ij = { I, ei, J, ej };
@@ -712,10 +712,10 @@ double primitive_brute_force(
     };
     const auto vf_col_time = [&](vector<int>& vilist, vector<int>& fjlist,
                                  const std::vector<std::unique_ptr<AffineBody>>& cubes,
-                                 int I, int J) -> double {
+                                 int I, int J) -> scalar {
         auto &ci{ *cubes[I] }, &cj{ *cubes[J] };
         int offi{ vertex_starting_index[I] }, offj{ vertex_starting_index[J] };
-        double toi = 1.0;
+        scalar toi = 1.0;
 
         vector<lu> viaabbs, fjaabbs;
         vector<vec3> v0s, v1s;
@@ -746,7 +746,7 @@ double primitive_brute_force(
                 auto &v0{ v0s[i] }, &v{ v1s[i] };
                 auto &f0{ f0s[j] }, &f{ f1s[j] };
                 if (intersects(viaabbs[i], fjaabbs[j])) {
-                    double t = pt_collision_time(v0, f0, v, f);
+                    scalar t = pt_collision_time(v0, f0, v, f);
 #ifdef TESTING
                     if (t < 1.0) {
                         idx.push_back({ I, vi, J, fj });
@@ -761,11 +761,11 @@ double primitive_brute_force(
 
     const auto ee_col_time = [&](vector<int>& eilist, vector<int>& ejlist,
                                  const std::vector<std::unique_ptr<AffineBody>>& cubes,
-                                 int I, int J) -> double {
+                                 int I, int J) -> scalar {
         auto &ci{ *cubes[I] }, &cj{ *cubes[J] };
         int offi{ vertex_starting_index[I] }, offj{ vertex_starting_index[J] };
 
-        double toi = 1.0;
+        scalar toi = 1.0;
         vector<lu> eiaabbs, ejaabbs;
         vector<Edge> ei0s, ej0s, ei1s, ej1s;
         for (auto& ei : eilist) {
@@ -793,7 +793,7 @@ double primitive_brute_force(
                 if (intersects(eiaabbs[i], ejaabbs[j])) {
                     auto &ei0{ ei0s[i] }, &ei1{ ei1s[i] }, &ej0{ ej0s[j] }, &ej1{ ej1s[j] };
                     int ei = eilist[i], ej = ejlist[j];
-                    double t = ee_collision_time(ei0, ej0, ei1, ej1);
+                    scalar t = ee_collision_time(ei0, ej0, ei1, ej1);
 #ifdef TESTING
                     if (t < 1.0) {
                         if (I < J)
@@ -809,7 +809,7 @@ double primitive_brute_force(
         return toi;
     };
 
-    double ee_global = 1.0, pt_global = 1.0;
+    scalar ee_global = 1.0, pt_global = 1.0;
     static vector<array<int, 4>>*idx_private = new vector<array<int, 4>>[omp_get_max_threads()],
                              *eidx_private = new vector<array<int, 4>>[omp_get_max_threads()];
     static vector<array<vec3, 4>>*pts_private = new vector<array<vec3, 4>>[omp_get_max_threads()], *ees_private = new vector<array<vec3, 4>>[omp_get_max_threads()];
@@ -997,7 +997,7 @@ double primitive_brute_force(
     else
 #pragma omp parallel
     {
-        double toi = 1.0;
+        scalar toi = 1.0;
 #pragma omp for schedule(guided) nowait
         for (int _i = 0; _i < n_overlap / 2; _i++) {
             int i = _i * 2;
@@ -1009,9 +1009,9 @@ double primitive_brute_force(
             auto& ejlist{ p.ej };
             auto& filist{ p.fi };
             auto& fjlist{ p.fj };
-            double t1 = vf_col_time(vilist, fjlist, cubes, I, J);
-            double t2 = vf_col_time(vjlist, filist, cubes, J, I);
-            double t3 = ee_col_time(eilist, ejlist, cubes, I, J);
+            scalar t1 = vf_col_time(vilist, fjlist, cubes, I, J);
+            scalar t2 = vf_col_time(vjlist, filist, cubes, J, I);
+            scalar t3 = ee_col_time(eilist, ejlist, cubes, I, J);
 
             toi = min(toi, min({t1, t2, t3}));
         }
@@ -1036,7 +1036,7 @@ double primitive_brute_force(
     return cull_trajectory? toi_global: 1.0;
 }
 
-double iaabb_brute_force(
+scalar iaabb_brute_force(
     int n_cubes,
     const std::vector<std::unique_ptr<AffineBody>>& cubes,
     const std::vector<lu>& aabbs,
@@ -1056,7 +1056,7 @@ double iaabb_brute_force(
     auto start = high_resolution_clock::now();
     vector<Intersection> ret;
     intersect_sort(n_cubes, cubes, aabbs, ret, vtn);
-    double toi = primitive_brute_force(n_cubes, ret, cubes, vtn,
+    scalar toi = primitive_brute_force(n_cubes, ret, cubes, vtn,
 #ifdef TESTING
         pt_tois, ee_tois,
 #ifndef _BODY_WISE_

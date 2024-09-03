@@ -13,7 +13,7 @@ namespace spatial_hashing {
 static unordered_map<hi, unique_ptr<BodyGroup>> pt_table;
 static unordered_map<hi, unique_ptr<BodyGroup>> ee_table;
 
-static const double MIN_XYZ = -10.0f, MAX_XYZ = 10.0f, dx = 0.5;
+static const scalar MIN_XYZ = -10.0f, MAX_XYZ = 10.0f, dx = 0.5;
 
 hi hash(const vec3i& grid_index)
 {
@@ -98,7 +98,7 @@ void register_edge(const vec3& a, const vec3& b, unsigned body, unsigned pid)
     register_interval(l, u, { pid, body }, ee_table);
 }
 
-vector<Primitive> query_edge(const vec3& a, const vec3& b, int group_exl, double dhat)
+vector<Primitive> query_edge(const vec3& a, const vec3& b, int group_exl, scalar dhat)
 {
     vec3 _u = a.cwiseMax(b).array() + dhat;
     vec3 _l = a.cwiseMin(b).array() - dhat;
@@ -113,7 +113,7 @@ void register_vertex(const vec3& a, unsigned body, unsigned pid)
     register_interval(ia, ia, { pid, body }, pt_table);
 }
 
-vector<Primitive> query_triangle(const vec3& a, const vec3& b, const vec3& c, int group_exl, double dhat)
+vector<Primitive> query_triangle(const vec3& a, const vec3& b, const vec3& c, int group_exl, scalar dhat)
 {
     vec3 _u = a.cwiseMax(b).cwiseMax(c).array() + dhat;
     vec3 _l = a.cwiseMin(b).cwiseMin(c).array() - dhat;

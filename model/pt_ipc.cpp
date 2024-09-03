@@ -16,19 +16,19 @@ extern Globals globals;
 #include "time_integrator.h"
 using namespace utils;
 tuple<mat12, vec12> ipc_hess_pt_12x12(
-    array<vec3, 4> pt, array<int, 4> ij, ipc::PointTriangleDistanceType pt_type, double dist);
+    array<vec3, 4> pt, array<int, 4> ij, ipc::PointTriangleDistanceType pt_type, scalar dist);
 
-double pt_uktk(
+scalar pt_uktk(
     AffineBody& ci, AffineBody& cj,
     array<vec3, 4>& pt, array<int, 4>& ij, const ::ipc::PointTriangleDistanceType& pt_type,
-    Matrix<double, 2, 12>& Tk_T_ret, Vector2d& uk_ret, double d, double dt)
+    Matrix<scalar, 2, 12>& Tk_T_ret, Vector2d& uk_ret, scalar d, scalar dt)
 
 {
 
-    Vector<double, 12> v_stack = pt_vstack(ci, cj, ij[1], ij[3]);
+    Vector<scalar, 12> v_stack = pt_vstack(ci, cj, ij[1], ij[3]);
 
     auto lams = ::ipc::point_triangle_closest_point(pt[0], pt[1], pt[2], pt[3]);
-    array<double, 3> tlams = { 1 - lams(0) - lams(1), lams(0), lams(1) };
+    array<scalar, 3> tlams = { 1 - lams(0) - lams(1), lams(0), lams(1) };
     auto Pk = ::ipc::point_triangle_tangent_basis(pt[0], pt[1], pt[2], pt[3]);
 
     if (pt_type == ::ipc::PointTriangleDistanceType::P_T)
@@ -90,7 +90,7 @@ double pt_uktk(
         std::cerr << "type" << to_int(pt_type) << std::endl;
         // exit(1);
     }
-    Matrix<double, 3, 12> gamma;
+    Matrix<scalar, 3, 12> gamma;
     gamma.setZero(3, 12);
     for (int i = 0; i < 3; i++) {
         gamma(i, i) = -1.0;
@@ -100,24 +100,24 @@ double pt_uktk(
 
     Tk_T_ret = Pk.transpose() * gamma;
     uk_ret = Tk_T_ret * v_stack;
-    double contact_force = -barrier::barrier_derivative_d(d) * 2 * sqrt(d);
+    scalar contact_force = -barrier::barrier_derivative_d(d) * 2 * sqrt(d);
     return contact_force;
 }
 
 
-tuple<double, Vector2d, Matrix<double, 2, 12>> pt_uktk(AffineBody& ci, AffineBody& cj, array<vec3, 4>& pt, array<int, 4>& ij, const ::ipc::PointTriangleDistanceType& pt_type, double d, double dt)
+tuple<scalar, Vector2d, Matrix<scalar, 2, 12>> pt_uktk(AffineBody& ci, AffineBody& cj, array<vec3, 4>& pt, array<int, 4>& ij, const ::ipc::PointTriangleDistanceType& pt_type, scalar d, scalar dt)
 {
     Vector2d uk;
-    Matrix<double, 2, 12> Tk;
-    double lam = pt_uktk(ci, cj, pt, ij, pt_type, Tk, uk, d, dt);
+    Matrix<scalar, 2, 12> Tk;
+    scalar lam = pt_uktk(ci, cj, pt, ij, pt_type, Tk, uk, d, dt);
     return { lam, uk, Tk };
 }
 
 void ipc_term(
-    array<vec3, 4> pt, array<int, 4> ij, ipc::PointTriangleDistanceType pt_type, double dist,
+    array<vec3, 4> pt, array<int, 4> ij, ipc::PointTriangleDistanceType pt_type, scalar dist,
 #ifdef _SM_OUT_
     const std::map<std::array<int, 2>, int>& lut,
-    SparseMatrix<double>& sparse_hess,
+    SparseMatrix<scalar>& sparse_hess,
 #endif
 #ifdef _TRIPLETS_
 
@@ -126,10 +126,10 @@ void ipc_term(
 #ifdef _DIRECT_OUT_
     mat12& hess_p_ret, mat12& hess_t_ret, mat12& off_diag_ret,
 #endif
-    Vector<double, 12>& grad_p, Vector<double, 12>& grad_t
+    Vector<scalar, 12>& grad_p, Vector<scalar, 12>& grad_t
 #ifdef _FRICTION_
     ,
-    double& contact_lambda, Matrix<double, 2, 12>& Tk
+    scalar& contact_lambda, Matrix<scalar, 2, 12>& Tk
 #endif
 )
 {
@@ -153,8 +153,8 @@ void ipc_term(
 #define _NO_FANCY_
 #ifdef _NO_FANCY_
 
-    Matrix<double, 9, 12> Jt;
-    Matrix<double, 3, 12> Jp;
+    Matrix<scalar, 9, 12> Jt;
+    Matrix<scalar, 3, 12> Jp;
     Jt.setZero(9, 12);
     Jp.setZero(3, 12);
     Jt.block<3, 12>(0, 0) = barrier::x_jacobian_q(t0_tile);
@@ -178,7 +178,7 @@ void ipc_term(
     ker1 << 1.0, t1_tile;
     Vector4d ker2;
     ker2 << 1.0, t2_tile;
-    Matrix<double, 4, 3> kert;
+    Matrix<scalar, 4, 3> kert;
     kert << ker0, ker1, ker2;
 
     Matrix4d blkp = kerp * kerp.transpose();
@@ -208,7 +208,7 @@ void ipc_term(
         }
     mat12 off_T = off_diag.transpose();
 
-    Vector<double, 12> dgp, dgt;
+    Vector<scalar, 12> dgp, dgt;
     vec3 seg = pt_grad.segment<3>(0);
     vec3 _0 = pt_grad.segment<3>(3), _1 = pt_grad.segment<3>(6), _2 = pt_grad.segment<3>(9);
     dgp << seg, seg * p_tile(0), seg * p_tile(1), seg * p_tile(2);

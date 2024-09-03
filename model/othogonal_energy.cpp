@@ -5,10 +5,10 @@ using namespace othogonal_energy;
 #define TEST_PYTHON
 namespace othogonal_energy {
 
-    static const double kappa = 1e9;
+    static const scalar kappa = 1e9;
 
 #ifdef TEST_PYTHON
-    inline double kronecker(int i, int j)
+    inline scalar kronecker(int i, int j)
     {
         return i == j ? 1.0 : 0.0;
     }
@@ -29,7 +29,7 @@ namespace othogonal_energy {
 
     //MatrixXd hessian(vec3 q[])
     //{
-    //    Matrix<double, 12, 12> H;
+    //    Matrix<scalar, 12, 12> H;
     //    H.setZero(12, 12);
     //    for (int i = 1; i < 4; i++) {
     //        auto qi = q[i];
@@ -64,16 +64,16 @@ namespace othogonal_energy {
         return H;
     }
 
-    double otho_energy(const VectorXd& x)
+    scalar otho_energy(const VectorXd& x)
     {
-        double E = 0;
+        scalar E = 0;
         vec3 q[4];
         for (int i = 1; i < 4; i++) {
             q[i] = x.segment<3>(i * 3);
         }
         for (int i = 1; i < 4; i++)
             for (int j = 1; j < 4; j++) {
-                double e = pow(q[i].dot(q[j]) - 1.0 * (i == j), 2);
+                scalar e = pow(q[i].dot(q[j]) - 1.0 * (i == j), 2);
                 E += e;
             }
         return E * kappa;
@@ -121,7 +121,7 @@ namespace othogonal_energy {
     }
 
 
-    /*double otho_energy(const mat3 &q) {
+    /*scalar otho_energy(const mat3 &q) {
         mat3 qqtmi = q.transpose() * q - Matrix3d::Identity(3,3);
         return qqtmi.squaredNorm() * kappa;
     }*/

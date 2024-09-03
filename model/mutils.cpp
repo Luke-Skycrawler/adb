@@ -50,7 +50,7 @@ vec12 cat(const q4& q)
     return ret;
 }
 
-vec12 grad_residue_per_body(AffineBody& c, double dt)
+vec12 grad_residue_per_body(AffineBody& c, scalar dt)
 {
     if (c.mass < 0.0) 
     return vec12::Zero(12);
@@ -64,7 +64,7 @@ vec12 grad_residue_per_body(AffineBody& c, double dt)
     return dt * dt * grad + M(cat(c.q) - c.q_tile(dt, globals.gravity));
 }
 
-mat12 hess_inertia_per_body(AffineBody& c, double dt)
+mat12 hess_inertia_per_body(AffineBody& c, scalar dt)
 {
     mat12 H;
     H.setZero(12, 12);
@@ -75,7 +75,7 @@ mat12 hess_inertia_per_body(AffineBody& c, double dt)
     return H + hess_otho * dt * dt;
 }
 
-double norm_M(const vec12& x, const AffineBody& c)
+scalar norm_M(const vec12& x, const AffineBody& c)
 {
     // assert shape of x
     auto p = x.head(3);
@@ -83,9 +83,9 @@ double norm_M(const vec12& x, const AffineBody& c)
     return p.dot(p) * c.mass + q.dot(q) * c.Ic;
 }
 
-double norm_1(VectorXd& dq, int n_cubes)
+scalar norm_1(VectorXd& dq, int n_cubes)
 {
-    double norm = 0.0;
+    scalar norm = 0.0;
     for (int i = 0; i < n_cubes; i++) {
         auto dqs = dq.segment<12>(i * 12);
         norm = max(norm, dqs.array().abs().sum());
@@ -93,7 +93,7 @@ double norm_1(VectorXd& dq, int n_cubes)
     return norm;
 }
 
-void damping_dense(MatrixXd& big_hess, double dt, int n_cubes)
+void damping_dense(MatrixXd& big_hess, scalar dt, int n_cubes)
 {
     MatrixXd D = globals.beta * big_hess;
     for (int i = 0; i < n_cubes; i++) {
@@ -103,18 +103,18 @@ void damping_dense(MatrixXd& big_hess, double dt, int n_cubes)
     big_hess += D / dt;
 }
 
-void damping_sparse(SparseMatrix<double>& sparse_hess, double dt, int n_cubes)
+void damping_sparse(SparseMatrix<scalar>& sparse_hess, scalar dt, int n_cubes)
 {
-    SparseMatrix<double>& D = sparse_hess;
+    SparseMatrix<scalar>& D = sparse_hess;
     sparse_hess *= (1 + globals.beta);
-    double dab = globals.alpha - globals.beta;
+    scalar dab = globals.alpha - globals.beta;
     for (int i = 0; i < n_cubes; i++) {
         for (int j = 0; j < 3; j++) { D.coeffRef(i * 12 + j, i * 12 + j) += globals.cubes[i]->mass * dab; }
         for (int j = 3; j < 12; j++) { D.coeffRef(i * 12 + j, i * 12 + j) += globals.cubes[i]->Ic * dab; }
     }
 }
 
-void build_from_triplets(SparseMatrix<double>& sparse_hess_trip, MatrixXd& big_hess, int hess_dim, int n_cubes)
+void build_from_triplets(SparseMatrix<scalar>& sparse_hess_trip, MatrixXd& big_hess, int hess_dim, int n_cubes)
 {
 
     vector<int> starting_point;
@@ -141,15 +141,15 @@ void build_from_triplets(SparseMatrix<double>& sparse_hess_trip, MatrixXd& big_h
         starting_point[0] = 0;
     };
 
-    // vector<Triplet<double>> bht;
+    // vector<Triplet<scalar>> bht;
 
-    // static const auto insert = [&](vector<Triplet<double>>& bht, const Matrix<double, 12, 12>& m, int r, int c) {
+    // static const auto insert = [&](vector<Triplet<scalar>>& bht, const Matrix<scalar, 12, 12>& m, int r, int c) {
     //     for (int i = 0; i < 12; i++)
     //         for (int j = 0; j < 12; j++) {
     //             bht.push_back({ r + i, c + j, m(i, j) });
     //         }
     // };
-    static const auto insert2 = [&](SparseMatrix<double>& sm, int tid) {
+    static const auto insert2 = [&](SparseMatrix<scalar>& sm, int tid) {
         auto& triplet = globals.hess_triplets[tid];
         bool new_col = tid == 0 || globals.hess_triplets[tid - 1].j != triplet.j;
 
@@ -194,7 +194,7 @@ void build_from_triplets(SparseMatrix<double>& sparse_hess_trip, MatrixXd& big_h
             insert2(sparse_hess_trip, k);
     }
 }
-double E(const vec12& q, const vec12& q_tiled, const AffineBody& c, double dt)
+scalar E(const vec12& q, const vec12& q_tiled, const AffineBody& c, scalar dt)
 {
     if(c.mass < 0.0) return 0.0;
     return othogonal_energy::otho_energy(q) * dt * dt + 0.5 * norm_M(q - q_tiled, c);
@@ -242,7 +242,7 @@ vector<array<unsigned, 2>> gen_triangle_list(
 #endif
 };
 #ifndef TESTING
-vec12 AffineBody::q_tile(double dt, const vec3& f) const
+vec12 AffineBody::q_tile(scalar dt, const vec3& f) const
 {
     auto _q = cat(q0);
     auto _dqdt = cat(dqdt);
@@ -266,9 +266,9 @@ void player_load(
     for (int i = 0; i < n_cubes; i++) {
         auto& c{ *cubes[i] };
         for (int j = 0; j < 4; j++)
-            in.read((char*)c.q0[j].data(), 3 * sizeof(double));
+            in.read((char*)c.q0[j].data(), 3 * sizeof(scalar));
         for (int j = 0; j < 4; j++)
-            in.read((char*)c.dqdt[j].data(), 3 * sizeof(double));
+            in.read((char*)c.dqdt[j].data(), 3 * sizeof(scalar));
         c.p = c.q0[0];
         c.A << c.q0[1], c.q0[2], c.q0[3];
     }
@@ -284,9 +284,9 @@ void dump_states(
     for (int i = 0; i < n_cubes; i++) {
         auto& c{ *cubes[i] };
         for (int j = 0; j < 4; j++)
-            out.write((char*)c.q[j].data(), 3 * sizeof(double));
+            out.write((char*)c.q[j].data(), 3 * sizeof(scalar));
         for (int j = 0; j < 4; j++)
-            out.write((char*)c.dq.segment<3>(j * 3).data(), 3 * sizeof(double));
+            out.write((char*)c.dq.segment<3>(j * 3).data(), 3 * sizeof(scalar));
     }
     out.close();
 }
@@ -321,9 +321,9 @@ void player_save(
     for (int i = 0; i < n_cubes; i++) {
         auto& c{ *cubes[i] };
         for (int j = 0; j < 4; j++)
-            out.write((char*)c.q0[j].data(), 3 * sizeof(double));
+            out.write((char*)c.q0[j].data(), 3 * sizeof(scalar));
         for (int j = 0; j < 4; j++)
-            out.write((char*)c.dqdt[j].data(), 3 * sizeof(double));
+            out.write((char*)c.dqdt[j].data(), 3 * sizeof(scalar));
     }
     out.close();
 }
