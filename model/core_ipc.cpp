@@ -6,6 +6,7 @@
 #include <ipc/utils/eigen_ext.hpp>
 #include <ipc/distance/edge_edge_mollifier.hpp>
 #include <tuple>
+#include "ipc_extension.h"
 using namespace std;
 #ifndef TESTING
 #ifndef ABDTK

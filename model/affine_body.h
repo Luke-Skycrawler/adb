@@ -9,7 +9,7 @@
 #include <Eigen/Eigen>
 #include "../view/shader.h"
 
-using scalar = double;
+using scalar = float;
 using mat3 = Eigen::Matrix<scalar, 3, 3>;
 using vec3 = Eigen::Vector<scalar, 3>;
 using q4 = std::array<vec3, 4>;

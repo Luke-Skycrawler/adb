@@ -11,6 +11,7 @@
 #include "time_integrator.h"
 #include <omp.h>
 #include <tbb/parallel_sort.h>
+#include "ipc_extension.h"
 // #define _FULL_PARALLEL_
 
 #ifndef TESTING

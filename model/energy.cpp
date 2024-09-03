@@ -7,7 +7,7 @@
 #include <array>
 #include "timer.h"
 #include <ipc/distance/edge_edge_mollifier.hpp>
-
+#include "ipc_extension.h"
 
 using namespace std;
 using namespace barrier;

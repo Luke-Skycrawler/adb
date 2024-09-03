@@ -13,6 +13,7 @@ extern Globals globals;
 #include <ipc/friction/closest_point.hpp>
 #include <ipc/friction/tangent_basis.hpp>
 #include "time_integrator.h"
+#include "ipc_extension.h"
 using namespace utils;
 tuple<mat12, vec12, scalar> ipc_hess_ee_12x12(
     array<vec3, 4> ee, array<int, 4> ij,

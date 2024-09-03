@@ -38,6 +38,7 @@ set(HEADERS
     model/collision.h
     model/spatial_hashing.h
     model/geometry.h
+    model/ipc_extension.h
     test_cases/tests.h
     view/camera.h
     view/env.h
@@ -71,6 +72,7 @@ set(SOURCE
     model/vg_ipc.cpp
     model/assemble_matrices.cpp
     model/friction.cpp
+    model/ipc_extension.cpp
     test_cases/spinning_cube.cpp
     view/control.cpp
     view/light.cpp
@@ -82,6 +84,7 @@ set(PYTHON_SOURCE
     model/barrier.cpp
     model/geometry.cpp
     model/collision.cpp
+    model/ipc_extension.cpp
 )
 
 set(PYTHON_HEADERS
@@ -90,6 +93,7 @@ set(PYTHON_HEADERS
     model/barrier.h
     model/geometry.h
     model/collision.h
+    model/ipc_extension.h
     cyCodeBase/cyCore.h
     cyCodeBase/cyPolynomial.h
     )

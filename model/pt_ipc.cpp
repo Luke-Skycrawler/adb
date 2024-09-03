@@ -14,6 +14,7 @@ extern Globals globals;
 #endif
 #include "collision.h"
 #include "time_integrator.h"
+#include "ipc_extension.h"
 using namespace utils;
 tuple<mat12, vec12> ipc_hess_pt_12x12(
     array<vec3, 4> pt, array<int, 4> ij, ipc::PointTriangleDistanceType pt_type, scalar dist);
@@ -47,17 +48,17 @@ scalar pt_uktk(
     }
     else if (pt_type == ::ipc::PointTriangleDistanceType::P_E0) {
         auto elam = ::ipc::point_edge_closest_point(pt[0], pt[1], pt[2]);
-        tlams = { 1.0 - elam, elam, 0.0 };
+        tlams = { 1.0f - elam, elam, 0.0f };
         Pk = ::ipc::point_edge_tangent_basis(pt[0], pt[1], pt[2]);
     }
     else if (pt_type == ::ipc::PointTriangleDistanceType::P_E1) {
         auto elam = ::ipc::point_edge_closest_point(pt[0], pt[2], pt[3]);
-        tlams = { 0.0, 1.0 - elam, elam };
+        tlams = { 0.0f, 1.0f - elam, elam };
         Pk = ::ipc::point_edge_tangent_basis(pt[0], pt[2], pt[3]);
     }
     else if (pt_type == ::ipc::PointTriangleDistanceType::P_E2) {
         auto elam = ::ipc::point_edge_closest_point(pt[0], pt[3], pt[1]);
-        tlams = { elam, 0.0, 1.0 - elam };
+        tlams = { elam, 0.0f, 1.0f - elam };
         Pk = ::ipc::point_edge_tangent_basis(pt[0], pt[3], pt[1]);
     }
 

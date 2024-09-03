@@ -14,13 +14,13 @@
 #define __CCD__ 2
 #define __LINE_SEARCH__ 3
 
-#define DURATION_TO_DOUBLE(X) duration_cast<duration<scalar>>((X)).count()
+#define DURATION_TO_DOUBLE(X) duration_cast<duration<double>>((X)).count()
 using json = nlohmann::json;
 void reset(bool init)
 {
     std::ifstream f("../config.json");
     json data = json::parse(f);
-    scalar dt = data["dt"];
+    double dt = data["dt"];
     auto predefined = data["predefined_case"]["enable"];
     auto g = data["gravity"];
     globals.gravity = vec3(0.0, g ? -9.8 : 0.0, 0.0);
@@ -220,7 +220,7 @@ void click_callback(GLFWwindow* window, int button, int action, int mods)
 
 // glfw: whenever the mouse moves, this callback is called
 // -------------------------------------------------------
-void mouse_callback(GLFWwindow* window, scalar xpos, scalar ypos)
+void mouse_callback(GLFWwindow* window, double xpos, double ypos)
 {
     if (globals.firstMouse) {
         globals.lastX = xpos;
@@ -240,7 +240,7 @@ void mouse_callback(GLFWwindow* window, scalar xpos, scalar ypos)
 
 // glfw: whenever the mouse scroll wheel scrolls, this callback is called
 // ----------------------------------------------------------------------
-void scroll_callback(GLFWwindow* window, scalar xoffset, scalar yoffset)
+void scroll_callback(GLFWwindow* window, double xoffset, double yoffset)
 {
     if (globals.cursor_hidden)
         globals.camera.ProcessMouseScroll(yoffset);
@@ -254,11 +254,11 @@ void scroll_callback(GLFWwindow* window, scalar xoffset, scalar yoffset)
 
 void exit_callback(GLFWwindow* window)
 {
-    scalar t = glfwGetTime();
+    double t = glfwGetTime();
     spdlog::default_logger()->flush();
     spdlog::error("running time = {}, ts = {}, #iters = {}, fps = {}, worst case = {}", t, globals.ts, globals.tot_iter, globals.ts / t, globals.params_int["worst case iter"]);
     auto& times{ globals.aggregate_time };
-    scalar frame_duration = 0.0;
+    double frame_duration = 0.0;
     times /= globals.ts;
     frame_duration = times.sum() / 100.0;
     spdlog::error("average per-frame time breakdown ------------\n\\

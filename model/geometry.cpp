@@ -1,5 +1,6 @@
 #include "geometry.h"
 #include <Eigen/Geometry>
+#include "ipc_extension.h"
 // #include <cmath>
 
 using namespace std;

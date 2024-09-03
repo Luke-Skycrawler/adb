@@ -227,7 +227,7 @@ scalar step_size_upper_bound(Vector<scalar, -1>& dq, vector<unique_ptr<AffineBod
     }
 
     toi = barrier::d_sqrt / 2.0 / norm_1(dq, n_cubes) * globals.safe_factor;
-    toi = min(1.0, toi);
+    toi = min(static_cast<scalar>(1.0), toi);
     vector<scalar> tois;
     tois.resize(n_pt + n_ee + n_g);
 

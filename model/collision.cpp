@@ -251,7 +251,7 @@ int build_and_solve_4_points_coplanar(
 
     Vector<scalar, 4> t = det_polynomial(a1, b1) - det_polynomial(a2, b2) + det_polynomial(a3, b3) - det_polynomial(a4, b4);
     scalar root = 1.0;
-    int found = cy::CubicRoots(roots, t.data(), 0.0, 1.0);
+    int found = cy::CubicRoots(roots, t.data(), static_cast<scalar>(0.0), static_cast<scalar>(1.0));
     return found;
 }
 

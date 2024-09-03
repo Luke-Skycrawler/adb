@@ -7,7 +7,7 @@
 #include <assert.h>
 #include <array>
 #include "timer.h"
-
+#include "ipc_extension.h"
 // #include <ipc/distance/point_triangle.hpp>
 // #include <ipc/distance/edge_edge.hpp>
 #include <ipc/friction/closest_point.hpp>
