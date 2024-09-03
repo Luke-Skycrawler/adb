@@ -27,8 +27,8 @@ static const unsigned int SCR_HEIGHT = 600;
 
 struct HessBlock {
     int i, j;
-    Matrix<float, 12, 1> block;
-    HessBlock(int _i, int _j, const Matrix<float, 12, 1> hess): i(_i), j(_j) {
+    Matrix<scalar, 12, 1> block;
+    HessBlock(int _i, int _j, const Matrix<scalar, 12, 1> hess): i(_i), j(_j) {
         block = hess;
     }
 };
@@ -54,22 +54,22 @@ struct GlobalVariableMainCPP{
         firstMouse = true;
     }
     #endif
-    float dt;
+    scalar dt;
     int max_iter, tot_iter, ts, set_size, starting_ts, ending_ts;
     std::vector<HessBlock> hess_triplets;
     std::vector<unique_ptr<AffineBody>> cubes;
         std::map<std::string, unique_ptr<Model>> loaded_models;
 
     vec3 gravity;
-    float alpha, beta;
-    float kappa, d_hat, safe_factor, mu, eps_x, backoff, evh;
+    scalar alpha, beta;
+    scalar kappa, d_hat, safe_factor, mu, eps_x, backoff, evh;
     Vector<scalar, 4> aggregate_time;
     bool vg_fric, pt_fric, ee_fric;
     bool col_set, upper_bound, line_search, sparse, dense, ee, pt, ground, psd, damp, full_ccd, align_com, player;
 
     // bundle the rest parameters in here
     // no intellecense but speed up compiling
-    std::map<std::string, float> params_double;
+    std::map<std::string, scalar> params_double;
     std::map<std::string, int> params_int;
     
     int log, iaabb;
