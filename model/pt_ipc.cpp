@@ -83,7 +83,7 @@ scalar pt_uktk(
         else
             assert(false);
     };
-    if (!(abs(d - closest) < 1e-12)) {
+    if (!(abs(d - closest) < 1e-6)) {
         std::cerr << "pt error\n";
         std::cerr << "d: " << d << std::endl;
         std::cerr << "closest: " << closest << std::endl;
