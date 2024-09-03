@@ -6,8 +6,6 @@
 #include <unordered_set>
 #include "affine_body.h"
 #define SPATIAL_HASHING_H
-using mat3 = Eigen::Matrix3d;
-using vec3 = Eigen::Vector3d;
 
 using element_type = unsigned short;
 union Primitive {

@@ -31,7 +31,7 @@ using namespace utils;
 #define __CCD__ 2
 #define __LINE_SEARCH__ 3
 
-scalar E_global(const VectorXd& q_plus_dq, const VectorXd& dq, int n_cubes, int n_pt, int n_ee, int n_g,
+scalar E_global(const Vector<scalar, -1>& q_plus_dq, const Vector<scalar, -1>& dq, int n_cubes, int n_pt, int n_ee, int n_g,
     const vector<array<int, 4>>& idx,
     const vector<array<int, 4>>& eidx,
     const vector<array<int, 2>>& vidx,
@@ -41,7 +41,7 @@ scalar E_global(const VectorXd& q_plus_dq, const VectorXd& dq, int n_cubes, int 
     scalar dt, scalar& _ef, bool _vt2);
 
 
-scalar E_barrier_plus_inert(const VectorXd& q_plus_dq, const VectorXd& dq, int n_cubes,
+scalar E_barrier_plus_inert(const Vector<scalar, -1>& q_plus_dq, const Vector<scalar, -1>& dq, int n_cubes,
     const vector<array<int, 4>>& idx,
     const vector<array<int, 4>>& eidx,
     const vector<array<int, 2>>& vidx,
@@ -49,7 +49,7 @@ scalar E_barrier_plus_inert(const VectorXd& q_plus_dq, const VectorXd& dq, int n
     scalar dt);
 
 scalar E_fric(
-    const VectorXd& dq, int n_cubes, 
+    const Vector<scalar, -1>& dq, int n_cubes, 
     int n_pt, int n_ee, int n_g,
     const vector<array<int, 4>>& idx,
     const vector<array<int, 4>>& eidx,
@@ -62,7 +62,7 @@ scalar E_fric(
     const vector<unique_ptr<AffineBody>>& cubes,
     scalar dt);
 
-scalar line_search(const VectorXd& dq, const VectorXd& grad, VectorXd& q0, scalar& E0, scalar& E1,
+scalar line_search(const Vector<scalar, -1>& dq, const Vector<scalar, -1>& grad, Vector<scalar, -1>& q0, scalar& E0, scalar& E1,
     int n_cubes, int n_pt, int n_ee, int n_g,
     vector<array<vec3, 4>>& pts,
     vector<array<int, 4>>& idx,
@@ -93,7 +93,7 @@ scalar line_search(const VectorXd& dq, const VectorXd& grad, VectorXd& q0, scala
         cubes, dt    
     );
     scalar qdg = dq.dot(grad);
-    VectorXd q1;
+    Vector<scalar, -1> q1;
     static vector<array<vec3, 4>> pts_new, pts_iaab;
     static vector<array<int, 4>> idx_new, idx_iaab;
 
@@ -166,7 +166,7 @@ void implicit_euler(vector<unique_ptr<AffineBody>>& cubes, scalar dt)
     bool term_cond;
     int& ts = globals.ts;
     static scalar tol = globals.params_double["tol"];
-    static VectorXd lastdq;
+    static Vector<scalar, -1> lastdq;
     int iter = 0;
     scalar sup_dq = 0.0;
     for (int k = 0; k < cubes.size(); k++) {
@@ -186,7 +186,7 @@ void implicit_euler(vector<unique_ptr<AffineBody>>& cubes, scalar dt)
 
     static vector<Matrix<scalar, 2, 12>> pt_tk;
     static vector<Matrix<scalar, 2, 12>> ee_tk;
-    static Vector4d times;
+    static Vector<scalar, 4> times;
     static int n_pt, n_ee, n_g;
     static vector<scalar> pt_contact_forces, ee_contact_forces, g_contact_forces;
     times.setZero(4);
@@ -353,14 +353,14 @@ void implicit_euler(vector<unique_ptr<AffineBody>>& cubes, scalar dt)
                     t10{ cj.vt0(cj.indices[ij[3] * 3 + 1]) },
                     t20{ cj.vt0(cj.indices[ij[3] * 3 + 2]) };
 
-                Vector4d w_p{ 1.0, pr[0], pr[1], pr[2] };
-                Vector4d w_t0{ 1.0, t0r[0], t0r[1], t0r[2] };
-                Vector4d w_t1{ 1.0, t1r[0], t1r[1], t1r[2] };
-                Vector4d w_t2{ 1.0, t2r[0], t2r[1], t2r[2] };
+                Vector<scalar, 4> w_p{ 1.0, pr[0], pr[1], pr[2] };
+                Vector<scalar, 4> w_t0{ 1.0, t0r[0], t0r[1], t0r[2] };
+                Vector<scalar, 4> w_t1{ 1.0, t1r[0], t1r[1], t1r[2] };
+                Vector<scalar, 4> w_t2{ 1.0, t2r[0], t2r[1], t2r[2] };
 
                 vector<vec3> surface_x{ p, f.t0, f.t1, f.t2 }, surface_xhat{ p0, t00, t10, t20 }, surface_X{ pr, t0r, t1r, t2r };
 
-                vector<pair<Vector4i, Vector4d>> dpdx{ { cid_p, w_p }, { cid_t0, w_t0 }, { cid_t1, w_t1 }, { cid_t2, w_t2 } };
+                vector<pair<Vector4i, Vector<scalar, 4>>> dpdx{ { cid_p, w_p }, { cid_t0, w_t0 }, { cid_t1, w_t1 }, { cid_t2, w_t2 } };
                 vec12 ga, gb;
                 ga.setZero(12);
                 gb.setZero(12);
@@ -368,17 +368,17 @@ void implicit_euler(vector<unique_ptr<AffineBody>>& cubes, scalar dt)
                 ha.setZero(12, 12);
                 hb.setZero(12, 12);
                 hab.setZero(12, 12);
-                VectorXd gaf, gbf;
+                Vector<scalar, -1> gaf, gbf;
                 gaf.setZero(12);
                 gbf.setZero(12);
-                MatrixXd haf, hbf, habf;
+                Matrix<scalar, -1, -1> haf, hbf, habf;
                 haf.setZero(12, 12);
                 hbf.setZero(12, 12);
                 habf.setZero(12, 12);
-                VectorXd gac, gbc;
+                Vector<scalar, -1> gac, gbc;
                 gac.setZero(12);
                 gbc.setZero(12);
-                MatrixXd hac, hbc, habc;
+                Matrix<scalar, -1, -1> hac, hbc, habc;
                 hac.setZero(12, 12);
                 hbc.setZero(12, 12);
                 habc.setZero(12, 12);
@@ -544,14 +544,14 @@ void implicit_euler(vector<unique_ptr<AffineBody>>& cubes, scalar dt)
                     ej00{ cj.vt0(cj.edges[ij[3] * 2]) },
                     ej10{ cj.vt0(cj.edges[ij[3] * 2 + 1]) };
 
-                Vector4d w_ei0{ 1.0, ei0r[0], ei0r[1], ei0r[2] };
-                Vector4d w_ei1{ 1.0, ei1r[0], ei1r[1], ei1r[2] };
-                Vector4d w_ej0{ 1.0, ej0r[0], ej0r[1], ej0r[2] };
-                Vector4d w_ej1{ 1.0, ej1r[0], ej1r[1], ej1r[2] };
+                Vector<scalar, 4> w_ei0{ 1.0, ei0r[0], ei0r[1], ei0r[2] };
+                Vector<scalar, 4> w_ei1{ 1.0, ei1r[0], ei1r[1], ei1r[2] };
+                Vector<scalar, 4> w_ej0{ 1.0, ej0r[0], ej0r[1], ej0r[2] };
+                Vector<scalar, 4> w_ej1{ 1.0, ej1r[0], ej1r[1], ej1r[2] };
 
                 vector<vec3> surface_x{ ee[0], ee[1], ee[2], ee[3] }, surface_xhat{ ei00, ei10, ej00, ej10 }, surface_X{ ei0r, ei1r, ej0r, ej1r };
                 vector<vec3> sx = surface_x, sX = surface_X;
-                vector<pair<Vector4i, Vector4d>> dpdx{ { cid_ei0, w_ei0 }, { cid_ei1, w_ei1 }, { cid_ej0, w_ej0 }, { cid_ej1, w_ej1 } }, px = dpdx;
+                vector<pair<Vector4i, Vector<scalar, 4>>> dpdx{ { cid_ei0, w_ei0 }, { cid_ei1, w_ei1 }, { cid_ej0, w_ej0 }, { cid_ej1, w_ej1 } }, px = dpdx;
                 vec12 ga, gb;
                 ga.setZero(12);
                 gb.setZero(12);
@@ -559,17 +559,17 @@ void implicit_euler(vector<unique_ptr<AffineBody>>& cubes, scalar dt)
                 ha.setZero(12, 12);
                 hb.setZero(12, 12);
                 hab.setZero(12, 12);
-                VectorXd gaf, gbf;
+                Vector<scalar, -1> gaf, gbf;
                 gaf.setZero(12);
                 gbf.setZero(12);
-                MatrixXd haf, hbf, habf;
+                Matrix<scalar, -1, -1> haf, hbf, habf;
                 haf.setZero(12, 12);
                 hbf.setZero(12, 12);
                 habf.setZero(12, 12);
-                VectorXd gac, gbc;
+                Vector<scalar, -1> gac, gbc;
                 gac.setZero(12);
                 gbc.setZero(12);
-                MatrixXd hac, hbc, habc;
+                Matrix<scalar, -1, -1> hac, hbc, habc;
                 hac.setZero(12, 12);
                 hbc.setZero(12, 12);
                 habc.setZero(12, 12);
@@ -635,7 +635,7 @@ void implicit_euler(vector<unique_ptr<AffineBody>>& cubes, scalar dt)
                 }
                 // if (false) {
                 if (ee_type == ipc::EdgeEdgeDistanceType::EA_EB0 || ee_type == ipc::EdgeEdgeDistanceType::EA_EB1) {
-                    MatrixXd _habf, _habc;
+                    Matrix<scalar, -1, -1> _habf, _habc;
                     _habf.setZero(12, 12);
                     _habc.setZero(12, 12);
                     friction_constraint->gradient({}, surface_x, surface_X, surface_xhat, {}, gbf, gaf);
@@ -754,7 +754,7 @@ void implicit_euler(vector<unique_ptr<AffineBody>>& cubes, scalar dt)
                 Pk.col(0) = vec3(1.0, 0.0, 0.0);
                 Pk.col(1) = vec3(0.0, 0.0, 1.0);
 
-                Vector2d uk = Pk.transpose() * (p - c.vt0(v));
+                Vector<scalar, 2> uk = Pk.transpose() * (p - c.vt0(v));
                 g_contact_forces[k] = -barrier_derivative_d(d) * 2 * _d;
 
                 ipc_term_vg(c, v, uk, g_contact_forces[k], Pk);
@@ -768,10 +768,10 @@ void implicit_euler(vector<unique_ptr<AffineBody>>& cubes, scalar dt)
         scalar toi = 1.0, factor = 1.0, alpha = 1.0;
 
         {
-            MatrixXd big_hess;
+            Matrix<scalar, -1, -1> big_hess;
             if (globals.dense)
                 big_hess.setZero(hess_dim, hess_dim);
-            VectorXd r, q0_cat, dq;
+            Vector<scalar, -1> r, q0_cat, dq;
             r.setZero(hess_dim);
             dq.setZero(hess_dim);
             q0_cat.setZero(hess_dim);

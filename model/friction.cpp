@@ -13,7 +13,7 @@ using namespace Eigen;
 
 
 void friction(
-    const Vector2d& _uk, scalar contact_lambda, const Matrix<scalar, 12, 2>& Tk,
+    const Vector<scalar, 2>& _uk, scalar contact_lambda, const Matrix<scalar, 12, 2>& Tk,
     Vector<scalar, 12>& g, Matrix<scalar, 12, 12>& H)
 {
     static scalar mu = globals.mu;
@@ -27,7 +27,7 @@ void friction(
     Matrix<scalar, 12, 12> D_k_hessian;
 
     if (uk >= evh) {
-        Vector2d ut{ -_uk(1), _uk(0) };
+        Vector<scalar, 2> ut{ -_uk(1), _uk(0) };
         D_k_hessian = mu * contact_lambda * f1 / (uk * uk) * Tk * ut * (ut.transpose() * Tk.transpose());
     }
     else if (uk <= globals.params_double["max_uk"]) {
@@ -35,9 +35,9 @@ void friction(
     }
     else {
         scalar f2_term = -1.0 / (evh * evh);
-        Matrix2d M2x2 = f2_term / uk * _uk * _uk.transpose();
-        // Matrix2d M2x2 = (df1_term * _uk * _uk.transpose());
-        M2x2 += f1 * Matrix2d::Identity(2, 2);
+        Matrix<scalar, 2, 2> M2x2 = f2_term / uk * _uk * _uk.transpose();
+        // Matrix<scalar, 2, 2> M2x2 = (df1_term * _uk * _uk.transpose());
+        M2x2 += f1 * Matrix<scalar, 2, 2>::Identity(2, 2);
         M2x2 *= mu * contact_lambda;
         M2x2 = project_to_psd(M2x2);
         D_k_hessian = Tk * M2x2 * Tk.transpose();

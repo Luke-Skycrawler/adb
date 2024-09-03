@@ -123,7 +123,7 @@ void cubic_binomial(const scalar a[3], const scalar b[3], scalar polynomial[4])
 
 }
 
-Vector4d det_polynomial(const mat3& a, const mat3& b)
+Vector<scalar, 4> det_polynomial(const mat3& a, const mat3& b)
 {
     scalar pos_polynomial[4]{ 0.0 }, neg_polynomial[4]{ 0.0 };
     scalar c11c22c33[2][3]{
@@ -171,7 +171,7 @@ Vector4d det_polynomial(const mat3& a, const mat3& b)
         c13c22c31[0],
         c13c22c31[1],
         neg_polynomial);
-    Vector4d ret;
+    Vector<scalar, 4> ret;
     for (int i = 0; i < 4; i++) ret(i) = pos_polynomial[i] - neg_polynomial[i];
     return ret;
 }
@@ -249,7 +249,7 @@ int build_and_solve_4_points_coplanar(
     a3 -= b3;
     a4 -= b4;
 
-    Vector4d t = det_polynomial(a1, b1) - det_polynomial(a2, b2) + det_polynomial(a3, b3) - det_polynomial(a4, b4);
+    Vector<scalar, 4> t = det_polynomial(a1, b1) - det_polynomial(a2, b2) + det_polynomial(a3, b3) - det_polynomial(a4, b4);
     scalar root = 1.0;
     int found = cy::CubicRoots(roots, t.data(), 0.0, 1.0);
     return found;

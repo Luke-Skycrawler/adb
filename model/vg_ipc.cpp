@@ -11,7 +11,7 @@ extern Globals globals;
 void ipc_term_vg(AffineBody& c, int v
 #ifdef _FRICTION_
     ,
-    const Vector2d& _uk, scalar contact_lambda, const Matrix<scalar, 3, 2>& Tk
+    const Vector<scalar, 2>& _uk, scalar contact_lambda, const Matrix<scalar, 3, 2>& Tk
 #endif
 
 )

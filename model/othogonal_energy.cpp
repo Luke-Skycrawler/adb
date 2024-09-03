@@ -27,24 +27,6 @@ namespace othogonal_energy {
         return ret;
     }
 
-    //MatrixXd hessian(vec3 q[])
-    //{
-    //    Matrix<scalar, 12, 12> H;
-    //    H.setZero(12, 12);
-    //    for (int i = 1; i < 4; i++) {
-    //        auto qi = q[i];
-    //        for (int j = 1; j < 4; j++) {
-    //            auto qj = q[j];
-    //            mat3 h = (qi.dot(qj) - kronecker(i, j)) * Matrix3d::Identity(3, 3);
-    //            for (int k = 1; k < 4; k++) {
-    //                auto qk = q[k];
-    //                h += (kronecker(k, j) * qi + kronecker(i, j) * qk) * qk.transpose();
-    //            }
-    //            H.block<3,3>(i * 3, j * 3) = 4 * kappa * h;
-    //        }
-    //    }
-    //    return H;
-    //}
     mat12 hessian(const q4& q)
     {
         mat12 H;
@@ -53,18 +35,18 @@ namespace othogonal_energy {
             mat3 h;
             h.setZero(3,3);
             if (i == j) {
-                h = 2 * q[i] * q[i].transpose() + (q[i].dot(q[i]) -1) * Matrix3d::Identity(3, 3);
+                h = 2 * q[i] * q[i].transpose() + (q[i].dot(q[i]) -1) * Matrix<scalar, 3, 3>::Identity(3, 3);
                 for(int k = 1; k < 4; k++)if(k!= i) h += q[k] * q[k].transpose();
             }
             else {
-                h = Matrix3d::Identity(3, 3) * q[j].dot(q[i]) + q[j] * q[i].transpose();
+                h = Matrix<scalar, 3, 3>::Identity(3, 3) * q[j].dot(q[i]) + q[j] * q[i].transpose();
             }
             H.block<3, 3>(3 * i, 3 * j) = h * 4 * kappa;
         }
         return H;
     }
 
-    scalar otho_energy(const VectorXd& x)
+    scalar otho_energy(const Vector<scalar, -1>& x)
     {
         scalar E = 0;
         vec3 q[4];
@@ -105,7 +87,7 @@ namespace othogonal_energy {
         mat3 ret;
         auto ai = q.col(i);
         if (i == j) {
-            ret = 2 * kappa * (4 * ai * ai.transpose() + 2 * (ai.dot(ai) - 1) * Matrix3d::Identity(3, 3));
+            ret = 2 * kappa * (4 * ai * ai.transpose() + 2 * (ai.dot(ai) - 1) * Matrix<scalar, 3, 3>::Identity(3, 3));
             // adjoint = transpose
             for (int j = 0; j < 3; j++) {
                 if (j == i) continue;
@@ -115,14 +97,14 @@ namespace othogonal_energy {
         }
         else {
             auto aj = q.col(j);
-            ret = 4 * kappa * (Matrix3d::Identity(3, 3) * aj.dot(ai) + aj * ai.transpose());
+            ret = 4 * kappa * (Matrix<scalar, 3, 3>::Identity(3, 3) * aj.dot(ai) + aj * ai.transpose());
         }
         return ret;
     }
 
 
     /*scalar otho_energy(const mat3 &q) {
-        mat3 qqtmi = q.transpose() * q - Matrix3d::Identity(3,3);
+        mat3 qqtmi = q.transpose() * q - Matrix<scalar, 3, 3>::Identity(3,3);
         return qqtmi.squaredNorm() * kappa;
     }*/
     #endif

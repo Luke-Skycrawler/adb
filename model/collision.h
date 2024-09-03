@@ -15,7 +15,7 @@
 
 #ifdef _FRICTION_
 void friction(
-    const Eigen::Vector2d& _uk, scalar contact_lambda, const Eigen::Matrix<scalar, 12, 2>& Tk,
+    const Eigen::Vector<scalar, 2>& _uk, scalar contact_lambda, const Eigen::Matrix<scalar, 12, 2>& Tk,
     Eigen::Vector<scalar, 12>& g, Eigen::Matrix<scalar, 12, 12>& H);
 #endif
 #ifdef _PLUG_IN_LAN_
@@ -51,13 +51,13 @@ scalar ee_collision_time(
     const Edge& ei1,
     const Edge& ej1);
 
-Eigen::Vector4d det_polynomial(const mat3& a, const mat3& b);
+Eigen::Vector<scalar, 4> det_polynomial(const mat3& a, const mat3& b);
 // only exported for testing
 
 void ipc_term_vg(AffineBody& c, int v
 #ifdef _FRICTION_
     ,
-    const Eigen::Vector2d& _uk, scalar contact_lambda, const Eigen::Matrix<scalar, 3, 2>& Tk
+    const Eigen::Vector<scalar, 2>& _uk, scalar contact_lambda, const Eigen::Matrix<scalar, 3, 2>& Tk
 #endif
 );
 

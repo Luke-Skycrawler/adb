@@ -12,6 +12,6 @@ namespace othogonal_energy{
     vec12 grad(const q4& q);
     //mat3 hessian(mat3 &q, int i, int j);
     mat12 hessian(const q4& q);
-    scalar otho_energy(const VectorXd& q);
+    scalar otho_energy(const Vector<scalar, -1>& q);
     //scalar otho_energy(mat3 &q);
 }

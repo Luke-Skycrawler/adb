@@ -21,7 +21,7 @@ tuple<mat12, vec12> ipc_hess_pt_12x12(
 scalar pt_uktk(
     AffineBody& ci, AffineBody& cj,
     array<vec3, 4>& pt, array<int, 4>& ij, const ::ipc::PointTriangleDistanceType& pt_type,
-    Matrix<scalar, 2, 12>& Tk_T_ret, Vector2d& uk_ret, scalar d, scalar dt)
+    Matrix<scalar, 2, 12>& Tk_T_ret, Vector<scalar, 2>& uk_ret, scalar d, scalar dt)
 
 {
 
@@ -105,9 +105,9 @@ scalar pt_uktk(
 }
 
 
-tuple<scalar, Vector2d, Matrix<scalar, 2, 12>> pt_uktk(AffineBody& ci, AffineBody& cj, array<vec3, 4>& pt, array<int, 4>& ij, const ::ipc::PointTriangleDistanceType& pt_type, scalar d, scalar dt)
+tuple<scalar, Vector<scalar, 2>, Matrix<scalar, 2, 12>> pt_uktk(AffineBody& ci, AffineBody& cj, array<vec3, 4>& pt, array<int, 4>& ij, const ::ipc::PointTriangleDistanceType& pt_type, scalar d, scalar dt)
 {
-    Vector2d uk;
+    Vector<scalar, 2> uk;
     Matrix<scalar, 2, 12> Tk;
     scalar lam = pt_uktk(ci, cj, pt, ij, pt_type, Tk, uk, d, dt);
     return { lam, uk, Tk };
@@ -138,7 +138,7 @@ void ipc_term(
     int ii = _i, jj = _j;
     auto &ci{ *globals.cubes[_i] }, &cj{ *globals.cubes[_j] };
     const auto& tidx{ cj.indices };
-    Vector2d _uk;
+    Vector<scalar, 2> _uk;
     contact_lambda = pt_uktk(ci, cj, pt, ij, pt_type, Tk, _uk, dist, globals.dt);
 
     auto [ipc_hess, pt_grad] = ipc_hess_pt_12x12(pt, ij, pt_type, dist);
@@ -170,18 +170,18 @@ void ipc_term(
     auto dgt = Jt.transpose() * pt_grad.segment<9>(3);
 #else
 
-    Vector4d kerp;
+    Vector<scalar, 4> kerp;
     kerp << 1.0, p_tile;
-    Vector4d ker0;
+    Vector<scalar, 4> ker0;
     ker0 << 1.0, t0_tile;
-    Vector4d ker1;
+    Vector<scalar, 4> ker1;
     ker1 << 1.0, t1_tile;
-    Vector4d ker2;
+    Vector<scalar, 4> ker2;
     ker2 << 1.0, t2_tile;
     Matrix<scalar, 4, 3> kert;
     kert << ker0, ker1, ker2;
 
-    Matrix4d blkp = kerp * kerp.transpose();
+    Matrix<scalar, 4, 4> blkp = kerp * kerp.transpose();
     mat12 hess_p, hess_t, off_diag;
     // mat12 hess_p, hess_t, hess__off;
 

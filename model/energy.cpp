@@ -16,7 +16,7 @@ using namespace utils;
 
 
 scalar E_barrier_plus_inert(
-    const VectorXd& q_plus_dq, const VectorXd& dq, int n_cubes, 
+    const Vector<scalar, -1>& q_plus_dq, const Vector<scalar, -1>& dq, int n_cubes, 
     const vector<array<int, 4>>& idx,
     const vector<array<int, 4>>& eidx,
     const vector<array<int, 2>>& vidx,
@@ -84,7 +84,7 @@ scalar E_barrier_plus_inert(
     return e;
 }
 
-scalar E_global(const VectorXd& q_plus_dq, const VectorXd& dq, int n_cubes, int n_pt, int n_ee, int n_g,
+scalar E_global(const Vector<scalar, -1>& q_plus_dq, const Vector<scalar, -1>& dq, int n_cubes, int n_pt, int n_ee, int n_g,
     const vector<array<int, 4>>& idx,
     const vector<array<int, 4>>& eidx,
     const vector<array<int, 2>>& vidx,
@@ -192,7 +192,7 @@ scalar E_global(const VectorXd& q_plus_dq, const VectorXd& dq, int n_cubes, int 
 }
 
 scalar E_fric(
-    const VectorXd& dq, int n_cubes, 
+    const Vector<scalar, -1>& dq, int n_cubes, 
     int n_pt, int n_ee, int n_g,
     const vector<array<int, 4>>& idx,
     const vector<array<int, 4>>& eidx,

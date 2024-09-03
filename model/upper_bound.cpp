@@ -10,7 +10,7 @@ using namespace std;
 using namespace std::chrono;
 using namespace utils;
 #define DURATION_TO_DOUBLE(X) duration_cast<duration<scalar>>(high_resolution_clock::now() - (X)).count()
-scalar step_size_upper_bound(VectorXd& dq, vector<unique_ptr<AffineBody>>& cubes,
+scalar step_size_upper_bound(Vector<scalar, -1>& dq, vector<unique_ptr<AffineBody>>& cubes,
     int n_cubes, int n_pt, int n_ee, int n_g,
     vector<array<vec3, 4>>& pts,
     vector<array<int, 4>>& idx,

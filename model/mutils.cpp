@@ -83,7 +83,7 @@ scalar norm_M(const vec12& x, const AffineBody& c)
     return p.dot(p) * c.mass + q.dot(q) * c.Ic;
 }
 
-scalar norm_1(VectorXd& dq, int n_cubes)
+scalar norm_1(Vector<scalar, -1>& dq, int n_cubes)
 {
     scalar norm = 0.0;
     for (int i = 0; i < n_cubes; i++) {
@@ -93,9 +93,9 @@ scalar norm_1(VectorXd& dq, int n_cubes)
     return norm;
 }
 
-void damping_dense(MatrixXd& big_hess, scalar dt, int n_cubes)
+void damping_dense(Matrix<scalar, -1, -1>& big_hess, scalar dt, int n_cubes)
 {
-    MatrixXd D = globals.beta * big_hess;
+    Matrix<scalar, -1, -1> D = globals.beta * big_hess;
     for (int i = 0; i < n_cubes; i++) {
         for (int j = 0; j < 3; j++) { D(i * 12 + j, i * 12 + j) += globals.cubes[i]->mass; }
         for (int j = 3; j < 12; j++) { D(i * 12 + j, i * 12 + j) += globals.cubes[i]->Ic; }
@@ -114,7 +114,7 @@ void damping_sparse(SparseMatrix<scalar>& sparse_hess, scalar dt, int n_cubes)
     }
 }
 
-void build_from_triplets(SparseMatrix<scalar>& sparse_hess_trip, MatrixXd& big_hess, int hess_dim, int n_cubes)
+void build_from_triplets(SparseMatrix<scalar>& sparse_hess_trip, Matrix<scalar, -1, -1>& big_hess, int hess_dim, int n_cubes)
 {
 
     vector<int> starting_point;

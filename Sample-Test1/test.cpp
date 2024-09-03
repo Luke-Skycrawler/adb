@@ -42,8 +42,8 @@ TEST(det_poly, Eigen_ref)
                 a(i, j) = dist(gen);
                 b(i, j) = dist(gen);
             }
-        Vector4d p = det_polynomial(a, b);
-        const auto eval = [](scalar t, Vector4d& poly) -> scalar {
+        Vector<scalar, 4> p = det_polynomial(a, b);
+        const auto eval = [](scalar t, Vector<scalar, 4>& poly) -> scalar {
             return poly(0) + t * (poly(1) + t * (poly(2) + t * poly(3)));
         };
         scalar t0 = eval(0.0, p);

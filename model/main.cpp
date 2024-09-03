@@ -3,7 +3,7 @@
 #include <iostream>
 using namespace std;
 
-static const double dt = 1e-3;
+static const scalar dt = 1e-3;
 int main(void) {
     vec3 omega(10.0f, 0.0f, 0.0f);
     auto cube = spinning_cube(omega);

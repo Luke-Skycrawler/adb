@@ -20,7 +20,7 @@ void gen_collision_set(
     std::vector<std::array<int, 4>>& eidx,
     std::vector<std::array<int, 2>>& vidx);
 
-scalar step_size_upper_bound(Eigen::VectorXd& dq, std::vector<std::unique_ptr<AffineBody>>& cubes,
+scalar step_size_upper_bound(Eigen::Vector<scalar, -1>& dq, std::vector<std::unique_ptr<AffineBody>>& cubes,
     int n_cubes, int n_pt, int n_ee, int n_g,
     std::vector<std::array<vec3, 4>>& pts,
     std::vector<std::array<int, 4>>& idx,
@@ -68,11 +68,11 @@ vec12 cat(const q4& q);
 vec12 grad_residue_per_body(AffineBody& c, scalar dt);
 mat12 hess_inertia_per_body(AffineBody& c, scalar dt);
 scalar norm_M(const vec12& x, const AffineBody& c);
-scalar norm_1(VectorXd& dq, int n_cubes);
-void damping_dense(MatrixXd& big_hess, scalar dt, int n_cubes);
+scalar norm_1(Vector<scalar, -1>& dq, int n_cubes);
+void damping_dense(Matrix<scalar, -1, -1>& big_hess, scalar dt, int n_cubes);
 
 void damping_sparse(SparseMatrix<scalar>& sparse_hess, scalar dt, int n_cubes);
-void build_from_triplets(SparseMatrix<scalar>& sparse_hess_trip, MatrixXd& big_hess, int hess_dim, int n_cubes);
+void build_from_triplets(SparseMatrix<scalar>& sparse_hess_trip, Matrix<scalar, -1, -1>& big_hess, int hess_dim, int n_cubes);
 scalar E(const vec12& q, const vec12& q_tiled, const AffineBody& c, scalar dt);
 
 std::vector<std::array<unsigned, 2>> gen_edge_list(

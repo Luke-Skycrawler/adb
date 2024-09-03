@@ -21,7 +21,7 @@ tuple<mat12, vec12, scalar> ipc_hess_ee_12x12(
 scalar ee_uktk(
     AffineBody& ci, AffineBody& cj,
     array<vec3, 4>& ee, array<int, 4>& ij, const ::ipc::EdgeEdgeDistanceType& ee_type,
-    Matrix<scalar, 2, 12>& Tk_T_ret, Vector2d& uk_ret, scalar d, scalar dt,
+    Matrix<scalar, 2, 12>& Tk_T_ret, Vector<scalar, 2>& uk_ret, scalar d, scalar dt,
     scalar mollifier)
 {
     auto v_stack = ee_vstack(ci, cj, ij[1], ij[3]);
@@ -124,7 +124,7 @@ scalar ee_uktk(
     // auto Tq_k = Tk_T * jacobian;
 
     // auto contact_force_lam = barrier_derivative_d(d) / (dt * dt) * 2 * sqrt(d);
-    Vector2d uk = Tk_T * v_stack;
+    Vector<scalar, 2> uk = Tk_T * v_stack;
     auto contact_force = -barrier::barrier_derivative_d(d) * 2 * sqrt(d);
     Tk_T_ret = Tk_T;
     uk_ret = uk;
@@ -132,9 +132,9 @@ scalar ee_uktk(
     return contact_force;
 }
 
-tuple<scalar, Vector2d, Matrix<scalar, 2, 12>> ee_uktk(AffineBody& ci, AffineBody& cj, array<vec3, 4>& ee, array<int, 4>& ij, const ::ipc::EdgeEdgeDistanceType& ee_type, scalar d, scalar dt, scalar mollifier)
+tuple<scalar, Vector<scalar, 2>, Matrix<scalar, 2, 12>> ee_uktk(AffineBody& ci, AffineBody& cj, array<vec3, 4>& ee, array<int, 4>& ij, const ::ipc::EdgeEdgeDistanceType& ee_type, scalar d, scalar dt, scalar mollifier)
 {
-    Vector2d uk;
+    Vector<scalar, 2> uk;
     Matrix<scalar, 2, 12> Tk;
     scalar lam = ee_uktk(ci, cj, ee, ij, ee_type, Tk, uk, d, dt, mollifier);
     return { lam, uk, Tk };
@@ -173,7 +173,7 @@ void ipc_term_ee(
 
     auto [ipc_hess, ee_grad, p] = ipc_hess_ee_12x12(ee, ij, ee_type, dist);
 
-    Vector2d _uk;
+    Vector<scalar, 2> _uk;
     contact_lambda = ee_uktk(ci, cj, ee, ij, ee_type, Tk, _uk, dist, globals.dt, p);
     // if (p != 1.0) {
     //     // contact_lambda = contact_lambda * p;
@@ -218,9 +218,6 @@ void ipc_term_ee(
         ker1[i][0] = i == 0 ? 1.0 : ej0_tile(i - 1);
         ker1[i][1] = i == 0 ? 1.0 : ej1_tile(i - 1);
     }
-
-    // Matrix4d blk0 = ker0 * ker0.transpose();
-    // Matrix4d blk1 = ker0 * ker1.transpose();
 
     mat3 hess_0[4][4], hess_1[4][4], off_diag[4][4], off_T[4][4];
     mat3 Akl[4][4];

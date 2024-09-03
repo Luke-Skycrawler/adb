@@ -29,8 +29,8 @@ set(HEADERS
     model/FrictionUtils.h
     model/glue.h
     model/iaabb.h
-    model/IpcCollisionConstraint.h
-    model/IpcFrictionConstraint.h
+    # model/IpcCollisionConstraint.h
+    # model/IpcFrictionConstraint.h
     model/psd.h
     model/othogonal_energy.h
     model/time_integrator.h
@@ -53,8 +53,8 @@ set(SOURCE
     model/affine_obj.cpp
     model/col_set.cpp
     model/iaabb.cpp
-    model/IpcCollisionConstraint.cpp
-    model/IpcFrictionConstraint.cpp
+    # model/IpcCollisionConstraint.cpp
+    # model/IpcFrictionConstraint.cpp
     model/othogonal_energy.cpp
     model/barrier.cpp
     model/euler.cpp

@@ -31,32 +31,32 @@ scalar barrier_function(scalar d)
         return vg_distance_gradient_x(vertex) * barrier_derivative_d(d * d) * 2 * d;
     }
 
-    VectorXd barrier_gradient_q(const vec3 &tilex, const vec3 &vertex)
+    Vector<scalar, -1> barrier_gradient_q(const vec3 &tilex, const vec3 &vertex)
     {
         return barrier_gradient_x(vertex).transpose() * x_jacobian_q(tilex);
     }
 
-    MatrixXd x_jacobian_q(const vec3 &tilex)
+    Matrix<scalar, -1, -1> x_jacobian_q(const vec3 &tilex)
     {
         // x in static frame
         Matrix<scalar, 3, 12> J;
         //J.setZero(3, 12);
-        //J.block<3, 3>(0, 0) = Matrix3d::Identity(3, 3);
-        //J.block<3, 3>(0, 3) = Matrix3d::Identity(3, 3) * tilex(0);
-        //J.block<3, 3>(0, 6) = Matrix3d::Identity(3, 3) * tilex(1);
-        //J.block<3, 3>(0, 9) = Matrix3d::Identity(3, 3) * tilex(2);
+        //J.block<3, 3>(0, 0) = Matrix<scalar, 3, 3>::Identity(3, 3);
+        //J.block<3, 3>(0, 3) = Matrix<scalar, 3, 3>::Identity(3, 3) * tilex(0);
+        //J.block<3, 3>(0, 6) = Matrix<scalar, 3, 3>::Identity(3, 3) * tilex(1);
+        //J.block<3, 3>(0, 9) = Matrix<scalar, 3, 3>::Identity(3, 3) * tilex(2);
 
-        J << Matrix3d::Identity(3, 3), Matrix3d::Identity(3, 3) * tilex(0), Matrix3d::Identity(3, 3) * tilex(1), Matrix3d::Identity(3, 3) * tilex(2);
+        J << Matrix<scalar, 3, 3>::Identity(3, 3), Matrix<scalar, 3, 3>::Identity(3, 3) * tilex(0), Matrix<scalar, 3, 3>::Identity(3, 3) * tilex(1), Matrix<scalar, 3, 3>::Identity(3, 3) * tilex(2);
         return J;
     }
 
-    inline VectorXd distance_gradient_q(const vec3 &tilex, const vec3 &vertex)
+    inline Vector<scalar, -1> distance_gradient_q(const vec3 &tilex, const vec3 &vertex)
     {
         scalar d = vg_distance(vertex);
         return vg_distance_gradient_x(vertex).transpose() * x_jacobian_q(tilex) * d * 2;
     }
 
-    MatrixXd barrier_hessian_q(const vec3 &tilex, const vec3 &vertex)
+    Matrix<scalar, -1, -1> barrier_hessian_q(const vec3 &tilex, const vec3 &vertex)
     {
         // arg: colliding vertex
         auto g(distance_gradient_q(tilex, vertex));

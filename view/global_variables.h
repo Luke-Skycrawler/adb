@@ -63,7 +63,7 @@ struct GlobalVariableMainCPP{
     vec3 gravity;
     double alpha, beta;
     double kappa, d_hat, safe_factor, mu, eps_x, backoff, evh;
-    Vector4d aggregate_time;
+    Vector<scalar, 4> aggregate_time;
     bool vg_fric, pt_fric, ee_fric;
     bool col_set, upper_bound, line_search, sparse, dense, ee, pt, ground, psd, damp, full_ccd, align_com, player;
 
