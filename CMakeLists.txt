@@ -132,6 +132,13 @@ target_include_directories(abd PRIVATE ${ipc_toolkit_SOURCE_DIR}/src)
 
 target_link_libraries(abd PRIVATE ipc::toolkit glfw assimp::assimp glad::glad glm::glm Eigen3::Eigen nlohmann_json::nlohmann_json)
 target_link_libraries(abdtk PRIVATE ipc::toolkit Eigen3::Eigen)
+
+set(OUTPUT_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/view)
+add_custom_target(copy_exe ALL
+    COMMAND ${CMAKE_COMMAND} -E copy $<TARGET_FILE:abd> ${OUTPUT_DIRECTORY}
+    DEPENDS abd
+    COMMENT "Copying abd.exe to ${OUTPUT_DIRECTORY}"
+)
 # if(MSVC) 
 #     set_property(TARGET abd PROPERTY CUDA_SEPARABLE_COMPILATION ON)
 #     set_property(TARGET abd PROPERTY CUDA_ARCHITECTURES 86)

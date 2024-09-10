@@ -810,7 +810,7 @@ void implicit_euler(vector<unique_ptr<AffineBody>>& cubes, scalar dt)
 #ifdef EIGEN_USE_MKL_ALL
                 PardisoLLT<SparseMatrix<scalar>> ldlt_solver;
 #else
-                SimplicialLLT<SparseMatrix<scalar>> ldlt_solver;
+                SimplicialLLT<SparseMatrix<scalar, ColMajor>> ldlt_solver;
 #endif
                 ldlt_solver.compute(sparse_hess);
                 dq = -ldlt_solver.solve(r);
