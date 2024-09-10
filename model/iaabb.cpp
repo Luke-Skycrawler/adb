@@ -16,10 +16,8 @@
 
 #ifndef TESTING
 #include "../view/global_variables.h"
-#define DT globals.dt
 #else
 #include "../iAABB/pch.h"
-#define DT 1e-2
 #endif
 #include <chrono>
 

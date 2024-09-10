@@ -1,5 +1,5 @@
 #include "affine_body.h"
-#include "time_integrator.h"
+#include "sparse.h"
 #include <omp.h>
 #ifndef TESTING
 #include "../view/global_variables.h"

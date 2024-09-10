@@ -25,7 +25,7 @@ set(HEADERS
     cyCodeBase/cyPolynomial.h
     model/affine_body.h
     # model/cube.h
-    model/FrictionUtils.h
+    # model/FrictionUtils.h
     model/glue.h
     model/iaabb.h
     # model/IpcCollisionConstraint.h
@@ -38,6 +38,7 @@ set(HEADERS
     model/spatial_hashing.h
     model/geometry.h
     model/ipc_extension.h
+    model/sparse.h
     view/camera.h
     view/env.h
     view/global_variables.h
@@ -53,6 +54,7 @@ set(SOURCE
     model/iaabb.cpp
     # model/IpcCollisionConstraint.cpp
     # model/IpcFrictionConstraint.cpp
+    model/line_search.cpp
     model/othogonal_energy.cpp
     model/barrier.cpp
     model/euler.cpp
