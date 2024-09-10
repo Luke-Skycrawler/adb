@@ -166,7 +166,7 @@ int main()
     auto bunny = make_unique<AffineObject>(b_mesh);
     globals.cubes.push_back(move(bunny));
 #endif
-    Light lights(LightPositions, 4);
+    Light lights(globals.light_positions, 4);
 
     // load textures (we now use a utility function to keep the code more organized)
     // -----------------------------------------------------------------------------
@@ -226,6 +226,8 @@ int main()
     globals.edges = utils::gen_edge_list(globals.cubes, n_cubes);
     globals.points = utils::gen_point_list(globals.cubes, n_cubes);
     globals.triangles = utils::gen_triangle_list(globals.cubes, n_cubes);
+    
+    auto &lightPos{globals.light_positions[0]};
     // be sure to call after glfw intiailzation 
 
     // render loop

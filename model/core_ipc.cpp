@@ -7,22 +7,14 @@
 #include <ipc/distance/edge_edge_mollifier.hpp>
 #include <tuple>
 #include "ipc_extension.h"
-using namespace std;
 #ifndef TESTING
-#ifndef ABDTK
-#include "../view/global_variables.h"
-#else
-static struct CoreIPCLocalConfig{
-    bool psd;
-    scalar eps_x;
-    CoreIPCLocalConfig(): psd(true), eps_x(1e-3){}
-} globals;
-#endif
+#include "settings.h"
 #else 
 #include "../iAABB/pch.h"
 extern Globals globals;
 #endif
 
+using namespace std;
 using namespace Eigen;
 
 
@@ -43,7 +35,6 @@ tuple<mat12, vec12> ipc_hess_pt_12x12(
 
     mat12 ipc_hess;
     ipc_hess.setZero(12, 12);
-    // ipc_hess = PSD_projection(pt_hess  * B_) + pt_grad * pt_grad.transpose() * B__;
     ipc_hess = pt_hess * B_ + pt_grad * pt_grad.transpose() * B__;
 
     pt_grad *= B_;
@@ -82,7 +73,6 @@ tuple<mat12, vec12, scalar> ipc_hess_ee_12x12(
     mat12 ipc_hess;
     ipc_hess.setZero(12, 12);
     ipc_hess = p_hess * B + B_ * (p_grad * ee_grad.transpose() + ee_grad * p_grad.transpose()) + p * (B__ * ee_grad * ee_grad.transpose() + B_ * ee_hess);
-    // ipc_hess = B__ * ee_grad * ee_grad.transpose() + project_to_psd(B_ * ee_hess);
 
     ee_grad = p * ee_grad * B_ + p_grad * B;
 

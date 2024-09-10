@@ -25,9 +25,6 @@ void friction(
 #undef _SM_OUT_
 #undef _TRIPLETS_
 #endif
-#ifdef _TRIPLETS_
-#include "../view/global_variables.h"
-#endif
 // x: vertex position in the static frame;
 // p: affine body translation
 // q: affine matrix

@@ -23,6 +23,7 @@ FetchContent_MakeAvailable(ipc_toolkit)
 set(HEADERS 
     cyCodeBase/cyCore.h
     cyCodeBase/cyPolynomial.h
+    model/settings.h
     model/affine_body.h
     # model/cube.h
     # model/FrictionUtils.h
@@ -92,6 +93,7 @@ set(PYTHON_HEADERS
     model/geometry.h
     model/collision.h
     model/ipc_extension.h
+    model/settings.h
     cyCodeBase/cyCore.h
     cyCodeBase/cyPolynomial.h
     )

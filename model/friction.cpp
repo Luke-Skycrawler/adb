@@ -3,7 +3,7 @@
 #include <ipc/friction/smooth_friction_mollifier.hpp>
 
 #ifndef TESTING
-#include "../view/global_variables.h"
+#include "settings.h"
 #else 
 #include "../iAABB/pch.h"
 extern Globals globals;

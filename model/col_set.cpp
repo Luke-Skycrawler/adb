@@ -1,4 +1,4 @@
-#include "../view/global_variables.h"
+#include "settings.h"
 #include "barrier.h"
 #include "affine_body.h"
 #include "collision.h"

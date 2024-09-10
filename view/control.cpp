@@ -115,6 +115,7 @@ void reset(bool init)
 // ---------------------------------------------------------------------------------------------------------
 void processInput(GLFWwindow* window)
 {
+    auto &lightPos {globals.light_positions[0]};
     if (globals.motion) {
         if (glfwGetKey(window, GLFW_KEY_W) == GLFW_PRESS)
             lightPos += 2.5f * globals.deltaTime * globals.camera.Front;

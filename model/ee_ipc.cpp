@@ -1,7 +1,7 @@
 #include "barrier.h"
 #include "affine_body.h"
 #ifndef TESTING
-#include "../view/global_variables.h"
+#include "settings.h"
 #else 
 #include "../iAABB/pch.h"
 extern Globals globals;

@@ -7,7 +7,7 @@
 #include <ipc/friction/tangent_basis.hpp>
 #include "time_integrator.h"
 #ifndef TESTING
-#include "../view/global_variables.h"
+#include "settings.h"
 #else 
 #include "../iAABB/pch.h"
 extern Globals globals;
@@ -83,6 +83,7 @@ scalar pt_uktk(
             return 6;
         else
             assert(false);
+            return -1;
     };
     if (!(abs(d - closest) < 1e-6)) {
         std::cerr << "pt error\n";

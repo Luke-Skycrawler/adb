@@ -1,5 +1,5 @@
 #include "time_integrator.h"
-#include "../view/global_variables.h"
+#include "settings.h"
 #include <array>
 
 using namespace Eigen;

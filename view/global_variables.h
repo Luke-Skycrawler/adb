@@ -1,5 +1,6 @@
 #pragma once
 #ifndef TESTING
+#ifndef ABDTK
 #include "camera.h"
 // consts
 static const int SHADOW_WIDTH = 800, SHADOW_HEIGHT = 600;
@@ -44,9 +45,20 @@ struct GlobalVariableMainCPP{
 
     // camera
     Camera camera;
+
+    // control
     float lastX, lastY;
     bool firstMouse;
-    GlobalVariableMainCPP(): camera(glm::vec3(0.0f, 6.0f, 10.0f)){
+
+    // light
+    glm::vec3 light_positions[4];
+    GlobalVariableMainCPP(): camera(glm::vec3(0.0f, 6.0f, 10.0f)), 
+        light_positions{
+            glm::vec3(5.0f, 5.0f, 6.0f),
+            glm::vec3(1.2f, 2.0f, 0.0f),
+            glm::vec3(-1.2f, 2.0f, 2.0f),
+            glm::vec3(-1.2f, 2.0f, 0.0f)}
+    {
         postrender = false, edge = false, skybox = false, model_draw = false, display_corner = true, motion = false, feedback = false, cursor_hidden = true;        
         lastX = SCR_WIDTH / 2.0f;
         lastY = SCR_HEIGHT / 2.0f;
@@ -81,24 +93,21 @@ struct GlobalVariableMainCPP{
 #endif
 
 };
+
+
+
+
+// alocate globals
 #ifndef GOOGLE_TEST
 #ifdef _MAIN_CPP
 #define VARIABLE_LOCATOR
-VARIABLE_LOCATOR glm::vec3 LightPositions[]
-= {
-   glm::vec3(5.0f, 5.0f, 6.0f),
-   glm::vec3(1.2f, 2.0f, 0.0f),
-   glm::vec3(-1.2f, 2.0f, 2.0f),
-   glm::vec3(-1.2f, 2.0f, 0.0f)};
 #else 
 #define VARIABLE_LOCATOR extern
-VARIABLE_LOCATOR glm::vec3 LightPositions[];
 #endif
 
 VARIABLE_LOCATOR GlobalVariableMainCPP globals;
 
-// lighting
-static glm::vec3 &lightPos(LightPositions[0]);
 
+#endif
 #endif
 #endif

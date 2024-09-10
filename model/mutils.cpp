@@ -1,5 +1,5 @@
 #include "time_integrator.h"
-#include "../view/global_variables.h"
+#include "settings.h"
 #include <algorithm>
 #include "othogonal_energy.h"
 #include "barrier.h"

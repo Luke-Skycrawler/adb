@@ -1,6 +1,6 @@
 #include "time_integrator.h"
 #include "geometry.h"
-#include "../view/global_variables.h"
+#include "settings.h"
 #include "barrier.h"
 #include <chrono>
 #include <spdlog/spdlog.h>

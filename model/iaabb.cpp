@@ -15,7 +15,7 @@
 // #define _FULL_PARALLEL_
 
 #ifndef TESTING
-#include "../view/global_variables.h"
+#include "settings.h"
 #else
 #include "../iAABB/pch.h"
 #endif

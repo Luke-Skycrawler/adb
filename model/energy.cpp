@@ -3,7 +3,7 @@
 #include "barrier.h"
 #include "spdlog/spdlog.h"
 #include "collision.h"
-#include "../view/global_variables.h"
+#include "settings.h"
 #include <assert.h>
 #include <array>
 #include "timer.h"
