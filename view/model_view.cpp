@@ -5,6 +5,7 @@
 #include "light.h"
 #define _MAIN_CPP
 #include "global_variables.h"
+#include "cube.h"
 #include "../model/time_integrator.h"
 #include "../model/glue.h"
 #include <glm/gtx/string_cast.hpp>
@@ -20,6 +21,7 @@ using namespace Eigen;
 // #define FEATURE_POSTRENDER
 //-----------------------------------------------------------------
 
+vector<unsigned> Cube::_edges {}, Cube::_indices {};
 void render_cubes(Shader shader, vector<unique_ptr<AffineBody>> &cubes)
 {
     for (int i = 0; i < cubes.size(); i++)
@@ -34,6 +36,7 @@ void render_cubes(Shader shader, vector<unique_ptr<AffineBody>> &cubes)
 }
 int main()
 {
+    Cube::gen_indices();
     int n_proc = omp_get_num_procs();
     omp_set_num_threads(n_proc);
     setNbThreads(n_proc);

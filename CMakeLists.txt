@@ -24,7 +24,8 @@ set(HEADERS
     cyCodeBase/cyCore.h
     cyCodeBase/cyPolynomial.h
     model/affine_body.h
-    # model/cube.h
+    model/affine_obj.h
+    model/cube.h
     model/FrictionUtils.h
     model/glue.h
     model/iaabb.h
@@ -49,6 +50,7 @@ set(HEADERS
 )
 
 set(SOURCE 
+    model/affine_obj.cpp
     model/col_set.cpp
     model/iaabb.cpp
     # model/IpcCollisionConstraint.cpp
@@ -70,6 +72,7 @@ set(SOURCE
     model/assemble_matrices.cpp
     model/friction.cpp
     model/ipc_extension.cpp
+    test_cases/spinning_cube.cpp
     view/control.cpp
     view/light.cpp
     view/utils.cpp

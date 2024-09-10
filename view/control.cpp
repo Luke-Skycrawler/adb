@@ -47,6 +47,9 @@ void reset(bool init)
         globals.pt_fric = data["pt_friction"];
         globals.ee_fric = data["ee_friction"];
     }
+    globals.cubes.clear();
+    globals.scene = data["predefined_case"]["custom"];
+    customize(globals.scene);
     int n_cubes = globals.cubes.size();
     globals.writelock_cols.resize(n_cubes);
     auto ptr = globals.writelock_cols.data();

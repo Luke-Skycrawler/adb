@@ -286,6 +286,7 @@ unsigned int Feedback_Initialize(unsigned int *_vbo, unsigned int *_xfb)
 }
 
 #include "global_variables.h"
+#include "cube.h"
 void gen_preview_framebuffer()
 {
     glGenFramebuffers(1, &globals.depthMapFBO);
@@ -346,10 +347,10 @@ unsigned int TextureFromFile(const char *path, const string &directory, bool gam
 
     return textureID;
 }
-// void Cube::draw(Shader& shader) const
-// {
-//     renderCube();
-// }
+void Cube::draw(Shader& shader) const
+{
+    renderCube();
+}
 
 void Mesh::align_com()
 {
