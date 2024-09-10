@@ -21,7 +21,6 @@ void reset(bool init)
     std::ifstream f("../config.json");
     json data = json::parse(f);
     double dt = data["dt"];
-    auto predefined = data["predefined_case"]["enable"];
     auto g = data["gravity"];
     globals.gravity = vec3(0.0, g ? -9.8 : 0.0, 0.0);
     globals.col_set = data["col_set"];
@@ -47,21 +46,6 @@ void reset(bool init)
         globals.vg_fric = data["vg_friction"];
         globals.pt_fric = data["pt_friction"];
         globals.ee_fric = data["ee_friction"];
-    }
-    if (predefined) {
-        int id = data["predefined_case"]["id"];
-        if (id == 1) {
-            globals.cubes.push_back(spinning_cube());
-        }
-        else {
-            globals.cubes.clear();
-            cube_blocks(2);
-        }
-    }
-    else {
-        globals.cubes.clear();
-        globals.scene = data["predefined_case"]["custom"];
-        customize(globals.scene);
     }
     int n_cubes = globals.cubes.size();
     globals.writelock_cols.resize(n_cubes);
@@ -167,7 +151,6 @@ void processInput(GLFWwindow* window)
 
 void text_callback(GLFWwindow* window, unsigned int c)
 {
-    Cube* p;
     switch (c) {
     case 'c':
     case 'C':
@@ -179,11 +162,6 @@ void text_callback(GLFWwindow* window, unsigned int c)
         break;
     case 'r':
     case 'R':
-        // p = &(globals.cubes[0]);
-        // globals.cubes.clear();
-        // globals.cubes.push_back(*spinning_cube());
-        // delete p;
-        //  globals.cubes = cube_blocks(2);
         reset();
         break;
     case 'q':

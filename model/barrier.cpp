@@ -1,5 +1,8 @@
 #include "barrier.h"
+#include "geometry.h"
+
 using namespace std;
+using namespace Eigen;
 
 scalar barrier::d_hat = 1e-4, barrier::kappa = 1e-3;
 scalar barrier::d_sqrt = 1e-2;

@@ -10,8 +10,7 @@ static const char *varyings[] = {
 };
 static const unsigned int SCR_WIDTH = 800;
 static const unsigned int SCR_HEIGHT = 600;
-#include "../model/cube.h"
-#include "../model/affine_obj.h"
+#include "../model/affine_body.h"
 #include <vector>
 #include <memory>
 #include <map>
@@ -27,8 +26,8 @@ static const unsigned int SCR_HEIGHT = 600;
 
 struct HessBlock {
     int i, j;
-    Matrix<scalar, 12, 1> block;
-    HessBlock(int _i, int _j, const Matrix<scalar, 12, 1> hess): i(_i), j(_j) {
+    Eigen::Matrix<scalar, 12, 1> block;
+    HessBlock(int _i, int _j, const Eigen::Matrix<scalar, 12, 1> hess): i(_i), j(_j) {
         block = hess;
     }
 };
@@ -63,7 +62,7 @@ struct GlobalVariableMainCPP{
     vec3 gravity;
     scalar alpha, beta;
     scalar kappa, d_hat, safe_factor, mu, eps_x, backoff, evh;
-    Vector<scalar, 4> aggregate_time;
+    Eigen::Vector<scalar, 4> aggregate_time;
     bool vg_fric, pt_fric, ee_fric;
     bool col_set, upper_bound, line_search, sparse, dense, ee, pt, ground, psd, damp, full_ccd, align_com, player;
 

@@ -24,8 +24,7 @@ set(HEADERS
     cyCodeBase/cyCore.h
     cyCodeBase/cyPolynomial.h
     model/affine_body.h
-    model/affine_obj.h
-    model/cube.h
+    # model/cube.h
     model/FrictionUtils.h
     model/glue.h
     model/iaabb.h
@@ -39,7 +38,6 @@ set(HEADERS
     model/spatial_hashing.h
     model/geometry.h
     model/ipc_extension.h
-    test_cases/tests.h
     view/camera.h
     view/env.h
     view/global_variables.h
@@ -51,7 +49,6 @@ set(HEADERS
 )
 
 set(SOURCE 
-    model/affine_obj.cpp
     model/col_set.cpp
     model/iaabb.cpp
     # model/IpcCollisionConstraint.cpp
@@ -73,7 +70,6 @@ set(SOURCE
     model/assemble_matrices.cpp
     model/friction.cpp
     model/ipc_extension.cpp
-    test_cases/spinning_cube.cpp
     view/control.cpp
     view/light.cpp
     view/utils.cpp

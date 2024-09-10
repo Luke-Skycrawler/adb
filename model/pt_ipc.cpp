@@ -1,5 +1,5 @@
 #include "barrier.h"
-#include "cube.h"
+#include "affine_body.h"
 #include <ipc/distance/point_triangle.hpp>
 #include <ipc/utils/eigen_ext.hpp>
 #include <ipc/friction/smooth_friction_mollifier.hpp>
@@ -16,6 +16,7 @@ extern Globals globals;
 #include "time_integrator.h"
 #include "ipc_extension.h"
 using namespace utils;
+using namespace Eigen;
 tuple<mat12, vec12> ipc_hess_pt_12x12(
     array<vec3, 4> pt, array<int, 4> ij, ipc::PointTriangleDistanceType pt_type, scalar dist);
 

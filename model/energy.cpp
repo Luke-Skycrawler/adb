@@ -1,3 +1,4 @@
+#include "geometry.h"
 #include "time_integrator.h"
 #include "barrier.h"
 #include "spdlog/spdlog.h"

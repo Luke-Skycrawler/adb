@@ -1,5 +1,5 @@
-#include "psd.h"
 #include "affine_body.h"
+#include "psd.h"
 #include "barrier.h"
 #include <ipc/distance/point_triangle.hpp>
 #include <ipc/distance/edge_edge.hpp>
@@ -23,6 +23,7 @@ static struct CoreIPCLocalConfig{
 extern Globals globals;
 #endif
 
+using namespace Eigen;
 
 
 tuple<mat12, vec12> ipc_hess_pt_12x12(

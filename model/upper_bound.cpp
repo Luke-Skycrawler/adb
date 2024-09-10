@@ -1,4 +1,5 @@
 #include "time_integrator.h"
+#include "geometry.h"
 #include "../view/global_variables.h"
 #include "barrier.h"
 #include <chrono>
@@ -9,6 +10,8 @@
 using namespace std;
 using namespace std::chrono;
 using namespace utils;
+using namespace Eigen;
+
 #define DURATION_TO_DOUBLE(X) duration_cast<duration<scalar>>(high_resolution_clock::now() - (X)).count()
 scalar step_size_upper_bound(Vector<scalar, -1>& dq, vector<unique_ptr<AffineBody>>& cubes,
     int n_cubes, int n_pt, int n_ee, int n_g,

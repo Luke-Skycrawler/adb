@@ -1,5 +1,5 @@
 #include "barrier.h"
-#include "cube.h"
+#include "affine_body.h"
 #ifndef TESTING
 #include "../view/global_variables.h"
 #else 
@@ -15,6 +15,7 @@ extern Globals globals;
 #include "time_integrator.h"
 #include "ipc_extension.h"
 using namespace utils;
+using namespace Eigen;
 tuple<mat12, vec12, scalar> ipc_hess_ee_12x12(
     array<vec3, 4> ee, array<int, 4> ij,
     ipc::EdgeEdgeDistanceType ee_type, scalar dist);

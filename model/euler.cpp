@@ -6,6 +6,7 @@
 #include "../view/global_variables.h"
 #include <assert.h>
 #include <array>
+#include "geometry.h"
 #include "timer.h"
 #include "ipc_extension.h"
 // #include <ipc/distance/point_triangle.hpp>

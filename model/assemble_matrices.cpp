@@ -7,7 +7,7 @@
 #include "../iAABB/pch.h"
 extern Globals globals;
 #endif
-
+using namespace Eigen;
 void put(scalar* values, int offset, int _stride, const Matrix<scalar, 12, 12>& block)
 {
     for (int j = 0; j < 12; j++)

@@ -7,7 +7,7 @@
 #include "../iAABB/pch.h"
 extern Globals globals;
 #endif
-
+using namespace Eigen;
 void ipc_term_vg(AffineBody& c, int v
 #ifdef _FRICTION_
     ,
