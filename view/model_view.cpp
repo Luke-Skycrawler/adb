@@ -5,7 +5,7 @@
 #include "light.h"
 #define _MAIN_CPP
 #include "global_variables.h"
-#include "../test_cases/tests.h"
+#include "cube.h"
 #include "../model/time_integrator.h"
 #include "../model/glue.h"
 #include <glm/gtx/string_cast.hpp>
@@ -14,6 +14,7 @@
 #include <omp.h>
 //#define FEATURE_MODEL
 using namespace std;
+using namespace Eigen;
 //------------------ optional features ----------------------------
 // #define FEATURE_MODEL
 // #define FEATURE_EDGE
@@ -168,7 +169,7 @@ int main()
     auto bunny = make_unique<AffineObject>(b_mesh);
     globals.cubes.push_back(move(bunny));
 #endif
-    Light lights(LightPositions, 4);
+    Light lights(globals.light_positions, 4);
 
     // load textures (we now use a utility function to keep the code more organized)
     // -----------------------------------------------------------------------------
@@ -228,6 +229,8 @@ int main()
     globals.edges = utils::gen_edge_list(globals.cubes, n_cubes);
     globals.points = utils::gen_point_list(globals.cubes, n_cubes);
     globals.triangles = utils::gen_triangle_list(globals.cubes, n_cubes);
+    
+    auto &lightPos{globals.light_positions[0]};
     // be sure to call after glfw intiailzation 
 
     // render loop

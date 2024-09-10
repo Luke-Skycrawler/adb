@@ -1,13 +1,13 @@
 #include "affine_body.h"
-#include "time_integrator.h"
+#include "sparse.h"
 #include <omp.h>
 #ifndef TESTING
-#include "../view/global_variables.h"
+#include "settings.h"
 #else 
 #include "../iAABB/pch.h"
 extern Globals globals;
 #endif
-
+using namespace Eigen;
 void put(scalar* values, int offset, int _stride, const Matrix<scalar, 12, 12>& block)
 {
     for (int j = 0; j < 12; j++)

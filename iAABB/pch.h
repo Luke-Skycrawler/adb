@@ -12,6 +12,13 @@ struct Globals {
     double mu, evh, dt;
     bool ground;
 };
+
+static struct CoreIPCLocalConfig{
+    bool psd;
+    scalar eps_x;
+    CoreIPCLocalConfig(): psd(true), eps_x(1e-3){}
+} globals;
+
 //#define _BODY_WISE_
 
 

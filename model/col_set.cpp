@@ -1,4 +1,4 @@
-#include "../view/global_variables.h"
+#include "settings.h"
 #include "barrier.h"
 #include "affine_body.h"
 #include "collision.h"
@@ -7,6 +7,7 @@
 #include <ipc/distance/point_triangle.hpp>
 #include <ipc/distance/edge_edge.hpp>
 #include <chrono>
+#include "geometry.h"
 #include "ipc_extension.h"
 
 using namespace std;

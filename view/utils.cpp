@@ -286,6 +286,7 @@ unsigned int Feedback_Initialize(unsigned int *_vbo, unsigned int *_xfb)
 }
 
 #include "global_variables.h"
+#include "cube.h"
 void gen_preview_framebuffer()
 {
     glGenFramebuffers(1, &globals.depthMapFBO);

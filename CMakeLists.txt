@@ -23,6 +23,7 @@ FetchContent_MakeAvailable(ipc_toolkit)
 set(HEADERS 
     cyCodeBase/cyCore.h
     cyCodeBase/cyPolynomial.h
+    model/settings.h
     model/affine_body.h
     model/affine_obj.h
     model/cube.h
@@ -39,7 +40,7 @@ set(HEADERS
     model/spatial_hashing.h
     model/geometry.h
     model/ipc_extension.h
-    test_cases/tests.h
+    model/sparse.h
     view/camera.h
     view/env.h
     view/global_variables.h
@@ -56,6 +57,7 @@ set(SOURCE
     model/iaabb.cpp
     # model/IpcCollisionConstraint.cpp
     # model/IpcFrictionConstraint.cpp
+    model/line_search.cpp
     model/othogonal_energy.cpp
     model/barrier.cpp
     model/euler.cpp
@@ -94,6 +96,7 @@ set(PYTHON_HEADERS
     model/geometry.h
     model/collision.h
     model/ipc_extension.h
+    model/settings.h
     cyCodeBase/cyCore.h
     cyCodeBase/cyPolynomial.h
     )

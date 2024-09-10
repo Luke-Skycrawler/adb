@@ -140,7 +140,7 @@ int main()
     Model temple("nanosuit/nanosuit.obj");
     // Model temple("mods/gallery/gallery.obj");
 #endif
-    Light lights(LightPositions, 4);
+    Light lights(globals.light_positions, 4);
 
     // load textures (we now use a utility function to keep the code more organized)
     // -----------------------------------------------------------------------------

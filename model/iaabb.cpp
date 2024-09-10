@@ -15,11 +15,9 @@
 // #define _FULL_PARALLEL_
 
 #ifndef TESTING
-#include "../view/global_variables.h"
-#define DT globals.dt
+#include "settings.h"
 #else
 #include "../iAABB/pch.h"
-#define DT 1e-2
 #endif
 #include <chrono>
 

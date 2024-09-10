@@ -2,12 +2,12 @@
 #include "collision.h"
 #include "barrier.h"
 #ifndef TESTING
-#include "../view/global_variables.h"
+#include "settings.h"
 #else 
 #include "../iAABB/pch.h"
 extern Globals globals;
 #endif
-
+using namespace Eigen;
 void ipc_term_vg(AffineBody& c, int v
 #ifdef _FRICTION_
     ,

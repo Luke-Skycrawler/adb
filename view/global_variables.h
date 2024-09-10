@@ -1,5 +1,6 @@
 #pragma once
 #ifndef TESTING
+#ifndef ABDTK
 #include "camera.h"
 // consts
 static const int SHADOW_WIDTH = 800, SHADOW_HEIGHT = 600;
@@ -10,8 +11,7 @@ static const char *varyings[] = {
 };
 static const unsigned int SCR_WIDTH = 800;
 static const unsigned int SCR_HEIGHT = 600;
-#include "../model/cube.h"
-#include "../model/affine_obj.h"
+#include "../model/affine_body.h"
 #include <vector>
 #include <memory>
 #include <map>
@@ -27,8 +27,8 @@ static const unsigned int SCR_HEIGHT = 600;
 
 struct HessBlock {
     int i, j;
-    Matrix<scalar, 12, 1> block;
-    HessBlock(int _i, int _j, const Matrix<scalar, 12, 1> hess): i(_i), j(_j) {
+    Eigen::Matrix<scalar, 12, 1> block;
+    HessBlock(int _i, int _j, const Eigen::Matrix<scalar, 12, 1> hess): i(_i), j(_j) {
         block = hess;
     }
 };
@@ -45,9 +45,20 @@ struct GlobalVariableMainCPP{
 
     // camera
     Camera camera;
+
+    // control
     float lastX, lastY;
     bool firstMouse;
-    GlobalVariableMainCPP(): camera(glm::vec3(0.0f, 6.0f, 10.0f)){
+
+    // light
+    glm::vec3 light_positions[4];
+    GlobalVariableMainCPP(): camera(glm::vec3(0.0f, 6.0f, 10.0f)), 
+        light_positions{
+            glm::vec3(5.0f, 5.0f, 6.0f),
+            glm::vec3(1.2f, 2.0f, 0.0f),
+            glm::vec3(-1.2f, 2.0f, 2.0f),
+            glm::vec3(-1.2f, 2.0f, 0.0f)}
+    {
         postrender = false, edge = false, skybox = false, model_draw = false, display_corner = true, motion = false, feedback = false, cursor_hidden = true;        
         lastX = SCR_WIDTH / 2.0f;
         lastY = SCR_HEIGHT / 2.0f;
@@ -63,7 +74,7 @@ struct GlobalVariableMainCPP{
     vec3 gravity;
     scalar alpha, beta;
     scalar kappa, d_hat, safe_factor, mu, eps_x, backoff, evh;
-    Vector<scalar, 4> aggregate_time;
+    Eigen::Vector<scalar, 4> aggregate_time;
     bool vg_fric, pt_fric, ee_fric;
     bool col_set, upper_bound, line_search, sparse, dense, ee, pt, ground, psd, damp, full_ccd, align_com, player;
 
@@ -82,24 +93,21 @@ struct GlobalVariableMainCPP{
 #endif
 
 };
+
+
+
+
+// alocate globals
 #ifndef GOOGLE_TEST
 #ifdef _MAIN_CPP
 #define VARIABLE_LOCATOR
-VARIABLE_LOCATOR glm::vec3 LightPositions[]
-= {
-   glm::vec3(5.0f, 5.0f, 6.0f),
-   glm::vec3(1.2f, 2.0f, 0.0f),
-   glm::vec3(-1.2f, 2.0f, 2.0f),
-   glm::vec3(-1.2f, 2.0f, 0.0f)};
 #else 
 #define VARIABLE_LOCATOR extern
-VARIABLE_LOCATOR glm::vec3 LightPositions[];
 #endif
 
 VARIABLE_LOCATOR GlobalVariableMainCPP globals;
 
-// lighting
-static glm::vec3 &lightPos(LightPositions[0]);
 
+#endif
 #endif
 #endif

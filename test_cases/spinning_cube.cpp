@@ -1,7 +1,9 @@
 #define _USE_MATH_DEFINES
 #include <cmath>
-#include "tests.h"
+#include "../model/affine_obj.h"
+#include "../model/cube.h"
 #include "../model/geometry.h"
+#include "global_variables.h"
 #include <nlohmann/json.hpp>
 #include <fstream>
 #include <iostream>

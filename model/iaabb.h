@@ -1,5 +1,6 @@
 #pragma once
 #include "affine_body.h"
+#include "geometry.h"
 #ifdef TESTING
 #include "../iAABB/pch.h"
 

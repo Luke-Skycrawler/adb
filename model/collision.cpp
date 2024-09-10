@@ -12,6 +12,7 @@
 #endif
 using namespace barrier;
 using namespace std;
+using namespace Eigen;
 #ifdef _TIGHT_INCLUSION_ENABLE_
 
 scalar vf_collision_detect(vec3& p_t0, vec3& p_t1, const AffineBody& c, int id)
