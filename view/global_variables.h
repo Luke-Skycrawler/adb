@@ -25,14 +25,6 @@ static const unsigned int SCR_HEIGHT = 600;
 #include "../model/iaabb.h"
 #endif
 
-struct HessBlock {
-    int i, j;
-    Eigen::Matrix<scalar, 12, 1> block;
-    HessBlock(int _i, int _j, const Eigen::Matrix<scalar, 12, 1> hess): i(_i), j(_j) {
-        block = hess;
-    }
-};
-
 struct GlobalVariableMainCPP{
     #ifndef GOOGLE_TEST
     // control
@@ -67,7 +59,6 @@ struct GlobalVariableMainCPP{
     #endif
     scalar dt;
     int max_iter, tot_iter, ts, set_size, starting_ts, ending_ts;
-    std::vector<HessBlock> hess_triplets;
     std::vector<unique_ptr<AffineBody>> cubes;
         std::map<std::string, unique_ptr<Model>> loaded_models;
 

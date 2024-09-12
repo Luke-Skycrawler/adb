@@ -1,4 +1,5 @@
 #include "affine_body.h"
+#include "time_integrator.h"
 #include "sparse.h"
 #include <omp.h>
 #ifndef TESTING
@@ -108,8 +109,8 @@ void output_hessian_gradient(
         triplets.push_back(HessBlock(ii * 12, ii * 12 + i, hess_p.block<12, 1>(0, i)));
         triplets.push_back(HessBlock(jj * 12, jj * 12 + i, hess_t.block<12, 1>(0, i)));
     }
-    // globals.hess_triplets.push_back({ii * 12, jj * 12, off_diag});
-    // globals.hess_triplets.push_back({jj * 12, ii * 12, off_T});
+    // hess_triplets.push_back({ii * 12, jj * 12, off_diag});
+    // hess_triplets.push_back({jj * 12, ii * 12, off_T});
 }
 
 void output_hessian_gradient(

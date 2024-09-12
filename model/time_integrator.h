@@ -10,6 +10,14 @@
 #include <ipc/distance/edge_edge.hpp>
 #include <tuple>
 
+struct HessBlock {
+    int i, j;
+    Eigen::Matrix<scalar, 12, 1> block;
+    HessBlock(int _i, int _j, const Eigen::Matrix<scalar, 12, 1> hess): i(_i), j(_j) {
+        block = hess;
+    }
+};
+
 void implicit_euler(std::vector<std::unique_ptr<AffineBody>>& cubes, scalar dt);
 void gen_collision_set(
     bool vt2, int n_cubes,
@@ -60,7 +68,7 @@ scalar norm_1(Eigen::Vector<scalar, -1>& dq, int n_cubes);
 void damping_dense(Eigen::Matrix<scalar, -1, -1>& big_hess, scalar dt, int n_cubes);
 
 void damping_sparse(Eigen::SparseMatrix<scalar>& sparse_hess, scalar dt, int n_cubes);
-void build_from_triplets(Eigen::SparseMatrix<scalar>& sparse_hess_trip, Eigen::Matrix<scalar, -1, -1>& big_hess, int hess_dim, int n_cubes);
+void build_from_triplets(Eigen::SparseMatrix<scalar>& sparse_hess_trip, Eigen::Matrix<scalar, -1, -1>& big_hess, int hess_dim, int n_cubes, std::vector<HessBlock>& hess_triplets);
 scalar E(const vec12& q, const vec12& q_tiled, const AffineBody& c, scalar dt);
 
 std::vector<std::array<unsigned, 2>> gen_edge_list(

@@ -6,7 +6,7 @@
 *Windows*
 Make sure you have cmake and vcpkg installed. Detailed instructions can be found [here](https://vcpkg.io/en/getting-started.html).
 
-Navigate to the vcpkg directory, and installed the following packages via vcpkg
+Navigate to the vcpkg directory, and install the following packages via vcpkg
 `vcpkg install glfw3 eigen3 glm glad assimp nlohmann-json --triplet=x64-windows`
 
 Navigate to the root directory glad_framework, and type in
