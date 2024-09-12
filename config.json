@@ -7,7 +7,7 @@
     "predefined_case" : {
         "enable": false,
         "id" : 2,
-        "custom": "../test_cases/blocks.json"
+        "custom": "../test_cases/10b.json"
     },
     "solver": "sparse",
     "gravity": true, 

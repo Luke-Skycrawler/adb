@@ -104,6 +104,7 @@
         "codecvt": "cpp",
         "future": "cpp",
         "shared_mutex": "cpp",
-        "*.tpp": "cpp"
+        "*.tpp": "cpp",
+        "pardisosupport": "cpp"
     }
 }

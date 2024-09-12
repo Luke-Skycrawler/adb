@@ -1,5 +1,5 @@
 #pragma once
-#include <Eigen/Eigen>
+#include "affine_body.h"
 
 
 template <
