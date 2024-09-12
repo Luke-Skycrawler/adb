@@ -400,7 +400,7 @@ void implicit_euler(vector<unique_ptr<AffineBody>>& cubes, scalar dt)
             else if (globals.sparse) {
 #ifdef EIGEN_USE_MKL_ALL
                 PardisoLLT<SparseMatrix<scalar>> ldlt_solver;
-                // SimplicialLLT<SparseMatrix<scalar, ColMajor>> ldlt_solver;
+                 //SimplicialLLT<SparseMatrix<scalar, ColMajor>> ldlt_solver;
 #else
                 SimplicialLLT<SparseMatrix<scalar, ColMajor>> ldlt_solver;
 #endif
