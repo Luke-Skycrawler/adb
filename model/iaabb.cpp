@@ -556,153 +556,6 @@ scalar primitive_brute_force(
                              *eidx_private = new vector<array<int, 4>>[omp_get_max_threads()];
     static vector<array<vec3, 4>>*pts_private = new vector<array<vec3, 4>>[omp_get_max_threads()], *ees_private = new vector<array<vec3, 4>>[omp_get_max_threads()];
 
-#ifdef _FULL_PARALLEL_
-    static vector<int> inner_presum;
-    auto n_lists = n_overlap / 2;
-    inner_presum.resize(n_lists + 1);
-
-    const auto compute_thread_starting = [&](int pt_ee_tp, vector<array<int, 2>>& ret) -> int {
-        int inner, outer;
-        int n_threads = omp_get_num_procs();
-        ret.resize(n_threads);
-        inner_presum[0] = 0;
-        for (int _i = 0; _i < n_lists; _i++) {
-            int i = _i * 2;
-            auto& p{ *overlaps[i].plist };
-            auto& pi{
-                pt_ee_tp == 0 ? p.vi : pt_ee_tp == 1 ? p.ei
-                                                     : p.fi
-            };
-            auto& pj{
-                pt_ee_tp == 0 ? p.fj : pt_ee_tp == 1 ? p.ej
-                                                     : p.vj
-            };
-            auto ni = pi.size(), nj = pj.size();
-            inner_presum[_i + 1] = inner_presum[_i] + ni * nj;
-            // presum
-        }
-        int n_task = inner_presum[n_lists];
-        int k_threads = (n_task + n_threads - 1) / n_threads;
-        for (int j = 0; j < n_threads; j++) {
-            int kj = j * k_threads;
-            int i0 = lower_bound(inner_presum.begin(), inner_presum.end(), kj, [](int a, int b) -> bool {
-                return a <= b;
-            }) - inner_presum.begin() - 1;
-
-            ret[j] = { i0 * 2, kj - inner_presum[i0] };
-        }
-        return k_threads;
-    };
-
-    static vector<array<int, 2>> thread_starting_index;
-    if (!cull_trajectory) {
-        // point-triangle
-        int k_threads = compute_thread_starting(0, thread_starting_index);
-#pragma omp parallel
-        {
-            int k_tasks_done = 0;
-            auto tid = omp_get_thread_num();
-            idx_private[tid].resize(0);
-            pts_private[tid].resize(0);
-
-            auto& a = thread_starting_index[tid];
-            int outer = a[0], inner = a[1];
-            do {
-                int I{ overlaps[outer].i }, J{ overlaps[outer].j };
-                auto &ci{ *cubes[I] }, &cj{ *cubes[J] };
-                auto& p{ *overlaps[outer].plist };
-                auto& vilist{ p.vi };
-                auto& fjlist{ p.fj };
-                int nv = vilist.size(), nf = fjlist.size();
-                int n_pt = nv * nf;
-                for (int i = inner; i < n_pt; i++) {
-                    int vi{ i / nf }, fj{ i % nf };
-                    pt_col_set_task(vi, fj, I, J, ci, cj, pts_private[tid], idx_private[tid]);
-                    k_tasks_done++;
-                    if (k_tasks_done >= k_threads) break;
-                }
-                if (outer >= n_overlap || k_tasks_done >= k_threads) break;
-                outer += 2;
-                inner = 0;
-            } while (1);
-#pragma omp critical
-            {
-                pts.insert(pts.end(), pts_private[tid].begin(), pts_private[tid].end());
-                idx.insert(idx.end(), idx_private[tid].begin(), idx_private[tid].end());
-            }
-        }
-        // triangle-point
-        k_threads = compute_thread_starting(2, thread_starting_index);
-#pragma omp parallel
-        {
-            int k_tasks_done = 0;
-            auto tid = omp_get_thread_num();
-            idx_private[tid].resize(0);
-            pts_private[tid].resize(0);
-
-            auto& a = thread_starting_index[tid];
-            int outer = a[0], inner = a[1];
-            do {
-                int I{ overlaps[outer].i }, J{ overlaps[outer].j };
-                auto &ci{ *cubes[I] }, &cj{ *cubes[J] };
-                auto& p{ *overlaps[outer].plist };
-                auto& vjlist{ p.vj };
-                auto& filist{ p.fi };
-                int nv = vjlist.size(), nf = filist.size();
-                int n_pt = nv * nf;
-                for (int i = inner; i < n_pt; i++) {
-                    int vj{ i / nf }, fi{ i % nf };
-                    pt_col_set_task(vj, fi, I, J, ci, cj, pts_private[tid], idx_private[tid]);
-                    k_tasks_done++;
-                    if (k_tasks_done >= k_threads) break;
-                }
-                if (outer >= n_overlap || k_tasks_done >= k_threads) break;
-                outer += 2;
-                inner = 0;
-            } while (1);
-#pragma omp critical
-            {
-                pts.insert(pts.end(), pts_private[tid].begin(), pts_private[tid].end());
-                idx.insert(idx.end(), idx_private[tid].begin(), idx_private[tid].end());
-            }
-        }
-        // edge-edge
-        k_threads = compute_thread_starting(1, thread_starting_index);
-#pragma omp parallel
-        {
-            int k_tasks_done = 0;
-            auto tid = omp_get_thread_num();
-            ees_private[tid].resize(0);
-            eidx_private[tid].resize(0);
-
-            auto& a = thread_starting_index[tid];
-            int outer = a[0], inner = a[1];
-            do {
-                int I{ overlaps[outer].i }, J{ overlaps[outer].j };
-                auto &ci{ *cubes[I] }, &cj{ *cubes[J] };
-                auto& p{ *overlaps[outer].plist };
-                auto& eilist{ p.ei };
-                auto& ejlist{ p.ej };
-                int nei = eilist.size(), nej = ejlist.size();
-                int n_ee = nei * nej;
-                for (int i = inner; i < n_ee; i++) {
-                    int ei{ i / nej }, ej{ i % nej };
-                    ee_col_set_task(ei, ej, I, J, ci, cj, ees_private[tid], eidx_private[tid]);
-                    k_tasks_done++;
-                    if (k_tasks_done >= k_threads) break;
-                }
-                if (outer >= n_overlap || k_tasks_done >= k_threads) break;
-                outer += 2;
-                inner = 0;
-            } while (1);
-#pragma omp critical
-            {
-                ees.insert(ees.end(), ees_private[tid].begin(), ees_private[tid].end());
-                eidx.insert(eidx.end(), eidx_private[tid].begin(), eidx_private[tid].end());
-            }
-        }
-    }
-    #else
     if (!cull_trajectory)
 #pragma omp parallel
     {
@@ -716,16 +569,10 @@ scalar primitive_brute_force(
             int i = _i * 2;
             int I{ overlaps[i].i }, J{ overlaps[i].j };
             auto& p{ *overlaps[i].plist };
-            auto& vilist{ p.vi };
-            auto& vjlist{ p.vj };
-            auto& eilist{ p.ei };
-            auto& ejlist{ p.ej };
-            auto& filist{ p.fi };
-            auto& fjlist{ p.fj };
 
-            ee_col_set(eilist, ejlist, cubes, I, J, ees_private[tid], eidx_private[tid]);
-            vf_col_set(vilist, fjlist, cubes, I, J, pts_private[tid], idx_private[tid]);
-            vf_col_set(vjlist, filist, cubes, J, I, pts_private[tid], idx_private[tid]);
+            ee_col_set(p.ei, p.ej, cubes, I, J, ees_private[tid], eidx_private[tid]);
+            vf_col_set(p.vi, p.fj, cubes, I, J, pts_private[tid], idx_private[tid]);
+            vf_col_set(p.vj, p.fi, cubes, J, I, pts_private[tid], idx_private[tid]);
         }
 #pragma omp critical
         {
@@ -735,7 +582,6 @@ scalar primitive_brute_force(
             eidx.insert(eidx.end(), eidx_private[tid].begin(), eidx_private[tid].end());
         }
     }
-    #endif
     else
 #pragma omp parallel
     {
@@ -745,15 +591,9 @@ scalar primitive_brute_force(
             int i = _i * 2;
             int I{ overlaps[i].i }, J{ overlaps[i].j };
             auto& p{ *overlaps[i].plist };
-            auto& vilist{ p.vi };
-            auto& vjlist{ p.vj };
-            auto& eilist{ p.ei };
-            auto& ejlist{ p.ej };
-            auto& filist{ p.fi };
-            auto& fjlist{ p.fj };
-            scalar t1 = vf_col_time(vilist, fjlist, cubes, I, J, vertex_starting_index, vt1_buffer);
-            scalar t2 = vf_col_time(vjlist, filist, cubes, J, I, vertex_starting_index, vt1_buffer);
-            scalar t3 = ee_col_time(eilist, ejlist, cubes, I, J, vertex_starting_index, vt1_buffer);
+            scalar t1 = vf_col_time(p.vi, p.fj, cubes, I, J, vertex_starting_index, vt1_buffer);
+            scalar t2 = vf_col_time(p.vj, p.fi, cubes, J, I, vertex_starting_index, vt1_buffer);
+            scalar t3 = ee_col_time(p.ei, p.ej, cubes, I, J, vertex_starting_index, vt1_buffer);
 
             toi = min(toi, min({t1, t2, t3}));
         }

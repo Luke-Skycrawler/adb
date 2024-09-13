@@ -14,6 +14,71 @@
 using namespace Eigen;
 using namespace std;
 
+void prepare_aabbs_ei(vector<int> eilist, AffineBody &ci, vector<vec3>& vt1_buffer, int offi, vector<Edge>& ei0s, vector<Edge>& ei1s, vector<lu>& eiaabbs){
+
+    eiaabbs.clear();
+    ei0s.clear();
+    ei1s.clear();
+
+    eiaabbs.reserve(eilist.size());
+    ei0s.reserve(eilist.size());
+    ei1s.reserve(eilist.size());
+
+    for (auto& ei : eilist) {
+        Edge ei1(ci, ei, true, true);
+        int i0, i1;
+        i0 = ci.edges[ei * 2];
+        i1 = ci.edges[ei * 2 + 1];
+        Edge ei0{ vt1_buffer[offi + i0], vt1_buffer[offi + i1] };
+        ei0s.push_back(ei0);
+        ei1s.push_back(ei1);
+        eiaabbs.push_back(compute_aabb(ei0, ei1));
+    }
+}
+
+void prepare_aabbs_v(vector<int> vilist, AffineBody &ci, vector<vec3>& vt1_buffer, int offi, vector<vec3>& v0s, vector<vec3> &v1s, vector<lu> &viaabbs){
+
+    viaabbs.clear();
+    v0s.clear();
+    v1s.clear();
+
+    viaabbs.reserve(vilist.size());
+    v0s.reserve(vilist.size());
+    v1s.reserve(vilist.size());
+
+    for (auto& vi : vilist) {
+        vec3 v1{ ci.v_transformed[vi] };
+        vec3 v0{ vt1_buffer[offi + vi] };
+        v0s.push_back(v0);
+        v1s.push_back(v1);
+        viaabbs.push_back(compute_aabb(v0, v1));
+    }
+}
+
+void prepare_aabbs_f(vector<int> fjlist, AffineBody &cj, vector<vec3> &vt1_buffer, int offj, vector<Face> &f0s, vector<Face> &f1s, vector<lu> &fjaabbs){
+    fjaabbs.clear();
+    f0s.clear();
+    f1s.clear();
+    fjaabbs.reserve(fjlist.size());
+    f0s.reserve(fjlist.size());
+    f1s.reserve(fjlist.size());
+
+    for (auto& fj : fjlist) {
+        Face f{ cj, unsigned(fj), true, true };
+        int _a, _b, _c;
+        _a = cj.indices[fj * 3 + 0],
+        _b = cj.indices[fj * 3 + 1],
+        _c = cj.indices[fj * 3 + 2];
+
+        Face f0{ vt1_buffer[offj + _a], vt1_buffer[offj + _b], vt1_buffer[offj + _c] };
+
+        f0s.push_back(f0);
+        f1s.push_back(f);
+        fjaabbs.push_back(compute_aabb(f0, f));
+    }
+
+}
+
 
 scalar ee_col_time(
     vector<int>& eilist, vector<int>& ejlist,
@@ -27,40 +92,8 @@ scalar ee_col_time(
     vector<lu> eiaabbs, ejaabbs;
     vector<Edge> ei0s, ej0s, ei1s, ej1s;
 
-    eiaabbs.clear();
-    ejaabbs.clear();
-    ei0s.clear();
-    ej0s.clear();
-    ei1s.clear();
-    ej1s.clear();
-
-    eiaabbs.reserve(eilist.size());
-    ejaabbs.reserve(ejlist.size());
-    ei0s.reserve(eilist.size());
-    ej0s.reserve(ejlist.size());
-    ei1s.reserve(eilist.size());
-    ej1s.reserve(ejlist.size());
-    
-    for (auto& ei : eilist) {
-        Edge ei1(ci, ei, true, true);
-        int i0, i1;
-        i0 = ci.edges[ei * 2];
-        i1 = ci.edges[ei * 2 + 1];
-        Edge ei0{ vt1_buffer[offi + i0], vt1_buffer[offi + i1] };
-        ei0s.push_back(ei0);
-        ei1s.push_back(ei1);
-        eiaabbs.push_back(compute_aabb(ei0, ei1));
-    }
-    for (auto& ej : ejlist) {
-        Edge ej1(cj, ej, true, true);
-        int j0, j1;
-        j0 = cj.edges[ej * 2];
-        j1 = cj.edges[ej * 2 + 1];
-        Edge ej0{ vt1_buffer[offj + j0], vt1_buffer[offj + j1] };
-        ej0s.push_back(ej0);
-        ej1s.push_back(ej1);
-        ejaabbs.push_back(compute_aabb(ej0, ej1));
-    }
+    prepare_aabbs_ei(eilist, ci, vt1_buffer, offi, ei0s, ei1s, eiaabbs);
+    prepare_aabbs_ei(ejlist, cj, vt1_buffer, offj, ej0s, ej1s, ejaabbs);
     int nei = eilist.size(), nej = ejlist.size();   
     if (nei > globals.params_int["thres"] || nej > globals.params_int["thres"]) {
         auto &EIs{nei > nej? eiaabbs: ejaabbs}, &EJs{nei > nej? ejaabbs: eiaabbs};
@@ -90,15 +123,6 @@ scalar ee_col_time(
                 auto &ei0{ ei0s[i] }, &ei1{ ei1s[i] }, &ej0{ ej0s[j] }, &ej1{ ej1s[j] };
                 int ei = eilist[i], ej = ejlist[j];
                 scalar t = ee_collision_time(ei0, ej0, ei1, ej1);
-#ifdef TESTING
-                if (t < 1.0) {
-                    if (I < J)
-                        eidx.push_back({ I, ei, J, ej });
-                    else
-                        eidx.push_back({ J, ej, I, ei });
-                    ee_tois.push_back({ t, int(ee_tois.size()) });
-                }
-#endif
                 toi = min(toi, t);
             }
         }
@@ -117,39 +141,8 @@ scalar vf_col_time(
     vector<vec3> v0s, v1s;
     vector<Face> f0s, f1s;
 
-    viaabbs.clear();
-    fjaabbs.clear();
-    v0s.clear();
-    v1s.clear();
-    f0s.clear();
-    f1s.clear();
-
-    viaabbs.reserve(vilist.size());
-    fjaabbs.reserve(fjlist.size());
-    v0s.reserve(vilist.size());
-    v1s.reserve(vilist.size());
-    f0s.reserve(fjlist.size());
-    f1s.reserve(fjlist.size());
-    for (auto& vi : vilist) {
-        vec3 v1{ ci.v_transformed[vi] };
-        vec3 v0{ vt1_buffer[offi + vi] };
-        v0s.push_back(v0);
-        v1s.push_back(v1);
-        viaabbs.push_back(compute_aabb(v0, v1));
-    }
-    for (auto& fj : fjlist) {
-        Face f{ cj, unsigned(fj), true, true };
-        int _a, _b, _c;
-        _a = cj.indices[fj * 3 + 0],
-        _b = cj.indices[fj * 3 + 1],
-        _c = cj.indices[fj * 3 + 2];
-
-        Face f0{ vt1_buffer[offj + _a], vt1_buffer[offj + _b], vt1_buffer[offj + _c] };
-
-        f0s.push_back(f0);
-        f1s.push_back(f);
-        fjaabbs.push_back(compute_aabb(f0, f));
-    }
+    prepare_aabbs_v(vilist, ci, vt1_buffer, offi, v0s, v1s, viaabbs);
+    prepare_aabbs_f(fjlist, cj, vt1_buffer, offj, f0s, f1s, fjaabbs);
 
     int nvi = vilist.size(), nfj = fjlist.size();   
     if (nvi > globals.params_int["thres"] || nfj > globals.params_int["thres"]) {
@@ -181,12 +174,6 @@ scalar vf_col_time(
                 auto &v0{ v0s[i] }, &v{ v1s[i] };
                 auto &f0{ f0s[j] }, &f{ f1s[j] };
                 scalar t = pt_collision_time(v0, f0, v, f);
-#ifdef TESTING
-                if (t < 1.0) {
-                    idx.push_back({ I, vi, J, fj });
-                    pt_tois.push_back({ t, int(pt_tois.size()) });
-                }
-#endif
                 toi = min(toi, t);
             }
         }
@@ -239,19 +226,7 @@ void vf_col_set(vector<int>& vilist, vector<int>& fjlist,
                 else 
                     {i = jj; j = ii;}
 
-
-                int vi = vilist[i], fj = fjlist[j];
-                auto& v{ vis[i] };
-                auto& f{ fjs[j] };
-                auto [d, pt_type] = vf_distance(v, f);
-                if (d < barrier::d_hat) {
-                    array<vec3, 4> pt = { v, f.t0, f.t1, f.t2 };
-                    array<int, 4> ij = { I, vi, J, fj };
-                    {
-                        pts.push_back(pt);
-                        idx.push_back(ij);
-                    }
-                }
+                pt_col_set_task(vilist[i], fjlist[j], I, J, vis[i], fjs[j], viaabbs[i], fjaabbs[j], pts, idx);
             }
         }
         bvh_destroy_host(bvh);
@@ -307,19 +282,7 @@ void ee_col_set(vector<int>& eilist, vector<int>& ejlist,
                 else 
                     {i = jj; j = ii;}
 
-                auto &eii{ eis[i] }, &ejj{ ejs[j] };
-                int ei = eilist[i], ej = ejlist[j];
-                auto ee_type = ipc::edge_edge_distance_type(eii.e0, eii.e1, ejj.e0, ejj.e1);
-                scalar d = ipc::edge_edge_distance(eii.e0, eii.e1, ejj.e0, ejj.e1, ee_type);
-                if (d < barrier::d_hat) {
-                    array<vec3, 4> ee = { eii.e0, eii.e1, ejj.e0, ejj.e1 };
-                    array<int, 4> ij = { I, ei, J, ej };
-                    {
-                        ees.push_back(ee);
-                        eidx.push_back(ij);
-                    }
-                }
-
+                ee_col_set_task(eilist[i], ejlist[j], I, J, eis[i], ejs[j], eiaabbs[i], ejaabbs[j], ees, eidx);
             }
         }
         bvh_destroy_host(bvh);
