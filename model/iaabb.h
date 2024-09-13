@@ -2,12 +2,12 @@
 #include "affine_body.h"
 #include "geometry.h"
 #include "bvh/bvh.h"
+#include "bounds3.h"
 #ifdef TESTING
 #include "../iAABB/pch.h"
 
 #endif
 // using lu = std::array<vec3, 2>;
-using lu = bounds3;
 
 struct PList {
     std::vector<int> vi, vj, fi, fj, ei, ej;
@@ -30,41 +30,6 @@ struct BoundingBox {
     scalar p;
     bool true_for_l_false_for_u;
 };
-
-lu compute_aabb(const AffineBody& c);
-
-inline lu compute_aabb(const Edge& e)
-{
-    vec3 l, u;
-    auto e0 {e.e0.array()}, e1 {e.e1.array()};
-    l = e0.min(e1);
-    u = e0.max(e1);
-    return { l, u };
-}
-
-
-inline lu compute_aabb(const Edge& e, scalar d_hat_sqrt)
-{
-    vec3 l, u;
-    auto e0 {e.e0.array()}, e1 {e.e1.array()};
-    l = e0.min(e1) - d_hat_sqrt;
-    u = e0.max(e1) + d_hat_sqrt;
-    return { l, u };
-}
-
-inline lu compute_aabb(const Face& f)
-{
-    vec3 l, u;
-    auto t0 {f.t0.array()}, 
-        t1 {f.t1.array()}, 
-        t2 {f.t2.array()};
-    l = t0.min(t1).min(t2);
-    u = t0.max(t1).max(t2);
-    return { l, u };
-}
-
-lu affine(const lu& aabb, q4& q);
-lu affine(lu aabb, AffineBody& c, int vtn);
 
 
 void intersect_brute_force(

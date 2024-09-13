@@ -49,6 +49,8 @@ set(HEADERS
     model/ipc_extension.h
     model/sparse.h
     model/bvh/bvh.h
+    model/thread_local_culling.h
+    model/bounds3.h
     view/camera.h
     view/env.h
     view/global_variables.h
@@ -84,6 +86,7 @@ set(SOURCE
     model/friction.cpp
     model/ipc_extension.cpp
     model/bvh/bvh.cpp
+    model/thread_local_culling.cpp
     test_cases/spinning_cube.cpp
     view/control.cpp
     view/light.cpp
