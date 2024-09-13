@@ -86,3 +86,7 @@ inline lu compute_aabb(const Face& f1, const Face& f2)
 {
     return merge(compute_aabb(f1), compute_aabb(f2));
 }
+
+inline lu dialate(lu &aabb, scalar d) {
+    return {aabb.lower - vec3(d, d, d), aabb.upper + vec3(d, d, d)};
+}

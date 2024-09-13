@@ -41,3 +41,38 @@ void ee_col_set(
     int I, int J,
     std::vector<std::array<vec3, 4>>& ees,
     std::vector<std::array<int, 4>>& eidx);
+
+
+void ee_task(
+    int ei, int ej, int I, int J, 
+    const Edge &eii, const Edge &ejj,
+    const Edge &ei1, const Edge &ej1,
+    std::vector<q4> ees,
+    std::vector<i4> eidx
+);
+
+void pt_task(
+    int vi, int fj, int I, int J,
+    const vec3 &v0, const Face &f0,
+    const vec3 &v1, const Face &f1,
+    std::vector<q4> pts,
+    std::vector<i4> idx
+);
+scalar pt_col_set_and_time(
+    std::vector<int> vilist, std::vector<int> fjlist,
+    const std::vector<std::unique_ptr<AffineBody>>& cubes,
+    int I, int J,
+    std::vector<int> &vertex_starting_index,
+    std::vector<vec3> &vt1_buffer,
+    std::vector<q4> &pts,
+    std::vector<i4> &idx
+);
+scalar ee_col_set_and_time(
+    std::vector<int> eilist, std::vector<int> ejlist, 
+    const std::vector<std::unique_ptr<AffineBody>>& cubes,  
+    int I, int J,   
+    std::vector<int> &vertex_starting_index, 
+    std::vector<vec3> &vt1_buffer,
+    std::vector<q4> &ees, 
+    std::vector<i4> &eidx
+);
