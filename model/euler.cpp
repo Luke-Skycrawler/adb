@@ -448,7 +448,7 @@ void implicit_euler(vector<unique_ptr<AffineBody>>& cubes, scalar dt)
             if (globals.upper_bound) {
                 scalar toi_iaabb;
                 if (globals.iaabb > 1)
-                    toi_iaabb = iaabb_brute_force(n_cubes, cubes, globals.aabbs, 3, pts, idx, ees, eidx, vidx);
+                    toi_iaabb = iaabb_brute_force(n_cubes, cubes, globals.aabbs, 4, pts, idx, ees, eidx, vidx);
 #ifndef IAABB_INTERNSHIP
                 else
 #endif

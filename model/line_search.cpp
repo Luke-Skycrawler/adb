@@ -67,13 +67,13 @@ scalar line_search(const Vector<scalar, -1>& dq, const Vector<scalar, -1>& grad,
     );
     scalar qdg = dq.dot(grad);
     Vector<scalar, -1> q1;
-    static vector<array<vec3, 4>> pts_new, pts_iaab;
-    static vector<array<int, 4>> idx_new, idx_iaab;
+    // static vector<array<vec3, 4>> pts_new, pts_iaab;
+    // static vector<array<int, 4>> idx_new, idx_iaab;
 
-    static vector<array<vec3, 4>> ees_new, ees_iaab;
-    static vector<array<int, 4>> eidx_new, eidx_iaab;
+    // static vector<array<vec3, 4>> ees_new, ees_iaab;
+    // static vector<array<int, 4>> eidx_new, eidx_iaab;
 
-    static vector<array<int, 2>> vidx_new, vidx_iaab;
+    // static vector<array<int, 2>> vidx_new, vidx_iaab;
 
     auto dq_norm = dq.norm();
     do {
@@ -84,30 +84,30 @@ scalar line_search(const Vector<scalar, -1>& dq, const Vector<scalar, -1>& grad,
             c.dq = dqk.segment<12>(i * 12);
         }
 
-        if (globals.iaabb % 2)
-            iaabb_brute_force(n_cubes, cubes, globals.aabbs, 2,
-#ifdef IAABB_COMPARING
-                pts_iaab,
-                idx_iaab,
-                ees_iaab,
-                eidx_iaab,
-                vidx_iaab);
-#else
-                pts_new,
-                idx_new,
-                ees_new,
-                eidx_new,
-                vidx_new);
-        else
-#endif
-        gen_collision_set(true, n_cubes, cubes,
-            pts_new,
-            idx_new,
-            ees_new,
-            eidx_new,
-            vidx_new);
+//         if (globals.iaabb % 2)
+//             iaabb_brute_force(n_cubes, cubes, globals.aabbs, 2,
+// #ifdef IAABB_COMPARING
+//                 pts_iaab,
+//                 idx_iaab,
+//                 ees_iaab,
+//                 eidx_iaab,
+//                 vidx_iaab);
+// #else
+//                 pts_new,
+//                 idx_new,
+//                 ees_new,
+//                 eidx_new,
+//                 vidx_new);
+//         else
+// #endif
+//         gen_collision_set(true, n_cubes, cubes,
+//             pts_new,
+//             idx_new,
+//             ees_new,
+//             eidx_new,
+//             vidx_new);
         scalar ef1 = 0.0, E2 = 0.0, ef2 = 0.0;
-        scalar E3 = E_barrier_plus_inert(q1, dqk, n_cubes, idx_new, eidx_new, vidx_new, cubes, dt);
+        scalar E3 = E_barrier_plus_inert(q1, dqk, n_cubes, idx, eidx, vidx, cubes, dt);
         scalar ef = E_fric(dqk, n_cubes, n_pt, n_ee, n_g, idx, eidx, vidx, pt_tk, ee_tk, pt_contact_forces, ee_contact_forces, g_contact_forces, cubes,  dt);
         E1 = E3 + ef;
         wolfe = E1 <= E0 + c1 * alpha * qdg;
@@ -125,11 +125,11 @@ scalar line_search(const Vector<scalar, -1>& dq, const Vector<scalar, -1>& grad,
             }
         }
     } while (true);
-    pts = pts_new;
-    idx = idx_new;
-    ees = ees_new;
-    eidx = eidx_new;
-    vidx = vidx_new;
+    // pts = pts_new;
+    // idx = idx_new;
+    // ees = ees_new;
+    // eidx = eidx_new;
+    // vidx = vidx_new;
 
     return alpha * 2;
 }

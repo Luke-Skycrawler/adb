@@ -237,6 +237,8 @@ scalar primitive_brute_force(
 
     scalar toi_global = 1.0, toi_ee_pt = 1.0;
     bool cull_trajectory = vtn == 3;
+    bool toi_and_colset = vtn == 4;
+
     int n_overlap = overlaps.size();
     if (!cull_trajectory) {
         pts.resize(0);
@@ -302,7 +304,15 @@ scalar primitive_brute_force(
             for (int v = 0; v < c.n_vertices; v++) {
                 auto& p{ c.v_transformed[v] };
                 // handling vertex-ground collision
-                if (!cull_trajectory) {
+                if (toi_and_colset) {
+                    scalar t = collision_time(c, v);
+                    toi_thread_local = min(toi_thread_local, t);
+                    scalar d0 = vg_distance(p);
+                    scalar d1 = vg_distance(c.v_transformed[v]);
+                    if (min(d0, d1) < barrier::d_sqrt) {
+                        vidx_thread_local[tid].push_back({ I, v });
+                    }
+                } else if (!cull_trajectory) {
                     scalar d = vg_distance(p);
                     d = d * d;
                     if (d < barrier::d_hat) {
@@ -325,7 +335,7 @@ scalar primitive_brute_force(
         }
     }
 
-    if (cull_trajectory) {
+    if (cull_trajectory || toi_and_colset) {
         if (toi_global < 1e-6) {
             spdlog::error("vertex ground toi_global = {}", toi_global);
             if (globals.params_int.find("g_cnt") != globals.params_int.end())
@@ -420,7 +430,8 @@ scalar primitive_brute_force(
         vec3 p{ c.v_transformed[v] };
         vec3 p0{ c.vt1(v) };
 
-        lu aabb = cull_trajectory ? compute_aabb(p, p0) : lu{p, p};
+        lu aabb = cull_trajectory || toi_and_colset ? compute_aabb(p, p0) : lu{p, p};
+        aabb = dialate(aabb, barrier::d_sqrt * 0.5);
         for (int o = starting[I]; o < starting[I + 1]; o++) {
             lu cull = overlaps[o].cull;
             if (intersects(cull, aabb)) {
@@ -445,7 +456,8 @@ scalar primitive_brute_force(
         Edge e{ c, ei, true, true };
         Edge e0{ c, ei };
 
-        lu aabb = cull_trajectory ? compute_aabb(e, e0) : compute_aabb(e);
+        lu aabb = cull_trajectory || toi_and_colset ? compute_aabb(e, e0) : compute_aabb(e);
+        aabb = dialate(aabb, barrier::d_sqrt * 0.5);
         for (int o = starting[I]; o < starting[I + 1]; o++) {
             lu cull = overlaps[o].cull;
             if (intersects(cull, aabb)) {
@@ -469,7 +481,8 @@ scalar primitive_brute_force(
         Face f{ c, fi, true, true };
         Face f0 {c, fi};
 
-        lu aabb= cull_trajectory ? compute_aabb(f, f0): compute_aabb(f);
+        lu aabb= cull_trajectory || toi_and_colset ? compute_aabb(f, f0): compute_aabb(f);
+        aabb = dialate(aabb, barrier::d_sqrt * 0.5);
         for (int o = starting[I]; o < starting[I + 1]; o++) {
             lu cull = overlaps[o].cull;
             if (intersects(aabb, cull)){
@@ -556,7 +569,24 @@ scalar primitive_brute_force(
                              *eidx_private = new vector<i4>[omp_get_max_threads()];
     static vector<q4>*pts_private = new vector<q4>[omp_get_max_threads()], *ees_private = new vector<q4>[omp_get_max_threads()];
 
-    if (!cull_trajectory)
+    if (toi_and_colset) {
+        auto tid = omp_get_thread_num();
+        idx_private[tid].resize(0);
+        eidx_private[tid].resize(0);
+        pts_private[tid].resize(0);
+        ees_private[tid].resize(0);
+
+        for (int _i = 0; _i < n_overlap / 2; _i ++) {
+            int i = _i * 2;
+            int I{ overlaps[i].i }, J{ overlaps[i].j };
+            auto &p{ *overlaps[i].plist };
+            
+            ee_col_set_and_time(p.ei, p.ej, cubes, I, J, vertex_starting_index, vt1_buffer, ees_private[tid], eidx_private[tid]);
+            pt_col_set_and_time(p.vi, p.fj, cubes, I, J, vertex_starting_index, vt1_buffer, pts_private[tid], idx_private[tid]);
+            pt_col_set_and_time(p.vj, p.fi, cubes, J, I, vertex_starting_index, vt1_buffer, pts_private[tid], idx_private[tid]);
+        }
+    } 
+    else if (!cull_trajectory)
 #pragma omp parallel
     {
         auto tid = omp_get_thread_num();
@@ -615,7 +645,7 @@ scalar primitive_brute_force(
             globals.params_int["p_cnt"] = 0;
     }
     toi_global = min(toi_global, toi_ee_pt);
-    return cull_trajectory? toi_global: 1.0;
+    return cull_trajectory || toi_and_colset? toi_global: 1.0;
 }
 
 scalar iaabb_brute_force(
