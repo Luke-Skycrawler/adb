@@ -12,9 +12,10 @@
 using scalar = double;
 using mat3 = Eigen::Matrix<scalar, 3, 3>;
 using vec3 = Eigen::Vector<scalar, 3>;
-using q4 = std::array<vec3, 4>;
 using vec12 = Eigen::Vector<scalar, 12>;
 using mat12 = Eigen::Matrix<scalar, 12, 12>;
+using q4 = std::array<vec3, 4>;
+using i4 = std::array<int, 4>;
 
 struct AffineBody {
     mat3 A;

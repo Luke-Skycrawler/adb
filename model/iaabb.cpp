@@ -228,10 +228,10 @@ scalar primitive_brute_force(
     Globals& globals,
 #endif
 #endif
-    vector<array<vec3, 4>>& pts,
-    vector<array<int, 4>>& idx,
-    vector<array<vec3, 4>>& ees,
-    vector<array<int, 4>>& eidx,
+    vector<q4>& pts,
+    vector<i4>& idx,
+    vector<q4>& ees,
+    vector<i4>& eidx,
     vector<array<int, 2>>& vidx)
 {
 
@@ -552,9 +552,9 @@ scalar primitive_brute_force(
     }
 
     scalar ee_global = 1.0, pt_global = 1.0;
-    static vector<array<int, 4>>*idx_private = new vector<array<int, 4>>[omp_get_max_threads()],
-                             *eidx_private = new vector<array<int, 4>>[omp_get_max_threads()];
-    static vector<array<vec3, 4>>*pts_private = new vector<array<vec3, 4>>[omp_get_max_threads()], *ees_private = new vector<array<vec3, 4>>[omp_get_max_threads()];
+    static vector<i4>*idx_private = new vector<i4>[omp_get_max_threads()],
+                             *eidx_private = new vector<i4>[omp_get_max_threads()];
+    static vector<q4>*pts_private = new vector<q4>[omp_get_max_threads()], *ees_private = new vector<q4>[omp_get_max_threads()];
 
     if (!cull_trajectory)
 #pragma omp parallel
@@ -629,10 +629,10 @@ scalar iaabb_brute_force(
     Globals& globals,
 #endif
 #endif
-    std::vector<std::array<vec3, 4>>& pts,
-    std::vector<std::array<int, 4>>& idx,
-    std::vector<std::array<vec3, 4>>& ees,
-    std::vector<std::array<int, 4>>& eidx,
+    std::vector<q4>& pts,
+    std::vector<i4>& idx,
+    std::vector<q4>& ees,
+    std::vector<i4>& eidx,
     std::vector<std::array<int, 2>>& vidx)
 {
     auto start = high_resolution_clock::now();

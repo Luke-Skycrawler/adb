@@ -37,10 +37,10 @@ using namespace utils;
 #endif
 scalar line_search(const Vector<scalar, -1>& dq, const Vector<scalar, -1>& grad, Vector<scalar, -1>& q0, scalar& E0, scalar& E1,
     int n_cubes, int n_pt, int n_ee, int n_g,
-    vector<array<vec3, 4>>& pts,
-    vector<array<int, 4>>& idx,
-    vector<array<vec3, 4>>& ees,
-    vector<array<int, 4>>& eidx,
+    vector<q4>& pts,
+    vector<i4>& idx,
+    vector<q4>& ees,
+    vector<i4>& eidx,
     vector<array<int, 2>>& vidx,
     const vector<Matrix<scalar, 2, 12>>& pt_tk,
     const vector<Matrix<scalar, 2, 12>>& ee_tk,
@@ -69,11 +69,11 @@ void implicit_euler(vector<unique_ptr<AffineBody>>& cubes, scalar dt)
     static const int n_cubes = cubes.size(), hess_dim = n_cubes * 12;
 
     // collision set
-    static vector<array<vec3, 4>> pts;
-    static vector<array<int, 4>> idx;
+    static vector<q4> pts;
+    static vector<i4> idx;
 
-    static vector<array<vec3, 4>> ees;
-    static vector<array<int, 4>> eidx;
+    static vector<q4> ees;
+    static vector<i4> eidx;
 
     static vector<array<int, 2>> vidx;
 
@@ -103,11 +103,11 @@ void implicit_euler(vector<unique_ptr<AffineBody>>& cubes, scalar dt)
         }
     }
 #ifdef IAABB_COMPARING
-    vector<array<vec3, 4>> pts_iaabb;
-    vector<array<int, 4>> idx_iaabb;
+    vector<q4> pts_iaabb;
+    vector<i4> idx_iaabb;
 
-    vector<array<vec3, 4>> ees_iaabb;
-    vector<array<int, 4>> eidx_iaabb;
+    vector<q4> ees_iaabb;
+    vector<i4> eidx_iaabb;
 
     vector<array<int, 2>> vidx_iaabb;
 
@@ -135,12 +135,12 @@ void implicit_euler(vector<unique_ptr<AffineBody>>& cubes, scalar dt)
         if (globals.iaabb % 2) {
             iaabb_brute_force(n_cubes, cubes, globals.aabbs, 1, pts_arg, idx_arg, ees_arg, eidx_arg, vidx_arg);
             const auto compare_collision = [](
-                                               vector<array<int, 4>>& aidx,
+                                               vector<i4>& aidx,
 
-                                               vector<array<int, 4>>& bidx) -> bool {
+                                               vector<i4>& bidx) -> bool {
                 // FIXME: make copy before sorting;
                 auto a_copy = aidx;
-                vector<array<int, 4>> adb, bda;
+                vector<i4> adb, bda;
 
                 sort(aidx.begin(), aidx.end());
                 sort(bidx.begin(), bidx.end());
@@ -238,7 +238,7 @@ void implicit_euler(vector<unique_ptr<AffineBody>>& cubes, scalar dt)
                 auto &ci(*cubes[i]), &cj(*cubes[j]);
                 Face f{ cj, unsigned(ij[3]), false, true };
                 vec3 p{ ci.v_transformed[ij[1]] };
-                array<vec3, 4> pt{ p, f.t0, f.t1, f.t2 };
+                q4 pt{ p, f.t0, f.t1, f.t2 };
                 auto [d, pt_type] = vf_distance(pt[0], f);
                 if (d < barrier::d_hat) {
                     vec12 gradp, gradt;
@@ -286,7 +286,7 @@ void implicit_euler(vector<unique_ptr<AffineBody>>& cubes, scalar dt)
                 int i = ij[0], j = ij[2];
                 auto &ci(*cubes[i]), &cj(*cubes[j]);
                 Edge ei{ ci, unsigned(ij[1]), false, true }, ej{ cj, unsigned(ij[3]), false, true };
-                array<vec3, 4> ee{ ei.e0, ei.e1, ej.e0, ej.e1 };
+                q4 ee{ ei.e0, ei.e1, ej.e0, ej.e1 };
                 auto ee_type = ipc::edge_edge_distance_type(ee[0], ee[1], ee[2], ee[3]);
                 scalar d = edge_edge_distance(ee[0], ee[1], ee[2], ee[3], ee_type);
                 if (d < barrier::d_hat) {
