@@ -1,5 +1,4 @@
 #pragma once
-#include <Eigen/Eigen>
 #include <vector>
 #include <memory>
 #include <atomic>

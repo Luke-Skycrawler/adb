@@ -1,4 +1,3 @@
-#include <Eigen/Eigen>
 #include "time_integrator.h"
 #include <iostream>
 #include <vector>

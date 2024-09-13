@@ -1,4 +1,3 @@
-// #include "IpcFrictionConstraint.h"
 #include "time_integrator.h"
 #include "sparse.h"
 #include "barrier.h"
@@ -33,7 +32,9 @@ using namespace utils;
 #define __CCD__ 2
 #define __LINE_SEARCH__ 3
 
-
+#ifdef PLUG_IN_LAN
+#include "IpcFrictionConstraint.h"
+#endif
 scalar line_search(const Vector<scalar, -1>& dq, const Vector<scalar, -1>& grad, Vector<scalar, -1>& q0, scalar& E0, scalar& E1,
     int n_cubes, int n_pt, int n_ee, int n_g,
     vector<array<vec3, 4>>& pts,
@@ -51,19 +52,23 @@ scalar line_search(const Vector<scalar, -1>& dq, const Vector<scalar, -1>& grad,
 
 void implicit_euler(vector<unique_ptr<AffineBody>>& cubes, scalar dt)
 {
-    bool term_cond;
+    static bool term_cond;
     int& ts = globals.ts;
     static scalar tol = globals.params_double["tol"];
     static Vector<scalar, -1> lastdq;
-    int iter = 0;
-    scalar sup_dq = 0.0;
-    for (int k = 0; k < cubes.size(); k++) {
-        auto& c(*cubes[k]);
-        for (int i = 0; i < 4; i++) {
-            c.q[i] = c.q0[i];
-        }
-    }
+    static int iter = 0;
 
+    static Vector<scalar, -1> r, q0_cat, dq;
+    static scalar sup_dq = 0.0;
+    static Matrix<scalar, -1, -1> big_hess;
+
+    static scalar toi = 1.0, factor = 1.0;
+    static scalar alpha = 1.0;
+
+
+    static const int n_cubes = cubes.size(), hess_dim = n_cubes * 12;
+
+    // collision set
     static vector<array<vec3, 4>> pts;
     static vector<array<int, 4>> idx;
 
@@ -77,8 +82,26 @@ void implicit_euler(vector<unique_ptr<AffineBody>>& cubes, scalar dt)
     static Vector<scalar, 4> times;
     static int n_pt, n_ee, n_g;
     static vector<scalar> pt_contact_forces, ee_contact_forces, g_contact_forces;
+
+#ifdef _TRIPLETS_
+    static vector<HessBlock> hess_triplets;
+#endif
+#ifdef _SM_
+    // look-up table for sparse matrix
+    static map<array<int, 2>, int> lut;
+    static SparseMatrix<scalar> sparse_hess(hess_dim, hess_dim);
+#endif
+
+
     times.setZero(4);
     auto frame_start = high_resolution_clock::now();
+
+    for (int k = 0; k < cubes.size(); k++) {
+        auto& c(*cubes[k]);
+        for (int i = 0; i < 4; i++) {
+            c.q[i] = c.q0[i];
+        }
+    }
 #ifdef IAABB_COMPARING
     vector<array<vec3, 4>> pts_iaabb;
     vector<array<int, 4>> idx_iaabb;
@@ -92,35 +115,25 @@ void implicit_euler(vector<unique_ptr<AffineBody>>& cubes, scalar dt)
     vector<Matrix<scalar, 2, 12>> ee_tk_iaabb;
 #endif
 
-    const int n_cubes = cubes.size(), hess_dim = n_cubes * 12;
 
     if (globals.col_set) {
-        if (globals.iaabb % 2)
-            iaabb_brute_force(n_cubes, cubes, globals.aabbs, 1,
-#ifdef IAABB_COMPARING
-                pts_iaabb,
-                idx_iaabb,
-                ees_iaabb,
-                eidx_iaabb,
-                vidx_iaabb);
-#else
-                pts,
-                idx,
-                ees,
-                eidx,
-                vidx);
-        else
-#endif
-        gen_collision_set(false, n_cubes, cubes,
-            pts,
-            idx,
-            ees,
-            eidx,
-            vidx);
 
+        auto &pts_arg = pts;
+        auto &idx_arg = idx;
+        auto &ees_arg = ees;
+        auto &eidx_arg = eidx;
+        auto &vidx_arg = vidx;
+
+#ifdef IAABB_COMPARING
+        pts_arg = pts_iaabb;
+        idx_arg = idx_iaabb;
+        ees_arg = ees_iaabb;
+        eidx_arg = eidx_iaabb;
+        vidx_arg = vidx_iaabb;
+
+        gen_collision_set(false, n_cubes, cubes, pts, idx, ees, eidx, vidx);
         if (globals.iaabb % 2) {
-
-#ifdef IAABB_COMPARING
+            iaabb_brute_force(n_cubes, cubes, globals.aabbs, 1, pts_arg, idx_arg, ees_arg, eidx_arg, vidx_arg);
             const auto compare_collision = [](
                                                vector<array<int, 4>>& aidx,
 
@@ -166,26 +179,31 @@ void implicit_euler(vector<unique_ptr<AffineBody>>& cubes, scalar dt)
             else
                 spdlog::info("pt and ee set matched");
 
-#endif
+        }   
+#else
+        if (globals.iaabb % 2)
+            iaabb_brute_force(n_cubes, cubes, globals.aabbs, 1, pts_arg, idx_arg, ees_arg, eidx_arg, vidx_arg);
+        else {
+            gen_collision_set(false, n_cubes, cubes, pts, idx, ees, eidx, vidx);
         }
+
+#endif
     }
 
-#ifdef _SM_
-    map<array<int, 2>, int> lut;
-    // look-up table
-    SparseMatrix<scalar> sparse_hess(hess_dim, hess_dim);
-    // gen_empty_sm(n_cubes, idx, eidx, sparse_hess, lut);
-#endif
-#ifdef _TRIPLETS_
-    globals.hess_triplets.reserve(((n_pt + n_ee) * 2 + n_cubes) * 12);
-#endif
 
     ///////////////////////// MAIN LOOP /////////////////////
     do {
-#ifdef _TRIPLETS_
-        globals.hess_triplets.clear();
-#endif
         auto newton_iter_start = high_resolution_clock::now();
+
+        n_pt = idx.size();
+        n_ee = eidx.size();
+        n_g = vidx.size();
+
+#ifdef _TRIPLETS_
+        hess_triplets.reserve(((n_pt + n_ee) * 2 + n_cubes) * 12);
+        hess_triplets.clear();
+#endif
+
 #pragma omp parallel for schedule(static)
         for (int k = 0; k < n_cubes; k++) {
             auto& c(*cubes[k]);
@@ -199,9 +217,7 @@ void implicit_euler(vector<unique_ptr<AffineBody>>& cubes, scalar dt)
             lut.clear();
             sparse_hess.setZero();
             gen_empty_sm(n_cubes, idx, eidx, sparse_hess, lut);
-            n_pt = idx.size();
-            n_ee = eidx.size();
-            n_g = vidx.size();
+
             pt_tk.resize(n_pt);
             pt_contact_forces.resize(n_pt);
             ee_tk.resize(n_ee);
@@ -209,427 +225,116 @@ void implicit_euler(vector<unique_ptr<AffineBody>>& cubes, scalar dt)
             g_contact_forces.resize(n_g);
             spdlog::info("constraint size = {}, {}", n_pt, n_ee);
         }
-        // clear(sparse_hess);
 #endif
-        scalar evh = globals.evh;
+        // ipc hessian & gradient
         auto ipc_start = high_resolution_clock::now();
+        {
 #pragma omp parallel for schedule(static)
-        for (int k = 0; k < n_pt; k++) {
-            // auto& pt(pts[k]);
-            auto& ij(idx[k]);
-            int i = ij[0], j = ij[2];
-            auto &ci(*cubes[i]), &cj(*cubes[j]);
-            Face f{ cj, unsigned(ij[3]), false, true };
-            vec3 p{ ci.v_transformed[ij[1]] };
-            array<vec3, 4> pt{ p, f.t0, f.t1, f.t2 };
-            auto [d, pt_type] = vf_distance(pt[0], f);
-            if (d < barrier::d_hat) {
-#ifdef _PLUG_IN_LAN_
+            for (int k = 0; k < n_pt; k++) {
 
-                Vector4i cid_p{ 0, 0, 0, 0 };
-                Vector4i cid_t0{ 4, 4, 4, 4 };
-                Vector4i cid_t1{ 4, 4, 4, 4 };
-                Vector4i cid_t2{ 4, 4, 4, 4 };
+                // auto& pt(pts[k]);
+                auto& ij(idx[k]);
+                int i = ij[0], j = ij[2];
+                auto &ci(*cubes[i]), &cj(*cubes[j]);
+                Face f{ cj, unsigned(ij[3]), false, true };
+                vec3 p{ ci.v_transformed[ij[1]] };
+                array<vec3, 4> pt{ p, f.t0, f.t1, f.t2 };
+                auto [d, pt_type] = vf_distance(pt[0], f);
+                if (d < barrier::d_hat) {
+                    vec12 gradp, gradt;
+                    mat12 hess_p, hess_t, off_diag;
+                    ipc_term(
+                        pt, ij, pt_type, d,
+    #ifdef _SM_OUT_
+                        lut, sparse_hess,
+    #endif
+    #ifdef _TRIPLETS_
+                        hess_triplets,
+    #endif
+    #ifdef _DIRECT_OUT_
+                        hess_p, hess_t, off_diag,
+                        gradp, gradt
+    #else
+                        ci.grad, cj.grad
+    #endif
+    #ifdef _FRICTION_
+                        ,
+                        pt_contact_forces[k], pt_tk[k]
+    #endif
+                    );
 
-                auto pr{ ci.vertices(ij[1]) },
-                    t0r{ cj.vertices(cj.indices[ij[3] * 3]) },
-                    t1r{ cj.vertices(cj.indices[ij[3] * 3 + 1]) },
-                    t2r{ cj.vertices(cj.indices[ij[3] * 3 + 2]) };
+    #ifdef _PLUG_IN_LAN_
+                    [ga, gb, ha, hb, hab] = pt_ipc_friction_constraint(ci, cj, f, p, pt_type);
 
-                auto p0{ ci.vt0(ij[1]) },
-                    t00{ cj.vt0(cj.indices[ij[3] * 3]) },
-                    t10{ cj.vt0(cj.indices[ij[3] * 3 + 1]) },
-                    t20{ cj.vt0(cj.indices[ij[3] * 3 + 2]) };
+                    output_hessian_gradient(
+                        lut, sparse_hess,
+                        i, j, ci.mass > 0.0, cj.mass > 0.0,
+                        ci.grad, cj.grad,
 
-                Vector<scalar, 4> w_p{ 1.0, pr[0], pr[1], pr[2] };
-                Vector<scalar, 4> w_t0{ 1.0, t0r[0], t0r[1], t0r[2] };
-                Vector<scalar, 4> w_t1{ 1.0, t1r[0], t1r[1], t1r[2] };
-                Vector<scalar, 4> w_t2{ 1.0, t2r[0], t2r[1], t2r[2] };
-
-                vector<vec3> surface_x{ p, f.t0, f.t1, f.t2 }, surface_xhat{ p0, t00, t10, t20 }, surface_X{ pr, t0r, t1r, t2r };
-
-                vector<pair<Vector4i, Vector<scalar, 4>>> dpdx{ { cid_p, w_p }, { cid_t0, w_t0 }, { cid_t1, w_t1 }, { cid_t2, w_t2 } };
-                vec12 ga, gb;
-                ga.setZero(12);
-                gb.setZero(12);
-                mat12 ha, hb, hab;
-                ha.setZero(12, 12);
-                hb.setZero(12, 12);
-                hab.setZero(12, 12);
-                Vector<scalar, -1> gaf, gbf;
-                gaf.setZero(12);
-                gbf.setZero(12);
-                Matrix<scalar, -1, -1> haf, hbf, habf;
-                haf.setZero(12, 12);
-                hbf.setZero(12, 12);
-                habf.setZero(12, 12);
-                Vector<scalar, -1> gac, gbc;
-                gac.setZero(12);
-                gbc.setZero(12);
-                Matrix<scalar, -1, -1> hac, hbc, habc;
-                hac.setZero(12, 12);
-                hbc.setZero(12, 12);
-                habc.setZero(12, 12);
-                AIPC::IpcFrictionConstraintOp3D* friction_constraint;
-                AIPC::IpcConstraintOp3D* constraint;
-                if (pt_type == ipc::PointTriangleDistanceType::P_T0) {
-                    friction_constraint = new AIPC::IpcPPFConstraint(0, 0, 1, dpdx, surface_x, surface_X, barrier::d_hat, globals.kappa, globals.mu, globals.dt, evh, 1.0, 1.0);
-                    constraint = new AIPC::IpcPPConstraint(0, 0, 1, dpdx, surface_x, surface_X, barrier::d_hat, globals.kappa, globals.dt, 1.0);
+                        // gradp, gradt, hess_p, hess_t, off_diag, off_diag.transpose()
+                        ga, gb, ha, hb, hab, hab.transpose()
+                        
+                    );
+                    compare_lan(ga, gb, ha, hb, hab, gradp, gradt, hess_p, hess_t, off_diag);
+    #endif
                 }
-
-                else if (pt_type == ipc::PointTriangleDistanceType::P_T1) {
-                    friction_constraint = new AIPC::IpcPPFConstraint(0, 0, 2, dpdx, surface_x, surface_X, barrier::d_hat, globals.kappa, globals.mu, globals.dt, evh, 1.0, 1.0);
-                    constraint = new AIPC::IpcPPConstraint(0, 0, 2, dpdx, surface_x, surface_X, barrier::d_hat, globals.kappa, globals.dt, 1.0);
-                }
-                else if (pt_type == ipc::PointTriangleDistanceType::P_T2) {
-                    friction_constraint = new AIPC::IpcPPFConstraint(0, 0, 3, dpdx, surface_x, surface_X, barrier::d_hat, globals.kappa, globals.mu, globals.dt, evh, 1.0, 1.0);
-                    constraint = new AIPC::IpcPPConstraint(0, 0, 3, dpdx, surface_x, surface_X, barrier::d_hat, globals.kappa, globals.dt, 1.0);
-                }
-                else if (pt_type == ipc::PointTriangleDistanceType::P_E0) {
-                    friction_constraint = new AIPC::IpcPEFConstraint(0, 0, 1, 2, dpdx, surface_x, surface_X, barrier::d_hat, globals.kappa, globals.mu, globals.dt, evh, 1.0, 1.0);
-                    constraint = new AIPC::IpcPEConstraint(0, 0, 1, 2, dpdx, surface_x, surface_X, barrier::d_hat, globals.kappa, globals.dt, 1.0);
-                }
-                else if (pt_type == ipc::PointTriangleDistanceType::P_E1) {
-                    friction_constraint = new AIPC::IpcPEFConstraint(0, 0, 2, 3, dpdx, surface_x, surface_X, barrier::d_hat, globals.kappa, globals.mu, globals.dt, evh, 1.0, 1.0);
-                    constraint = new AIPC::IpcPEConstraint(0, 0, 2, 3, dpdx, surface_x, surface_X, barrier::d_hat, globals.kappa, globals.dt, 1.0);
-                }
-                else if (pt_type == ipc::PointTriangleDistanceType::P_E2) {
-                    friction_constraint = new AIPC::IpcPEFConstraint(0, 0, 3, 1, dpdx, surface_x, surface_X, barrier::d_hat, globals.kappa, globals.mu, globals.dt, evh, 1.0, 1.0);
-                    constraint = new AIPC::IpcPEConstraint(0, 0, 3, 1, dpdx, surface_x, surface_X, barrier::d_hat, globals.kappa, globals.dt, 1.0);
-                }
-                else {
-                    friction_constraint = new AIPC::IpcPTFConstraint(0, 0, 1, 2, 3, dpdx, surface_x, surface_X, barrier::d_hat, globals.kappa, globals.mu, globals.dt, evh, 1.0, 1.0);
-                    constraint = new AIPC::IpcPTConstraint(0, 0, 1, 2, 3, dpdx, surface_x, surface_X, barrier::d_hat, globals.kappa, globals.dt, 1.0);
-                }
-
-#endif
-
-                vec12 gradp, gradt;
-                mat12 hess_p, hess_t, off_diag;
-                ipc_term(
-                    pt, ij, pt_type, d,
-#ifdef _SM_OUT_
-                    lut, sparse_hess,
-#endif
-#ifdef _TRIPLETS_
-                    globals.hess_triplets,
-#endif
-#ifdef _DIRECT_OUT_
-                    hess_p, hess_t, off_diag,
-                    gradp, gradt
-#else
-                    ci.grad, cj.grad
-#endif
-#ifdef _FRICTION_
-                    ,
-                    pt_contact_forces[k], pt_tk[k]
-#endif
-                );
-#ifdef _PLUG_IN_LAN_
-                constraint->gradient({}, surface_x, surface_X, surface_xhat, {}, gac, gbc);
-                constraint->hessian({}, surface_x, surface_X, surface_xhat, {}, hac, hbc, habc);
-
-                friction_constraint->gradient({}, surface_x, surface_X, surface_xhat, {}, gaf, gbf);
-                friction_constraint->hessian({}, surface_x, surface_X, surface_xhat, {}, haf, hbf, habf);
-
-              
-                ga = gaf + gac;
-                gb = gbf + gbc;
-                ha = haf + hac;
-                hb = hbf + hbc;
-                hab = habf + habc;
-
-                ga /= barrier::d_hat;
-                gb /= barrier::d_hat;
-                ha /= barrier::d_hat;
-                hb /= barrier::d_hat;
-                hab /= barrier::d_hat;
-                output_hessian_gradient(
-                    lut, sparse_hess,
-                    i, j, ci.mass > 0.0, cj.mass > 0.0,
-                    ci.grad, cj.grad,
-
-                    // gradp, gradt, hess_p, hess_t, off_diag, off_diag.transpose()
-                    ga, gb, ha, hb, hab, hab.transpose()
-                    
-                );
-                bool b0 = ::fd::compare_gradient(ga, gradp);
-                bool b1 = ::fd::compare_gradient(gb, gradt);
-
-                bool b2 = fd::compare_hessian(ha, hess_p);
-                bool b3 = fd::compare_hessian(hb, hess_t);
-                bool b4 = fd::compare_hessian(hab, off_diag);
-
-                if (!b0) {
-                    spdlog::error("gradient p error");
-                }
-                if (!b1) {
-                    spdlog::error("gradient t error");
-                }
-                if (!b2) {
-                    spdlog::error("hessian p error");
-                }
-                if (!b3) {
-                    spdlog::error("hessian t error");
-                }
-                if (!b4) {
-                    spdlog::error("hessian off_diag error");
-                }
-#endif
-            }
-    }
-#pragma omp parallel for schedule(static)
-        for (int k = 0; k < n_ee; k++) {
-            // auto& ee(ees[k]);
-            auto& ij(eidx[k]);
-            int i = ij[0], j = ij[2];
-            auto &ci(*cubes[i]), &cj(*cubes[j]);
-            Edge ei{ ci, unsigned(ij[1]), false, true }, ej{ cj, unsigned(ij[3]), false, true };
-            array<vec3, 4> ee{ ei.e0, ei.e1, ej.e0, ej.e1 };
-            auto ee_type = ipc::edge_edge_distance_type(ee[0], ee[1], ee[2], ee[3]);
-            scalar d = edge_edge_distance(ee[0], ee[1], ee[2], ee[3], ee_type);
-            if (d < barrier::d_hat) {
-                mat12 hess_0, hess_1, off_diag;
-                vec12 grad_0, grad_1;
-                scalar eps_x = globals.eps_x * (ee[0] - ee[1]).squaredNorm() * (ee[2] - ee[3]).squaredNorm();
-
-                scalar mollifier = ipc::edge_edge_mollifier(ee[0], ee[1], ee[2], ee[3], eps_x);
-                ipc_term_ee(
-                    ee, ij, ee_type, d,
-#ifdef _SM_OUT_
-                    lut, sparse_hess,
-#endif
-#ifdef _TRIPLETS_
-                    globals.hess_triplets,
-#endif
-#ifdef _DIRECT_OUT_
-                    hess_0, hess_1, off_diag,
-                    grad_0, grad_1
-
-#else
-                    ci.grad, cj.grad
-#endif
-#ifdef _FRICTION_
-                    ,
-                    ee_contact_forces[k], ee_tk[k]
-#endif
-                );
-
-#ifdef _PLUG_IN_LAN_
-
-                Vector4i cid_ei0{ 0, 0, 0, 0 };
-                Vector4i cid_ei1{ 0, 0, 0, 0 };
-                Vector4i cid_ej0{ 4, 4, 4, 4 };
-                Vector4i cid_ej1{ 4, 4, 4, 4 };
-
-                auto ei0r{ ci.vertices(ci.edges[ij[1] * 2]) },
-                    ei1r{ ci.vertices(ci.edges[ij[1] * 2 + 1]) },
-                    ej0r{ cj.vertices(cj.edges[ij[3] * 2]) },
-                    ej1r{ cj.vertices(cj.edges[ij[3] * 2 + 1]) };
-
-                auto ei00{ ci.vt0(ci.edges[ij[1] * 2]) },
-                    ei10{ ci.vt0(ci.edges[ij[1] * 2 + 1]) },
-                    ej00{ cj.vt0(cj.edges[ij[3] * 2]) },
-                    ej10{ cj.vt0(cj.edges[ij[3] * 2 + 1]) };
-
-                Vector<scalar, 4> w_ei0{ 1.0, ei0r[0], ei0r[1], ei0r[2] };
-                Vector<scalar, 4> w_ei1{ 1.0, ei1r[0], ei1r[1], ei1r[2] };
-                Vector<scalar, 4> w_ej0{ 1.0, ej0r[0], ej0r[1], ej0r[2] };
-                Vector<scalar, 4> w_ej1{ 1.0, ej1r[0], ej1r[1], ej1r[2] };
-
-                vector<vec3> surface_x{ ee[0], ee[1], ee[2], ee[3] }, surface_xhat{ ei00, ei10, ej00, ej10 }, surface_X{ ei0r, ei1r, ej0r, ej1r };
-                vector<vec3> sx = surface_x, sX = surface_X;
-                vector<pair<Vector4i, Vector<scalar, 4>>> dpdx{ { cid_ei0, w_ei0 }, { cid_ei1, w_ei1 }, { cid_ej0, w_ej0 }, { cid_ej1, w_ej1 } }, px = dpdx;
-                vec12 ga, gb;
-                ga.setZero(12);
-                gb.setZero(12);
-                mat12 ha, hb, hab;
-                ha.setZero(12, 12);
-                hb.setZero(12, 12);
-                hab.setZero(12, 12);
-                Vector<scalar, -1> gaf, gbf;
-                gaf.setZero(12);
-                gbf.setZero(12);
-                Matrix<scalar, -1, -1> haf, hbf, habf;
-                haf.setZero(12, 12);
-                hbf.setZero(12, 12);
-                habf.setZero(12, 12);
-                Vector<scalar, -1> gac, gbc;
-                gac.setZero(12);
-                gbc.setZero(12);
-                Matrix<scalar, -1, -1> hac, hbc, habc;
-                hac.setZero(12, 12);
-                hbc.setZero(12, 12);
-                habc.setZero(12, 12);
-                AIPC::IpcFrictionConstraintOp3D* friction_constraint;
-                AIPC::IpcConstraintOp3D* constraint;
-                if (ee_type == ipc::EdgeEdgeDistanceType::EA0_EB0) {
-                    friction_constraint = new AIPC::IpcPPFConstraint(0, 0, 2, dpdx, surface_x, surface_X, barrier::d_hat, globals.kappa, globals.mu, globals.dt, evh, 1.0, 1.0);
-                    // constraint = new AIPC::IpcPPConstraint(0, 0, 2, dpdx, surface_x, surface_X, barrier::d_hat, globals.kappa, globals.dt, 1.0);
-                    constraint = new AIPC::IpcPPMConstraint(0, 0, 1, 2, 3, dpdx, surface_x, surface_X, barrier::d_hat, globals.kappa, globals.dt, 1.0, mollifier, eps_x);
-                }
-                else if (ee_type == ipc::EdgeEdgeDistanceType::EA0_EB1) {
-                    friction_constraint = new AIPC::IpcPPFConstraint(0, 0, 3, dpdx, surface_x, surface_X, barrier::d_hat, globals.kappa, globals.mu, globals.dt, evh, 1.0, 1.0);
-                    // constraint = new AIPC::IpcPPConstraint(0, 0, 3, dpdx, surface_x, surface_X, barrier::d_hat, globals.kappa, globals.dt, 1.0);
-
-                    constraint = new AIPC::IpcPPMConstraint(0, 0, 1, 3, 2, px, sx, sX, barrier::d_hat, globals.kappa, globals.dt, 1.0, mollifier, eps_x);
-                    // perm = { 0, 1, 3, 2 };
-                }
-                else if (ee_type == ipc::EdgeEdgeDistanceType::EA1_EB0) {
-                    friction_constraint = new AIPC::IpcPPFConstraint(0, 1, 2, dpdx, surface_x, surface_X, barrier::d_hat, globals.kappa, globals.mu, globals.dt, evh, 1.0, 1.0);
-                    // constraint = new AIPC::IpcPPConstraint(0, 1, 2, dpdx, surface_x, surface_X, barrier::d_hat, globals.kappa, globals.dt, 1.0);
-
-                    constraint = new AIPC::IpcPPMConstraint(0, 1, 0, 2, 3, px, sx, sX, barrier::d_hat, globals.kappa, globals.dt, 1.0, mollifier, eps_x);
-                    // perm = { 1, 0, 2, 3 };
-                }
-                else if (ee_type == ipc::EdgeEdgeDistanceType::EA1_EB1) {
-                    friction_constraint = new AIPC::IpcPPFConstraint(0, 1, 3, dpdx, surface_x, surface_X, barrier::d_hat, globals.kappa, globals.mu, globals.dt, evh, 1.0, 1.0);
-                    // constraint = new AIPC::IpcPPConstraint(0, 1, 3, dpdx, surface_x, surface_X, barrier::d_hat, globals.kappa, globals.dt, 1.0);
-
-                    constraint = new AIPC::IpcPPMConstraint(0, 1, 0, 3, 2, px, sx, sX, barrier::d_hat, globals.kappa, globals.dt, 1.0, mollifier, eps_x);
-                    // perm = { 1, 0, 3, 2 };
-                }
-                else if (ee_type == ipc::EdgeEdgeDistanceType::EA_EB0) {
-                    friction_constraint = new AIPC::IpcPEFConstraint(0, 2, 0, 1, dpdx, surface_x, surface_X, barrier::d_hat, globals.kappa, globals.mu, globals.dt, evh, 1.0, 1.0);
-                    // constraint = new AIPC::IpcPEConstraint(0, 2, 0, 1, dpdx, surface_x, surface_X, barrier::d_hat, globals.kappa, globals.dt, 1.0);
-
-                    constraint = new AIPC::IpcPEMConstraint(0, 2, 3, 0, 1, px, sx, sX, barrier::d_hat, globals.kappa, globals.dt, 1.0, mollifier, eps_x);
-                    // perm = { 2, 3, 0, 1 };
-                }
-                else if (ee_type == ipc::EdgeEdgeDistanceType::EA_EB1) {
-                    friction_constraint = new AIPC::IpcPEFConstraint(0, 3, 0, 1, dpdx, surface_x, surface_X, barrier::d_hat, globals.kappa, globals.mu, globals.dt, evh, 1.0, 1.0);
-                    // constraint = new AIPC::IpcPEConstraint(0, 3, 0, 1, dpdx, surface_x, surface_X, barrier::d_hat, globals.kappa, globals.dt, 1.0);
-                    
-                    constraint = new AIPC::IpcPEMConstraint(0, 3, 2, 0, 1, px, sx, sX, barrier::d_hat, globals.kappa, globals.dt, 1.0, mollifier, eps_x);
-                    // perm = { 3, 2, 0, 1 };
-                }
-                else if (ee_type == ipc::EdgeEdgeDistanceType::EA0_EB) {
-                    friction_constraint = new AIPC::IpcPEFConstraint(0, 0, 2, 3, dpdx, surface_x, surface_X, barrier::d_hat, globals.kappa, globals.mu, globals.dt, evh, 1.0, 1.0);
-                    // constraint = new AIPC::IpcPEConstraint(0, 0, 2, 3, dpdx, surface_x, surface_X, barrier::d_hat, globals.kappa, globals.dt, 1.0);
-                    constraint = new AIPC::IpcPEMConstraint(0, 0, 1, 2, 3, dpdx, surface_x, surface_X, barrier::d_hat, globals.kappa, globals.dt, 1.0, mollifier, eps_x);
-                }
-                else if (ee_type == ipc::EdgeEdgeDistanceType::EA1_EB) {
-                    friction_constraint = new AIPC::IpcPEFConstraint(0, 1, 2, 3, dpdx, surface_x, surface_X, barrier::d_hat, globals.kappa, globals.mu, globals.dt, evh, 1.0, 1.0);
-                    // constraint = new AIPC::IpcPEConstraint(0, 1, 2, 3, dpdx, surface_x, surface_X, barrier::d_hat, globals.kappa, globals.dt, 1.0);
-                    
-                    constraint = new AIPC::IpcPEMConstraint(0, 1, 0, 2, 3, px, sx, sX, barrier::d_hat, globals.kappa, globals.dt, 1.0, mollifier, eps_x);
-                    // perm = { 1, 0, 2, 3 };
-                }
-                else {
-                    friction_constraint = new AIPC::IpcEEFConstraint(0, 0, 1, 2, 3, dpdx, surface_x, surface_X, barrier::d_hat, globals.kappa, globals.mu, globals.dt, evh, 1.0, 1.0);
-                    // constraint = new AIPC::IpcEEConstraint(0, 0, 1, 2, 3, dpdx, surface_x, surface_X, barrier::d_hat, globals.kappa, globals.dt, 1.0);
-                    constraint = new AIPC::IpcEEMConstraint(0, 0, 1, 2, 3, dpdx, surface_x, surface_X, barrier::d_hat, globals.kappa, globals.dt, 1.0, mollifier, eps_x);
-
-                }
-                // if (false) {
-                if (ee_type == ipc::EdgeEdgeDistanceType::EA_EB0 || ee_type == ipc::EdgeEdgeDistanceType::EA_EB1) {
-                    Matrix<scalar, -1, -1> _habf, _habc;
-                    _habf.setZero(12, 12);
-                    _habc.setZero(12, 12);
-                    friction_constraint->gradient({}, surface_x, surface_X, surface_xhat, {}, gbf, gaf);
-                    friction_constraint->hessian({}, surface_x, surface_X, surface_xhat, {}, hbf, haf, _habf);
-                    constraint->gradient({}, surface_x, surface_X, surface_xhat, {}, gbc, gac);
-                    constraint->hessian({}, surface_x, surface_X, surface_xhat, {}, hbc, hac, _habc);
-                    habf = _habf; // .transpose();
-                    habc = _habc; //.transpose();
-                }
-                else {
-                    friction_constraint->gradient({}, surface_x, surface_X, surface_xhat, {}, gaf, gbf);
-                    friction_constraint->hessian({}, surface_x, surface_X, surface_xhat, {}, haf, hbf, habf);
-                    constraint->gradient({}, surface_x, surface_X, surface_xhat, {}, gac, gbc);
-                    constraint->hessian({}, surface_x, surface_X, surface_xhat, {}, hac, hbc, habc);
-                }
-
-                ga = gaf + gac;
-                gb = gbf + gbc;
-                ha = haf + hac;
-                hb = hbf + hbc;
-                hab = habf + habc;
-
-                ga /= barrier::d_hat;
-                gb /= barrier::d_hat;
-                ha /= barrier::d_hat;
-                hb /= barrier::d_hat;
-                hab /= barrier::d_hat;
-
-                output_hessian_gradient(
-                    lut, sparse_hess,
-                    i, j, ci.mass > 0.0, cj.mass > 0.0,
-                    ci.grad, cj.grad,
-// #define LANS_DIRECT
-#ifdef LANS_DIRECT
-                    ga, gb, ha, hb, hab, hab.transpose()
-#else
-                    grad_0, grad_1, hess_0, hess_1, off_diag, off_diag.transpose()
-#endif
-                );
-
-                bool b0 = ::fd::compare_gradient(ga, grad_0);
-                bool b1 = ::fd::compare_gradient(gb, grad_1);
-
-                bool b2 = fd::compare_hessian(ha, hess_0);
-                bool b3 = fd::compare_hessian(hb, hess_1);
-                bool b4 = fd::compare_hessian(hab, off_diag);
-                const auto to_int = [](const ipc::EdgeEdgeDistanceType& type) -> int{
-                    if (type == ipc::EdgeEdgeDistanceType::EA0_EB) {
-                        return 0;
-                    }
-                    else if (type == ipc::EdgeEdgeDistanceType::EA1_EB) {
-                        return 1;
-                    }
-                    else if (type == ipc::EdgeEdgeDistanceType::EA_EB0) {
-                        return 2;
-                    }
-                    else if (type == ipc::EdgeEdgeDistanceType::EA_EB1) {
-                        return 3;
-                    }
-                    else if (type == ipc::EdgeEdgeDistanceType::EA0_EB0) {
-                        return 4;
-                    }
-                    else if (type == ipc::EdgeEdgeDistanceType::EA0_EB1) {
-                        return 5;
-                    }
-                    else if (type == ipc::EdgeEdgeDistanceType::EA1_EB0) {
-                        return 6;
-                    }
-                    else if (type == ipc::EdgeEdgeDistanceType::EA1_EB1) {
-                        return 7;
-                    }
-                    else {
-                        return 8;
-                    }
-                };
-#ifndef LANS_DIRECT
-                // b4 = b4 || mollifier != 1.0;
-                // b3 = b3 || mollifier != 1.0;
-                // b2 = b2 || mollifier != 1.0;
-                // b1 = b1 || mollifier != 1.0;
-                // b0 = b0 || mollifier != 1.0;
-                
-
-                if (!b0) {
-                    spdlog::error("ee gradient p error, {}, molli = {}", to_int(ee_type), mollifier);
-                }
-                if (!b1) {
-                    spdlog::error("ee gradient t error, {}, molli = {}", to_int(ee_type), mollifier);
-                }
-                if (!b2) {
-                    spdlog::error("ee hessian p error, {}, molli = {}", to_int(ee_type), mollifier);
-                }
-                if (!b3) {
-                    spdlog::error("ee hessian t error, {}, molli = {}", to_int(ee_type), mollifier);
-                }
-                if (!b4) {
-                    globals.params_int["ee error " + to_string(to_int(ee_type))] ++;
-                    spdlog::error("ee hessian off_diag error, {}, molli = {}", to_int(ee_type), mollifier);
-                }
-                
-#endif
-#endif
-            }
         }
+#pragma omp parallel for schedule(static)
+            for (int k = 0; k < n_ee; k++) {
+                // auto& ee(ees[k]);
+                auto& ij(eidx[k]);
+                int i = ij[0], j = ij[2];
+                auto &ci(*cubes[i]), &cj(*cubes[j]);
+                Edge ei{ ci, unsigned(ij[1]), false, true }, ej{ cj, unsigned(ij[3]), false, true };
+                array<vec3, 4> ee{ ei.e0, ei.e1, ej.e0, ej.e1 };
+                auto ee_type = ipc::edge_edge_distance_type(ee[0], ee[1], ee[2], ee[3]);
+                scalar d = edge_edge_distance(ee[0], ee[1], ee[2], ee[3], ee_type);
+                if (d < barrier::d_hat) {
+                    mat12 hess_0, hess_1, off_diag;
+                    vec12 grad_0, grad_1;
+                    ipc_term_ee(
+                        ee, ij, ee_type, d,
+    #ifdef _SM_OUT_
+                        lut, sparse_hess,
+    #endif
+    #ifdef _TRIPLETS_
+                        hess_triplets,
+    #endif
+    #ifdef _DIRECT_OUT_
+                        hess_0, hess_1, off_diag,
+                        grad_0, grad_1
+    #else
+                        ci.grad, cj.grad
+    #endif
+    #ifdef _FRICTION_
+                        ,
+                        ee_contact_forces[k], ee_tk[k]
+    #endif
+                    );
 
-        for (int k = 0; k < n_g; k ++) {
+    #ifdef _PLUG_IN_LAN_
+                    scalar eps_x = globals.eps_x * (ee[0] - ee[1]).squaredNorm() * (ee[2] - ee[3]).squaredNorm();
+
+                    scalar mollifier = ipc::edge_edge_mollifier(ee[0], ee[1], ee[2], ee[3], eps_x);
+                    [ga, gb, ha, hb, hab] = ee_ipc_friction_constraint(ci, cj, ee_type, eps_x, mollifier);
+
+                    output_hessian_gradient(
+                        lut, sparse_hess,
+                        i, j, ci.mass > 0.0, cj.mass > 0.0,
+                        ci.grad, cj.grad,
+    // #define LANS_DIRECT
+    #ifdef LANS_DIRECT
+                        ga, gb, ha, hb, hab, hab.transpose()
+    #else
+                        grad_0, grad_1, hess_0, hess_1, off_diag, off_diag.transpose()
+    #endif
+                    );
+                    compare_lan_ee(ga, gb, ha, hb, hab, grad_0, grad_1, hess_0, hess_1, off_diag, ee_type, mollifier);
+    #endif
+                }
+            }
+
+            for (int k = 0; k < n_g; k ++) {
             auto &_v {vidx[k]};
             int i = _v[0], v = _v[1];
             auto& c{ *cubes[i] };
@@ -651,18 +356,18 @@ void implicit_euler(vector<unique_ptr<AffineBody>>& cubes, scalar dt)
 #endif
             }
         }
+        }
         auto ipc_duration = DURATION_TO_DOUBLE(ipc_start);
         times[__IPC__] += ipc_duration;
-        scalar toi = 1.0, factor = 1.0, alpha = 1.0;
 
+        auto solver_start = high_resolution_clock::now();
         {
-            Matrix<scalar, -1, -1> big_hess;
             if (globals.dense)
                 big_hess.setZero(hess_dim, hess_dim);
-            Vector<scalar, -1> r, q0_cat, dq;
             r.setZero(hess_dim);
             dq.setZero(hess_dim);
             q0_cat.setZero(hess_dim);
+
             for (int k = 0; k < n_cubes; k++) {
                 auto& c = *cubes[k];
                 r.segment<12>(k * 12) = c.grad;
@@ -670,8 +375,7 @@ void implicit_euler(vector<unique_ptr<AffineBody>>& cubes, scalar dt)
             }
 
 #ifdef _TRIPLETS_
-            SparseMatrix<scalar> sparse_hess_trip(hess_dim, hess_dim);
-            build_from_triplets(sparse_hess_trip, big_hess, hess_dim, n_cubes);
+            build_from_triplets(sparse_hess, big_hess, hess_dim, n_cubes, hess_triplets);
 #endif
 #ifdef _SM_
 #pragma omp parallel for schedule(static)
@@ -690,13 +394,13 @@ void implicit_euler(vector<unique_ptr<AffineBody>>& cubes, scalar dt)
 #endif
             if (globals.damp)
                 damping_sparse(sparse_hess, dt, n_cubes);
-            auto solver_start = high_resolution_clock::now();
 
             if (globals.dense)
                 dq = -big_hess.ldlt().solve(r);
             else if (globals.sparse) {
 #ifdef EIGEN_USE_MKL_ALL
                 PardisoLLT<SparseMatrix<scalar>> ldlt_solver;
+                 //SimplicialLLT<SparseMatrix<scalar, ColMajor>> ldlt_solver;
 #else
                 SimplicialLLT<SparseMatrix<scalar, ColMajor>> ldlt_solver;
 #endif
@@ -713,29 +417,34 @@ void implicit_euler(vector<unique_ptr<AffineBody>>& cubes, scalar dt)
                 }
 #endif
             }
-            auto solver_duration = DURATION_TO_DOUBLE(solver_start);
-            times[__SOLVER__] += solver_duration;
-            spdlog::info("solver time = {:0.6f} ms", solver_duration);
             if (isnan(dq.norm())) {
                 spdlog::error("solver nan");
                 exit(1);
             }
             spdlog::info("norms: dq = {}, grad = {}, big_hess = {}", dq.norm(), r.norm(), globals.sparse ? sparse_hess.norm() : big_hess.norm());
-            // spdlog::warn("dense norms: dq = {}, grad = {}, big_hess = {}, difference = {}", dq.norm(), r.norm(), big_hess.norm(), dif);
             spdlog::info("dq dot grad = {}, cos = {}", dq.dot(r), dq.dot(r) / (dq.norm() * r.norm()));
             if (globals.sparse && globals.dense && (sparse_hess - big_hess).norm() > 1e-6) {
                 spdlog::error("diff too large");
                 cout << big_hess << "\n\n"
                      << sparse_hess;
             }
-            sup_dq = dq.norm();
+        }
+        auto solver_duration = DURATION_TO_DOUBLE(solver_start);
+        times[__SOLVER__] += solver_duration;
+        spdlog::info("solver time = {:0.6f} ms", solver_duration);
+
+        auto ccd_start = high_resolution_clock::now();
+        {
             toi = 1.0;
+            factor = 1.0;
+            sup_dq = dq.norm();
+
 #pragma omp parallel for schedule(static)
             for (int k = 0; k < n_cubes; k++) {
                 auto& c(*cubes[k]);
                 c.dq = dq.segment<12>(k * 12);
             }
-            auto ccd_start = high_resolution_clock::now();
+
             if (globals.upper_bound) {
                 scalar toi_iaabb;
                 if (globals.iaabb > 1)
@@ -755,8 +464,7 @@ void implicit_euler(vector<unique_ptr<AffineBody>>& cubes, scalar dt)
                     toi = toi_iaabb;
 #endif
             }
-            scalar ccd_duration = DURATION_TO_DOUBLE(ccd_start);
-            times[__CCD__] += ccd_duration;
+            
             if (toi < 1.0) {
                 spdlog::warn("collision at {}, toi = {}", iter, toi);
                 factor = globals.backoff;
@@ -773,10 +481,14 @@ void implicit_euler(vector<unique_ptr<AffineBody>>& cubes, scalar dt)
             }
             lastdq = dq;
             dq *= factor * toi;
+        }
+        scalar ccd_duration = DURATION_TO_DOUBLE(ccd_start);
+        times[__CCD__] += ccd_duration;
 
+        auto line_search_start = high_resolution_clock::now();
+        {
             alpha = 1.0;
             scalar E0 = 0.0, E1 = 0.0;
-            auto line_search_start = high_resolution_clock::now();
             if (globals.line_search)
                 alpha = line_search(dq, r, q0_cat, E0, E1,
                     n_cubes, n_pt, n_ee, n_g,
@@ -796,20 +508,22 @@ void implicit_euler(vector<unique_ptr<AffineBody>>& cubes, scalar dt)
             if (alpha < 2e-8) {
                 spdlog::error("iter, ts ({}, {}), alpha = {}, E0 = {}, E1 = {}", iter, ts, alpha, E0, E1);
             }
-            auto line_search_duration = DURATION_TO_DOUBLE(line_search_start);
-            times[__LINE_SEARCH__] += line_search_duration;
-            scalar norm_dq = dq.norm();
-#pragma omp parallel for schedule(static)
-            for (int i = 0; i < n_cubes; i++) {
-                for (int j = 0; j < 4; j++)
-                    cubes[i]->q[j] += dq.segment<3>(i * 12 + j * 3);
-            }
             spdlog::info("step size upper = {}, alpha = {}", toi, alpha);
-
-            auto iter_duration = DURATION_TO_DOUBLE(newton_iter_start);
-            // spdlog::warn("iter {}, time = {} ms, IPC term time = {} \n e0 = {}, e1 = {}, norm_dq = {}\n", iter, iter_duration, ipc_duration, E0, E1, norm_dq);
-            spdlog::warn("Newton iter #{}, time = {} ms, upper bound = {}, line search = {}", iter + 1, iter_duration, toi, alpha);
         }
+        auto line_search_duration = DURATION_TO_DOUBLE(line_search_start);
+        times[__LINE_SEARCH__] += line_search_duration;
+
+
+
+        scalar norm_dq = dq.norm();
+#pragma omp parallel for schedule(static)
+        for (int i = 0; i < n_cubes; i++) {
+            for (int j = 0; j < 4; j++)
+                cubes[i]->q[j] += dq.segment<3>(i * 12 + j * 3);
+        }
+
+        auto iter_duration = DURATION_TO_DOUBLE(newton_iter_start);
+        spdlog::warn("Newton iter #{}, time = {} ms, upper bound = {}, line search = {}", iter + 1, iter_duration, toi, alpha);
 
         term_cond = sup_dq < tol || ++iter >= globals.max_iter;
         sup_dq = 0.0;

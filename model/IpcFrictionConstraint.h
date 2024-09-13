@@ -1,6 +1,7 @@
 #pragma once
 #ifndef IPC_FRICTION_CONSTRAINT_H
 #define IPC_FRICTION_CONSTRAINT_H
+#include "affine_body.h"
 #include "IpcCollisionConstraint.h"
 #include "FrictionUtils.h"
 #include <ipc/friction/tangent_basis.hpp>
@@ -166,6 +167,11 @@ namespace AIPC
 
 }
 
+tuple<vec12, vec12, mat12, mat12, mat12> pt_ipc_friction_constraint(AffineBody &ci, AffineBody &cj, Face &f, vec3 &p, ipc::PointTriangleDistanceType pt_type);
+void compare_lan(const vec12 &ga, const vec12& gb, const mat12 &ha, const mat12 &hb, const mat12 &hab, const vec12 & gradp, const vec12 &gradt, const mat12 &hess_p, const mat12 &hess_t, const mat12 &off_diag);
+
+tuple<vec12, vec12, mat12, mat12, mat12> ee_ipc_friction_constraint(AffineBody &ci, AffineBody &cj, ipc::EdgeEdgeDistanceType ee_type, scalar eps_x, scalar mollifier);
+void compare_lan_ee(vec12 &ga, vec12 &gb, mat12 &ha, mat12 &hb, mat12 &hab, vec12 &grad_0, vec12 &grad_1, mat12 &hess_0, mat12 &hess_1, mat12 &off_diag, ipc::EdgeEdgeDistanceType ee_type, scalar mollifier);
 
 
 #endif

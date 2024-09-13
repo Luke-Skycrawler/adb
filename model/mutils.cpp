@@ -114,7 +114,7 @@ void damping_sparse(SparseMatrix<scalar>& sparse_hess, scalar dt, int n_cubes)
     }
 }
 
-void build_from_triplets(SparseMatrix<scalar>& sparse_hess_trip, Matrix<scalar, -1, -1>& big_hess, int hess_dim, int n_cubes)
+void build_from_triplets(SparseMatrix<scalar>& sparse_hess_trip, Matrix<scalar, -1, -1>& big_hess, int hess_dim, int n_cubes, vector<HessBlock> hess_triplets)
 {
 
     vector<int> starting_point;
@@ -150,8 +150,8 @@ void build_from_triplets(SparseMatrix<scalar>& sparse_hess_trip, Matrix<scalar, 
     //         }
     // };
     static const auto insert2 = [&](SparseMatrix<scalar>& sm, int tid) {
-        auto& triplet = globals.hess_triplets[tid];
-        bool new_col = tid == 0 || globals.hess_triplets[tid - 1].j != triplet.j;
+        auto& triplet = hess_triplets[tid];
+        bool new_col = tid == 0 || hess_triplets[tid - 1].j != triplet.j;
 
         int c = triplet.j, r = triplet.i;
         if (new_col)
@@ -162,7 +162,7 @@ void build_from_triplets(SparseMatrix<scalar>& sparse_hess_trip, Matrix<scalar, 
     };
 
     if (globals.sparse) {
-        int n_ele = (n_cubes + globals.hess_triplets.size()) * 12 * 12;
+        int n_ele = (n_cubes + hess_triplets.size()) * 12 * 12;
         // bht.resize(n_ele);
         // sparse_hess.reserve(n_ele);
     }
@@ -175,16 +175,16 @@ void build_from_triplets(SparseMatrix<scalar>& sparse_hess_trip, Matrix<scalar, 
         //     insert(bht, cubes[k].hess, k * 12, k * 12);
         auto& c = *globals.cubes[k];
         for (int i = 0; i < 12; i++)
-            globals.hess_triplets.push_back({ k * 12, k * 12 + i, c.hess.block<12, 1>(0, i) });
-        // globals.hess_triplets.push_back({k * 12, k * 12, cubes[k].hess});
+            hess_triplets.push_back({ k * 12, k * 12 + i, c.hess.block<12, 1>(0, i) });
+        // hess_triplets.push_back({k * 12, k * 12, cubes[k].hess});
     }
 
-    merge_triplets(globals.hess_triplets);
+    merge_triplets(hess_triplets);
 
-    const int nt = globals.hess_triplets.size();
+    const int nt = hess_triplets.size();
 
     for (int k = 0; k < nt; k++) {
-        auto& triplet(globals.hess_triplets[k]);
+        auto& triplet(hess_triplets[k]);
         if (triplet.i == -1) continue;
         if (globals.dense)
             big_hess.block<12, 1>(triplet.i, triplet.j) = triplet.block;

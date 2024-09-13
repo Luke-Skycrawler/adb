@@ -1,11 +1,13 @@
 #pragma once
 #include "affine_body.h"
 #include "geometry.h"
+#include "bvh/bvh.h"
 #ifdef TESTING
 #include "../iAABB/pch.h"
 
 #endif
-using lu = std::array<vec3, 2>;
+// using lu = std::array<vec3, 2>;
+using lu = bounds3;
 
 struct PList {
     std::vector<int> vi, vj, fi, fj, ei, ej;

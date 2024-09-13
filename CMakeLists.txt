@@ -8,6 +8,13 @@ find_package(glm CONFIG REQUIRED)
 find_package(glfw3 CONFIG REQUIRED)
 find_package(assimp CONFIG REQUIRED)
 find_package (Eigen3 CONFIG REQUIRED)
+set(MKL_INTERFACE lp64)
+find_package(MKL CONFIG REQUIRED)
+find_package(OpenMP)
+if (MKL_FOUND)
+    message("MKL")
+    message("${MKL_INCLUDE}")
+endif()
 # find_package(spdlog CONFIG REQUIRED)
 find_package(nlohmann_json CONFIG REQUIRED)
 find_package(pybind11 CONFIG REQUIRED)
@@ -41,6 +48,7 @@ set(HEADERS
     model/geometry.h
     model/ipc_extension.h
     model/sparse.h
+    model/bvh/bvh.h
     view/camera.h
     view/env.h
     view/global_variables.h
@@ -75,6 +83,7 @@ set(SOURCE
     model/assemble_matrices.cpp
     model/friction.cpp
     model/ipc_extension.cpp
+    model/bvh/bvh.cpp
     test_cases/spinning_cube.cpp
     view/control.cpp
     view/light.cpp
@@ -131,10 +140,17 @@ target_include_directories(abdtk PRIVATE
 )
 
 # Now, link the ipc_toolkit to your target (replace 'your_target' with your actual target)
-target_include_directories(abd PRIVATE ${ipc_toolkit_SOURCE_DIR}/src)
+target_compile_options(abd PUBLIC $<TARGET_PROPERTY:MKL::MKL,INTERFACE_COMPILE_OPTIONS>)
+target_include_directories(abd PRIVATE 
+    ${ipc_toolkit_SOURCE_DIR}/src 
+    ${MKL_INCLUDE})
 
-target_link_libraries(abd PRIVATE ipc::toolkit glfw assimp::assimp glad::glad glm::glm Eigen3::Eigen nlohmann_json::nlohmann_json)
-target_link_libraries(abdtk PRIVATE ipc::toolkit Eigen3::Eigen)
+target_link_libraries(abd PRIVATE ipc::toolkit glfw assimp::assimp glad::glad glm::glm Eigen3::Eigen nlohmann_json::nlohmann_json $<LINK_ONLY:MKL::MKL>)
+if(OpenMP_CXX_FOUND)
+    target_link_libraries(abd PRIVATE OpenMP::OpenMP_CXX)
+    target_link_libraries(abdtk PRIVATE OpenMP::OpenMP_CXX)
+endif()
+target_link_libraries(abdtk PRIVATE ipc::toolkit Eigen3::Eigen $<LINK_ONLY:MKL::MKL>)
 
 set(OUTPUT_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/view)
 add_custom_target(copy_exe ALL

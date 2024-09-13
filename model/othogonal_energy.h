@@ -1,6 +1,5 @@
 #pragma once
 #include "affine_body.h"
-#include <Eigen/Eigen>
 #include <array>
 namespace othogonal_energy{
 
