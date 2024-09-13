@@ -7,7 +7,7 @@
     "predefined_case" : {
         "enable": false,
         "id" : 2,
-        "custom": "../test_cases/10b.json"
+        "custom": "../test_cases/chains.json"
     },
     "solver": "sparse",
     "gravity": true, 
@@ -15,7 +15,7 @@
     "col_set": true,
     "ee": true,
     "pt": true,
-    "ground": true,
+    "ground": false,
     "safe_factor": 1.0,
     "uppper_bound": true, 
     "mu": 0.0,
@@ -64,6 +64,7 @@
     "params_int": {
         "clip": 0,
         "gfk": 1,
-        "hdk": 1
+        "hdk": 1,
+        "thres": 100
     }
 }

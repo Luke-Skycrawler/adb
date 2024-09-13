@@ -48,6 +48,7 @@ set(HEADERS
     model/geometry.h
     model/ipc_extension.h
     model/sparse.h
+    model/bvh/bvh.h
     view/camera.h
     view/env.h
     view/global_variables.h
@@ -82,6 +83,7 @@ set(SOURCE
     model/assemble_matrices.cpp
     model/friction.cpp
     model/ipc_extension.cpp
+    model/bvh/bvh.cpp
     test_cases/spinning_cube.cpp
     view/control.cpp
     view/light.cpp

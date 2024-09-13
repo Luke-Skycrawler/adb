@@ -25,7 +25,7 @@ using namespace std;
 using namespace Eigen;
 using namespace utils;
 using namespace std::chrono;
-using lu = std::array<vec3, 2>;
+
 #define DURATION_TO_DOUBLE(X) duration_cast<duration<scalar>>(high_resolution_clock::now() - (X)).count()
 inline bool les(const Intersection& a, const Intersection& b){
     return a.i < b.i || (a.i == b.i && a.j < b.j);
@@ -50,8 +50,8 @@ lu compute_aabb(const AffineBody& c)
 inline lu merge(const lu& a, const lu& b)
 {
     vec3 l, u;
-    l = a[0].array().min(b[0].array());
-    u = a[1].array().max(b[1].array());
+    l = a.lower.array().min(b.lower.array());
+    u = a.upper.array().max(b.upper.array());
     return { l, u };
 }
 inline lu compute_aabb(const vec3& p0, const vec3& p1)
@@ -78,7 +78,7 @@ inline lu compute_aabb(const Face& f1, const Face& f2)
 lu affine(const lu& aabb, q4& q)
 {
     Matrix<scalar, 3, 8> cull, _cull;
-    vec3 l{ aabb[0] }, u{ aabb[1] };
+    vec3 l{ aabb.lower }, u{ aabb.upper };
     for (int i = 0; i < 2; i++)
         for (int j = 0; j < 2; j++)
             for (int k = 0; k < 2; k++) {
@@ -98,8 +98,8 @@ lu affine(const lu& aabb, q4& q)
 inline bool intersection(const lu& a, const lu& b, lu& ret)
 {
     vec3 l, u;
-    l = a[0].array().max(b[0].array());
-    u = a[1].array().min(b[1].array());
+    l = a.lower.array().max(b.lower.array());
+    u = a.upper.array().min(b.upper.array());
     bool intersects = (l.array() <= u.array()).all();
     ret = { l, u };
     return intersects;
@@ -108,7 +108,7 @@ inline bool intersection(const lu& a, const lu& b, lu& ret)
 inline bool intersects(const lu& a, const lu& b)
 {
     const auto overlaps = [&](int i) -> bool {
-        return a[0][i] <= b[1][i] && a[1][i] >= b[0][i];
+        return a.lower[i] <= b.upper[i] && a.upper[i] >= b.lower[i];
     };
     return overlaps(0) && overlaps(1) && overlaps(2);
 }
@@ -194,7 +194,7 @@ void intersect_sort(
         bounds[dim].resize(n_cubes * 2);
         for (int i = 0; i < n_cubes; i++) {
             auto& t{ affine_bb[i] };
-            auto &l{ t[0] }, &u{ t[1] };
+            auto &l{ t.lower }, &u{ t.upper };
             bounds[dim][i * 2] = { i, l(dim), true };
             bounds[dim][i * 2 + 1] = { i, u(dim), false };
         }
@@ -346,6 +346,29 @@ scalar ee_col_time(
         ej1s.push_back(ej1);
         ejaabbs.push_back(compute_aabb(ej0, ej1));
     }
+    int nei = eilist.size(), nej = ejlist.size();   
+    if (nei > globals.params_int["thres"] || nej > globals.params_int["thres"]) {
+        auto &EIs{nei > nej? eiaabbs: ejaabbs}, &EJs{nei > nej? ejaabbs: eiaabbs};
+        auto bvh = bvh_create(EIs.data(), EIs.size());
+        for (int J = 0; J < EJs.size(); J ++){
+            int I;
+            auto &aabbj {EJs[J]};
+            auto query = bvh_query_aabb(uint64_t(&bvh), aabbj.lower, aabbj.upper);
+            while (bvh_query_next(query, I)){
+                int i, j;
+                if (nei > nej) 
+                    {i = I; j = J;}
+                else 
+                    {i = J; j = I;}
+
+                auto &ei0{ ei0s[i] }, &ei1{ ei1s[i] }, &ej0{ ej0s[j] }, &ej1{ ej1s[j] };
+                int ei = eilist[i], ej = ejlist[j];
+                scalar t = ee_collision_time(ei0, ej0, ei1, ej1);
+                toi = min(toi, t);
+            }
+        }
+        bvh_destroy_host(bvh);
+    } else
     for (int i = 0; i < eilist.size(); i++)
         for (int j = 0; j < ejlist.size(); j++) {
             if (intersects(eiaabbs[i], ejaabbs[j])) {
@@ -412,12 +435,36 @@ scalar vf_col_time(
         f1s.push_back(f);
         fjaabbs.push_back(compute_aabb(f0, f));
     }
+
+    int nvi = vilist.size(), nfj = fjlist.size();   
+    if (nvi > globals.params_int["thres"] || nfj > globals.params_int["thres"]) {
+        auto &EIs{nvi > nfj? viaabbs: fjaabbs}, &EJs{nvi > nfj? fjaabbs: viaabbs};
+        auto bvh = bvh_create(EIs.data(), EIs.size());
+        for (int J = 0; J < EJs.size(); J ++){
+            int I;
+            auto &aabbj {EJs[J]};
+            auto query = bvh_query_aabb(uint64_t(&bvh), aabbj.lower, aabbj.upper);
+            while (bvh_query_next(query, I)){
+                int i, j;
+                if (nvi > nfj) 
+                    {i = I; j = J;}
+                else 
+                    {i = J; j = I;}
+
+                auto &v0{ v0s[i] }, &v{ v1s[i] };
+                auto &f0{ f0s[j] }, &f{ f1s[j] };
+                scalar t = pt_collision_time(v0, f0, v, f);
+                toi = min(toi, t);
+            }
+        }
+        bvh_destroy_host(bvh);
+    } else
     for (int i = 0; i < vilist.size(); i++)
         for (int j = 0; j < fjlist.size(); j++) {
             int vi = vilist[i], fj = fjlist[j];
-            auto &v0{ v0s[i] }, &v{ v1s[i] };
-            auto &f0{ f0s[j] }, &f{ f1s[j] };
             if (intersects(viaabbs[i], fjaabbs[j])) {
+                auto &v0{ v0s[i] }, &v{ v1s[i] };
+                auto &f0{ f0s[j] }, &f{ f1s[j] };
                 scalar t = pt_collision_time(v0, f0, v, f);
 #ifdef TESTING
                 if (t < 1.0) {
@@ -461,6 +508,40 @@ void vf_col_set(vector<int>& vilist, vector<int>& fjlist,
         fjs.push_back(f);
         fjaabbs.push_back(compute_aabb(f));
     }
+
+    int nvi = vilist.size(), nfj = fjlist.size();   
+    if (nvi > globals.params_int["thres"] || nfj > globals.params_int["thres"]) {
+        auto &EIs{nvi > nfj? viaabbs: fjaabbs}, &EJs{nvi > nfj? fjaabbs: viaabbs};
+        auto bvh = bvh_create(EIs.data(), EIs.size());
+        for (int jj = 0; jj < EJs.size(); jj ++){
+            int ii;
+            auto &aabbj {EJs[jj]};
+            auto query = bvh_query_aabb(uint64_t(&bvh), aabbj.lower, aabbj.upper);
+            while (bvh_query_next(query, ii)){
+                int i, j;
+                if (nvi > nfj) 
+                    {i = ii; j = jj;}
+                else 
+                    {i = jj; j = ii;}
+
+
+                int vi = vilist[i], fj = fjlist[j];
+                auto& v{ vis[i] };
+                auto& f{ fjs[j] };
+                auto [d, pt_type] = vf_distance(v, f);
+                if (d < barrier::d_hat) {
+                    array<vec3, 4> pt = { v, f.t0, f.t1, f.t2 };
+                    array<int, 4> ij = { I, vi, J, fj };
+                    {
+                        pts.push_back(pt);
+                        idx.push_back(ij);
+                    }
+                }
+            }
+        }
+        bvh_destroy_host(bvh);
+    } else
+
     for (int i = 0; i < vilist.size(); i ++)
         for (int j = 0; j < fjlist.size(); j ++){
             int vi = vilist[i], fj = fjlist[j];
@@ -508,6 +589,39 @@ void ee_col_set(vector<int>& eilist, vector<int>& ejlist,
         ejs.push_back(ejj);
         ejaabbs.push_back(compute_aabb(ejj));
     }
+
+    int nei = eilist.size(), nej = ejlist.size();   
+    if (nei > globals.params_int["thres"] || nej > globals.params_int["thres"]) {
+        auto &EIs{nei > nej? eiaabbs: ejaabbs}, &EJs{nei > nej? ejaabbs: eiaabbs};
+        auto bvh = bvh_create(EIs.data(), EIs.size());
+        for (int jj = 0; jj < EJs.size(); jj ++){
+            int ii;
+            auto &aabbj {EJs[jj]};
+            auto query = bvh_query_aabb(uint64_t(&bvh), aabbj.lower, aabbj.upper);
+            while (bvh_query_next(query, ii)){
+                int i, j;
+                if (nei > nej) 
+                    {i = ii; j = jj;}
+                else 
+                    {i = jj; j = ii;}
+
+                auto &eii{ eis[i] }, &ejj{ ejs[j] };
+                int ei = eilist[i], ej = ejlist[j];
+                auto ee_type = ipc::edge_edge_distance_type(eii.e0, eii.e1, ejj.e0, ejj.e1);
+                scalar d = ipc::edge_edge_distance(eii.e0, eii.e1, ejj.e0, ejj.e1, ee_type);
+                if (d < barrier::d_hat) {
+                    array<vec3, 4> ee = { eii.e0, eii.e1, ejj.e0, ejj.e1 };
+                    array<int, 4> ij = { I, ei, J, ej };
+                    {
+                        ees.push_back(ee);
+                        eidx.push_back(ij);
+                    }
+                }
+
+            }
+        }
+        bvh_destroy_host(bvh);
+    } else
     for (int i = 0; i < eilist.size(); i++)
         for (int j = 0; j < ejlist.size(); j++) {
 
