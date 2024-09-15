@@ -240,7 +240,7 @@ scalar primitive_brute_force(
     bool toi_and_colset = vtn == 4;
 
     int n_overlap = overlaps.size();
-    if (!cull_trajectory) {
+    if (!(cull_trajectory || toi_and_colset)) {
         pts.resize(0);
         idx.resize(0);
         ees.resize(0);
@@ -569,21 +569,58 @@ scalar primitive_brute_force(
                              *eidx_private = new vector<i4>[omp_get_max_threads()];
     static vector<q4>*pts_private = new vector<q4>[omp_get_max_threads()], *ees_private = new vector<q4>[omp_get_max_threads()];
 
-    if (toi_and_colset) {
-        auto tid = omp_get_thread_num();
-        idx_private[tid].resize(0);
-        eidx_private[tid].resize(0);
-        pts_private[tid].resize(0);
-        ees_private[tid].resize(0);
 
-        for (int _i = 0; _i < n_overlap / 2; _i ++) {
-            int i = _i * 2;
-            int I{ overlaps[i].i }, J{ overlaps[i].j };
-            auto &p{ *overlaps[i].plist };
-            
-            ee_col_set_and_time(p.ei, p.ej, cubes, I, J, vertex_starting_index, vt1_buffer, ees_private[tid], eidx_private[tid]);
-            pt_col_set_and_time(p.vi, p.fj, cubes, I, J, vertex_starting_index, vt1_buffer, pts_private[tid], idx_private[tid]);
-            pt_col_set_and_time(p.vj, p.fi, cubes, J, I, vertex_starting_index, vt1_buffer, pts_private[tid], idx_private[tid]);
+    static vector<i4> idx_new, eidx_new;
+    idx_new.resize(0);
+    eidx_new.resize(0);
+    if (toi_and_colset){
+
+        #pragma omp parallel
+        {
+            scalar toi = 1.0;
+            auto tid = omp_get_thread_num();
+            idx_private[tid].resize(0);
+            eidx_private[tid].resize(0);
+            pts_private[tid].resize(0);
+            ees_private[tid].resize(0);
+            #pragma omp for schedule(guided) nowait
+            for (int _i = 0; _i < n_overlap / 2; _i ++) {
+                int i = _i * 2;
+                int I{ overlaps[i].i }, J{ overlaps[i].j };
+                auto &p{ *overlaps[i].plist };
+                
+                scalar t1 = ee_col_set_and_time(p.ei, p.ej, cubes, I, J, vertex_starting_index, vt1_buffer, ees_private[tid], eidx_private[tid]);
+                scalar t2 = pt_col_set_and_time(p.vi, p.fj, cubes, I, J, vertex_starting_index, vt1_buffer, pts_private[tid], idx_private[tid]);
+                scalar t3 = pt_col_set_and_time(p.vj, p.fi, cubes, J, I, vertex_starting_index, vt1_buffer, pts_private[tid], idx_private[tid]);
+
+
+                
+                toi = min(toi, min({t1, t2, t3}));
+            }
+            #pragma omp critical
+            {
+                // pts.insert(pts.end(), pts_private[tid].begin(), pts_private[tid].end());
+                // idx.insert(idx.end(), idx_private[tid].begin(), idx_private[tid].end());
+                // ees.insert(ees.end(), ees_private[tid].begin(), ees_private[tid].end());
+                // eidx.insert(eidx.end(), eidx_private[tid].begin(), eidx_private[tid].end());
+                idx_new.insert(idx_new.end(), idx_private[tid].begin(), idx_private[tid].end());
+                eidx_new.insert(eidx_new.end(), eidx_private[tid].begin(), eidx_private[tid].end());
+
+                toi_ee_pt = min(toi_ee_pt, toi);
+            }
+        } 
+
+        vector<i4> lesser, lesser_ee;
+        set_difference(idx.begin(), idx.end(), idx_new.begin(), idx_new.end(), back_inserter(lesser));
+        set_difference(eidx.begin(), eidx.end(), eidx_new.begin(), eidx_new.end(), back_inserter(lesser_ee));
+        if (lesser.size() > 0) {
+            spdlog::error("pt didnot include all t0 collisions, ref size = {}, new size = {}, diff = {}", idx.size(), idx_new.size(), lesser.size());
+            // for (auto& i: lesser) {
+            //     spdlog::error("idx = {} {}", i[0], i[1]);
+            // }
+        }
+        if (lesser_ee.size() > 0) {
+            spdlog::error("ee didnot include all t0 collisions, ref size =  {}, new size = {}, diff = {}", eidx.size(), eidx_new.size(), lesser_ee.size());
         }
     } 
     else if (!cull_trajectory)

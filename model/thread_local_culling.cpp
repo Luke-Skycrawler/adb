@@ -333,7 +333,8 @@ scalar pt_col_set_and_time(
                 scalar t = pt_collision_time(v0, f0, v, f);
                 toi = min(toi, t);
 
-                pt_task(vilist[i], fjlist[j], I, J, v0, f0, v, f, pts, idx);
+                // pt_task(vilist[i], fjlist[j], I, J, v0, f0, v, f, pts, idx);
+                pt_col_set_task(vilist[i], fjlist[j], I, J, v0, f0, viaabbs[i], fjaabbs[j], pts, idx);
             }
         }
         bvh_destroy_host(bvh);
@@ -346,7 +347,8 @@ scalar pt_col_set_and_time(
                 scalar t = pt_collision_time(v0, f0, v, f);
                 toi = min(toi, t);
 
-                pt_task(vilist[i], fjlist[j], I, J, v0, f0, v, f, pts, idx);
+                // pt_task(vilist[i], fjlist[j], I, J, v0, f0, v, f, pts, idx);
+                pt_col_set_task(vilist[i], fjlist[j], I, J, v0, f0, viaabbs[i], fjaabbs[j], pts, idx);
             }
         }
     return toi;
@@ -390,8 +392,10 @@ scalar ee_col_set_and_time(
                 auto &ei0{ ei0s[i] }, &ei1{ ei1s[i] }, &ej0{ ej0s[j] }, &ej1{ ej1s[j] };
                 int ei = eilist[i], ej = ejlist[j];
                 scalar t = ee_collision_time(ei0, ej0, ei1, ej1);
-                ee_task(ei, ej, I, J, ei0, ej0, ei1, ej1, ees, eidx);
                 toi = min(toi, t);
+                // ee_task(ei, ej, I, J, ei0, ej0, ei1, ej1, ees, eidx);
+                ee_col_set_task(eilist[i], ejlist[j], I, J, ei0s[i], ej0s[j], eiaabbs[i], ejaabbs[j], ees, eidx);
+
             }
         }
         bvh_destroy_host(bvh);
@@ -403,7 +407,8 @@ scalar ee_col_set_and_time(
                 int ei = eilist[i], ej = ejlist[j];
                 scalar t = ee_collision_time(ei0, ej0, ei1, ej1);
                 toi = min(toi, t);
-                ee_task(ei, ej, I, J, ei0, ej0, ei1, ej1, ees, eidx);
+                // ee_task(ei, ej, I, J, ei0, ej0, ei1, ej1, ees, eidx);
+                ee_col_set_task(eilist[i], ejlist[j], I, J, ei0s[i], ej0s[j], eiaabbs[i], ejaabbs[j], ees, eidx);
             }
         }
 
@@ -460,6 +465,18 @@ void pt_task(
 ) {
     auto [d0, pt_type0] = vf_distance(v0, f0);
     auto [d1, pt_type1] = vf_distance(v1, f1);
+
+    if (d0 < barrier::d_hat) {
+        i4 ij = { I, vi, J, fj };
+        q4 pt = { v0, f0.t0, f0.t1, f0.t2 };
+        {
+            pts.push_back(pt);
+            idx.push_back(ij);
+        }
+    }
+    return;
+    d0 = sqrt(d0);
+    d1 = sqrt(d1);
     scalar d_p = (v1 - v0).norm();
     scalar d_f0 = (f1.t0 - f0.t0).norm();
     scalar d_f1 = (f1.t1 - f0.t1).norm();
@@ -467,7 +484,7 @@ void pt_task(
 
     scalar L = d_p + max(d_f0, max(d_f1, d_f2));
     scalar min_d = min(d0, d1) - 0.5 * (L - abs(d1 - d0));
-    if (min_d < barrier::d_hat) {
+    if (min_d < barrier::d_sqrt) {
         q4 pt = { v0, f0.t0, f0.t1, f0.t2 };
         i4 ij = { I, vi, J, fj };
         {
@@ -489,20 +506,23 @@ void ee_task(
     scalar d0 = sqrt(ipc::edge_edge_distance(eii.e0, eii.e1, ejj.e0, ejj.e1, ee_type0));
     scalar d1 = sqrt(ipc::edge_edge_distance(ei1.e0, ei1.e1, ej1.e0, ej1.e1, ee_type1));
     
-    scalar d_ei0 = (ei1.e0 - eii.e0).norm();
-    scalar d_ei1 = (ei1.e1 - eii.e1).norm();
-    scalar d_ej0 = (ej1.e0 - ejj.e0).norm();
-    scalar d_ej1 = (ej1.e1 - ejj.e1).norm();
-
-    scalar L = max(d_ei0, d_ei1) + max(d_ej0, d_ej1);
-    scalar min_d = min(d0, d1) - 0.5 * (L - abs(d1 - d0));
-
-    if (min_d < barrier::d_sqrt) {
-        q4 ee = { eii.e0, eii.e1, ejj.e0, ejj.e1 };
-        i4 ij = { I, ei, J, ej };
-        {
-            ees.push_back(ee);
-            eidx.push_back(ij);
-        }
+    if (d0 < barrier::d_sqrt) {
+        eidx.push_back({I, ei, J, ej});
     }
+    // scalar d_ei0 = (ei1.e0 - eii.e0).norm();
+    // scalar d_ei1 = (ei1.e1 - eii.e1).norm();
+    // scalar d_ej0 = (ej1.e0 - ejj.e0).norm();
+    // scalar d_ej1 = (ej1.e1 - ejj.e1).norm();
+
+    // scalar L = max(d_ei0, d_ei1) + max(d_ej0, d_ej1);
+    // scalar min_d = min(d0, d1) - 0.5 * (L - abs(d1 - d0));
+
+    // if (min_d < barrier::d_sqrt) {
+    //     q4 ee = { eii.e0, eii.e1, ejj.e0, ejj.e1 };
+    //     i4 ij = { I, ei, J, ej };
+    //     {
+    //         ees.push_back(ee);
+    //         eidx.push_back(ij);
+    //     }
+    // }
 }
