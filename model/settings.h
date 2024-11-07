@@ -1,10 +1,9 @@
+#pragma once
 #include "affine_body.h"
 #include <string>
 #include <map>
-#ifndef ABDTK
-#include "../view/global_variables.h"
-#else 
-static const struct ABDTKLocalConfig{
+
+struct ABDTKLocalConfig{
     bool g = true;
     vec3 gravity = vec3(0.0, g ? -9.8 : 0.0, 0.0);
     bool col_set = true;
@@ -52,6 +51,9 @@ static const struct ABDTKLocalConfig{
         {"hdk", 1}
     };    
 
-} globals;
-
+};
+#ifndef ABDTK
+#include "../view/global_variables.h"
+#else 
+static const ABDTKLocalConfig globals;
 #endif

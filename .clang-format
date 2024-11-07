@@ -58,15 +58,15 @@ SpacesInAngles:  false
 SpaceInEmptyParentheses: false
 SpacesInCStyleCastParentheses: false
 SpaceAfterCStyleCast: false
-SpacesInSquareBrackets: false
+# SpacesInSquareBrackets: false
 SpaceAfterTemplateKeyword: true
 SpacesInContainerLiterals: false
-SpacesInParentheses: false
+# SpacesInParentheses: false
 SpaceBeforeAssignmentOperators: true
 SpaceBeforeParens: false
 ContinuationIndentWidth: 4
 CommentPragmas:  '^ IWYU pragma:'
 ForEachMacros:   [ foreach, Q_FOREACH, BOOST_FOREACH ]
-SpaceBeforeParens: ControlStatements
+# SpaceBeforeParens: ControlStatements
 DisableFormat:   false
 ...

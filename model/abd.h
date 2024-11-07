@@ -4,11 +4,18 @@
 #include "collision.h"
 #include "settings.h"
 #include "geometry.h"
+
 struct ABD {
     std::vector<std::unique_ptr<AffineBody>>& cubes;
     void implicit_euler(scalar dt);
     GlobalVariableMainCPP& globals;
-    ABD(std::vector<std::unique_ptr<AffineBody>>& cubes, GlobalVariableMainCPP& globals): cubes(cubes), globals(globals), n_cubes(cubes.size()), hess_dim(n_cubes * 12), tol(globals.params_double["tol"]), ts(globals.ts), sparse_hess(hess_dim, hess_dim) {}
+    ABD(std::vector<std::unique_ptr<AffineBody>>& cubes, GlobalVariableMainCPP& globals)
+        : cubes(cubes), globals(globals), n_cubes(cubes.size()), hess_dim(n_cubes * 12), tol(globals.params_double["tol"]), ts(globals.ts), sparse_hess(hess_dim, hess_dim) {}
+
+    void line_search(scalar dt);
+    void solve(scalar dt);
+    void ccd();
+    void ipc();
 
     static const int __IPC__ = 0;
     static const int __SOLVER__ = 1;
@@ -54,13 +61,4 @@ struct ABD {
     map<std::array<int, 2>, int> lut;
     Eigen::SparseMatrix<scalar> sparse_hess;
 #endif
-
-
-    
-
-
-
-
 };
-
-
