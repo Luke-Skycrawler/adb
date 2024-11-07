@@ -1,3 +1,4 @@
+#pragma once
 #include "affine_body.h"
 #include "geometry.h"
 #include <vector>

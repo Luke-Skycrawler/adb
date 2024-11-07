@@ -51,6 +51,7 @@ set(HEADERS
     model/bvh/bvh.h
     model/thread_local_culling.h
     model/bounds3.h
+    model/abd.h
     view/camera.h
     view/env.h
     view/global_variables.h
@@ -87,6 +88,7 @@ set(SOURCE
     model/ipc_extension.cpp
     model/bvh/bvh.cpp
     model/thread_local_culling.cpp
+    model/abd.cpp
     test_cases/spinning_cube.cpp
     view/control.cpp
     view/light.cpp

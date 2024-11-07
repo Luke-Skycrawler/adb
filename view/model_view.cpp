@@ -6,6 +6,7 @@
 #define _MAIN_CPP
 #include "global_variables.h"
 #include "cube.h"
+#include "abd.h"
 #include "../model/time_integrator.h"
 #include "../model/glue.h"
 #include <glm/gtx/string_cast.hpp>
@@ -232,7 +233,7 @@ int main()
     
     auto &lightPos{globals.light_positions[0]};
     // be sure to call after glfw intiailzation 
-
+    ABD abd(globals.cubes, globals);
     // render loop
     // -----------
     while (!glfwWindowShouldClose(window))
@@ -281,7 +282,7 @@ int main()
         bool init = globals.ts == 0;
         if (!globals.player) {
             for (int i = 0; i < 1; i++)
-                implicit_euler(globals.cubes, globals.dt);
+                abd.implicit_euler(globals.dt);
             player_save(trace_folder, globals.ts, globals.cubes, init);
             if (globals.ending_ts > 0 && globals.ts >= globals.ending_ts) 
                 exit_callback(window);

@@ -96,8 +96,11 @@ struct GlobalVariableMainCPP{
 #define VARIABLE_LOCATOR extern
 #endif
 
-VARIABLE_LOCATOR GlobalVariableMainCPP globals;
 
+
+#ifndef _GLOBAL_VARIABLE_DEFINE_ONLY_
+VARIABLE_LOCATOR GlobalVariableMainCPP globals;
+#endif
 
 #endif
 #endif
