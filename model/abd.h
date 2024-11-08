@@ -4,6 +4,7 @@
 #include "collision.h"
 #include "settings.h"
 #include "geometry.h"
+#include "ipc.h"
 
 struct ABD {
     std::vector<std::unique_ptr<AffineBody>>& cubes;
@@ -22,6 +23,7 @@ struct ABD {
     static const int __CCD__ = 2;
     static const int __LINE_SEARCH__ = 3;
 
+    IPC ipc_assembler;
     bool term_cond;
     int& ts;
     scalar tol;

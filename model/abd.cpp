@@ -4,6 +4,7 @@
 #include "barrier.h"
 #include "spdlog/spdlog.h"
 #include "collision.h"
+#include "ipc.h"
 #include "settings.h"
 #include <assert.h>
 #include <array>
@@ -335,7 +336,7 @@ void ABD::ipc()
             if(d < barrier::d_hat) {
                 vec12 gradp, gradt;
                 mat12 hess_p, hess_t, off_diag;
-                ipc_term(
+                ipc_assembler.ipc_term(
                     pt, ij, pt_type, d,
 #ifdef _SM_OUT_
                     lut, sparse_hess,
@@ -369,7 +370,7 @@ void ABD::ipc()
             if(d < barrier::d_hat) {
                 mat12 hess_0, hess_1, off_diag;
                 vec12 grad_0, grad_1;
-                ipc_term_ee(
+                ipc_assembler.ipc_term_ee(
                     ee, ij, ee_type, d,
 #ifdef _SM_OUT_
                     lut, sparse_hess,
@@ -407,9 +408,9 @@ void ABD::ipc()
                 Vector<scalar, 2> uk = Pk.transpose() * (p - c.vt0(v));
                 g_contact_forces[k] = -barrier_derivative_d(d) * 2 * _d;
 
-                ipc_term_vg(c, v, uk, g_contact_forces[k], Pk);
+                ipc_assembler.ipc_term_vg(c, v, uk, g_contact_forces[k], Pk);
 #else
-                ipc_term_vg(c, v);
+                ipc_assembler.ipc_term_vg(c, v);
 #endif
             }
         }

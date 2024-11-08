@@ -1,4 +1,5 @@
 #include "affine_body.h"
+#include "ipc.h"
 #include "time_integrator.h"
 #include "sparse.h"
 #include <omp.h>
@@ -29,7 +30,7 @@ void put2(scalar* values, int offset, int _stride, mat3 block[4][4])
         }
 }
 
-void output_hessian_gradient(
+void IPC::output_hessian_gradient(
     const std::map<std::array<int, 2>, int>& lut,
     SparseMatrix<scalar>& sparse_hess,
     int ii, int jj, bool ci_nonstatic, bool cj_nonstatic,

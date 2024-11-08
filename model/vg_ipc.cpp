@@ -1,4 +1,5 @@
 #include "affine_body.h"
+#include "ipc.h"
 #include "collision.h"
 #include "barrier.h"
 #ifndef TESTING
@@ -8,7 +9,7 @@
 extern Globals globals;
 #endif
 using namespace Eigen;
-void ipc_term_vg(AffineBody& c, int v
+void IPC::ipc_term_vg(AffineBody& c, int v
 #ifdef _FRICTION_
     ,
     const Vector<scalar, 2>& _uk, scalar contact_lambda, const Matrix<scalar, 3, 2>& Tk

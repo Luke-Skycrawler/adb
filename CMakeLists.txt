@@ -52,6 +52,7 @@ set(HEADERS
     model/thread_local_culling.h
     model/bounds3.h
     model/abd.h
+    model/ipc.h
     view/camera.h
     view/env.h
     view/global_variables.h
@@ -104,6 +105,7 @@ set(PYTHON_SOURCE
 )
 
 set(PYTHON_HEADERS
+    model/ipc.h
     model/psd.h
     model/affine_body.h
     model/barrier.h

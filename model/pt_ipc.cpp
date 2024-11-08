@@ -1,3 +1,4 @@
+#include "ipc.h"
 #include "barrier.h"
 #include "affine_body.h"
 #include <ipc/distance/point_triangle.hpp>
@@ -17,8 +18,6 @@ extern Globals globals;
 #include "ipc_extension.h"
 using namespace utils;
 using namespace Eigen;
-tuple<mat12, vec12> ipc_hess_pt_12x12(
-    array<vec3, 4> pt, array<int, 4> ij, ipc::PointTriangleDistanceType pt_type, scalar dist);
 
 scalar pt_uktk(
     AffineBody& ci, AffineBody& cj,
@@ -116,7 +115,7 @@ tuple<scalar, Vector<scalar, 2>, Matrix<scalar, 2, 12>> pt_uktk(AffineBody& ci, 
     return { lam, uk, Tk };
 }
 
-void ipc_term(
+void IPC::ipc_term(
     array<vec3, 4> pt, array<int, 4> ij, ipc::PointTriangleDistanceType pt_type, scalar dist,
 #ifdef _SM_OUT_
     const std::map<std::array<int, 2>, int>& lut,

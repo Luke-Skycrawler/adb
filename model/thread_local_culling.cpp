@@ -10,6 +10,7 @@
 #include <ipc/distance/point_triangle.hpp>
 #include <ipc/distance/edge_edge.hpp>
 #include "collision.h"
+#include "ipc_extension.h"
 
 using namespace Eigen;
 using namespace std;

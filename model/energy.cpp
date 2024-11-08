@@ -2,7 +2,7 @@
 #include "time_integrator.h"
 #include "barrier.h"
 #include "spdlog/spdlog.h"
-#include "collision.h"
+#include "ipc.h"
 #include "settings.h"
 #include <assert.h>
 #include <array>
