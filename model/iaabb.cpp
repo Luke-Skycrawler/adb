@@ -8,8 +8,8 @@
 #include <ipc/distance/point_triangle.hpp>
 #include <ipc/distance/edge_edge.hpp>
 #include "barrier.h"
+#include "timer.h"
 #include "time_integrator.h"
-#include <omp.h>
 #include <tbb/parallel_sort.h>
 #include "ipc_extension.h"
 #include "thread_local_culling.h"
@@ -20,17 +20,12 @@
 #else
 #include "../iAABB/pch.h"
 #endif
-#include <chrono>
 
 using namespace std;
 using namespace Eigen;
 using namespace utils;
 using namespace std::chrono;
 
-#define DURATION_TO_DOUBLE(X) duration_cast<duration<scalar>>(high_resolution_clock::now() - (X)).count()
-inline bool les(const Intersection& a, const Intersection& b){
-    return a.i < b.i || (a.i == b.i && a.j < b.j);
-};
 lu compute_aabb(const AffineBody& c)
 {
     vec3 l, u;
@@ -122,7 +117,6 @@ void IAABB::intersect_sort(
     }
 
     */
-    static vector<BoundingBox> bounds[3];
     static vector<int>*intersected_body_per_dim[3] = {
         new vector<int>[n_cubes],
         new vector<int>[n_cubes],
@@ -131,7 +125,6 @@ void IAABB::intersect_sort(
            *intersected_body_joint = new vector<int>[n_cubes];
     static vector<Intersection>* ret_tmp = new vector<Intersection>[n_cubes];
 
-    static vector<lu> affine_bb;
     // static vector<Intersection> intersected_body_joint;
     ret.resize(0);
     
@@ -172,7 +165,6 @@ void IAABB::intersect_sort(
             }
         }
     }
-    static vector<unsigned> buckets;
     buckets.resize(omp_get_max_threads() * n_cubes);
 
 #pragma omp parallel
@@ -238,13 +230,14 @@ scalar IAABB::primitive_brute_force(
         vidx.resize(0);
     }
 
-    static PList* lists = new PList[n_overlap];
-    static int allocated = n_overlap;
-    if (n_overlap > allocated) {
-        delete []lists;
-        lists = new PList[n_overlap];
-        allocated = n_overlap;
-    }
+    // static PList* lists = new PList[n_overlap];
+    // static int allocated = n_overlap;
+    // if (n_overlap > allocated) {
+    //     delete []lists;
+    //     lists = new PList[n_overlap];
+    //     allocated = n_overlap;
+    // }
+    lists.resize(n_overlap);
     for (int i = 0; i < n_overlap; i++) {
         lists[i].vi.resize(0);
         lists[i].vj.resize(0);
@@ -280,9 +273,7 @@ scalar IAABB::primitive_brute_force(
         }
     }
 
-    static vector<array<int, 2>>* vidx_thread_local = new vector<array<int, 2>>[omp_get_max_threads()];
-
-    if (globals.ground)
+    if(ground)
     // #pragma omp parallel
     {
         scalar toi_thread_local = 1.0;
@@ -320,16 +311,13 @@ scalar IAABB::primitive_brute_force(
     if (cull_trajectory) {
         if (toi_global < 1e-6) {
             spdlog::error("vertex ground toi_global = {}", toi_global);
-            if (globals.params_int.find("g_cnt") != globals.params_int.end())
-                globals.params_int["g_cnt"]++;
-            else
-                globals.params_int["g_cnt"] = 0;
-            if (globals.params_int["g_cnt"] > 1) exit(1);
+
+            g_cnt++;
+            if(g_cnt > 1) exit(1);
         }
         else
-            globals.params_int["g_cnt"] = 0;
+            g_cnt = 0;
     }
-    int n_points = globals.points.size(), n_triangles = globals.triangles.size(), n_edges = globals.edges.size();
 
     static omp_lock_t* locks = nullptr;
     static int allocated_locks = 0;
@@ -346,11 +334,11 @@ scalar IAABB::primitive_brute_force(
             omp_init_lock(locks + i);
     }
 
-    for (int i = 0; i < n_overlap; i ++) overlaps[i].plist = lists + i;
+    for(int i = 0; i < n_overlap; i++) overlaps[i].plist = &lists[i];
 
 #pragma omp parallel for schedule(static)
     for (int i = 0; i < n_points; i++) {
-        auto idx{ globals.points[i] };
+        auto idx{ points[i] };
         auto I{ idx[0] };
         auto v{ idx[1] };
         auto& c{ *cubes[I] };
@@ -375,7 +363,7 @@ scalar IAABB::primitive_brute_force(
 
 #pragma omp parallel for schedule(static)
     for (int i = 0; i < n_edges; i++) {
-        auto idx{ globals.edges[i] };
+        auto idx{ edges[i] };
         auto I{ idx[0] };
         auto ei{ idx[1] };
         auto& c{ *cubes[I] };
@@ -399,7 +387,7 @@ scalar IAABB::primitive_brute_force(
 
 #pragma omp parallel for schedule(static)
     for (int i = 0; i < n_triangles; i++) {
-        auto idx{ globals.triangles[i] };
+        auto idx{ triangles[i] };
         auto I{ idx[0] };
         auto fi{ idx[1] };
         auto& c{ *cubes[I] };
@@ -460,13 +448,11 @@ scalar IAABB::primitive_brute_force(
         fj0.insert(fj0.end(), fj1.begin(), fj1.end());
     }
 
-    static vector<vec3> vt1_buffer;
-    static vector<int> vertex_starting_index;
 
     if (vertex_starting_index.size() == 0) {
         // initialization
         vertex_starting_index.resize(n_cubes);
-        vt1_buffer.resize(globals.points.size());
+        vt1_buffer.resize(points.size());
         vertex_starting_index[0] = 0;
 
         for (int i = 0; i < n_cubes - 1; i++) {
@@ -488,9 +474,8 @@ scalar IAABB::primitive_brute_force(
     }
 
     scalar ee_global = 1.0, pt_global = 1.0;
-    static vector<array<int, 4>>*idx_private = new vector<array<int, 4>>[omp_get_max_threads()],
-                             *eidx_private = new vector<array<int, 4>>[omp_get_max_threads()];
-    static vector<array<vec3, 4>>*pts_private = new vector<array<vec3, 4>>[omp_get_max_threads()], *ees_private = new vector<array<vec3, 4>>[omp_get_max_threads()];
+    static vector<vector<array<int, 4>>> idx_private(omp_get_max_threads()),eidx_private(omp_get_max_threads());
+    static vector<vector<array<vec3, 4>>> pts_private(omp_get_max_threads()), ees_private(omp_get_max_threads());
 
     if (!cull_trajectory)
 #pragma omp parallel
@@ -553,14 +538,11 @@ scalar IAABB::primitive_brute_force(
     if (cull_trajectory) {
         if (toi_ee_pt < 1e-6) {
             spdlog::error("pt/ee toi_global = {}", toi_ee_pt);
-            if (globals.params_int.find("p_cnt") != globals.params_int.end())
-                globals.params_int["p_cnt"]++;
-            else
-                globals.params_int["p_cnt"] = 0;
-            if (globals.params_int["p_cnt"] > 1) exit(1);
+            p_cnt++;
+            if(p_cnt > 1) exit(1);
         }
         else
-            globals.params_int["p_cnt"] = 0;
+            p_cnt = 0;
     }
     toi_global = min(toi_global, toi_ee_pt);
     return cull_trajectory? toi_global: 1.0;
@@ -590,3 +572,6 @@ scalar IAABB::iaabb_brute_force(
     spdlog::info("time: {} = {:0.6f} ms", vtn == 3 ? "iaabb upper bound": "iAABB", t * 1000);
     return toi;
 }
+
+IAABB::IAABB(std::vector<std::unique_ptr<AffineBody>>& cubes, bool ground)
+    : points(utils::gen_point_list(cubes, cubes.size())), edges(utils::gen_edge_list(cubes, cubes.size())), triangles(utils::gen_triangle_list(cubes, cubes.size())), n_points(points.size()), n_triangles(triangles.size()), n_edges(edges.size()), ground(ground), vidx_thread_local(omp_get_max_threads()) {}

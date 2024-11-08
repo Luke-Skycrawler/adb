@@ -3,7 +3,7 @@
 #include "geometry.h"
 #include "bvh/bvh.h"
 #include "bounds3.h"
-
+#include <omp.h>
 // using lu = std::array<vec3, 2>;
 
 struct PList {
@@ -14,10 +14,10 @@ struct Intersection {
     int i, j;
     lu cull;
     PList* plist;
-    inline bool operator==(Intersection &b) const {
+    inline bool operator==(const Intersection &b) const {
         return i == b.i && j == b.j;
     }
-    inline bool operator<(Intersection& b) const {
+    inline bool operator<(const Intersection& b) const {
         return i < b.i || (i == b.i && j < b.j);
     }
 };
@@ -29,7 +29,22 @@ struct BoundingBox {
 };
 
 struct IAABB {
+    std::vector<std::array<unsigned, 2>> edges, points, triangles;
+    int n_points, n_triangles, n_edges;
 
+    int g_cnt = 0;
+    int p_cnt = 0;
+
+    bool ground = true;
+    std::vector<BoundingBox> bounds[3];
+    std::vector<lu> affine_bb;
+    std::vector<unsigned> buckets;
+    std::vector<PList> lists;
+    std::vector<std::vector<std::array<int, 2>>> vidx_thread_local;
+    std::vector<vec3> vt1_buffer;
+    std::vector<int> vertex_starting_index;
+
+    IAABB(std::vector<std::unique_ptr<AffineBody>>& cubes, bool ground = true);
     void intersect_brute_force(
         int n_cubes,
         const std::vector<std::unique_ptr<AffineBody>>& cubes,

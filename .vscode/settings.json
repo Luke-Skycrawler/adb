@@ -105,6 +105,7 @@
         "future": "cpp",
         "shared_mutex": "cpp",
         "*.tpp": "cpp",
-        "pardisosupport": "cpp"
+        "pardisosupport": "cpp",
+        "hash_map": "cpp"
     }
 }

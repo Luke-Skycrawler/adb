@@ -11,7 +11,7 @@ struct ABD {
     void implicit_euler(scalar dt);
     GlobalVariableMainCPP& globals;
     ABD(std::vector<std::unique_ptr<AffineBody>>& cubes, GlobalVariableMainCPP& globals)
-        : cubes(cubes), globals(globals), n_cubes(cubes.size()), hess_dim(n_cubes * 12), ipc_assembler(n_cubes), tol(globals.params_double["tol"]), ts(globals.ts), sparse_hess(hess_dim, hess_dim) {}
+        : cubes(cubes), globals(globals), n_cubes(cubes.size()), hess_dim(n_cubes * 12), culling(cubes, globals.ground), ipc_assembler(n_cubes), tol(globals.params_double["tol"]), ts(globals.ts), sparse_hess(hess_dim, hess_dim) {}
 
     scalar line_search(const Eigen::Vector<scalar, -1>& dq, const Eigen::Vector<scalar, -1>& grad, Eigen::Vector<scalar, -1>& q0, scalar& E0, scalar& E1,
         int n_cubes, int n_pt, int n_ee, int n_g,
