@@ -22,7 +22,7 @@ using namespace Eigen;
 scalar pt_uktk(
     AffineBody& ci, AffineBody& cj,
     array<vec3, 4>& pt, array<int, 4>& ij, const ::ipc::PointTriangleDistanceType& pt_type,
-    Matrix<scalar, 2, 12>& Tk_T_ret, Vector<scalar, 2>& uk_ret, scalar d, scalar dt)
+    Matrix<scalar, 2, 12>& Tk_T_ret, Vector<scalar, 2>& uk_ret, scalar d)
 
 {
 
@@ -107,11 +107,11 @@ scalar pt_uktk(
 }
 
 
-tuple<scalar, Vector<scalar, 2>, Matrix<scalar, 2, 12>> pt_uktk(AffineBody& ci, AffineBody& cj, array<vec3, 4>& pt, array<int, 4>& ij, const ::ipc::PointTriangleDistanceType& pt_type, scalar d, scalar dt)
+tuple<scalar, Vector<scalar, 2>, Matrix<scalar, 2, 12>> pt_uktk(AffineBody& ci, AffineBody& cj, array<vec3, 4>& pt, array<int, 4>& ij, const ::ipc::PointTriangleDistanceType& pt_type, scalar d)
 {
     Vector<scalar, 2> uk;
     Matrix<scalar, 2, 12> Tk;
-    scalar lam = pt_uktk(ci, cj, pt, ij, pt_type, Tk, uk, d, dt);
+    scalar lam = pt_uktk(ci, cj, pt, ij, pt_type, Tk, uk, d);
     return { lam, uk, Tk };
 }
 
@@ -141,7 +141,7 @@ void IPC::ipc_term(
     auto &ci{ *globals.cubes[_i] }, &cj{ *globals.cubes[_j] };
     const auto& tidx{ cj.indices };
     Vector<scalar, 2> _uk;
-    contact_lambda = pt_uktk(ci, cj, pt, ij, pt_type, Tk, _uk, dist, globals.dt);
+    contact_lambda = pt_uktk(ci, cj, pt, ij, pt_type, Tk, _uk, dist);
 
     auto [ipc_hess, pt_grad] = ipc_hess_pt_12x12(pt, ij, pt_type, dist);
 
@@ -151,9 +151,6 @@ void IPC::ipc_term(
 #endif
 
         auto p_tile = ci.vertices(v), t0_tile = cj.vertices(tidx[3 * f]), t1_tile = cj.vertices(tidx[3 * f + 1]), t2_tile = cj.vertices(tidx[3 * f + 2]);
-
-#define _NO_FANCY_
-#ifdef _NO_FANCY_
 
     Matrix<scalar, 9, 12> Jt;
     Matrix<scalar, 3, 12> Jp;
@@ -170,55 +167,6 @@ void IPC::ipc_term(
     mat12 off_T = off_diag.transpose();
     auto dgp = Jp.transpose() * pt_grad.segment<3>(0);
     auto dgt = Jt.transpose() * pt_grad.segment<9>(3);
-#else
-
-    Vector<scalar, 4> kerp;
-    kerp << 1.0, p_tile;
-    Vector<scalar, 4> ker0;
-    ker0 << 1.0, t0_tile;
-    Vector<scalar, 4> ker1;
-    ker1 << 1.0, t1_tile;
-    Vector<scalar, 4> ker2;
-    ker2 << 1.0, t2_tile;
-    Matrix<scalar, 4, 3> kert;
-    kert << ker0, ker1, ker2;
-
-    Matrix<scalar, 4, 4> blkp = kerp * kerp.transpose();
-    mat12 hess_p, hess_t, off_diag;
-    // mat12 hess_p, hess_t, hess__off;
-
-    for (int i = 0; i < 4; i++)
-        for (int j = 0; j < 4; j++) {
-            hess_p.block<3, 3>(i * 3, j * 3) = blkp(i, j) * ipc_hess.block<3, 3>(0, 0);
-
-            mat3 hij;
-            hij.setZero(3, 3);
-            for (int k = 0; k < 3; k++)
-                for (int l = 0; l < 3; l++) {
-                    mat3 Akl = ipc_hess.block<3, 3>((k + 1) * 3, (l + 1) * 3);
-                    hij += Akl * (kert(i, k) * kert(j, l));
-                }
-            hess_t.block<3, 3>(i * 3, j * 3) = hij;
-
-            mat3 offd_ij;
-            offd_ij.setZero(3, 3);
-            for (int l = 0; l < 3; l++) {
-                mat3 Akl = ipc_hess.block<3, 3>(0, (l + 1) * 3);
-                offd_ij += Akl * (kerp(i) * kert(j, l));
-            }
-            off_diag.block<3, 3>(i * 3, j * 3) = offd_ij;
-        }
-    mat12 off_T = off_diag.transpose();
-
-    Vector<scalar, 12> dgp, dgt;
-    vec3 seg = pt_grad.segment<3>(0);
-    vec3 _0 = pt_grad.segment<3>(3), _1 = pt_grad.segment<3>(6), _2 = pt_grad.segment<3>(9);
-    dgp << seg, seg * p_tile(0), seg * p_tile(1), seg * p_tile(2);
-    dgt << _0 + _1 + _2,
-        _0 * t0_tile(0) + _1 * t1_tile(0) + _2 * t2_tile(0),
-        _0 * t0_tile(1) + _1 * t1_tile(1) + _2 * t2_tile(1),
-        _0 * t0_tile(2) + _1 * t1_tile(2) + _2 * t2_tile(2);
-#endif
 
     output_hessian_gradient(
 #ifdef _SM_OUT_

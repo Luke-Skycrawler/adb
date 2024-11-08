@@ -51,11 +51,6 @@ void reset(bool init)
     globals.scene = data["predefined_case"]["custom"];
     customize(globals.scene);
     int n_cubes = globals.cubes.size();
-    globals.writelock_cols.resize(n_cubes);
-    auto ptr = globals.writelock_cols.data();
-    for (int i = 0; i < n_cubes; i++) {
-        omp_init_lock(ptr + i);
-    }
     globals.tot_iter = 0;
     globals.ts = 0;
     glfwSetTime(0.0);

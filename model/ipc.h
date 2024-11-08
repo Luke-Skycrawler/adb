@@ -3,7 +3,7 @@
 
 #include <vector>
 #include <ipc/distance/distance_type.hpp>
-
+#include <omp.h>
 #define _FRICTION_
 #define _SM_
 #ifdef _SM_
@@ -77,6 +77,21 @@ struct IPC {
 #endif
     );
 
+    IPC(int n_cubes)
+    {
+        writelock_cols.resize(n_cubes);
+        auto ptr = writelock_cols.data();
+        for(int i = 0; i < n_cubes; i++) {
+            omp_init_lock(ptr + i);
+        }
+    }
+    ~IPC()
+    {
+        for(auto& lock : writelock_cols) {
+            omp_destroy_lock(&lock);
+        }
+    }
+
 private:
     std::tuple<mat12, vec12> ipc_hess_pt_12x12(
         std::array<vec3, 4> pt, std::array<int, 4> ij, ipc::PointTriangleDistanceType pt_type, scalar dist);
@@ -91,4 +106,13 @@ private:
         vec12& grad_p, vec12& grad_t,
         const vec12& dgp, const vec12& dgt,
         const mat12& hess_p, const mat12& hess_t, const mat12& off_diag, const mat12& off_T);
+
+    void output_hessian_gradient(
+        const std::map<std::array<int, 2>, int>& lut,
+        Eigen::SparseMatrix<scalar>& sparse_hess,
+        int ii, int jj, bool ci_nonstatic, bool cj_nonstatic,
+        vec12& grad_p, vec12& grad_t,
+        const vec12& dgp, const vec12& dgt,
+        mat3 hess_p[4][4], mat3 hess_t[4][4], mat3 off_diag[4][4], mat3 off_T[4][4]);
+    std::vector<omp_lock_t> writelock_cols;
 };

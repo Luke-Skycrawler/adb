@@ -2,14 +2,9 @@
 #include "ipc.h"
 #include "time_integrator.h"
 #include "sparse.h"
-#include <omp.h>
-#ifndef TESTING
-#include "settings.h"
-#else 
-#include "../iAABB/pch.h"
-extern Globals globals;
-#endif
+
 using namespace Eigen;
+using namespace std;
 void put(scalar* values, int offset, int _stride, const Matrix<scalar, 12, 12>& block)
 {
     for (int j = 0; j < 12; j++)
@@ -43,7 +38,7 @@ void IPC::output_hessian_gradient(
 
     auto stride_j = stride(jj, outers), stride_i = stride(ii, outers);
     auto oii = starting_offset(ii, ii, lut, outers), ojj = starting_offset(jj, jj, lut, outers), oij = starting_offset(ii, jj, lut, outers), oji = starting_offset(jj, ii, lut, outers);
-    auto ptr = globals.writelock_cols.data();
+    auto ptr = writelock_cols.data();
 
     if (cj_nonstatic) {
         omp_set_lock(ptr + jj);
@@ -62,7 +57,7 @@ void IPC::output_hessian_gradient(
         omp_unset_lock(ptr + ii);
     }
 }
-void output_hessian_gradient(
+void IPC::output_hessian_gradient(
     const std::map<std::array<int, 2>, int>& lut,
     SparseMatrix<scalar>& sparse_hess,
     int ii, int jj, bool ci_nonstatic, bool cj_nonstatic,
@@ -75,7 +70,7 @@ void output_hessian_gradient(
 
         auto stride_j = stride(jj, outers), stride_i = stride(ii, outers);
         auto oii = starting_offset(ii, ii, lut, outers), ojj = starting_offset(jj, jj, lut, outers), oij = starting_offset(ii, jj, lut, outers), oji = starting_offset(jj, ii, lut, outers);
-        auto ptr = globals.writelock_cols.data();
+        auto ptr = writelock_cols.data();
 
         if (cj_nonstatic) {
             omp_set_lock(ptr + jj);

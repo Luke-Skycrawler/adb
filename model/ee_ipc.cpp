@@ -21,8 +21,7 @@ using namespace Eigen;
 scalar ee_uktk(
     AffineBody& ci, AffineBody& cj,
     array<vec3, 4>& ee, array<int, 4>& ij, const ::ipc::EdgeEdgeDistanceType& ee_type,
-    Matrix<scalar, 2, 12>& Tk_T_ret, Vector<scalar, 2>& uk_ret, scalar d, scalar dt,
-    scalar mollifier)
+    Matrix<scalar, 2, 12>& Tk_T_ret, Vector<scalar, 2>& uk_ret, scalar d, scalar mollifier)
 {
     auto v_stack = ee_vstack(ci, cj, ij[1], ij[3]);
     auto ei0 = ee[0], ei1 = ee[1], ej0 = ee[2], ej1 = ee[3];
@@ -110,20 +109,6 @@ scalar ee_uktk(
         gamma(i, i + 9) = lambdas[3];
     }
     Matrix<scalar, 2, 12> Tk_T = Pk.transpose() * gamma;
-
-    // Matrix<scalar, 12, 24> jacobian;
-    // auto _i0 = ci.edges[_ei * 2], _i1 = ci.edges[_ei * 2 + 1],
-    //      _j0 = cj.edges[_ej * 2], _j1 = cj.edges[_ej * 2 + 1];
-
-    // jacobian.setZero(12, 24);
-    // jacobian.block<3, 12>(0, 0) = x_jacobian_q(ci.vertices(_i0));
-    // jacobian.block<3, 12>(3, 0) = x_jacobian_q(cj.vertices(_i1));
-    // jacobian.block<3, 12>(6, 12) = x_jacobian_q(cj.vertices(_j0));
-    // jacobian.block<3, 12>(9, 12) = x_jacobian_q(cj.vertices(_j1));
-
-    // auto Tq_k = Tk_T * jacobian;
-
-    // auto contact_force_lam = barrier_derivative_d(d) / (dt * dt) * 2 * sqrt(d);
     Vector<scalar, 2> uk = Tk_T * v_stack;
     auto contact_force = -barrier::barrier_derivative_d(d) * 2 * sqrt(d);
     Tk_T_ret = Tk_T;
@@ -132,11 +117,11 @@ scalar ee_uktk(
     return contact_force;
 }
 
-tuple<scalar, Vector<scalar, 2>, Matrix<scalar, 2, 12>> ee_uktk(AffineBody& ci, AffineBody& cj, array<vec3, 4>& ee, array<int, 4>& ij, const ::ipc::EdgeEdgeDistanceType& ee_type, scalar d, scalar dt, scalar mollifier)
+tuple<scalar, Vector<scalar, 2>, Matrix<scalar, 2, 12>> ee_uktk(AffineBody& ci, AffineBody& cj, array<vec3, 4>& ee, array<int, 4>& ij, const ::ipc::EdgeEdgeDistanceType& ee_type, scalar d, scalar mollifier)
 {
     Vector<scalar, 2> uk;
     Matrix<scalar, 2, 12> Tk;
-    scalar lam = ee_uktk(ci, cj, ee, ij, ee_type, Tk, uk, d, dt, mollifier);
+    scalar lam = ee_uktk(ci, cj, ee, ij, ee_type, Tk, uk, d, mollifier);
     return { lam, uk, Tk };
 }
 
@@ -172,7 +157,7 @@ void IPC::ipc_term_ee(
     auto [ipc_hess, ee_grad, p] = ipc_hess_ee_12x12(ee, ij, ee_type, dist);
 
     Vector<scalar, 2> _uk;
-    contact_lambda = ee_uktk(ci, cj, ee, ij, ee_type, Tk, _uk, dist, globals.dt, p);
+    contact_lambda = ee_uktk(ci, cj, ee, ij, ee_type, Tk, _uk, dist, p);
     // if (p != 1.0) {
     //     // contact_lambda = contact_lambda * p;
     // }
@@ -189,8 +174,7 @@ void IPC::ipc_term_ee(
 #endif
     auto ei0_tile = ci.vertices(eidxi[2 * _ei]), ei1_tile = ci.vertices(eidxi[2 * _ei + 1]),
          ej0_tile = cj.vertices(eidxj[2 * _ej]), ej1_tile = cj.vertices(eidxj[2 * _ej + 1]);
-#define _NO_FANCY_
-#ifdef _NO_FANCY_
+
     Matrix<scalar, 6, 12> J0;
     Matrix<scalar, 6, 12> J1;
 
@@ -206,65 +190,6 @@ void IPC::ipc_term_ee(
     vec12 d0, d1;
     d0 = J0.transpose() * ee_grad.segment<6>(0);
     d1 = J1.transpose() * ee_grad.segment<6>(6);
-#else
-
-    scalar ker0[4][2], ker1[4][2];
-
-    for (int i = 0; i < 4; i++) {
-        ker0[i][0] = i == 0 ? 1.0 : ei0_tile(i - 1);
-        ker0[i][1] = i == 0 ? 1.0 : ei1_tile(i - 1);
-        ker1[i][0] = i == 0 ? 1.0 : ej0_tile(i - 1);
-        ker1[i][1] = i == 0 ? 1.0 : ej1_tile(i - 1);
-    }
-
-    mat3 hess_0[4][4], hess_1[4][4], off_diag[4][4], off_T[4][4];
-    mat3 Akl[4][4];
-    for (int i = 0; i < 4; i++)
-        for (int j = 0; j < 4; j++) Akl[i][j] = ipc_hess.block<3, 3>(i * 3, j * 3);
-    for (int i = 0; i < 4; i++)
-        for (int j = 0; j < 4; j++) {
-            hess_0[i][j].setZero(3, 3);
-            for (int k = 0; k < 2; k++)
-                for (int l = 0; l < 2; l++) {
-                    hess_0[i][j] += Akl[k][l] * (ker0[i][k] * ker0[j][l]);
-                }
-
-            hess_1[i][j].setZero(3, 3);
-            for (int k = 0; k < 2; k++)
-                for (int l = 0; l < 2; l++) {
-                    hess_1[i][j] += Akl[k + 2][l + 2] * (ker1[i][k] * ker1[j][l]);
-                }
-
-            off_diag[i][j].setZero(3, 3);
-            for (int k = 0; k < 2; k++)
-                for (int l = 0; l < 2; l++) {
-                    off_diag[i][j] += Akl[k][l + 2] * (ker0[i][k] * ker1[j][l]);
-                }
-            off_T[j][i] = off_diag[i][j].transpose();
-        }
-    // mat12 off_T = off_diag.transpose();
-
-    Vector<scalar, 12> d0, d1;
-    vec3 i0 = ee_grad.segment<3>(0), i1 = ee_grad.segment<3>(3);
-    vec3 j0 = ee_grad.segment<3>(6), j1 = ee_grad.segment<3>(9);
-    // d0 << i0 + i1,
-    //     i0 * ei0_tile(0) + i1 * ei1_tile(0),
-    //     i0 * ei0_tile(1) + i1 * ei1_tile(1),
-    //     i0 * ei0_tile(2) + i1 * ei1_tile(2);
-    for (int i = 0; i < 12; i++) {
-        d0(i) = ker0[i / 3][0] * i0(i % 3)
-            + ker0[i / 3][1] * i1(i % 3);
-
-        d1(i) = ker1[i / 3][0] * j0(i % 3)
-            + ker1[i / 3][1] * j1(i % 3);
-    }
-    // d1 << j0 + j1,
-    //     j0 * ej0_tile(0) + j1 * ej1_tile(0),
-    //     j0 * ej0_tile(1) + j1 * ej1_tile(1),
-    //     j0 * ej0_tile(2) + j1 * ej1_tile(2);
-
-#endif
-
 
     output_hessian_gradient(
 #ifdef _SM_OUT_

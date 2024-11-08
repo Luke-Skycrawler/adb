@@ -1,4 +1,5 @@
-#include "time_integrator.h"
+// #include "time_integrator.h"
+#include "abd.h"
 #include "settings.h"
 #include <array>
 
@@ -35,7 +36,7 @@ scalar E_fric(
     const vector<unique_ptr<AffineBody>>& cubes,
     scalar dt);
 
-scalar line_search(const Vector<scalar, -1>& dq, const Vector<scalar, -1>& grad, Vector<scalar, -1>& q0, scalar& E0, scalar& E1,
+scalar ABD::line_search(const Vector<scalar, -1>& dq, const Vector<scalar, -1>& grad, Vector<scalar, -1>& q0, scalar& E0, scalar& E1,
     int n_cubes, int n_pt, int n_ee, int n_g,
     vector<array<vec3, 4>>& pts,
     vector<array<int, 4>>& idx,
@@ -44,9 +45,9 @@ scalar line_search(const Vector<scalar, -1>& dq, const Vector<scalar, -1>& grad,
     vector<array<int, 2>>& vidx,
     const vector<Matrix<scalar, 2, 12>>& pt_tk,
     const vector<Matrix<scalar, 2, 12>>& ee_tk,
-    const vector<scalar> &pt_contact_forces,
-    const vector<scalar> &ee_contact_forces,
-    const vector<scalar> &g_contact_forces,
+    const vector<scalar>& pt_contact_forces,
+    const vector<scalar>& ee_contact_forces,
+    const vector<scalar>& g_contact_forces,
     const vector<unique_ptr<AffineBody>>& cubes,
     scalar dt)
 {
@@ -85,7 +86,7 @@ scalar line_search(const Vector<scalar, -1>& dq, const Vector<scalar, -1>& grad,
         }
 
         if (globals.iaabb % 2)
-            iaabb_brute_force(n_cubes, cubes, globals.aabbs, 2,
+            culling.iaabb_brute_force(n_cubes, cubes, globals.aabbs, 2,
 #ifdef IAABB_COMPARING
                 pts_iaab,
                 idx_iaab,

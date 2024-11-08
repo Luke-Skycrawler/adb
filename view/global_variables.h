@@ -17,7 +17,6 @@ static const unsigned int SCR_HEIGHT = 600;
 #include <map>
 #include "model.h"
 #include <string>
-#include <omp.h>
 #include <string>
 #include "../model/spatial_hashing.h"
 #define _INCLUDE_IAABB_H_
@@ -75,7 +74,6 @@ struct GlobalVariableMainCPP{
     std::map<std::string, int> params_int;
     
     int log, iaabb;
-    vector<omp_lock_t> writelock_cols;
     unique_ptr<spatial_hashing> sh;
     std::string scene, trace_folder;
     std::vector<std::array<unsigned, 2>> edges, points, triangles;
