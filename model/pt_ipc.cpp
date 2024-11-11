@@ -21,7 +21,7 @@ using namespace Eigen;
 
 scalar pt_uktk(
     AffineBody& ci, AffineBody& cj,
-    array<vec3, 4>& pt, array<int, 4>& ij, const ::ipc::PointTriangleDistanceType& pt_type,
+    q4& pt, i4& ij, const ::ipc::PointTriangleDistanceType& pt_type,
     Matrix<scalar, 2, 12>& Tk_T_ret, Vector<scalar, 2>& uk_ret, scalar d)
 
 {
@@ -107,7 +107,7 @@ scalar pt_uktk(
 }
 
 
-tuple<scalar, Vector<scalar, 2>, Matrix<scalar, 2, 12>> pt_uktk(AffineBody& ci, AffineBody& cj, array<vec3, 4>& pt, array<int, 4>& ij, const ::ipc::PointTriangleDistanceType& pt_type, scalar d)
+tuple<scalar, Vector<scalar, 2>, Matrix<scalar, 2, 12>> pt_uktk(AffineBody& ci, AffineBody& cj, q4& pt, i4& ij, const ::ipc::PointTriangleDistanceType& pt_type, scalar d)
 {
     Vector<scalar, 2> uk;
     Matrix<scalar, 2, 12> Tk;
@@ -116,7 +116,7 @@ tuple<scalar, Vector<scalar, 2>, Matrix<scalar, 2, 12>> pt_uktk(AffineBody& ci, 
 }
 
 void IPC::ipc_term(
-    array<vec3, 4> pt, array<int, 4> ij, ipc::PointTriangleDistanceType pt_type, scalar dist,
+    q4 pt, i4 ij, ipc::PointTriangleDistanceType pt_type, scalar dist,
 #ifdef _SM_OUT_
     const std::map<std::array<int, 2>, int>& lut,
     SparseMatrix<scalar>& sparse_hess,

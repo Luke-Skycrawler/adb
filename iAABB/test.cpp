@@ -19,7 +19,7 @@
 
 inline void Cube::draw(Shader& shader) const {}
 bool predefined = false;
-unsigned *Cube::_edges = nullptr, *Cube::_indices = nullptr;
+int *Cube::_edges = nullptr, *Cube::_indices = nullptr;
 
 
 using namespace std;
@@ -82,7 +82,7 @@ public:
     default_random_engine gen;
     static uniform_real_distribution<double> dist;
     vector<array<double, 6>> args;
-    void diff(vector<array<int, 4>>& a, vector<array<int, 4>>& b);
+    void diff(vector<i4>& a, vector<i4>& b);
     void diff(vector<Intersection>& a, vector<Intersection>& b);
 
 protected:
@@ -156,14 +156,14 @@ protected:
         globals.points.resize(0);
         globals.edges.resize(0);
         globals.triangles.resize(0);
-        for (unsigned I = 0; I < n_cubes; I++) {
+        for (int I = 0; I < n_cubes; I++) {
             auto& c{ *cubes[I] };
 
-            for (unsigned i = 0; i < c.n_vertices; i++)
+            for (int i = 0; i < c.n_vertices; i++)
                 globals.points.push_back({ I, i });
-            for (unsigned i = 0; i < c.n_edges; i++)
+            for (int i = 0; i < c.n_edges; i++)
                 globals.edges.push_back({ I, i });
-            for (unsigned i = 0; i < c.n_faces; i++)
+            for (int i = 0; i < c.n_faces; i++)
                 globals.triangles.push_back({ I, i });
         }
     }
@@ -186,22 +186,22 @@ vec12 ee_vstack(AffineBody& ci, AffineBody& cj, int ei, int ej);
 
 double ee_uktk(
     AffineBody& ci, AffineBody& cj,
-    std::array<vec3, 4>& ee, std::array<int, 4>& ij, const ::ipc::EdgeEdgeDistanceType& ee_type,
+    q4& ee, i4& ij, const ::ipc::EdgeEdgeDistanceType& ee_type,
     Matrix<double, 2, 12>& Tk_T_ret, Vector2d& uk_ret, double d, double dt);
 
 double pt_uktk(
     AffineBody& ci, AffineBody& cj,
-    std::array<vec3, 4>& pt, std::array<int, 4>& ij, const ::ipc::PointTriangleDistanceType& pt_type,
+    q4& pt, i4& ij, const ::ipc::PointTriangleDistanceType& pt_type,
     Matrix<double, 2, 12>& Tk_T_ret, Vector2d& uk_ret, double d, double dt);
 
 };
 
-void iAABBTest::diff(vector<array<int, 4>>& a, vector<array<int, 4>>& b)
+void iAABBTest::diff(vector<i4>& a, vector<i4>& b)
 {
     EXPECT_EQ(a.size(), b.size()) << "size mismatch";
     cout << a.size() << " "
          << b.size() << "\n";
-    vector<array<int, 4>> adb, bda;
+    vector<i4> adb, bda;
     set_difference(a.begin(), a.end(), b.begin(), b.end(), back_inserter(adb));
     set_difference(b.begin(), b.end(), a.begin(), a.end(), back_inserter(bda));
     EXPECT_EQ(adb.size(), 0) << "should include following: ";
@@ -257,8 +257,8 @@ array<double, 2> brute_force(
     int n_cubes,
     const std::vector<std::unique_ptr<AffineBody>>& cubes,
     std::vector<double_int>& pt_tois, std::vector<double_int>& ee_tois,
-    std::vector<std::array<int, 4>>& idx,
-    std::vector<std::array<int, 4>>& eidx
+    std::vector<i4>& idx,
+    std::vector<i4>& eidx
     )
 {
     double toi_pt = 1.0, toi_ee = 1.0;
@@ -267,10 +267,10 @@ array<double, 2> brute_force(
         for (int j = 0; j < n_cubes; j++) {
             if (i == j) continue;
             auto &ci{ *cubes[i] }, &cj{ *cubes[j] };
-            for (unsigned v = 0; v < ci.n_vertices; v++) {
+            for (int v = 0; v < ci.n_vertices; v++) {
                 auto p1{ ci.vt1(v) };
                 auto p2{ ci.vt2(v)};
-                for (unsigned f = 0; f < cj.n_faces; f++) {
+                for (int f = 0; f < cj.n_faces; f++) {
                     Face t1{ cj, f }, t2{ cj, f, true };
                     double t = pt_collision_time(p1, t1, p2, t2);
                     if (t < 1.0) {
@@ -284,9 +284,9 @@ array<double, 2> brute_force(
     for (int i = 0; i < n_cubes; i++)
         for (int j = i + 1; j < n_cubes; j++) {
             auto &ci{ *cubes[i] }, &cj{ *cubes[j] };
-            for (unsigned ei = 0; ei < ci.n_edges; ei++) {
+            for (int ei = 0; ei < ci.n_edges; ei++) {
                 Edge ei1{ ci, ei }, ei2{ ci, ei, true };
-                for (unsigned ej = 0; ej < cj.n_edges; ej++) {
+                for (int ej = 0; ej < cj.n_edges; ej++) {
                     Edge ej1{ cj, ej }, ej2{ cj, ej, true };
                     double t = ee_collision_time(ei1, ej1, ei2, ej2);
                     if (t < 1.0) {
@@ -317,18 +317,18 @@ TEST_F(iAABBTest, sort_against_bf)
 TEST_F(iAABBTest, pipelined)
 {
     vector<Intersection> overlaps_sort;
-    vector<array<vec3, 4>> pts;
-    vector<array<int, 4>> idx;
-    vector<array<vec3, 4>> ees;
-    vector<array<int, 4>> eidx;
+    vector<q4> pts;
+    vector<i4> idx;
+    vector<q4> ees;
+    vector<i4> eidx;
     vector<array<int, 2>> vidx;
     vector<Matrix<double, 2, 12>> pt_tk;
     vector<Matrix<double, 2, 12>> ee_tk;
 
-    vector<array<vec3, 4>> pts_ref;
-    vector<array<int, 4>> idx_ref;
-    vector<array<vec3, 4>> ees_ref;
-    vector<array<int, 4>> eidx_ref;
+    vector<q4> pts_ref;
+    vector<i4> idx_ref;
+    vector<q4> ees_ref;
+    vector<i4> eidx_ref;
     vector<array<int, 2>> vidx_ref;
     vector<Matrix<double, 2, 12>> pt_tk_ref;
     vector<Matrix<double, 2, 12>> ee_tk_ref;
@@ -356,8 +356,8 @@ TEST_F(iAABBTest, pipelined)
 
                 double d = ipc::point_triangle_distance(p, _f.t0, _f.t1, _f.t2, pt_type);
                 if (d < barrier::d_hat) {
-                    array<vec3, 4> pt = { p, _f.t0, _f.t1, _f.t2 };
-                    array<int, 4> ij = { i, v, j, f };
+                    q4 pt = { p, _f.t0, _f.t1, _f.t2 };
+                    i4 ij = { i, v, j, f };
 
                     {
                         pts_ref.push_back(pt);
@@ -382,8 +382,8 @@ TEST_F(iAABBTest, pipelined)
                         continue;
                     double d = ipc::edge_edge_distance(ei.e0, ei.e1, ej.e0, ej.e1);
                     if (d < barrier::d_hat) {
-                        array<vec3, 4> ee = { ei.e0, ei.e1, ej.e0, ej.e1 };
-                        array<int, 4> ij = { i, _ei, j, _ej };
+                        q4 ee = { ei.e0, ei.e1, ej.e0, ej.e1 };
+                        i4 ij = { i, _ei, j, _ej };
 
 #pragma omp critical
                         {
@@ -412,10 +412,10 @@ TEST_F(iAABBTest, pipelined)
 
 TEST_F(iAABBTest, upper_bound_against_sh)
 {
-    vector<array<vec3, 4>> pts;
-    vector<array<int, 4>> idx, idx_iaabb;
-    vector<array<vec3, 4>> ees;
-    vector<array<int, 4>> eidx, eidx_iaabb;
+    vector<q4> pts;
+    vector<i4> idx, idx_iaabb;
+    vector<q4> ees;
+    vector<i4> eidx, eidx_iaabb;
     vector<array<int, 2>> vidx;
     vector<Matrix<double, 2, 12>> pt_tk;
     vector<Matrix<double, 2, 12>> ee_tk;
@@ -435,10 +435,10 @@ TEST_F(iAABBTest, upper_bound_against_sh)
 #endif
 TEST_F(iAABBTest, finite_diff)
 {
-    vector<array<vec3, 4>> pts;
-    vector<array<int, 4>> idx;
-    vector<array<vec3, 4>> ees;
-    vector<array<int, 4>> eidx;
+    vector<q4> pts;
+    vector<i4> idx;
+    vector<q4> ees;
+    vector<i4> eidx;
     vector<array<int, 2>> vidx;
     vector<Matrix<double, 2, 12>> pt_tk;
     vector<Matrix<double, 2, 12>> ee_tk;
@@ -458,7 +458,7 @@ TEST_F(iAABBTest, finite_diff)
         auto &ci{ *cubes[ij[0]] }, &cj{ *cubes[ij[2]] };
         auto du = utils::pt_vstack(ci, cj, ij[1], ij[3]);
 
-        const auto &[d, pt_type] = vf_distance(ci.vt1(ij[1]), Face{ cj, unsigned(ij[3]) });
+        const auto &[d, pt_type] = vf_distance(ci.vt1(ij[1]), Face{ cj, int(ij[3]) });
         Vector2d _uk;
         Matrix<double, 2, 12> Tk;
         double lam = utils::pt_uktk(ci, cj, pt, ij, pt_type, Tk, _uk, d, globals.dt);

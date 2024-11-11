@@ -18,8 +18,8 @@ using namespace utils;
 
 scalar E_barrier_plus_inert(
     const Vector<scalar, -1>& q_plus_dq, const Vector<scalar, -1>& dq, int n_cubes, 
-    const vector<array<int, 4>>& idx,
-    const vector<array<int, 4>>& eidx,
+    const vector<i4>& idx,
+    const vector<i4>& eidx,
     const vector<array<int, 2>>& vidx,
     const vector<unique_ptr<AffineBody>>& cubes,
     scalar dt)
@@ -86,8 +86,8 @@ scalar E_barrier_plus_inert(
 }
 
 scalar E_global(const Vector<scalar, -1>& q_plus_dq, const Vector<scalar, -1>& dq, int n_cubes, int n_pt, int n_ee, int n_g,
-    const vector<array<int, 4>>& idx,
-    const vector<array<int, 4>>& eidx,
+    const vector<i4>& idx,
+    const vector<i4>& eidx,
     const vector<array<int, 2>>& vidx,
     const vector<Matrix<scalar, 2, 12>>& pt_tk,
     const vector<Matrix<scalar, 2, 12>>& ee_tk,
@@ -124,7 +124,7 @@ scalar E_global(const Vector<scalar, -1>& q_plus_dq, const Vector<scalar, -1>& d
             Face f(*cubes[ij[2]], ij[3], _vt2, _vt2);
             vec3 v(cubes[ij[0]]->v_transformed[ij[1]]);
             if (!_vt2) v = cubes[ij[0]]->vt1(ij[1]);
-            // array<vec3, 4> a = {v, f.t0, f.t1, f.t2};
+            // q4 a = {v, f.t0, f.t1, f.t2};
             auto [d, pt_type] = vf_distance(v, f);
             // scalar d = ipc::point_triangle_distance(v, f.t0, f.t1, f.t2);
             e += barrier::barrier_function(d);
@@ -195,8 +195,8 @@ scalar E_global(const Vector<scalar, -1>& q_plus_dq, const Vector<scalar, -1>& d
 scalar E_fric(
     const Vector<scalar, -1>& dq, int n_cubes, 
     int n_pt, int n_ee, int n_g,
-    const vector<array<int, 4>>& idx,
-    const vector<array<int, 4>>& eidx,
+    const vector<i4>& idx,
+    const vector<i4>& eidx,
     const vector<array<int, 2>>& vidx,
     const vector<Matrix<scalar, 2, 12>>& pt_tk,
     const vector<Matrix<scalar, 2, 12>>& ee_tk,

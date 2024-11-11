@@ -6,13 +6,13 @@
 #include "affine_body.h"
 #define SPATIAL_HASHING_H
 
-using element_type = unsigned short;
+using element_type = int short;
 union Primitive {
     struct {
         element_type pid, body;
     } pbody;
-    unsigned as_uint;
-    Primitive(unsigned u)
+    int as_uint;
+    Primitive(int u)
         : as_uint(u) {}
     Primitive()
         : as_uint(0) {}
@@ -26,9 +26,9 @@ union Primitive {
         return as_uint < b.as_uint;
     }
 };
-using BodyGroup = std::map<unsigned, std::unique_ptr<std::vector<unsigned>>>;
+using BodyGroup = std::map<int, std::unique_ptr<std::vector<int>>>;
 using vec3i = Eigen::Vector<int, 3>;
-using hi = unsigned;
+using hi = int;
 struct spatial_hashing {
     spatial_hashing(int vec3_compressed_bits, int n_buffer,
         scalar MIN_XYZ, scalar MAX_XYZ, scalar dx, int set_size);
@@ -40,7 +40,7 @@ struct spatial_hashing {
         delete[] bitmap_l2;
         delete[] sets;
     }
-    std::unordered_set<unsigned>* sets;
+    std::unordered_set<int>* sets;
     std::vector<Primitive> *collisions;
     const int vec3_compressed_bits, n_entries, n_overflow_buffer, n_l1_bitmap, n_l2_bitmap, n_buffer, set_size;
     element_type * count_non_atomic;
@@ -51,7 +51,7 @@ struct spatial_hashing {
 
     const scalar MIN_XYZ, MAX_XYZ, dx;
 
-    // using hi = unsigned long long;
+    // using hi = int long long;
     // hashing index type
     hi hash(const vec3i& grid_index);
     vec3i tovec3i(const vec3& f);

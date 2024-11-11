@@ -6,8 +6,8 @@
 using namespace Eigen;
 
 scalar E_global(const Vector<scalar, -1>& q_plus_dq, const Vector<scalar, -1>& dq, int n_cubes, int n_pt, int n_ee, int n_g,
-    const vector<array<int, 4>>& idx,
-    const vector<array<int, 4>>& eidx,
+    const vector<i4>& idx,
+    const vector<i4>& eidx,
     const vector<array<int, 2>>& vidx,
     const vector<Matrix<scalar, 2, 12>>& pt_tk,
     const vector<Matrix<scalar, 2, 12>>& ee_tk,
@@ -16,8 +16,8 @@ scalar E_global(const Vector<scalar, -1>& q_plus_dq, const Vector<scalar, -1>& d
 
 
 scalar E_barrier_plus_inert(const Vector<scalar, -1>& q_plus_dq, const Vector<scalar, -1>& dq, int n_cubes,
-    const vector<array<int, 4>>& idx,
-    const vector<array<int, 4>>& eidx,
+    const vector<i4>& idx,
+    const vector<i4>& eidx,
     const vector<array<int, 2>>& vidx,
     const vector<unique_ptr<AffineBody>>& cubes,
     scalar dt);
@@ -25,8 +25,8 @@ scalar E_barrier_plus_inert(const Vector<scalar, -1>& q_plus_dq, const Vector<sc
 scalar E_fric(
     const Vector<scalar, -1>& dq, int n_cubes, 
     int n_pt, int n_ee, int n_g,
-    const vector<array<int, 4>>& idx,
-    const vector<array<int, 4>>& eidx,
+    const vector<i4>& idx,
+    const vector<i4>& eidx,
     const vector<array<int, 2>>& vidx,
     const vector<Matrix<scalar, 2, 12>>& pt_tk,
     const vector<Matrix<scalar, 2, 12>>& ee_tk,
@@ -38,10 +38,10 @@ scalar E_fric(
 
 scalar ABD::line_search(const Vector<scalar, -1>& dq, const Vector<scalar, -1>& grad, Vector<scalar, -1>& q0, scalar& E0, scalar& E1,
     int n_cubes, int n_pt, int n_ee, int n_g,
-    vector<array<vec3, 4>>& pts,
-    vector<array<int, 4>>& idx,
-    vector<array<vec3, 4>>& ees,
-    vector<array<int, 4>>& eidx,
+    vector<q4>& pts,
+    vector<i4>& idx,
+    vector<q4>& ees,
+    vector<i4>& eidx,
     vector<array<int, 2>>& vidx,
     const vector<Matrix<scalar, 2, 12>>& pt_tk,
     const vector<Matrix<scalar, 2, 12>>& ee_tk,
@@ -68,11 +68,11 @@ scalar ABD::line_search(const Vector<scalar, -1>& dq, const Vector<scalar, -1>& 
     );
     scalar qdg = dq.dot(grad);
     Vector<scalar, -1> q1;
-    static vector<array<vec3, 4>> pts_new, pts_iaab;
-    static vector<array<int, 4>> idx_new, idx_iaab;
+    static vector<q4> pts_new, pts_iaab;
+    static vector<i4> idx_new, idx_iaab;
 
-    static vector<array<vec3, 4>> ees_new, ees_iaab;
-    static vector<array<int, 4>> eidx_new, eidx_iaab;
+    static vector<q4> ees_new, ees_iaab;
+    static vector<i4> eidx_new, eidx_iaab;
 
     static vector<array<int, 2>> vidx_new, vidx_iaab;
 

@@ -312,9 +312,9 @@ void ABD::ipc()
             auto& ij(idx[k]);
             int i = ij[0], j = ij[2];
             auto &ci(*cubes[i]), &cj(*cubes[j]);
-            Face f{ cj, unsigned(ij[3]), false, true };
+            Face f{ cj, int(ij[3]), false, true };
             vec3 p{ ci.v_transformed[ij[1]] };
-            array<vec3, 4> pt{ p, f.t0, f.t1, f.t2 };
+            q4 pt{ p, f.t0, f.t1, f.t2 };
             auto [d, pt_type] = vf_distance(pt[0], f);
             if(d < barrier::d_hat) {
                 vec12 gradp, gradt;
@@ -346,8 +346,8 @@ void ABD::ipc()
             auto& ij(eidx[k]);
             int i = ij[0], j = ij[2];
             auto &ci(*cubes[i]), &cj(*cubes[j]);
-            Edge ei{ ci, unsigned(ij[1]), false, true }, ej{ cj, unsigned(ij[3]), false, true };
-            array<vec3, 4> ee{ ei.e0, ei.e1, ej.e0, ej.e1 };
+            Edge ei{ ci, int(ij[1]), false, true }, ej{ cj, int(ij[3]), false, true };
+            q4 ee{ ei.e0, ei.e1, ej.e0, ej.e1 };
             auto ee_type = ipc::edge_edge_distance_type(ee[0], ee[1], ee[2], ee[3]);
             scalar d = edge_edge_distance(ee[0], ee[1], ee[2], ee[3], ee_type);
             if(d < barrier::d_hat) {

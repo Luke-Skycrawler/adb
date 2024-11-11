@@ -15,10 +15,10 @@ using namespace Eigen;
 #define DURATION_TO_DOUBLE(X) duration_cast<duration<scalar>>(high_resolution_clock::now() - (X)).count()
 scalar step_size_upper_bound(Vector<scalar, -1>& dq, vector<unique_ptr<AffineBody>>& cubes,
     int n_cubes, int n_pt, int n_ee, int n_g,
-    vector<array<vec3, 4>>& pts,
-    vector<array<int, 4>>& idx,
-    vector<array<vec3, 4>>& ees,
-    vector<array<int, 4>>& eidx,
+    vector<q4>& pts,
+    vector<i4>& idx,
+    vector<q4>& ees,
+    vector<i4>& eidx,
     vector<array<int, 2>>& vidx
 )
  {
@@ -56,7 +56,7 @@ scalar step_size_upper_bound(Vector<scalar, -1>& dq, vector<unique_ptr<AffineBod
 #pragma omp parallel for schedule(static)
             for (int I = 0; I < n_cubes; I++) {
                 auto& ci(*cubes[I]);
-                for (unsigned v = 0; v < ci.n_vertices; v++) {
+                for (int v = 0; v < ci.n_vertices; v++) {
                     vec3 p1 = ci.v_transformed[v];
                     vec3 p0 = ci.vt1(v);
                     globals.sh->register_edge(p0, p1, I, v);
@@ -67,7 +67,7 @@ scalar step_size_upper_bound(Vector<scalar, -1>& dq, vector<unique_ptr<AffineBod
             for (int J = 0; J < n_cubes; J++) {
                 auto& cj(*cubes[J]);
                 scalar toi_private = 1.0;
-                for (unsigned f = 0; f < cj.n_faces; f++) {
+                for (int f = 0; f < cj.n_faces; f++) {
                     Face f0(cj, f, false);
                     Face f1(cj, f, true, true);
                     auto collisions = globals.sh->query_triangle_trajectory(
@@ -75,7 +75,7 @@ scalar step_size_upper_bound(Vector<scalar, -1>& dq, vector<unique_ptr<AffineBod
                         f1.t0, f1.t1, f1.t2,
                         J);
                     for (auto& c : collisions) {
-                        unsigned I = c.body, v = c.pid;
+                        int I = c.body, v = c.pid;
                         vec3 p1 = cubes[I]->v_transformed[v];
                         vec3 p0 = cubes[I]->vt1(v);
 
@@ -109,7 +109,7 @@ scalar step_size_upper_bound(Vector<scalar, -1>& dq, vector<unique_ptr<AffineBod
                     auto& idx = globals.triangles[J];
 
                     auto& cj(*cubes[idx[0]]);
-                    unsigned f = idx[1];
+                    int f = idx[1];
                     Face f0(cj, f, false);
                     Face f1(cj, f, true, true);
                     // vector<Primitive> collisions;
@@ -119,7 +119,7 @@ scalar step_size_upper_bound(Vector<scalar, -1>& dq, vector<unique_ptr<AffineBod
                         idx[0], collisions);
                     for (auto& _c : collisions) {
                         auto& c{ _c.pbody };
-                        unsigned I = c.body, v = c.pid;
+                        int I = c.body, v = c.pid;
                         vec3 p1 = cubes[I]->v_transformed[v];
                         vec3 p0 = cubes[I]->vt1(v);
 
@@ -143,7 +143,7 @@ scalar step_size_upper_bound(Vector<scalar, -1>& dq, vector<unique_ptr<AffineBod
 #pragma omp parallel for schedule(static)
             for (int I = 0; I < n_cubes; I++) {
                 auto& ci(*cubes[I]);
-                for (unsigned ei = 0; ei < ci.n_edges; ei++) {
+                for (int ei = 0; ei < ci.n_edges; ei++) {
                     Edge e1{ ci, ei, true, true };
                     Edge e0{ ci, ei, false };
                     globals.sh->register_edge_trajectory(e0.e0, e0.e1, e1.e0, e1.e1, I, ei);
@@ -155,14 +155,14 @@ scalar step_size_upper_bound(Vector<scalar, -1>& dq, vector<unique_ptr<AffineBod
                 auto& cj(*cubes[J]);
 
                 scalar toi_private = 1.0;
-                for (unsigned ej = 0; ej < cj.n_edges; ej++) {
+                for (int ej = 0; ej < cj.n_edges; ej++) {
                     Edge e1{ cj, ej, true, true };
 
                     Edge e0{ cj, ej, false };
                     auto collisions = globals.sh->query_edge_trajectory(e0.e0, e0.e1, e1.e0, e1.e1, J);
 
                     for (auto& c : collisions) {
-                        unsigned I = c.body, ei = c.pid;
+                        int I = c.body, ei = c.pid;
                         if (I > J) continue;
                         Edge ei1{ *cubes[I], ei, true, true };
                         Edge ei0{ *cubes[I], ei, false };
@@ -205,7 +205,7 @@ scalar step_size_upper_bound(Vector<scalar, -1>& dq, vector<unique_ptr<AffineBod
 
                     for (auto& _c : collisions) {
                         auto &c{ _c.pbody };
-                        unsigned I = c.body, ei = c.pid;
+                        int I = c.body, ei = c.pid;
                         if (I > idx[0]) continue;
                         Edge ei1{ *cubes[I], ei, true, true };
                         Edge ei0{ *cubes[I], ei, false };

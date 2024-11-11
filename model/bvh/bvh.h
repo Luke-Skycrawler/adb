@@ -6,8 +6,8 @@ struct BVHPackedNodeHalf
 	float x;
 	float y;
 	float z;
-	unsigned int i : 31;
-	unsigned int b : 1;
+	int i : 31;
+	int b : 1;
 };
 
 struct bounds3

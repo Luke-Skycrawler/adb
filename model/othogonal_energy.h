@@ -4,7 +4,7 @@
 namespace othogonal_energy{
 
     using namespace Eigen;
-    using q4 = std::array<vec3, 4>;
+    using q4 = q4;
 
     //vec3 grad(mat3 &q, int i);
     //mat3 grad(mat3 &q);

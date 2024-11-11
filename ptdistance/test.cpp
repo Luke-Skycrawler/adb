@@ -10,7 +10,7 @@ using namespace std;
 
 TEST(ipctkref, random) {
     static const int n_pts = 1000;
-    array<vec3, 4> pts[n_pts];
+    q4 pts[n_pts];
     default_random_engine gen;
     uniform_real_distribution<scalar> dist(0.0, 1.0);
     for (int i = 0; i < n_pts; i++)
@@ -32,7 +32,7 @@ TEST(ipctkref, random) {
 //TEST(distance_type, random)
 //{
 //    static const int n_pts = 1000;
-//    array<vec3, 4> pts[n_pts];
+//    q4 pts[n_pts];
 //    default_random_engine gen;
 //    uniform_real_distribution<scalar> dist(0.0, 1.0);
 //    for (int i = 0; i < n_pts; i++)
@@ -58,7 +58,7 @@ using namespace std::chrono;
 
 TEST(ipctkref, time_cosumption) {
     static const int n_pts = 1000;
-    array<vec3, 4> pts[n_pts];
+    q4 pts[n_pts];
     default_random_engine gen;
     uniform_real_distribution<scalar> dist(0.0, 1.0);
 

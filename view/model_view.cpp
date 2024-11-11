@@ -22,7 +22,7 @@ using namespace Eigen;
 // #define FEATURE_POSTRENDER
 //-----------------------------------------------------------------
 
-vector<unsigned> Cube::_edges {}, Cube::_indices {};
+vector<int> Cube::_edges {}, Cube::_indices {};
 void render_cubes(Shader shader, vector<unique_ptr<AffineBody>> &cubes)
 {
     for (int i = 0; i < cubes.size(); i++)

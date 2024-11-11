@@ -12,8 +12,8 @@ namespace utils {
 
 void gen_empty_sm(
     int n_cubes,
-    vector<array<int, 4>>& idx,
-    vector<array<int, 4>>& eidx,
+    vector<i4>& idx,
+    vector<i4>& eidx,
     SparseMatrix<scalar>& sparse_hess,
     map<array<int, 2>, int>& lut
     )

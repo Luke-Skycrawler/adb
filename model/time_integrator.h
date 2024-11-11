@@ -22,18 +22,18 @@ void implicit_euler(std::vector<std::unique_ptr<AffineBody>>& cubes, scalar dt);
 void gen_collision_set(
     bool vt2, int n_cubes,
     const std::vector<std::unique_ptr<AffineBody>>& cubes,
-    std::vector<std::array<vec3, 4>>& pts,
-    std::vector<std::array<int, 4>>& idx,
-    std::vector<std::array<vec3, 4>>& ees,
-    std::vector<std::array<int, 4>>& eidx,
+    std::vector<q4>& pts,
+    std::vector<i4>& idx,
+    std::vector<q4>& ees,
+    std::vector<i4>& eidx,
     std::vector<std::array<int, 2>>& vidx);
 
 scalar step_size_upper_bound(Eigen::Vector<scalar, -1>& dq, std::vector<std::unique_ptr<AffineBody>>& cubes,
     int n_cubes, int n_pt, int n_ee, int n_g,
-    std::vector<std::array<vec3, 4>>& pts,
-    std::vector<std::array<int, 4>>& idx,
-    std::vector<std::array<vec3, 4>>& ees,
-    std::vector<std::array<int, 4>>& eidx,
+    std::vector<q4>& pts,
+    std::vector<i4>& idx,
+    std::vector<q4>& ees,
+    std::vector<i4>& eidx,
     std::vector<std::array<int, 2>>& vidx);
 
 void player_load(
@@ -51,8 +51,8 @@ namespace utils {
 
 void gen_empty_sm(
     int n_cubes,
-    std::vector<std::array<int, 4>>& idx,
-    std::vector<std::array<int, 4>>& eidx,
+    std::vector<i4>& idx,
+    std::vector<i4>& eidx,
     Eigen::SparseMatrix<scalar>& sparse_hess,
     std::map<std::array<int, 2>, int>& lut);
 
@@ -71,11 +71,11 @@ void damping_sparse(Eigen::SparseMatrix<scalar>& sparse_hess, scalar dt, int n_c
 void build_from_triplets(Eigen::SparseMatrix<scalar>& sparse_hess_trip, Eigen::Matrix<scalar, -1, -1>& big_hess, int hess_dim, int n_cubes, std::vector<HessBlock>& hess_triplets);
 scalar E(const vec12& q, const vec12& q_tiled, const AffineBody& c, scalar dt);
 
-std::vector<std::array<unsigned, 2>> gen_edge_list(
+std::vector<std::array<int, 2>> gen_edge_list(
     std::vector<std::unique_ptr<AffineBody>>& cubes, int n_cubes);
-std::vector<std::array<unsigned, 2>> gen_point_list(
+std::vector<std::array<int, 2>> gen_point_list(
     std::vector<std::unique_ptr<AffineBody>>& cubes, int n_cubes);
-std::vector<std::array<unsigned, 2>> gen_triangle_list(
+std::vector<std::array<int, 2>> gen_triangle_list(
     std::vector<std::unique_ptr<AffineBody>>& cubes, int n_cubes);
 
 }

@@ -29,7 +29,7 @@ struct BoundingBox {
 };
 
 struct IAABB {
-    std::vector<std::array<unsigned, 2>> edges, points, triangles;
+    std::vector<std::array<int, 2>> edges, points, triangles;
     int n_points, n_triangles, n_edges;
 
     int g_cnt = 0;
@@ -38,7 +38,7 @@ struct IAABB {
     bool ground = true;
     std::vector<BoundingBox> bounds[3];
     std::vector<lu> affine_bb;
-    std::vector<unsigned> buckets;
+    std::vector<int> buckets;
     std::vector<PList> lists;
     std::vector<std::vector<std::array<int, 2>>> vidx_thread_local;
     std::vector<vec3> vt1_buffer;
@@ -67,10 +67,10 @@ struct IAABB {
         ///////////////////////////return values//////////////////////
         // if vtn == 3 returns ccd toi
         // if vtn == 2 ccd returns collision set by following params
-        std::vector<std::array<vec3, 4>>& pts,
-        std::vector<std::array<int, 4>>& idx,
-        std::vector<std::array<vec3, 4>>& ees,
-        std::vector<std::array<int, 4>>& eidx,
+        std::vector<q4>& pts,
+        std::vector<i4>& idx,
+        std::vector<q4>& ees,
+        std::vector<i4>& eidx,
         std::vector<std::array<int, 2>>& vidx);
 
     scalar iaabb_brute_force(
@@ -78,9 +78,9 @@ struct IAABB {
         const std::vector<std::unique_ptr<AffineBody>>& cubes,
         const std::vector<lu>& aabbs,
         int vtn,
-        std::vector<std::array<vec3, 4>>& pts,
-        std::vector<std::array<int, 4>>& idx,
-        std::vector<std::array<vec3, 4>>& ees,
-        std::vector<std::array<int, 4>>& eidx,
+        std::vector<q4>& pts,
+        std::vector<i4>& idx,
+        std::vector<q4>& ees,
+        std::vector<i4>& eidx,
         std::vector<std::array<int, 2>>& vidx);
 };

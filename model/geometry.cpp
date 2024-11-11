@@ -4,9 +4,9 @@
 // #include <cmath>
 
 using namespace std;
-Edge::Edge(const AffineBody& c, unsigned id, bool b, bool batch)
+Edge::Edge(const AffineBody& c, int id, bool b, bool batch)
 {
-    unsigned _0 = c.edges[id * 2], _1 = c.edges[id * 2 + 1];
+    int _0 = c.edges[id * 2], _1 = c.edges[id * 2 + 1];
     if (batch) {
         e0 = c.v_transformed[_0];
         e1 = c.v_transformed[_1];
@@ -35,10 +35,10 @@ vec3 Face::unit_normal() const
     return n / sqrt(n.dot(n));
 }
 
-Face::Face(const AffineBody& c, unsigned id, bool b, bool batch)
+Face::Face(const AffineBody& c, int id, bool b, bool batch)
 {
 
-    unsigned _a = c.indices[id * 3 + 0],
+    int _a = c.indices[id * 3 + 0],
              _b = c.indices[id * 3 + 1],
              _c = c.indices[id * 3 + 2];
 

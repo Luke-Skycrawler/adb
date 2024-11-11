@@ -31,7 +31,7 @@ spatial_hashing::spatial_hashing(
     : vec3_compressed_bits(vec3_compressed_bits), n_entries(1 << (vec3_compressed_bits * 3)), n_overflow_buffer(8), n_l1_bitmap(n_entries >> 8), n_l2_bitmap(n_entries >> 3), n_buffer(n_buffer), MIN_XYZ(MIN_XYZ), MAX_XYZ(MAX_XYZ), dx(dx), count(new atomic<element_type>[n_entries]), overflow(new Primitive[n_overflow_buffer]), hashtable(new Primitive[n_entries * n_buffer]), bitmap_l1(new bool[n_l1_bitmap]), bitmap_l2(new bool[n_l2_bitmap]), set_size(set_size), count_non_atomic(new element_type[n_entries])
 {
     auto n_proc = omp_get_num_procs();
-    sets = new unordered_set<unsigned>[n_proc];
+    sets = new unordered_set<int>[n_proc];
     collisions = new vector<Primitive>[n_proc];
     for (int i = 0; i < n_proc; i++) {
         sets[i].max_load_factor(0.5);
@@ -72,7 +72,7 @@ void spatial_hashing::query_interval(const vec3i& l, const vec3i& u, element_typ
     // };
     // unordered_set<Primitive, decltype(cmp)> ret(cmp);
     auto tid = omp_get_thread_num();
-    unordered_set<unsigned>& ret = sets[tid];
+    unordered_set<int>& ret = sets[tid];
     val.resize(0);
     ret.clear();
     // ret.reserve(n_buffer * set_size);
@@ -86,7 +86,7 @@ void spatial_hashing::query_interval(const vec3i& l, const vec3i& u, element_typ
                 for (int _i = 0; _i < cnt; _i++) {
                     auto offset = h * n_buffer + _i;
                     auto p = hashtable[offset].pbody;
-                    // unsigned ele = (static_cast<unsigned>(p.body) << 16) | static_cast<unsigned>(p.pid);
+                    // int ele = (static_cast<int>(p.body) << 16) | static_cast<int>(p.pid);
                     auto ele = hashtable[offset].as_uint;
                     if (p.body != body_exl  && ret.find(ele)== ret.end()) {
                         // ret.insert(ele);

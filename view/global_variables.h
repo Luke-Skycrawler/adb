@@ -76,7 +76,7 @@ struct GlobalVariableMainCPP{
     int log, iaabb;
     unique_ptr<spatial_hashing> sh;
     std::string scene, trace_folder;
-    std::vector<std::array<unsigned, 2>> edges, points, triangles;
+    std::vector<std::array<int, 2>> edges, points, triangles;
 #ifdef _INCLUDE_IAABB_H_
     std::vector<lu> aabbs;
 #endif

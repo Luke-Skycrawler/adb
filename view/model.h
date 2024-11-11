@@ -87,7 +87,7 @@ private:
     {
         // data to fill
         vector<Vertex> vertices;
-        vector<unsigned int> indices;
+        vector<int> indices;
         vector<Texture> textures;
 
         // walk through each of the mesh's vertices

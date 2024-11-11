@@ -20,10 +20,10 @@ using namespace utils;
 void gen_collision_set(
     bool vt2, int n_cubes,
     const vector<unique_ptr<AffineBody>>& cubes,
-    vector<array<vec3, 4>>& pts,
-    vector<array<int, 4>>& idx,
-    vector<array<vec3, 4>>& ees,
-    vector<array<int, 4>>& eidx,
+    vector<q4>& pts,
+    vector<i4>& idx,
+    vector<q4>& ees,
+    vector<i4>& eidx,
     vector<array<int, 2>>& vidx)
 {
 
@@ -68,29 +68,29 @@ void gen_collision_set(
 #pragma omp parallel for schedule(static)
         for (int I = 0; I < n_cubes; I++) {
             auto& ci(*cubes[I]);
-            for (unsigned v = 0; v < ci.n_vertices; v++) {
+            for (int v = 0; v < ci.n_vertices; v++) {
                 vec3 p = ci.v_transformed[v];
                 globals.sh -> register_vertex(p, I, v);
             }
         }
 #pragma omp parallel
         {
-            vector<array<vec3, 4>> pts_private;
-            vector<array<int, 4>> idx_private;
+            vector<q4> pts_private;
+            vector<i4> idx_private;
 
 #pragma omp for schedule(static) nowait
             for (int J = 0; J < n_cubes; J++) {
                 auto& cj(*cubes[J]);
-                for (unsigned f = 0; f < cj.n_faces; f++) {
+                for (int f = 0; f < cj.n_faces; f++) {
                     Face _f(cj, f, false, true);
                     auto collisions = globals.sh -> query_triangle(_f.t0, _f.t1, _f.t2, J, barrier::d_sqrt * globals.safe_factor);
                     for (auto& c : collisions) {
-                        unsigned I = c.body, v = c.pid;
+                        int I = c.body, v = c.pid;
                         vec3 p = cubes[I]->v_transformed[v];
                         auto [d, pt_type] = vf_distance(p, _f);
                         if (d < barrier::d_hat * (globals.safe_factor * globals.safe_factor)) {
-                            array<vec3, 4> pt = { p, _f.t0, _f.t1, _f.t2 };
-                            array<int, 4> ij = { I, v, J, f };
+                            q4 pt = { p, _f.t0, _f.t1, _f.t2 };
+                            i4 ij = { I, v, J, f };
                             {
                                 pts_private.push_back(pt);
                                 idx_private.push_back(ij);
@@ -118,14 +118,14 @@ void gen_collision_set(
         globals.sh -> remove_all_entries();
 #pragma omp parallel
         {
-            vector<array<vec3, 4>> pts_private;
-            vector<array<int, 4>> idx_private;
+            vector<q4> pts_private;
+            vector<i4> idx_private;
 
 #pragma omp for schedule(guided) nowait
             for (int j = 0; j < n_triangles; j++) {
                 auto idx{ globals.triangles[j] };
-                auto J{ idx[0] };
-                auto f{ idx[1] };
+                int J = int( idx[0]);
+                int f = int( idx[1]);
                 auto& cj(*cubes[J]);
                 Face _f(cj, f, vt2, vt2);
                 // vector<Primitive> collisions;
@@ -134,12 +134,12 @@ void gen_collision_set(
                 globals.sh->query_triangle(_f.t0, _f.t1, _f.t2, J, barrier::d_sqrt * globals.safe_factor, collisions);
                 for (auto& _c : collisions) {
                     auto& c{ _c.pbody };
-                    unsigned I = c.body, v = c.pid;
+                    int I = c.body, v = c.pid;
                     vec3 p = cubes[I]->v_transformed[v];
                     auto [d, pt_type] = vf_distance(p, _f);
                     if (d < barrier::d_hat * (globals.safe_factor * globals.safe_factor)) {
-                        array<vec3, 4> pt = { p, _f.t0, _f.t1, _f.t2 };
-                        array<int, 4> ij = { I, v, J, f };
+                        q4 pt = { p, _f.t0, _f.t1, _f.t2 };
+                        i4 ij { I, v, J, f };
                         {
                             pts_private.push_back(pt);
                             idx_private.push_back(ij);
@@ -177,8 +177,8 @@ void gen_collision_set(
 
                     scalar d = ipc::point_triangle_distance(p, _f.t0, _f.t1, _f.t2, pt_type);
                     if (d < barrier::d_hat * globals.safe_factor) {
-                        array<vec3, 4> pt = { p, _f.t0, _f.t1, _f.t2 };
-                        array<int, 4> ij = { i, v, j, f };
+                        q4 pt = { p, _f.t0, _f.t1, _f.t2 };
+                        i4 ij = { i, v, j, f };
 
 #pragma omp critical
                         {
@@ -197,7 +197,7 @@ void gen_collision_set(
 #pragma omp parallel for schedule(static)
         for (int I = 0; I < n_cubes; I++) {
             auto& ci(*cubes[I]);
-            for (unsigned ei = 0; ei < ci.n_edges; ei++) {
+            for (int ei = 0; ei < ci.n_edges; ei++) {
                 Edge e{ ci, ei, false, true };
                 globals.sh -> register_edge(e.e0, e.e1, I, ei);
             }
@@ -209,8 +209,8 @@ void gen_collision_set(
             int ithread = omp_get_thread_num();
             int nthreads = omp_get_num_threads();
 
-            vector<array<vec3, 4>> ees_private;
-            vector<array<int, 4>> eidx_private;
+            vector<q4> ees_private;
+            vector<i4> eidx_private;
 #pragma omp single
             {
                 cnt = new size_t[nthreads + 1];
@@ -219,18 +219,18 @@ void gen_collision_set(
 #pragma omp for schedule(static) nowait
             for (int J = 0; J < n_cubes; J++) {
                 auto& cj(*cubes[J]);
-                for (unsigned ej = 0; ej < cj.n_edges; ej++) {
+                for (int ej = 0; ej < cj.n_edges; ej++) {
                     Edge e{ cj, ej, false, true };
                     auto collisions = globals.sh -> query_edge(e.e0, e.e1, J, barrier::d_sqrt * globals.safe_factor);
                     for (auto& c : collisions) {
-                        unsigned I = c.body, ei = c.pid;
+                        int I = c.body, ei = c.pid;
                         if (I > J) continue;
                         Edge _ei{ *cubes[I], ei };
 
                         scalar d = ipc::edge_edge_distance(_ei.e0, _ei.e1, e.e0, e.e1);
                         if (d < barrier::d_hat * (globals.safe_factor * globals.safe_factor)) {
-                            array<vec3, 4> ee = { _ei.e0, _ei.e1, e.e0, e.e1 };
-                            array<int, 4> ij = { I, ei, J, ej };
+                            q4 ee = { _ei.e0, _ei.e1, e.e0, e.e1 };
+                            i4 ij = { I, ei, J, ej };
                             {
                                 ees_private.push_back(ee);
                                 eidx_private.push_back(ij);
@@ -270,12 +270,12 @@ void gen_collision_set(
 #pragma omp parallel
         {
 
-            vector<array<vec3, 4>> ees_private;
-            vector<array<int, 4>> eidx_private;
+            vector<q4> ees_private;
+            vector<i4> eidx_private;
 #pragma omp for schedule(guided) nowait
             for (int j = 0; j < n_edges; j++) {
                 auto idx{ globals.edges[j] };
-                auto J{ idx[0] }, ej{ idx[1] };
+                int J = idx[0], ej = idx[1];
                 auto& cj(*cubes[J]);
                 Edge e{ cj, ej, vt2, vt2 };
                 // vector<Primitive> collisions;
@@ -283,14 +283,14 @@ void gen_collision_set(
                 globals.sh->query_edge(e.e0, e.e1, J, barrier::d_sqrt * globals.safe_factor, collisions);
                 for (auto& _c : collisions) {
                     auto& c{ _c.pbody };
-                    unsigned I = c.body, ei = c.pid;
+                    int I = c.body, ei = c.pid;
                     if (I > J) continue;
                     Edge _ei{ *cubes[I], ei, vt2, vt2 };
                     auto ee_type = ipc::edge_edge_distance_type(_ei.e0, _ei.e1, e.e0, e.e1);
                     scalar d = ipc::edge_edge_distance(_ei.e0, _ei.e1, e.e0, e.e1, ee_type);
                     if (d < barrier::d_hat * (globals.safe_factor * globals.safe_factor)) {
-                        array<vec3, 4> ee = { _ei.e0, _ei.e1, e.e0, e.e1 };
-                        array<int, 4> ij = { I, ei, J, ej };
+                        q4 ee = { _ei.e0, _ei.e1, e.e0, e.e1 };
+                        i4 ij = { I, ei, J, ej };
                         {
                             ees_private.push_back(ee);
                             eidx_private.push_back(ij);
@@ -323,8 +323,8 @@ void gen_collision_set(
                             continue;
                         scalar d = ipc::edge_edge_distance(ei.e0, ei.e1, ej.e0, ej.e1);
                         if (d < barrier::d_hat * globals.safe_factor) {
-                            array<vec3, 4> ee = { ei.e0, ei.e1, ej.e0, ej.e1 };
-                            array<int, 4> ij = { i, _ei, j, _ej };
+                            q4 ee = { ei.e0, ei.e1, ej.e0, ej.e1 };
+                            i4 ij = { i, _ei, j, _ej };
 
 #pragma omp critical
                             {

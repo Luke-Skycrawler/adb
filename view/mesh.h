@@ -35,12 +35,12 @@ class Mesh {
 public:
     // mesh Data
     vector<Vertex>       vertices;
-    vector<unsigned int> indices;
+    vector<int> indices;
     vector<Texture>      textures;
     unsigned int vao;
 
     // constructor
-    Mesh(vector<Vertex> vertices, vector<unsigned int> indices, vector<Texture> textures)
+    Mesh(vector<Vertex> vertices, vector<int> indices, vector<Texture> textures)
     {
         this->vertices = vertices;
         this->indices = indices;

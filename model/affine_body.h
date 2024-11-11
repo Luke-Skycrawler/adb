@@ -1,6 +1,6 @@
 #pragma once
 #include <vector>
-#include <array>
+// #include <array>
 
 #ifndef TESTING 
 #define EIGEN_USE_MKL_ALL
@@ -13,6 +13,9 @@ using scalar = double;
 using mat3 = Eigen::Matrix<scalar, 3, 3>;
 using vec3 = Eigen::Vector<scalar, 3>;
 using q4 = std::array<vec3, 4>;
+// using i4 = std::array<int, 4>;
+// using q4 = Eigen::Matrix<scalar, 4, 3>; 
+using i4 = Eigen::Vector4i;
 using vec12 = Eigen::Vector<scalar, 12>;
 using mat12 = Eigen::Matrix<scalar, 12, 12>;
 
@@ -20,7 +23,7 @@ struct AffineBody {
     mat3 A;
     vec3 p;
     scalar mass, Ic;
-    std::vector<unsigned> indices, edges;
+    std::vector<int> indices, edges;
     virtual const vec3 vertices(int i) const = 0;
     virtual void draw(Shader& shader) const = 0;
     std::vector<vec3> v_transformed;
@@ -85,7 +88,7 @@ struct AffineBody {
             v_transformed[i] = a * vertices(i) + b;
         }
     }
-    AffineBody(int n_vertices, int n_faces, int n_edges, std::vector<unsigned> indices = {}, std::vector<unsigned> edges = {})
+    AffineBody(int n_vertices, int n_faces, int n_edges, std::vector<int> indices = {}, std::vector<int> edges = {})
         : mass(1000.0), Ic(1000.0), p(0.0f, 0.0f, 0.0f), indices(indices), edges(edges), n_vertices(n_vertices), n_edges(n_edges), n_faces(n_faces)
     {
         v_transformed.resize(n_vertices);

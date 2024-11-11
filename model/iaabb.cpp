@@ -13,13 +13,7 @@
 #include <tbb/parallel_sort.h>
 #include "ipc_extension.h"
 #include "thread_local_culling.h"
-// #define _FULL_PARALLEL_
 
-#ifndef TESTING
-#include "settings.h"
-#else
-#include "../iAABB/pch.h"
-#endif
 
 using namespace std;
 using namespace Eigen;
@@ -169,7 +163,7 @@ void IAABB::intersect_sort(
 
 #pragma omp parallel
     {
-        // unsigned char* bucket = new unsigned char[n_cubes];
+        // int char* bucket = new int char[n_cubes];
         auto tid = omp_get_thread_num();
 #pragma omp for schedule(guided)
         for (int i = 0; i < n_cubes; i++) {
@@ -212,10 +206,10 @@ scalar IAABB::primitive_brute_force(
     std::vector<Intersection>& overlaps, // assert sorted
     const std::vector<std::unique_ptr<AffineBody>>& cubes,
     int vtn,
-    vector<array<vec3, 4>>& pts,
-    vector<array<int, 4>>& idx,
-    vector<array<vec3, 4>>& ees,
-    vector<array<int, 4>>& eidx,
+    vector<q4>& pts,
+    vector<i4>& idx,
+    vector<q4>& ees,
+    vector<i4>& eidx,
     vector<array<int, 2>>& vidx)
 {
 
@@ -474,8 +468,8 @@ scalar IAABB::primitive_brute_force(
     }
 
     scalar ee_global = 1.0, pt_global = 1.0;
-    static vector<vector<array<int, 4>>> idx_private(omp_get_max_threads()),eidx_private(omp_get_max_threads());
-    static vector<vector<array<vec3, 4>>> pts_private(omp_get_max_threads()), ees_private(omp_get_max_threads());
+    static vector<vector<i4>> idx_private(omp_get_max_threads()),eidx_private(omp_get_max_threads());
+    static vector<vector<q4>> pts_private(omp_get_max_threads()), ees_private(omp_get_max_threads());
 
     if (!cull_trajectory)
 #pragma omp parallel
@@ -553,10 +547,10 @@ scalar IAABB::iaabb_brute_force(
     const std::vector<std::unique_ptr<AffineBody>>& cubes,
     const std::vector<lu>& aabbs,
     int vtn,
-    std::vector<std::array<vec3, 4>>& pts,
-    std::vector<std::array<int, 4>>& idx,
-    std::vector<std::array<vec3, 4>>& ees,
-    std::vector<std::array<int, 4>>& eidx,
+    std::vector<q4>& pts,
+    std::vector<i4>& idx,
+    std::vector<q4>& ees,
+    std::vector<i4>& eidx,
     std::vector<std::array<int, 2>>& vidx)
 {
     auto start = high_resolution_clock::now();

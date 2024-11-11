@@ -19,7 +19,7 @@ using namespace std;
 using namespace Eigen;
 
 tuple<mat12, vec12> IPC::ipc_hess_pt_12x12(
-    array<vec3, 4> pt, array<int, 4> ij, ipc::PointTriangleDistanceType pt_type, scalar dist)
+    q4 pt, i4 ij, ipc::PointTriangleDistanceType pt_type, scalar dist)
 {
     int _i = ij[0], v = ij[1], _j = ij[2], f = ij[3];
 
@@ -45,7 +45,7 @@ tuple<mat12, vec12> IPC::ipc_hess_pt_12x12(
     return { ipc_hess, pt_grad };
 }
 tuple<mat12, vec12, scalar> IPC::ipc_hess_ee_12x12(
-    array<vec3, 4> ee, array<int, 4> ij,
+    q4 ee, i4 ij,
     ipc::EdgeEdgeDistanceType ee_type, scalar dist)
 {
     int _i = ij[0], _ei = ij[1], _j = ij[2], _ej = ij[3];

@@ -139,7 +139,7 @@ scalar vf_col_time(
         viaabbs.push_back(compute_aabb(v0, v1));
     }
     for (auto& fj : fjlist) {
-        Face f{ cj, unsigned(fj), true, true };
+        Face f{ cj, int(fj), true, true };
         int _a, _b, _c;
         _a = cj.indices[fj * 3 + 0],
         _b = cj.indices[fj * 3 + 1],
@@ -197,8 +197,8 @@ scalar vf_col_time(
 void vf_col_set(vector<int>& vilist, vector<int>& fjlist,
                             const std::vector<std::unique_ptr<AffineBody>>& cubes,
                             int I, int J,
-                            vector<array<vec3, 4>>& pts,
-                            vector<array<int, 4>>& idx) {
+                            vector<q4>& pts,
+                            vector<i4>& idx) {
     auto &ci{ *cubes[I] }, &cj{ *cubes[J] };
     vector<lu> viaabbs, fjaabbs;
     vector<vec3> vis;
@@ -220,7 +220,7 @@ void vf_col_set(vector<int>& vilist, vector<int>& fjlist,
         viaabbs.push_back({ v.array() - barrier::d_sqrt, v.array() + barrier::d_sqrt });
     }
     for (auto& fj : fjlist) {
-        Face f{ cj, unsigned(fj), true, true };
+        Face f{ cj, int(fj), true, true };
         fjs.push_back(f);
         fjaabbs.push_back(compute_aabb(f));
     }
@@ -246,8 +246,8 @@ void vf_col_set(vector<int>& vilist, vector<int>& fjlist,
                 auto& f{ fjs[j] };
                 auto [d, pt_type] = vf_distance(v, f);
                 if (d < barrier::d_hat) {
-                    array<vec3, 4> pt = { v, f.t0, f.t1, f.t2 };
-                    array<int, 4> ij = { I, vi, J, fj };
+                    q4 pt = { v, f.t0, f.t1, f.t2 };
+                    i4 ij = { I, vi, J, fj };
                     {
                         pts.push_back(pt);
                         idx.push_back(ij);
@@ -267,8 +267,8 @@ void vf_col_set(vector<int>& vilist, vector<int>& fjlist,
 void ee_col_set(vector<int>& eilist, vector<int>& ejlist,
                             const std::vector<std::unique_ptr<AffineBody>>& cubes,
                             int I, int J,
-                            vector<array<vec3, 4>>& ees,
-                            vector<array<int, 4>>& eidx) {
+                            vector<q4>& ees,
+                            vector<i4>& eidx) {
     auto &ci{ *cubes[I] }, &cj{ *cubes[J] };
     vector<lu> eiaabbs, ejaabbs;
     vector<Edge> eis, ejs;
@@ -283,12 +283,12 @@ void ee_col_set(vector<int>& eilist, vector<int>& ejlist,
     eis.reserve(eilist.size());
     ejs.reserve(ejlist.size());
     for (auto& ei : eilist) {
-        Edge eii{ ci, unsigned(ei), true, true };
+        Edge eii{ ci, int(ei), true, true };
         eis.push_back(eii);
         eiaabbs.push_back(compute_aabb(eii, barrier::d_sqrt));
     }
     for (auto& ej : ejlist) {
-        Edge ejj{ cj, unsigned(ej), true, true };
+        Edge ejj{ cj, int(ej), true, true };
         ejs.push_back(ejj);
         ejaabbs.push_back(compute_aabb(ejj));
     }
@@ -313,8 +313,8 @@ void ee_col_set(vector<int>& eilist, vector<int>& ejlist,
                 auto ee_type = ipc::edge_edge_distance_type(eii.e0, eii.e1, ejj.e0, ejj.e1);
                 scalar d = ipc::edge_edge_distance(eii.e0, eii.e1, ejj.e0, ejj.e1, ee_type);
                 if (d < barrier::d_hat) {
-                    array<vec3, 4> ee = { eii.e0, eii.e1, ejj.e0, ejj.e1 };
-                    array<int, 4> ij = { I, ei, J, ej };
+                    q4 ee = { eii.e0, eii.e1, ejj.e0, ejj.e1 };
+                    i4 ij = { I, ei, J, ej };
                     {
                         ees.push_back(ee);
                         eidx.push_back(ij);
@@ -336,15 +336,15 @@ void pt_col_set_task(
     // const AffineBody& ci, const AffineBody& cj,
     const vec3& v, const Face& f,
     const lu& aabb_i, const lu& aabb_j,
-    vector<array<vec3, 4>>& pts,
-    vector<array<int, 4>>& idx)
+    vector<q4>& pts,
+    vector<i4>& idx)
 {
     bool pt_intersects = intersects(aabb_i, aabb_j);
     if (!pt_intersects) return;
     auto [d, pt_type] = vf_distance(v, f);
     if (d < barrier::d_hat) {
-        array<vec3, 4> pt = { v, f.t0, f.t1, f.t2 };
-        array<int, 4> ij = { I, vi, J, fj };
+        q4 pt = { v, f.t0, f.t1, f.t2 };
+        i4 ij = { I, vi, J, fj };
         {
             pts.push_back(pt);
             idx.push_back(ij);
@@ -355,16 +355,16 @@ void ee_col_set_task(
     int ei, int ej, int I, int J,
     // const AffineBody& ci, const AffineBody& cj,
     const Edge& eii, const Edge& ejj,
-    const lu& aabb_i, const lu& aabb_j, vector<array<vec3, 4>>& ees,
-    vector<array<int, 4>>& eidx)
+    const lu& aabb_i, const lu& aabb_j, vector<q4>& ees,
+    vector<i4>& eidx)
 {
     bool ee_intersects = intersects(aabb_i, aabb_j);
     if (!ee_intersects) return;
     auto ee_type = ipc::edge_edge_distance_type(eii.e0, eii.e1, ejj.e0, ejj.e1);
     scalar d = ipc::edge_edge_distance(eii.e0, eii.e1, ejj.e0, ejj.e1, ee_type);
     if (d < barrier::d_hat) {
-        array<vec3, 4> ee = { eii.e0, eii.e1, ejj.e0, ejj.e1 };
-        array<int, 4> ij = { I, ei, J, ej };
+        q4 ee = { eii.e0, eii.e1, ejj.e0, ejj.e1 };
+        i4 ij = { I, ei, J, ej };
 
         {
             ees.push_back(ee);

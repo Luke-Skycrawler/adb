@@ -31,7 +31,7 @@ vec3i tovec3i(const vec3& f)
     return u;
 }
 
-std::vector<unsigned>& register_group(unsigned body, hi h, unordered_map<hi, unique_ptr<BodyGroup>>& table)
+std::vector<int>& register_group(int body, hi h, unordered_map<hi, unique_ptr<BodyGroup>>& table)
 {
     auto it = table.find(h);
     if (it == end(table)) {
@@ -45,7 +45,7 @@ std::vector<unsigned>& register_group(unsigned body, hi h, unordered_map<hi, uni
         return *(jt -> second);
     }
     else {
-        container_grid[body] = move(make_unique<std::vector<unsigned>>());
+        container_grid[body] = move(make_unique<std::vector<int>>());
         jt = container_grid.find(body);
         return *(jt -> second);
     }
@@ -90,7 +90,7 @@ void remove_all_entries()
     ee_table.clear();
 }
 
-void register_edge(const vec3& a, const vec3& b, unsigned body, unsigned pid)
+void register_edge(const vec3& a, const vec3& b, int body, int pid)
 {
     vec3i ia(tovec3i(a)), ib(tovec3i(b));
     vec3i u = ia.cwiseMax(ib);
@@ -107,7 +107,7 @@ vector<Primitive> query_edge(const vec3& a, const vec3& b, int group_exl, scalar
     return query_interval(l, u, group_exl, ee_table);
 }
 
-void register_vertex(const vec3& a, unsigned body, unsigned pid)
+void register_vertex(const vec3& a, int body, int pid)
 {
     vec3i ia(tovec3i(a));
     register_interval(ia, ia, { pid, body }, pt_table);

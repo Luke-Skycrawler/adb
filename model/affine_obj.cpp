@@ -3,9 +3,9 @@
 #include <array>
 using namespace std;
 void AffineObject::extract_edges() {
-    static set<array<unsigned,2>> e;
+    static set<array<int,2>> e;
     e.clear();
-    static const auto insert = [&](unsigned a, unsigned b){
+    static const auto insert = [&](int a, int b){
         e.insert({min(a, b), max(a, b)});
     };
     for (int i = 0; i < n_faces; i ++){

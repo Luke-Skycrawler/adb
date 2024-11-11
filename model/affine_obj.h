@@ -9,7 +9,7 @@ struct AffineObject: AffineBody {
         extract_edges();
         Ic = mass / 12;
     }
-    std::vector<unsigned> _edges;
+    std::vector<int> _edges;
     void extract_edges();
     const vec3 vertices(int i) const;
     void draw(Shader &shader) const;

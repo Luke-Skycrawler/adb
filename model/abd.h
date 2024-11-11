@@ -15,10 +15,10 @@ struct ABD {
 
     scalar line_search(const Eigen::Vector<scalar, -1>& dq, const Eigen::Vector<scalar, -1>& grad, Eigen::Vector<scalar, -1>& q0, scalar& E0, scalar& E1,
         int n_cubes, int n_pt, int n_ee, int n_g,
-        std::vector<std::array<vec3, 4>>& pts,
-        std::vector<std::array<int, 4>>& idx,
-        std::vector<std::array<vec3, 4>>& ees,
-        std::vector<std::array<int, 4>>& eidx,
+        std::vector<q4>& pts,
+        std::vector<i4>& idx,
+        std::vector<q4>& ees,
+        std::vector<i4>& eidx,
         std::vector<std::array<int, 2>>& vidx,
         const std::vector<Eigen::Matrix<scalar, 2, 12>>& pt_tk,
         const std::vector<Eigen::Matrix<scalar, 2, 12>>& ee_tk,
@@ -55,11 +55,11 @@ struct ABD {
     scalar alpha = 1.0;
 
     // collision set
-    std::vector<std::array<vec3, 4>> pts;
-    std::vector<std::array<int, 4>> idx;
+    std::vector<q4> pts;
+    std::vector<i4> idx;
 
-    std::vector<std::array<vec3, 4>> ees;
-    std::vector<std::array<int, 4>> eidx;
+    std::vector<q4> ees;
+    std::vector<i4> eidx;
 
     std::vector<std::array<int, 2>> vidx;
 

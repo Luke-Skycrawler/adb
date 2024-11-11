@@ -20,7 +20,7 @@ using namespace Eigen;
 
 scalar ee_uktk(
     AffineBody& ci, AffineBody& cj,
-    array<vec3, 4>& ee, array<int, 4>& ij, const ::ipc::EdgeEdgeDistanceType& ee_type,
+    q4& ee, i4& ij, const ::ipc::EdgeEdgeDistanceType& ee_type,
     Matrix<scalar, 2, 12>& Tk_T_ret, Vector<scalar, 2>& uk_ret, scalar d, scalar mollifier)
 {
     auto v_stack = ee_vstack(ci, cj, ij[1], ij[3]);
@@ -117,7 +117,7 @@ scalar ee_uktk(
     return contact_force;
 }
 
-tuple<scalar, Vector<scalar, 2>, Matrix<scalar, 2, 12>> ee_uktk(AffineBody& ci, AffineBody& cj, array<vec3, 4>& ee, array<int, 4>& ij, const ::ipc::EdgeEdgeDistanceType& ee_type, scalar d, scalar mollifier)
+tuple<scalar, Vector<scalar, 2>, Matrix<scalar, 2, 12>> ee_uktk(AffineBody& ci, AffineBody& cj, q4& ee, i4& ij, const ::ipc::EdgeEdgeDistanceType& ee_type, scalar d, scalar mollifier)
 {
     Vector<scalar, 2> uk;
     Matrix<scalar, 2, 12> Tk;
@@ -126,7 +126,7 @@ tuple<scalar, Vector<scalar, 2>, Matrix<scalar, 2, 12>> ee_uktk(AffineBody& ci, 
 }
 
 void IPC::ipc_term_ee(
-    array<vec3, 4> ee, array<int, 4> ij, ipc::EdgeEdgeDistanceType ee_type, scalar dist,
+    q4 ee, i4 ij, ipc::EdgeEdgeDistanceType ee_type, scalar dist,
 #ifdef _SM_OUT_
     const std::map<std::array<int, 2>, int>& lut,
     SparseMatrix<scalar>& sparse_hess,

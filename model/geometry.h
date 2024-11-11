@@ -7,7 +7,7 @@ struct Face {
     vec3 t0, t1, t2;
     Face(const vec3& t0, const vec3& t1, const vec3& t2)
         : t0(t0), t1(t1), t2(t2) {}
-    Face(const AffineBody& c, unsigned triangle_id, bool use_line_search_increment = false, bool batch = false);
+    Face(const AffineBody& c, int triangle_id, bool use_line_search_increment = false, bool batch = false);
     vec3 normal() const;
     vec3 unit_normal() const;
 };
@@ -16,7 +16,7 @@ struct Edge {
     vec3 e0, e1;
     Edge(const vec3& e0, const vec3& e1)
         : e0(e0), e1(e1) {}
-    Edge(const AffineBody& c, unsigned eid, bool use_line_search_increment = false, bool batch = false);
+    Edge(const AffineBody& c, int eid, bool use_line_search_increment = false, bool batch = false);
 };
 scalar vf_distance(const vec3& v, const Face& f, ipc::PointTriangleDistanceType &pt_type);
 
@@ -40,7 +40,7 @@ inline mat3 cross_matrix(const vec3& a)
         -a[1], a[0], 0;
     return ret;
 }
-inline std::array<vec3, 4> skew(const vec3& a)
+inline q4 skew(const vec3& a)
 {
     return {
         -vec3(0, -a[2], a[1]),

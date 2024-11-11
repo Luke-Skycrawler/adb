@@ -8,7 +8,7 @@
 #include <vector>
 #include <array>
 struct Globals {
-    std::vector<std::array<unsigned, 2>> points, edges, triangles;
+    std::vector<std::array<int, 2>> points, edges, triangles;
     double mu, evh, dt;
     bool ground;
 };
