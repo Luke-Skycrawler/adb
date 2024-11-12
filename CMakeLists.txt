@@ -19,11 +19,12 @@ endif()
 find_package(nlohmann_json CONFIG REQUIRED)
 find_package(pybind11 CONFIG REQUIRED)
 
+add_subdirectory("ext/cnpy")
 include(FetchContent)
 FetchContent_Declare(
     ipc_toolkit
     GIT_REPOSITORY https://github.com/ipc-sim/ipc-toolkit.git
-    GIT_TAG main
+    GIT_TAG v1.2.1
 )
 FetchContent_GetProperties(ipc_toolkit)
 FetchContent_MakeAvailable(ipc_toolkit)
@@ -134,6 +135,7 @@ target_include_directories(abd PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/model
     ${CMAKE_CURRENT_SOURCE_DIR}/test_cases
     ${CMAKE_CURRENT_SOURCE_DIR}/view
+    "ext/cnpy"
 )
 
 target_include_directories(abdtk PRIVATE    
@@ -152,7 +154,7 @@ target_include_directories(abd PRIVATE
     ${ipc_toolkit_SOURCE_DIR}/src 
     ${MKL_INCLUDE})
 
-target_link_libraries(abd PRIVATE ipc::toolkit glfw assimp::assimp glad::glad glm::glm Eigen3::Eigen nlohmann_json::nlohmann_json $<LINK_ONLY:MKL::MKL>)
+target_link_libraries(abd PRIVATE ipc::toolkit glfw assimp::assimp glad::glad glm::glm Eigen3::Eigen nlohmann_json::nlohmann_json $<LINK_ONLY:MKL::MKL> cnpy)
 if(OpenMP_CXX_FOUND)
     target_link_libraries(abd PRIVATE OpenMP::OpenMP_CXX)
     target_link_libraries(abdtk PRIVATE OpenMP::OpenMP_CXX)
