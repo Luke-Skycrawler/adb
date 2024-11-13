@@ -127,7 +127,7 @@ void gen_collision_set(
                 int J = int( idx[0]);
                 int f = int( idx[1]);
                 auto& cj(*cubes[J]);
-                Face _f(cj, f, vt2, vt2);
+                Face _f(cj.face(f, vt2, vt2));
                 // vector<Primitive> collisions;
                 auto& collisions {globals.sh->collisions[omp_get_thread_num()]};
 
@@ -260,7 +260,7 @@ void gen_collision_set(
             auto idx{ globals.edges[i] };
             auto I{ idx[0] }, ei{ idx[1] };
             auto& ci(*cubes[I]);
-            Edge e{ ci, ei, vt2, vt2 };
+            Edge e{ ci.edge(ei, vt2, vt2) };
             globals.sh->register_edge(e.e0, e.e1, I, ei);
         }
 
@@ -277,7 +277,7 @@ void gen_collision_set(
                 auto idx{ globals.edges[j] };
                 int J = idx[0], ej = idx[1];
                 auto& cj(*cubes[J]);
-                Edge e{ cj, ej, vt2, vt2 };
+                Edge e{ cj.edge(ej, vt2, vt2) };
                 // vector<Primitive> collisions;
                 auto& collisions {globals.sh->collisions[omp_get_thread_num()]};
                 globals.sh->query_edge(e.e0, e.e1, J, barrier::d_sqrt * globals.safe_factor, collisions);
@@ -285,7 +285,7 @@ void gen_collision_set(
                     auto& c{ _c.pbody };
                     int I = c.body, ei = c.pid;
                     if (I > J) continue;
-                    Edge _ei{ *cubes[I], ei, vt2, vt2 };
+                    Edge _ei{ cubes[I]->edge(ei, vt2, vt2) };
                     auto ee_type = ipc::edge_edge_distance_type(_ei.e0, _ei.e1, e.e0, e.e1);
                     scalar d = ipc::edge_edge_distance(_ei.e0, _ei.e1, e.e0, e.e1, ee_type);
                     if (d < barrier::d_hat * (globals.safe_factor * globals.safe_factor)) {

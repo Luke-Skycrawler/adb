@@ -1,6 +1,10 @@
 #pragma once
 #include "float.h"
+#ifndef CUDA_SOURCE
 #include "../affine_body.h"
+#else
+#include "../cuda/common.cuh"
+#endif
 struct BVHPackedNodeHalf
 {
 	float x;
@@ -12,18 +16,18 @@ struct BVHPackedNodeHalf
 
 struct bounds3
 {
-	inline bounds3() : lower( FLT_MAX, FLT_MAX, FLT_MAX)
+	inline func bounds3() : lower( FLT_MAX, FLT_MAX, FLT_MAX)
 						           , upper(-FLT_MAX, -FLT_MAX, -FLT_MAX) {}
 
-	inline bounds3(const vec3& lower, const vec3& upper) : lower(lower), upper(upper) {}
+	inline func bounds3(const vec3& lower, const vec3& upper) : lower(lower), upper(upper) {}
 
-	inline vec3 center() const { return 0.5*(lower+upper); }
-	inline vec3 edges() const { return upper-lower; }
+	inline func vec3 center() const { return 0.5*(lower+upper); }
+	inline func vec3 edges() const { return upper-lower; }
 
 
-	inline bool empty() const { return lower[0] >= upper[0] || lower[1] >= upper[1] || lower[2] >= upper[2]; }
+	inline func bool empty() const { return lower[0] >= upper[0] || lower[1] >= upper[1] || lower[2] >= upper[2]; }
 
-	inline bool overlaps(const vec3& p) const
+	inline func bool overlaps(const vec3& p) const
 	{
 		if (p[0] < lower[0] ||
 			p[1] < lower[1] ||
@@ -40,7 +44,7 @@ struct bounds3
 		}
 	}
 
-	inline bool overlaps(const bounds3& b) const
+	inline func bool overlaps(const bounds3& b) const
 	{
 		if (lower[0] > b.upper[0] ||
 			lower[1] > b.upper[1] ||

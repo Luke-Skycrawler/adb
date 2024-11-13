@@ -2,6 +2,7 @@ cmake_minimum_required(VERSION 3.12)
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 project(abd)
+enable_language(CUDA)
 # set(IPC_TOOLKIT_BUILD_PYTHON ON)
 find_package(glad CONFIG REQUIRED)
 find_package(glm CONFIG REQUIRED)
@@ -28,9 +29,19 @@ FetchContent_Declare(
 )
 FetchContent_GetProperties(ipc_toolkit)
 FetchContent_MakeAvailable(ipc_toolkit)
+
+set(CUDA_SOURCE 
+    model/cuda/common.cuh
+    model/cuda/soup.cu
+    model/cuda/ipc.cu
+    model/cuda/ccd.cu
+    model/cuda/dist.cu
+    model/cuda/cubic_roots.cu
+)
 set(HEADERS 
     cyCodeBase/cyCore.h
     cyCodeBase/cyPolynomial.h
+    model/scalar_types.h
     model/settings.h
     model/affine_body.h
     model/affine_obj.h
@@ -95,6 +106,7 @@ set(SOURCE
     view/control.cpp
     view/light.cpp
     view/utils.cpp
+    ${CUDA_SOURCE}
     )
 
 set(PYTHON_SOURCE 
@@ -162,12 +174,15 @@ endif()
 target_link_libraries(abdtk PRIVATE ipc::toolkit Eigen3::Eigen $<LINK_ONLY:MKL::MKL>)
 
 set(OUTPUT_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/view)
+if(MSVC) 
+    set_property(TARGET abd PROPERTY VS_DEBUGGER_WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}/view)
+
+    set_property(TARGET abd PROPERTY CUDA_SEPARABLE_COMPILATION ON)
+    set_property(TARGET abd PROPERTY CUDA_ARCHITECTURES 86)
+endif()
+
 add_custom_target(copy_exe ALL
     COMMAND ${CMAKE_COMMAND} -E copy $<TARGET_FILE:abd> ${OUTPUT_DIRECTORY}
     DEPENDS abd
     COMMENT "Copying abd.exe to ${OUTPUT_DIRECTORY}"
 )
-# if(MSVC) 
-#     set_property(TARGET abd PROPERTY CUDA_SEPARABLE_COMPILATION ON)
-#     set_property(TARGET abd PROPERTY CUDA_ARCHITECTURES 86)
-# endif()

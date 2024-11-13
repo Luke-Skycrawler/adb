@@ -4,62 +4,54 @@
 // #include <cmath>
 
 using namespace std;
-Edge::Edge(const AffineBody& c, int id, bool b, bool batch)
+Edge AffineBody::edge(int id, bool b, bool batch) const
 {
-    int _0 = c.edges[id * 2], _1 = c.edges[id * 2 + 1];
+    Edge ret;
+    int _0 = edges[id * 2], _1 = edges[id * 2 + 1];
     if (batch) {
-        e0 = c.v_transformed[_0];
-        e1 = c.v_transformed[_1];
+        ret.e0 = v_transformed[_0];
+        ret.e1 = v_transformed[_1];
     }
     else if (b) {
-        e0 = c.vt2(_0);
-        e1 = c.vt2(_1);
+        ret.e0 = vt2(_0);
+        ret.e1 = vt2(_1);
     }
     else {
         mat3 a;
-        vec3 b = c.q[0];
-        a << c.q[1] , c.q[2], c.q[3];
-        e0 = a * c.vertices(_0) + b;
-        e1 = a * c.vertices(_1) + b;
+        vec3 b = q[0];
+        a << q[1], q[2], q[3];
+        ret.e0 = a * vertices(_0) + b;
+        ret.e1 = a * vertices(_1) + b;
     }
+    return ret;
 }
 
-vec3 Face::normal() const
+Face AffineBody::face(int id, bool b, bool batch) const
 {
-    return (t0 - t1).cross(t0 - t2);
-}
-
-vec3 Face::unit_normal() const
-{
-    auto n = (t0 - t1).cross(t0 - t2);
-    return n / sqrt(n.dot(n));
-}
-
-Face::Face(const AffineBody& c, int id, bool b, bool batch)
-{
-
-    int _a = c.indices[id * 3 + 0],
-             _b = c.indices[id * 3 + 1],
-             _c = c.indices[id * 3 + 2];
+    Face ret;
+    int _a = indices[id * 3 + 0],
+        _b = indices[id * 3 + 1],
+        _c = indices[id * 3 + 2];
 
     if (batch) {
-        t0 = c.v_transformed[_a];
-        t1 = c.v_transformed[_b];
-        t2 = c.v_transformed[_c];
+        ret.t0 = v_transformed[_a];
+        ret.t1 = v_transformed[_b];
+        ret.t2 = v_transformed[_c];
     }
     else if (b) {
-        t0 = c.vt2(_a);
-        t1 = c.vt2(_b);
-        t2 = c.vt2(_c);
+        ret.t0 = vt2(_a);
+        ret.t1 = vt2(_b);
+        ret.t2 = vt2(_c);
     }
     else {
         mat3 a;
-        vec3 b = c.q[0];
-        a << c.q[1] , c.q[2], c.q[3];
-        t0 = a * c.vertices(_a) + b;
-        t1 = a * c.vertices(_b) + b;
-        t2 = a * c.vertices(_c) + b;
+        vec3 b = q[0];
+        a << q[1], q[2], q[3];
+        ret.t0 = a * vertices(_a) + b;
+        ret.t1 = a * vertices(_b) + b;
+        ret.t2 = a * vertices(_c) + b;
     }
+    return ret;
 }
 
 scalar vg_distance(const vec3& vertex) // not squared

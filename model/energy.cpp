@@ -46,7 +46,7 @@ scalar E_barrier_plus_inert(
                                                     : e) 
         for (int k = 0; k < n_pt; k++) {
             auto& ij = idx[k];
-            Face f(*cubes[ij[2]], ij[3], true, true);
+            Face f(cubes[ij[2]]->face(ij[3], true, true));
             vec3 v(cubes[ij[0]]->v_transformed[ij[1]]);
             auto [d, pt_type] = vf_distance(v, f);
             e += barrier::barrier_function(d);
@@ -61,7 +61,7 @@ scalar E_barrier_plus_inert(
                                                     : e) 
         for (int k = 0; k < n_ee; k++) {
             auto& ij(eidx[k]);
-            Edge ei(*cubes[ij[0]], ij[1], true, true), ej(*cubes[ij[2]], ij[3], true, true);
+            Edge ei(cubes[ij[0]]->edge(ij[1], true, true)), ej(cubes[ij[2]]->edge(ij[3], true, true));
             scalar eps_x = (ei.e0 - ei.e1).squaredNorm() * (ej.e0 - ej.e1).squaredNorm() * globals.eps_x;
             scalar p = ipc::edge_edge_mollifier(ei.e0, ei.e1, ej.e0, ej.e1, eps_x);
             scalar d = ipc::edge_edge_distance(ei.e0, ei.e1, ej.e0, ej.e1);
@@ -121,7 +121,7 @@ scalar E_global(const Vector<scalar, -1>& q_plus_dq, const Vector<scalar, -1>& d
                                                                    : ef)
         for (int k = 0; k < n_pt; k++) {
             auto& ij = idx[k];
-            Face f(*cubes[ij[2]], ij[3], _vt2, _vt2);
+            Face f(cubes[ij[2]]->face(ij[3], _vt2, _vt2));
             vec3 v(cubes[ij[0]]->v_transformed[ij[1]]);
             if (!_vt2) v = cubes[ij[0]]->vt1(ij[1]);
             // q4 a = {v, f.t0, f.t1, f.t2};
@@ -144,7 +144,7 @@ scalar E_global(const Vector<scalar, -1>& q_plus_dq, const Vector<scalar, -1>& d
                                                                    : ef)
         for (int k = 0; k < n_ee; k++) {
             auto& ij(eidx[k]);
-            Edge ei(*cubes[ij[0]], ij[1], _vt2, _vt2), ej(*cubes[ij[2]], ij[3], _vt2, _vt2);
+            Edge ei(cubes[ij[0]]->edge(ij[1], _vt2, _vt2)), ej(cubes[ij[2]]->edge(ij[3], _vt2, _vt2));
             scalar eps_x = (ei.e0 - ei.e1).squaredNorm() * (ej.e0 - ej.e1).squaredNorm() * globals.eps_x;
             scalar p = ipc::edge_edge_mollifier(ei.e0, ei.e1, ej.e0, ej.e1, eps_x);
             scalar d = ipc::edge_edge_distance(ei.e0, ei.e1, ej.e0, ej.e1);

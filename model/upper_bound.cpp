@@ -110,8 +110,8 @@ scalar step_size_upper_bound(Vector<scalar, -1>& dq, vector<unique_ptr<AffineBod
 
                     auto& cj(*cubes[idx[0]]);
                     int f = idx[1];
-                    Face f0(cj, f, false);
-                    Face f1(cj, f, true, true);
+                    Face f0 = cj.face(f, false);
+                    Face f1 = cj.face(f, true, true);
                     // vector<Primitive> collisions;
                     globals.sh->query_triangle_trajectory(
                         f0.t0, f0.t1, f0.t2,
@@ -180,8 +180,8 @@ scalar step_size_upper_bound(Vector<scalar, -1>& dq, vector<unique_ptr<AffineBod
                 auto& idx(globals.edges[I]);
                 auto& ci(*cubes[idx[0]]);
                 auto ei{ idx[1] };
-                Edge e1{ ci, ei, true, true };
-                Edge e0{ ci, ei, false };
+                Edge e1{ ci.edge(ei, true, true) };
+                Edge e0{ ci.edge(ei, false) };
                 globals.sh->register_edge_trajectory(e0.e0, e0.e1, e1.e0, e1.e1, idx[0], ei);
             }
             globals.sh->remove_all_entries();
@@ -196,9 +196,9 @@ scalar step_size_upper_bound(Vector<scalar, -1>& dq, vector<unique_ptr<AffineBod
 
                     auto& cj(*cubes[idx[0]]);
                     auto ej{ idx[1] };
-                    Edge e1{ cj, ej, true, true };
+                    Edge e1{ cj.edge(ej, true, true) };
 
-                    Edge e0{ cj, ej, false };
+                    Edge e0{ cj.edge(ej, false) };
                     // vector<Primitive> collisions;
 
                     globals.sh->query_edge_trajectory(e0.e0, e0.e1, e1.e0, e1.e1, idx[0], collisions);
@@ -207,8 +207,8 @@ scalar step_size_upper_bound(Vector<scalar, -1>& dq, vector<unique_ptr<AffineBod
                         auto &c{ _c.pbody };
                         int I = c.body, ei = c.pid;
                         if (I > idx[0]) continue;
-                        Edge ei1{ *cubes[I], ei, true, true };
-                        Edge ei0{ *cubes[I], ei, false };
+                        Edge ei1{ cubes[I]->edge(ei, true, true) };
+                        Edge ei0{ cubes[I]->edge(ei, false) };
                         auto t = ee_collision_time(ei0, e0, ei1, e1);
                         toi_private = min(toi_private, t);
                     }
@@ -252,7 +252,7 @@ scalar step_size_upper_bound(Vector<scalar, -1>& dq, vector<unique_ptr<AffineBod
         vec3 p_t1 = cubes[i]->vt1(ij[1]);
         // scalar t = vf_collision_detect(p_t1, p_t2,
         //     *cubes[j], ij[3]);
-        scalar t = pt_collision_time(p_t1, Face(*cubes[j], ij[3]), p_t2, Face(*cubes[j], ij[3], true, true));
+        scalar t = pt_collision_time(p_t1, cubes[j]->face(ij[3]), p_t2, cubes[j]->face(ij[3], true, true));
         // scalar t = vf_collision_detect(p_t1, p_t2, Face(*cubes[j], ij[3]), Face(*cubes[j], ij[3], true));
         tois[k] = t;
         // toi = min(toi, t);
@@ -264,8 +264,8 @@ scalar step_size_upper_bound(Vector<scalar, -1>& dq, vector<unique_ptr<AffineBod
 
         auto &ci(*cubes[ij[0]]), &cj(*cubes[ij[2]]);
         // scalar t = ee_collision_detect(ci, cj, ij[1], ij[3]);
-        Edge ei0(ci, ij[1]), ei1(ci, ij[1], true, true);
-        Edge ej0(cj, ij[3]), ej1(cj, ij[3], true, true);
+        Edge ei0(ci.edge(ij[1])), ei1(ci.edge(ij[1], true, true));
+        Edge ej0(cj.edge(ij[3])), ej1(cj.edge(ij[3], true, true));
         scalar t = ee_collision_time(ei0, ej0, ei1, ej1);
         tois[k + n_pt] = t;
         // toi = min(toi, t);

@@ -5,7 +5,7 @@
 #include <unordered_set>
 #include "affine_body.h"
 #define SPATIAL_HASHING_H
-
+#include <map>
 using element_type = int short;
 union Primitive {
     struct {

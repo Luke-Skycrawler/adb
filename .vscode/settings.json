@@ -106,6 +106,7 @@
         "shared_mutex": "cpp",
         "*.tpp": "cpp",
         "pardisosupport": "cpp",
-        "hash_map": "cpp"
+        "hash_map": "cpp",
+        "regex": "cpp"
     }
 }

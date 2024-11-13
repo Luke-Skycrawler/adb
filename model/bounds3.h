@@ -1,15 +1,20 @@
 #pragma once
-#include "affine_body.h"
 #include "bvh/bvh.h"
-
+#ifndef CUDA_SOURCE
+#include "affine_body.h"
 using lu = bounds3;
 
 lu compute_aabb(const AffineBody& c);
 lu affine(const lu& aabb, q4& q);
 lu affine(lu aabb, AffineBody& c, int vtn);
+#else
+using lu = bounds3;
+#endif
 
 
-inline lu compute_aabb(const Edge& e)
+
+
+inline func lu compute_aabb(const Edge& e)
 {
     vec3 l, u;
     auto e0 {e.e0.array()}, e1 {e.e1.array()};
@@ -19,7 +24,7 @@ inline lu compute_aabb(const Edge& e)
 }
 
 
-inline lu compute_aabb(const Edge& e, scalar d_hat_sqrt)
+inline func lu compute_aabb(const Edge& e, scalar d_hat_sqrt)
 {
     vec3 l, u;
     auto e0 {e.e0.array()}, e1 {e.e1.array()};
@@ -28,7 +33,7 @@ inline lu compute_aabb(const Edge& e, scalar d_hat_sqrt)
     return { l, u };
 }
 
-inline lu compute_aabb(const Face& f)
+inline func lu compute_aabb(const Face& f)
 {
     vec3 l, u;
     auto t0 {f.t0.array()}, 
@@ -40,7 +45,7 @@ inline lu compute_aabb(const Face& f)
 }
 
 
-inline bool intersects(const lu& a, const lu& b)
+inline func bool intersects(const lu& a, const lu& b)
 {
     const auto overlaps = [&](int i) -> bool {
         return a.lower[i] <= b.upper[i] && a.upper[i] >= b.lower[i];
@@ -58,14 +63,14 @@ inline bool intersection(const lu& a, const lu& b, lu& ret)
     return intersects;
 }
 
-inline lu merge(const lu& a, const lu& b)
+inline func lu merge(const lu& a, const lu& b)
 {
     vec3 l, u;
     l = a.lower.array().min(b.lower.array());
     u = a.upper.array().max(b.upper.array());
     return { l, u };
 }
-inline lu compute_aabb(const vec3& p0, const vec3& p1)
+inline func lu compute_aabb(const vec3& p0, const vec3& p1)
 {
     vec3 l, u;
     auto e0{ p0.array() }, e1{ p1.array() };
@@ -73,7 +78,7 @@ inline lu compute_aabb(const vec3& p0, const vec3& p1)
     u = e0.max(e1);
     return { l, u };
 }
-inline lu compute_aabb(const Edge& e1, const Edge& e2)
+inline func lu compute_aabb(const Edge& e1, const Edge& e2)
 {
     vec3 l, u;
     auto e10{ e1.e0.array() }, e11{ e1.e1.array() };
@@ -82,7 +87,7 @@ inline lu compute_aabb(const Edge& e1, const Edge& e2)
     u = e10.max(e11).max(e20).max(e21);
     return { l, u };
 }
-inline lu compute_aabb(const Face& f1, const Face& f2)
+inline func lu compute_aabb(const Face& f1, const Face& f2)
 {
     return merge(compute_aabb(f1), compute_aabb(f2));
 }

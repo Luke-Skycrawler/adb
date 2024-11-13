@@ -5,19 +5,9 @@
 #ifndef TESTING 
 #define EIGEN_USE_MKL_ALL
 #endif
- 
-#include <Eigen/Eigen>
-#include "../view/shader.h"
 
-using scalar = double;
-using mat3 = Eigen::Matrix<scalar, 3, 3>;
-using vec3 = Eigen::Vector<scalar, 3>;
-using q4 = std::array<vec3, 4>;
-// using i4 = std::array<int, 4>;
-// using q4 = Eigen::Matrix<scalar, 4, 3>; 
-using i4 = Eigen::Vector4i;
-using vec12 = Eigen::Vector<scalar, 12>;
-using mat12 = Eigen::Matrix<scalar, 12, 12>;
+#include "../view/shader.h"
+#include "scalar_types.h"
 
 struct AffineBody {
     mat3 A;
@@ -88,6 +78,9 @@ struct AffineBody {
             v_transformed[i] = a * vertices(i) + b;
         }
     }
+
+    Face face(int triangle_id, bool use_line_search_increment = false, bool batch = false) const;
+    Edge edge(int eid, bool use_line_search_increment = false, bool batch = false) const;
     AffineBody(int n_vertices, int n_faces, int n_edges, std::vector<int> indices = {}, std::vector<int> edges = {})
         : mass(1000.0), Ic(1000.0), p(0.0f, 0.0f, 0.0f), indices(indices), edges(edges), n_vertices(n_vertices), n_edges(n_edges), n_faces(n_faces)
     {

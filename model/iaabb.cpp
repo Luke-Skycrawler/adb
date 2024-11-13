@@ -361,8 +361,8 @@ scalar IAABB::primitive_brute_force(
         auto I{ idx[0] };
         auto ei{ idx[1] };
         auto& c{ *cubes[I] };
-        Edge e{ c, ei, true, true };
-        Edge e0{ c, ei };
+        Edge e{ c.edge(ei, true, true) };
+        Edge e0{ c.edge(ei) };
 
         lu aabb = cull_trajectory ? compute_aabb(e, e0) : compute_aabb(e);
         for (int o = starting[I]; o < starting[I + 1]; o++) {
@@ -385,8 +385,8 @@ scalar IAABB::primitive_brute_force(
         auto I{ idx[0] };
         auto fi{ idx[1] };
         auto& c{ *cubes[I] };
-        Face f{ c, fi, true, true };
-        Face f0 {c, fi};
+        Face f{ c.face(fi, true, true) };
+        Face f0{ c.face(fi) };
 
         lu aabb= cull_trajectory ? compute_aabb(f, f0): compute_aabb(f);
         for (int o = starting[I]; o < starting[I + 1]; o++) {

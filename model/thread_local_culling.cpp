@@ -43,7 +43,7 @@ scalar ee_col_time(
     ej1s.reserve(ejlist.size());
     
     for (auto& ei : eilist) {
-        Edge ei1(ci, ei, true, true);
+        Edge ei1(ci.edge(ei, true, true));
         int i0, i1;
         i0 = ci.edges[ei * 2];
         i1 = ci.edges[ei * 2 + 1];
@@ -53,7 +53,7 @@ scalar ee_col_time(
         eiaabbs.push_back(compute_aabb(ei0, ei1));
     }
     for (auto& ej : ejlist) {
-        Edge ej1(cj, ej, true, true);
+        Edge ej1(cj.edge(ej, true, true));
         int j0, j1;
         j0 = cj.edges[ej * 2];
         j1 = cj.edges[ej * 2 + 1];
@@ -105,7 +105,6 @@ scalar ee_col_time(
         }
     return toi;
 }
-
 scalar vf_col_time(
     vector<int>& vilist, vector<int>& fjlist,
     const std::vector<std::unique_ptr<AffineBody>>& cubes,
@@ -139,7 +138,7 @@ scalar vf_col_time(
         viaabbs.push_back(compute_aabb(v0, v1));
     }
     for (auto& fj : fjlist) {
-        Face f{ cj, int(fj), true, true };
+        Face f{ cj.face(int(fj), true, true) };
         int _a, _b, _c;
         _a = cj.indices[fj * 3 + 0],
         _b = cj.indices[fj * 3 + 1],
@@ -220,7 +219,7 @@ void vf_col_set(vector<int>& vilist, vector<int>& fjlist,
         viaabbs.push_back({ v.array() - barrier::d_sqrt, v.array() + barrier::d_sqrt });
     }
     for (auto& fj : fjlist) {
-        Face f{ cj, int(fj), true, true };
+        Face f{ cj.face(int(fj), true, true) };
         fjs.push_back(f);
         fjaabbs.push_back(compute_aabb(f));
     }
@@ -283,12 +282,12 @@ void ee_col_set(vector<int>& eilist, vector<int>& ejlist,
     eis.reserve(eilist.size());
     ejs.reserve(ejlist.size());
     for (auto& ei : eilist) {
-        Edge eii{ ci, int(ei), true, true };
+        Edge eii{ ci.edge(int(ei), true, true) };
         eis.push_back(eii);
         eiaabbs.push_back(compute_aabb(eii, barrier::d_sqrt));
     }
     for (auto& ej : ejlist) {
-        Edge ejj{ cj, int(ej), true, true };
+        Edge ejj{ cj.edge(int(ej), true, true) };
         ejs.push_back(ejj);
         ejaabbs.push_back(compute_aabb(ejj));
     }
