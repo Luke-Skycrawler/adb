@@ -440,13 +440,16 @@ func scalar ee_collision_time(
 
 __global__ void ccd_toi(int nvi, int nfj, int* vilist, int* fjlist, lu* viaabbs, lu* fjaabbs, vec3* v0s, vec3* v1s, Face* f0s, Face* f1s, scalar* toi)
 {
-    int i = threadIdx.x, int j = threadIdx.y;
+    int i = threadIdx.x + blockDim.x * blockIdx.x, int j = threadIdx.y + blockDim.y * blockIdx.y;
     int vi = vilist[i], fj = fjlist[j];
-    if(intersects(viaabbs[i], fjaabbs[j])) {
-        auto &v0{ v0s[i] }, &v{ v1s[i] };
-        auto &f0{ f0s[j] }, &f{ f1s[j] };
-        scalar t = pt_collision_time(v0, f0, v, f);
-        atomic_min<scalar>(toi, t);
+    if(i < nvi && j < nfj) {
+
+        if(intersects(viaabbs[i], fjaabbs[j])) {
+            auto &v0{ v0s[i] }, &v{ v1s[i] };
+            auto &f0{ f0s[j] }, &f{ f1s[j] };
+            scalar t = pt_collision_time(v0, f0, v, f);
+            atomic_min<scalar>(toi, t);
+        }
     }
 }
 scalar cuda_pt_list_toi(int nvi, int nfj, int* vilist, int* fjlist, lu* viaabbs, lu* fjaabbs, vec3* v0s, vec3* v1s, Face* f0s, Face* f1s)
@@ -457,19 +460,48 @@ scalar cuda_pt_list_toi(int nvi, int nfj, int* vilist, int* fjlist, lu* viaabbs,
     lu *dev_viaabbs, *dev_fjaabbs;
     vec3 *dev_v0s, *dev_v1s;
     Face *dev_f0s, *dev_f1s;
-    cudaMallocManaged(&dev_vilist, sizeof(int) * nvi);
-    cudaMallocManaged(&dev_fjlist, sizeof(int) * nfj);
-    cudaMallocManaged(&dev_viaabbs, sizeof(lu) * nvi);
-    cudaMallocManaged(&dev_fjaabbs, sizeof(lu) * nfj);
-    cudaMallocManaged(&dev_v0s, sizeof(vec3) * nvi);
-    cudaMallocManaged(&dev_v1s, sizeof(vec3) * nvi);
-    cudaMallocManaged(&dev_f0s, sizeof(Face) * nfj);
-    cudaMallocManaged(&dev_f1s, sizeof(Face) * nfj);
-    cudaMallocManaged(&toi, sizeof(scalar));
-    *toi = 1.0;
+    cudaMalloc(&dev_vilist, sizeof(int) * nvi);
+    cudaMalloc(&dev_fjlist, sizeof(int) * nfj);
+    cudaMalloc(&dev_viaabbs, sizeof(lu) * nvi);
+    cudaMalloc(&dev_fjaabbs, sizeof(lu) * nfj);
+    cudaMalloc(&dev_v0s, sizeof(vec3) * nvi);
+    cudaMalloc(&dev_v1s, sizeof(vec3) * nvi);
+    cudaMalloc(&dev_f0s, sizeof(Face) * nfj);
+    cudaMalloc(&dev_f1s, sizeof(Face) * nfj);
+    cudaMalloc(&toi, sizeof(scalar));
 
-    dim3 grid_dim(1), block_dim(nvi, nfj);
+    cudaMemcpy(dev_vilist, vilist, sizeof(int) * nvi, cudaMemcpyHostToDevice);
+    cudaMemcpy(dev_fjlist, fjlist, sizeof(int) * nfj, cudaMemcpyHostToDevice);
+    cudaMemcpy(dev_viaabbs, viaabbs, sizeof(lu) * nvi, cudaMemcpyHostToDevice);
+    cudaMemcpy(dev_fjaabbs, fjaabbs, sizeof(lu) * nfj, cudaMemcpyHostToDevice);
+    cudaMemcpy(dev_v0s, v0s, sizeof(vec3) * nvi, cudaMemcpyHostToDevice);
+    cudaMemcpy(dev_v1s, v1s, sizeof(vec3) * nvi, cudaMemcpyHostToDevice);
+    cudaMemcpy(dev_f0s, f0s, sizeof(Face) * nfj, cudaMemcpyHostToDevice);
+    cudaMemcpy(dev_f1s, f1s, sizeof(Face) * nfj, cudaMemcpyHostToDevice);
+    scalar* ret = new scalar;
+    *ret = 1.0;
+    cudaMemcpy(toi, ret, sizeof(scalar), cudaMemcpyHostToDevice);
+    int gx, gy, bx, by;
+    if(nvi > 32) {
+        gx = (nvi + 31) / 32;
+        bx = 32;
+    }
+    else {
+        gx = 1;
+        bx = nvi;
+    }
+    if(nfj > 32) {
+        gy = (nfj + 31) / 32;
+        by = 32;
+    }
+    else {
+        gy = 1;
+        by = nfj;
+    }
+    dim3 grid_dim(gx, gy), block_dim(bx, by);
     ccd_toi<<<grid_dim, block_dim>>>(nvi, nfj, dev_vilist, dev_fjlist, dev_viaabbs, dev_fjaabbs, dev_v0s, dev_v1s, dev_f0s, dev_f1s, toi);
+    cudaMemcpy(ret, toi, sizeof(scalar), cudaMemcpyDeviceToHost);
+
     cudaFree(dev_vilist);
     cudaFree(dev_fjlist);
     cudaFree(dev_viaabbs);
@@ -479,6 +511,6 @@ scalar cuda_pt_list_toi(int nvi, int nfj, int* vilist, int* fjlist, lu* viaabbs,
     cudaFree(dev_f0s);
     cudaFree(dev_f1s);
     cudaFree(toi);
-    return *toi;
+    return *ret;
 }
 };

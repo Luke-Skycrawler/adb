@@ -1,11 +1,4 @@
 #pragma once
-#include <Eigen/Dense>
-#include <cuda_runtime.h>
-#include <device_launch_parameters.h>
-
-#define func __device__ __host__
-#define kernel __global__
-
 #include "scalar_types.h"
 
 #define CUDA_SOURCE

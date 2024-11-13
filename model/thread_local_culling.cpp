@@ -11,11 +11,20 @@
 #include <ipc/distance/edge_edge.hpp>
 #include "collision.h"
 #include "ipc_extension.h"
-
+#define CUDA_ENABLED
 using namespace Eigen;
 using namespace std;
 
+namespace cuda {
 
+scalar cuda_pt_list_toi(int nvi, int nfj, int* vilist, int* fjlist, lu* viaabbs, lu* fjaabbs, vec3* v0s, vec3* v1s, Face* f0s, Face* f1s);
+
+scalar cuda_pt_list_toi(vector<int> vilist, vector<int> fjlist, vector<lu> viaabbs, vector<lu> fjaabbs, vector<vec3> v0s, vector<vec3> v1s, vector<Face> f0s, vector<Face> f1s)
+{
+    return cuda_pt_list_toi(vilist.size(), fjlist.size(), vilist.data(), fjlist.data(), viaabbs.data(), fjaabbs.data(), v0s.data(), v1s.data(), f0s.data(), f1s.data());
+}
+
+};
 scalar ee_col_time(
     vector<int>& eilist, vector<int>& ejlist,
     const std::vector<std::unique_ptr<AffineBody>>& cubes,
@@ -152,6 +161,9 @@ scalar vf_col_time(
     }
 
     int nvi = vilist.size(), nfj = fjlist.size();   
+    #ifdef CUDA_ENABLED 
+    toi = cuda::cuda_pt_list_toi(vilist, fjlist, viaabbs, fjaabbs, v0s, v1s, f0s, f1s);
+    #else
     if (nvi > globals.params_int["thres"] || nfj > globals.params_int["thres"]) {
         auto &EIs{nvi > nfj? viaabbs: fjaabbs}, &EJs{nvi > nfj? fjaabbs: viaabbs};
         auto bvh = bvh_create(EIs.data(), EIs.size());
@@ -190,6 +202,7 @@ scalar vf_col_time(
                 toi = min(toi, t);
             }
         }
+    #endif
     return toi;
 }
 

@@ -5,7 +5,6 @@
 #ifndef TESTING 
 #define EIGEN_USE_MKL_ALL
 #endif
-
 #include "../view/shader.h"
 #include "scalar_types.h"
 
