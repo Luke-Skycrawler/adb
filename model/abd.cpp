@@ -134,6 +134,7 @@ void ABD::implicit_euler(scalar dt) {
         }
         c.p = c.q0[0];
         c.A << c.q0[1], c.q0[2], c.q0[3];
+        c.project_vt1();
     }
 }
 

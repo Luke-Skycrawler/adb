@@ -23,11 +23,21 @@ void AffineObject::extract_edges() {
 }
 
 const vec3 AffineObject::vertices(int i) const{
-    glm::vec3 p = mesh.vertices[i].Position;
-     return vec3(p[0], p[1], p[2]);
+    // glm::vec3 p = mesh.vertices[i].Position;
+    //  return vec3(p[0], p[1], p[2]);
+    return vert_rest[i];
 }
 
+void AffineObject::set_vertices() const {
+    for (int i = 0; i < n_vertices; i++) {
+        auto p = v_transformed[i];
+        mesh.vertices[i].Position = glm::vec3(p[0], p[1], p[2]);
+        
+    }
+}
 void AffineObject::draw(Shader& shader) const
 {
+    set_vertices();
+    mesh.setupMesh();
     mesh.Draw(shader);
 }

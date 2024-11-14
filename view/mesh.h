@@ -89,8 +89,10 @@ public:
         glActiveTexture(GL_TEXTURE0);
     }
     double Ic[6];
-
-private:
+    void update_vertices() const {
+        glBufferData(GL_ARRAY_BUFFER, vertices.size() * sizeof(Vertex), &vertices[0], GL_STATIC_DRAW);
+    }
+public:
     // render data 
     unsigned int vbo, ebo;
 

@@ -11,7 +11,7 @@
 #include <ipc/distance/edge_edge.hpp>
 #include "collision.h"
 #include "ipc_extension.h"
-#define CUDA_ENABLED
+//#define CUDA_ENABLED
 using namespace Eigen;
 using namespace std;
 
