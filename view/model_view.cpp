@@ -28,10 +28,10 @@ void render_cubes(Shader shader, vector<unique_ptr<AffineBody>> &cubes)
     for (int i = 0; i < cubes.size(); i++)
     {
         auto& c {*cubes[i]};
-        // glm::mat4 A(from_eigen(c.A));
-        glm::mat4 A = glm::mat4(1.0f);
-        // for (int i = 0; i < 3; i++)
-        //     A[3][i] = c.p(i);
+        glm::mat4 A(from_eigen(c.A));
+        // glm::mat4 A = glm::mat4(1.0f);
+        for (int i = 0; i < 3; i++)
+            A[3][i] = c.p(i);
         shader.setMat4("model", A);
         c.draw(shader);
     }

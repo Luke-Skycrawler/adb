@@ -132,9 +132,10 @@ void ABD::implicit_euler(scalar dt) {
             c.dqdt[i] = (c.q[i] - c.q0[i]) / dt;
             c.q0[i] = c.q[i];
         }
-        c.p = c.q0[0];
-        c.A << c.q0[1], c.q0[2], c.q0[3];
-        c.project_vt1();
+        // c.p = c.q0[0];
+        // c.A << c.q0[1], c.q0[2], c.q0[3];
+        // c.project_vt1();
+        c.predraw();
     }
 }
 

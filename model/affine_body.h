@@ -15,6 +15,8 @@ struct AffineBody {
     std::vector<int> indices, edges;
     virtual const vec3 vertices(int i) const = 0;
     virtual void draw(Shader& shader) const = 0;
+    virtual void predraw() = 0;
+    
     std::vector<vec3> v_transformed;
     int n_edges, n_vertices, n_faces;
     vec12 dq, grad;

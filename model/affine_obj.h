@@ -21,4 +21,5 @@ struct AffineObject: AffineBody {
     void set_vertices() const;
     // mesh.vertices <- v_transformed 
     void draw(Shader &shader) const;
+    void predraw();
 };

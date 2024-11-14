@@ -2,6 +2,8 @@
     
     {
         "obj": "assets/bug.off",
+        "npy": "assets/bug/Q.npy",
+        "lambda": "assets/bug/lambdas.npy",
         "omega": [0.0, 0.0, 0.0], 
         "p": [2.1, 1.0, 0.1],
         "p_dot": [0.0, 0.0, 0.0],

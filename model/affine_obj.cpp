@@ -41,3 +41,8 @@ void AffineObject::draw(Shader& shader) const
     mesh.setupMesh();
     mesh.Draw(shader);
 }
+void AffineObject::predraw() {
+    p = vec3::Zero();
+    A = mat3::Identity();
+    project_vt1(); 
+}
