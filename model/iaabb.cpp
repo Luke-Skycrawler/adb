@@ -568,4 +568,4 @@ scalar IAABB::iaabb_brute_force(
 }
 
 IAABB::IAABB(std::vector<std::unique_ptr<AffineBody>>& cubes, bool ground)
-    : points(utils::gen_point_list(cubes, cubes.size())), edges(utils::gen_edge_list(cubes, cubes.size())), triangles(utils::gen_triangle_list(cubes, cubes.size())), n_points(points.size()), n_triangles(triangles.size()), n_edges(edges.size()), ground(ground), vidx_thread_local(omp_get_max_threads()) {}
+    : points(utils::gen_point_list(cubes, cubes.size())), edges(utils::gen_edge_list(cubes, cubes.size())), triangles(utils::gen_triangle_list(cubes, cubes.size())), n_points(points.size()), n_triangles(triangles.size()), n_edges(edges.size()), ground(ground), vidx_thread_local(omp_get_max_threads()), cuda_toi_handlers(omp_get_max_threads()) {}

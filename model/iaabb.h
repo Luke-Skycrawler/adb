@@ -4,6 +4,7 @@
 #include "bvh/bvh.h"
 #include "bounds3.h"
 #include <omp.h>
+#include "cuda/thread_local_toi.cuh"
 // using lu = std::array<vec3, 2>;
 
 struct PList {
@@ -41,6 +42,7 @@ struct IAABB {
     std::vector<int> buckets;
     std::vector<PList> lists;
     std::vector<std::vector<std::array<int, 2>>> vidx_thread_local;
+    std::vector<cuda::ThreadLocalToI> cuda_toi_handlers;
     std::vector<vec3> vt1_buffer;
     std::vector<int> vertex_starting_index;
 
@@ -83,4 +85,16 @@ struct IAABB {
         std::vector<q4>& ees,
         std::vector<i4>& eidx,
         std::vector<std::array<int, 2>>& vidx);
+
+private:
+    scalar ee_col_time(
+        std::vector<int>& eilist, std::vector<int>& ejlist,
+        const std::vector<std::unique_ptr<AffineBody>>& cubes,
+        int I, int J,
+        std::vector<int>& vertex_starting_index, std::vector<vec3>& vt1_buffer);
+    scalar vf_col_time(
+        std::vector<int>& vilist, std::vector<int>& fjlist,
+        const std::vector<std::unique_ptr<AffineBody>>& cubes,
+        int I, int J,
+        std::vector<int>& vertex_starting_index, std::vector<vec3>& vt1_buffer);
 };

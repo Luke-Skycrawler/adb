@@ -2,6 +2,7 @@
 #include <array>
 #include <vector>
 #include "iaabb.h"
+
 void pt_col_set_task(
     int vi, int fj, int I, int J,
     // const AffineBody& ci, const AffineBody& cj,
@@ -17,16 +18,16 @@ inline void ee_col_set_task(
     std::vector<i4>& eidx);
 
     
-scalar ee_col_time(
-    std::vector<int>& eilist, std::vector<int>& ejlist,
-    const std::vector<std::unique_ptr<AffineBody>>& cubes,
-    int I, int J, 
-    std::vector<int>& vertex_starting_index, std::vector<vec3>& vt1_buffer);
-scalar vf_col_time(
-    std::vector<int>& vilist, std::vector<int>& fjlist,
-    const std::vector<std::unique_ptr<AffineBody>>& cubes,
-    int I, int J, 
-    std::vector<int> &vertex_starting_index, std::vector<vec3> &vt1_buffer);
+// scalar ee_col_time(
+//     std::vector<int>& eilist, std::vector<int>& ejlist,
+//     const std::vector<std::unique_ptr<AffineBody>>& cubes,
+//     int I, int J, 
+//     std::vector<int>& vertex_starting_index, std::vector<vec3>& vt1_buffer);
+// scalar vf_col_time(
+//     std::vector<int>& vilist, std::vector<int>& fjlist,
+//     const std::vector<std::unique_ptr<AffineBody>>& cubes,
+//     int I, int J, 
+//     std::vector<int> &vertex_starting_index, std::vector<vec3> &vt1_buffer);
 
 void vf_col_set(
     std::vector<int>& vilist, std::vector<int>& fjlist,

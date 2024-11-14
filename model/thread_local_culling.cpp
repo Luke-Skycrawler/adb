@@ -11,7 +11,7 @@
 #include <ipc/distance/edge_edge.hpp>
 #include "collision.h"
 #include "ipc_extension.h"
-//#define CUDA_ENABLED
+#define CUDA_ENABLED
 using namespace Eigen;
 using namespace std;
 
@@ -25,7 +25,7 @@ scalar cuda_pt_list_toi(vector<int> vilist, vector<int> fjlist, vector<lu> viaab
 }
 
 };
-scalar ee_col_time(
+scalar IAABB::ee_col_time(
     vector<int>& eilist, vector<int>& ejlist,
     const std::vector<std::unique_ptr<AffineBody>>& cubes,
     int I, int J, vector<int>& vertex_starting_index, vector<vec3>& vt1_buffer)
@@ -114,7 +114,7 @@ scalar ee_col_time(
         }
     return toi;
 }
-scalar vf_col_time(
+scalar IAABB::vf_col_time(
     vector<int>& vilist, vector<int>& fjlist,
     const std::vector<std::unique_ptr<AffineBody>>& cubes,
     int I, int J, vector<int> &vertex_starting_index, vector<vec3> &vt1_buffer){
@@ -162,7 +162,9 @@ scalar vf_col_time(
 
     int nvi = vilist.size(), nfj = fjlist.size();   
     #ifdef CUDA_ENABLED 
-    toi = cuda::cuda_pt_list_toi(vilist, fjlist, viaabbs, fjaabbs, v0s, v1s, f0s, f1s);
+    // toi = cuda::cuda_pt_list_toi(vilist, fjlist, viaabbs, fjaabbs, v0s, v1s, f0s, f1s);
+    int tid = omp_get_thread_num();
+    toi = cuda_toi_handlers[tid].pt_list_toi(nvi, nfj, vilist.data(), fjlist.data(), viaabbs.data(), fjaabbs.data(), v0s.data(), v1s.data(), f0s.data(), f1s.data());
     #else
     if (nvi > globals.params_int["thres"] || nfj > globals.params_int["thres"]) {
         auto &EIs{nvi > nfj? viaabbs: fjaabbs}, &EJs{nvi > nfj? fjaabbs: viaabbs};

@@ -37,6 +37,7 @@ set(CUDA_SOURCE
     model/cuda/ccd.cu
     model/cuda/dist.cu
     model/cuda/cubic_roots.cu
+    model/cuda/thread_local_toi.cuh
 )
 set(HEADERS 
     cyCodeBase/cyCore.h
