@@ -7,9 +7,24 @@
 #include <nlohmann/json.hpp>
 #include <fstream>
 #include <iostream>
+#include "cnpy.h"
 using namespace std;
 using json = nlohmann::json;
 
+Eigen::Matrix<scalar, -1, -1> load(const string& npy){
+    auto phi = cnpy::npy_load(npy);
+    int nc = phi.shape[1], nr = phi.shape[0];
+
+    if (phi.word_size == sizeof(float)) {
+        Eigen::Map<Eigen::Matrix<float, -1, -1, Eigen::RowMajor>> Phi{phi.data<float>(), nr, nc};
+        return Phi.cast<scalar>();
+    }
+    else {
+        Eigen::Map<Eigen::Matrix<double, -1, -1, Eigen::RowMajor>> Phi{phi.data<double>(), nr, nc};
+        return Phi.cast<scalar>();
+    }
+    
+}
 
 static const vec3 omega(0.0, 0.0, 20.0);
 unique_ptr<Cube> spinning_cube()
@@ -56,6 +71,18 @@ void customize(string file)
             }
             auto& mesh{ globals.loaded_models[objfile]->meshes[0] };
             _a = make_unique<AffineObject>(mesh);
+
+            if(it.find("npy") != it.end()) {
+                assert(it.find("lambda") != it.end());
+                auto npy = it["npy"];
+                auto lam_npy = it["lambda"];
+                _a -> Phi = load(npy);
+                _a -> lam = load(lam_npy);
+                assert(_a -> lam.rows() == _a -> Phi.cols());
+                // filter out interior vertices (the npy Phi correspond to a mesh, with surface vertices are at the front)
+                _a -> Phi.conservativeResize(_a -> n_vertices, NoChange);
+            }
+            
         }
         else
             _a = make_unique<Cube>();

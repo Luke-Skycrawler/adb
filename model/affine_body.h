@@ -21,6 +21,14 @@ struct AffineBody {
     mat12 hess;
     q4 q, q0, dqdt;
     vec12 q_tile(scalar dt, const vec3 &f) const;
+
+    Eigen::Vector<scalar, -1> qq, qq0, dqqdt, qqgrad, qq_hess_diag, lam;
+    Eigen::Matrix<scalar, -1, -1> Phi;
+
+    mat3 R, R0;  // should be updated each time q changes
+    void compute_R();
+    void compute_R0();
+
     inline vec3 vt0(int i) const {
         mat3 a;
         vec3 b = q0[0];
@@ -81,7 +89,7 @@ struct AffineBody {
     Face face(int triangle_id, bool use_line_search_increment = false, bool batch = false) const;
     Edge edge(int eid, bool use_line_search_increment = false, bool batch = false) const;
     AffineBody(int n_vertices, int n_faces, int n_edges, std::vector<int> indices = {}, std::vector<int> edges = {})
-        : mass(1000.0), Ic(1000.0), p(0.0f, 0.0f, 0.0f), indices(indices), edges(edges), n_vertices(n_vertices), n_edges(n_edges), n_faces(n_faces)
+        : mass(1000.0), Ic(1000.0), p(0.0f, 0.0f, 0.0f), indices(indices), edges(edges), n_vertices(n_vertices), n_edges(n_edges), n_faces(n_faces), qq(0), qq0(0), dqqdt(0), qqgrad(0), qq_hess_diag(0), lam(0), Phi(0, 0)
     {
         v_transformed.resize(n_vertices);
         A.setIdentity(3, 3);
