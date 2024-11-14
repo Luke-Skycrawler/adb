@@ -1,13 +1,13 @@
 {
     "player": false,
     "starting_ts": -1,
-    "ending_ts": 500,
+    "ending_ts": 5000,
     "dt": 1e-2,
     "max_iter": 1000,
     "predefined_case" : {
         "enable": false,
         "id" : 2,
-        "custom": "../test_cases/chains.json"
+        "custom": "../test_cases/bug.json"
     },
     "solver": "sparse",
     "gravity": true, 
@@ -15,7 +15,7 @@
     "col_set": true,
     "ee": true,
     "pt": true,
-    "ground": false,
+    "ground": true,
     "safe_factor": 1.0,
     "uppper_bound": true, 
     "mu": 0.0,
@@ -59,7 +59,9 @@
         "kappa": 1e-1,
         "c1": 1e-4,
         "max_uk": 0.0,
-        "dq_tol": 0.0
+        "dq_tol": 0.0,
+        "vib_kappa": 1.0,
+        "thres_print": 5e-3
     },
     "params_int": {
         "clip": 0,

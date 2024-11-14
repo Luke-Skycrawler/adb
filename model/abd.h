@@ -8,6 +8,7 @@
 
 struct ABD {
     std::vector<std::unique_ptr<AffineBody>>& cubes;
+    void vibrate(scalar dt);
     void implicit_euler(scalar dt);
     GlobalVariableMainCPP& globals;
     ABD(std::vector<std::unique_ptr<AffineBody>>& cubes, GlobalVariableMainCPP& globals)

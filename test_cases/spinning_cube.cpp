@@ -79,8 +79,20 @@ void customize(string file)
                 _a -> Phi = load(npy);
                 _a -> lam = load(lam_npy);
                 assert(_a -> lam.rows() == _a -> Phi.cols());
+                int n_modes = _a -> lam.rows();
                 // filter out interior vertices (the npy Phi correspond to a mesh, with surface vertices are at the front)
                 _a -> Phi.conservativeResize(_a -> n_vertices, NoChange);
+                _a -> qq.resize(n_modes);
+                _a -> qq0.resize(n_modes);
+                _a -> dqqdt.resize(n_modes);
+                _a -> qqgrad.resize(n_modes);
+                _a -> excitement.resize(n_modes);
+
+                _a -> qq.setZero();
+                _a -> qq0.setZero();
+                _a -> dqqdt.setZero();
+                _a -> qqgrad.setZero();
+                _a -> excitement.setZero();
             }
             
         }

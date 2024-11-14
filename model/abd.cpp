@@ -5,14 +5,11 @@
 #include "spdlog/spdlog.h"
 #include "collision.h"
 #include "ipc.h"
-#include "settings.h"
 #include <assert.h>
 #include <array>
 #include "geometry.h"
 #include "timer.h"
 #include "ipc_extension.h"
-// #include <ipc/distance/point_triangle.hpp>
-// #include <ipc/distance/edge_edge.hpp>
 #include <ipc/friction/closest_point.hpp>
 #include <ipc/friction/tangent_basis.hpp>
 #ifdef EIGEN_USE_MKL_ALL
@@ -26,6 +23,37 @@ using namespace std;
 using namespace Eigen;
 using namespace barrier;
 using namespace utils;
+
+mat3 RQ(const mat3 &a) {
+    Eigen::HouseholderQR<mat3> qr(a.transpose()); // Decompose A^T
+
+    mat3 R = qr.matrixQR().triangularView<Eigen::Upper>().transpose(); // Extract R and transpose back
+    Eigen::MatrixXd Q = qr.householderQ().transpose(); // Extract Q and transpose back
+
+    // std::cout << "Original Matrix A:\n"
+    //         << a << "\n";
+    // std::cout << "R (on the left):\n"
+    //         << R << "\n";
+    // std::cout << "Q:\n"
+    //         << Q << "\n";
+
+    // // Verify decomposition A = Q * R
+    // std::cout << "A - R * Q:\n"
+    //         << a - R * Q << "\n";
+    return R;
+}
+void AffineBody::compute_R()
+{
+    mat3 a;
+    a << q[1], q[2], q[3];
+    R = RQ(a);
+}
+void AffineBody::compute_R0()
+{
+    mat3 a;
+    a << q0[1], q0[2], q0[3];
+    R0 = RQ(a);
+}
 
 void ABD::implicit_euler(scalar dt) {
     times.setZero(4);
@@ -402,4 +430,54 @@ void ABD::ipc()
     }
     auto ipc_duration = DURATION_TO_DOUBLE(ipc_start);
     times[__IPC__] += ipc_duration;
+}
+
+void ABD::vibrate(scalar dt) {
+    //static const scalar kappa = 1e-3;
+    scalar vib_kappa = globals.params_double["vib_kappa"];
+    scalar thres_print = globals.params_double["thres_print"];
+    // compute excitement
+    for (int i = 0; i < n_g; i++) {
+        int bid = vidx[i][0], pid = vidx[i][1];
+        auto &c{ *cubes[bid] };
+        vec3 p = c.v_transformed[pid];
+
+        vec3 F = vec3(0.0, 0.0, 1.0) * g_contact_forces[i];
+        int n_modes = c.Phi.cols();
+        for (int j = 0; j < n_modes; j ++) {
+
+            c.excitement[j] = F.dot( c.displacement(pid, j)) * vib_kappa;
+        }
+    }
+
+
+    for (int i = 0; i < n_cubes; i++){
+        auto &c{ *cubes[i] };
+        int n_modes = c.Phi.cols();
+        for (int j = 0; j < n_modes; j++) {
+            scalar lj = c.lam[j];
+            scalar divd = dt * dt * lj + 1.0;
+            scalar a = 1.0 / divd;
+            scalar b = dt / divd;
+            scalar cc = 0.5 * dt * dt / divd;
+
+            c.qq[j] = a * c.qq0[j] + b * c.dqqdt[j] + cc * c.excitement[j];
+            if (c.qq[j] > thres_print) {
+                spdlog::error("qq[{}] = {}, excitement = {}", j, c.qq[j], c.excitement[j]);
+            }
+
+            c.dqqdt[j] = (c.qq[j] - c.qq0[j]) / dt;
+            c.qq0[j] = c.qq[j];
+        }
+        c.project_vib();
+    }
+}
+
+vec3 AffineBody::displacement(int i, int j) {
+    // displacement of vertex i in mode j
+    compute_R();
+    auto &Phij {Phi.col(j)};
+    vec3 phi(Phij[i * 3], Phij[i * 3 + 1], Phij[i * 3 + 2]);
+    phi = R * phi;
+    return phi;
 }

@@ -24,7 +24,9 @@ struct AffineBody {
     q4 q, q0, dqdt;
     vec12 q_tile(scalar dt, const vec3 &f) const;
 
-    Eigen::Vector<scalar, -1> qq, qq0, dqqdt, qqgrad, qq_hess_diag, lam;
+    Eigen::Vector<scalar, -1> qq, qq0, dqqdt, qqgrad, qq_hess_diag, excitement, lam;
+    vec3 displacement(int i, int j);
+
     Eigen::Matrix<scalar, -1, -1> Phi;
 
     mat3 R, R0;  // should be updated each time q changes
@@ -88,6 +90,19 @@ struct AffineBody {
         }
     }
 
+    inline void project_vib() {
+        mat3 a;
+        vec3  b = q[0];
+        a << q[1], q[2], q[3];
+        compute_R();
+        for (int i = 0;  i < n_vertices; i++) {
+            int n_modes = Phi.cols();
+            v_transformed[i] = a * vertices(i) + b;
+            for (int j = 0; j < n_modes; j++) {
+                v_transformed[i] += R * Phi.block<3, 1>(3 * i, j) * qq[j];
+            }
+        }
+    }
     Face face(int triangle_id, bool use_line_search_increment = false, bool batch = false) const;
     Edge edge(int eid, bool use_line_search_increment = false, bool batch = false) const;
     AffineBody(int n_vertices, int n_faces, int n_edges, std::vector<int> indices = {}, std::vector<int> edges = {})

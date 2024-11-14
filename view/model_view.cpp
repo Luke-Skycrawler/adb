@@ -284,6 +284,8 @@ int main()
         if (!globals.player) {
             for (int i = 0; i < 1; i++)
                 abd.implicit_euler(globals.dt);
+
+            abd.vibrate(globals.dt);
             player_save(trace_folder, globals.ts, globals.cubes, init);
             if (globals.ending_ts > 0 && globals.ts >= globals.ending_ts) 
                 exit_callback(window);
