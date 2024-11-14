@@ -160,25 +160,30 @@ scalar IAABB::vf_col_time(
         fjaabbs.push_back(compute_aabb(f0, f));
     }
 
-    int nvi = vilist.size(), nfj = fjlist.size();   
-    #ifdef CUDA_ENABLED 
-    // toi = cuda::cuda_pt_list_toi(vilist, fjlist, viaabbs, fjaabbs, v0s, v1s, f0s, f1s);
-    int tid = omp_get_thread_num();
-    toi = cuda_toi_handlers[tid].pt_list_toi(nvi, nfj, vilist.data(), fjlist.data(), viaabbs.data(), fjaabbs.data(), v0s.data(), v1s.data(), f0s.data(), f1s.data());
-    #else
-    if (nvi > globals.params_int["thres"] || nfj > globals.params_int["thres"]) {
-        auto &EIs{nvi > nfj? viaabbs: fjaabbs}, &EJs{nvi > nfj? fjaabbs: viaabbs};
+    int nvi = vilist.size(), nfj = fjlist.size();
+    if((nvi > globals.params_int["thres"]) || (nfj > globals.params_int["thres"])) {
+
+#ifdef CUDA_ENABLED
+        // toi = cuda::cuda_pt_list_toi(vilist, fjlist, viaabbs, fjaabbs, v0s, v1s, f0s, f1s);
+        int tid = omp_get_thread_num();
+        toi = cuda_toi_handlers[tid].pt_list_toi(nvi, nfj, vilist.data(), fjlist.data(), viaabbs.data(), fjaabbs.data(), v0s.data(), v1s.data(), f0s.data(), f1s.data());
+#else
+        auto &EIs{ nvi > nfj ? viaabbs : fjaabbs }, &EJs{ nvi > nfj ? fjaabbs : viaabbs };
         auto bvh = bvh_create(EIs.data(), EIs.size());
-        for (int J = 0; J < EJs.size(); J ++){
+        for(int J = 0; J < EJs.size(); J++) {
             int I;
-            auto &aabbj {EJs[J]};
+            auto& aabbj{ EJs[J] };
             auto query = bvh_query_aabb(uint64_t(&bvh), aabbj.lower, aabbj.upper);
-            while (bvh_query_next(query, I)){
+            while(bvh_query_next(query, I)) {
                 int i, j;
-                if (nvi > nfj) 
-                    {i = I; j = J;}
-                else 
-                    {i = J; j = I;}
+                if(nvi > nfj) {
+                    i = I;
+                    j = J;
+                }
+                else {
+                    i = J;
+                    j = I;
+                }
 
                 auto &v0{ v0s[i] }, &v{ v1s[i] };
                 auto &f0{ f0s[j] }, &f{ f1s[j] };
@@ -187,24 +192,27 @@ scalar IAABB::vf_col_time(
             }
         }
         bvh_destroy_host(bvh);
-    } else
-    for (int i = 0; i < vilist.size(); i++)
-        for (int j = 0; j < fjlist.size(); j++) {
-            int vi = vilist[i], fj = fjlist[j];
-            if (intersects(viaabbs[i], fjaabbs[j])) {
-                auto &v0{ v0s[i] }, &v{ v1s[i] };
-                auto &f0{ f0s[j] }, &f{ f1s[j] };
-                scalar t = pt_collision_time(v0, f0, v, f);
-#ifdef TESTING
-                if (t < 1.0) {
-                    idx.push_back({ I, vi, J, fj });
-                    pt_tois.push_back({ t, int(pt_tois.size()) });
-                }
 #endif
-                toi = min(toi, t);
+    }
+    else {
+
+        for(int i = 0; i < vilist.size(); i++)
+            for(int j = 0; j < fjlist.size(); j++) {
+                int vi = vilist[i], fj = fjlist[j];
+                if(intersects(viaabbs[i], fjaabbs[j])) {
+                    auto &v0{ v0s[i] }, &v{ v1s[i] };
+                    auto &f0{ f0s[j] }, &f{ f1s[j] };
+                    scalar t = pt_collision_time(v0, f0, v, f);
+#ifdef TESTING
+                    if(t < 1.0) {
+                        idx.push_back({ I, vi, J, fj });
+                        pt_tois.push_back({ t, int(pt_tois.size()) });
+                    }
+#endif
+                    toi = min(toi, t);
+                }
             }
-        }
-    #endif
+    }
     return toi;
 }
 

@@ -341,6 +341,7 @@ scalar cuda_pt_list_toi(int nvi, int nfj, int* vilist, int* fjlist, lu* viaabbs,
 
 ThreadLocalToI::ThreadLocalToI(int nx, int ny)
 {
+    cudaStreamCreate(&stream);
     cudaMalloc(&dev_vilist, sizeof(int) * nx);
     cudaMalloc(&dev_fjlist, sizeof(int) * ny);
     cudaMalloc(&dev_viaabbs, sizeof(lu) * nx);
@@ -365,16 +366,16 @@ ThreadLocalToI::~ThreadLocalToI()
     cudaFree(toi);
 }
 scalar ThreadLocalToI::pt_list_toi(int nvi, int nfj, int* vilist, int* fjlist, lu* viaabbs, lu* fjaabbs, vec3* v0s, vec3* v1s, Face* f0s, Face* f1s) {
-    cudaMemcpy(dev_vilist, vilist, sizeof(int) * nvi, cudaMemcpyHostToDevice);
-    cudaMemcpy(dev_fjlist, fjlist, sizeof(int) * nfj, cudaMemcpyHostToDevice);
-    cudaMemcpy(dev_viaabbs, viaabbs, sizeof(lu) * nvi, cudaMemcpyHostToDevice);
-    cudaMemcpy(dev_fjaabbs, fjaabbs, sizeof(lu) * nfj, cudaMemcpyHostToDevice);
-    cudaMemcpy(dev_v0s, v0s, sizeof(vec3) * nvi, cudaMemcpyHostToDevice);
-    cudaMemcpy(dev_v1s, v1s, sizeof(vec3) * nvi, cudaMemcpyHostToDevice);
-    cudaMemcpy(dev_f0s, f0s, sizeof(Face) * nfj, cudaMemcpyHostToDevice);
-    cudaMemcpy(dev_f1s, f1s, sizeof(Face) * nfj, cudaMemcpyHostToDevice);
+    cudaMemcpyAsync(dev_vilist, vilist, sizeof(int) * nvi, cudaMemcpyHostToDevice, stream);
+    cudaMemcpyAsync(dev_fjlist, fjlist, sizeof(int) * nfj, cudaMemcpyHostToDevice, stream);
+    cudaMemcpyAsync(dev_viaabbs, viaabbs, sizeof(lu) * nvi, cudaMemcpyHostToDevice, stream);
+    cudaMemcpyAsync(dev_fjaabbs, fjaabbs, sizeof(lu) * nfj, cudaMemcpyHostToDevice, stream);
+    cudaMemcpyAsync(dev_v0s, v0s, sizeof(vec3) * nvi, cudaMemcpyHostToDevice, stream);
+    cudaMemcpyAsync(dev_v1s, v1s, sizeof(vec3) * nvi, cudaMemcpyHostToDevice, stream);
+    cudaMemcpyAsync(dev_f0s, f0s, sizeof(Face) * nfj, cudaMemcpyHostToDevice, stream);
+    cudaMemcpyAsync(dev_f1s, f1s, sizeof(Face) * nfj, cudaMemcpyHostToDevice, stream);
     scalar ret = 1.0;
-    cudaMemcpy(toi, &ret, sizeof(scalar), cudaMemcpyHostToDevice);
+    cudaMemcpyAsync(toi, &ret, sizeof(scalar), cudaMemcpyHostToDevice, stream);
     int gx, gy, bx, by;
     if(nvi > 32) {
         gx = (nvi + 31) / 32;
@@ -393,8 +394,8 @@ scalar ThreadLocalToI::pt_list_toi(int nvi, int nfj, int* vilist, int* fjlist, l
         by = nfj;
     }
     dim3 grid_dim(gx, gy), block_dim(bx, by);
-    ccd_toi<<<grid_dim, block_dim>>>(nvi, nfj, dev_vilist, dev_fjlist, dev_viaabbs, dev_fjaabbs, dev_v0s, dev_v1s, dev_f0s, dev_f1s, toi);
-    cudaMemcpy(&ret, toi, sizeof(scalar), cudaMemcpyDeviceToHost);
+    ccd_toi<<<grid_dim, block_dim, 0, stream>>>(nvi, nfj, dev_vilist, dev_fjlist, dev_viaabbs, dev_fjaabbs, dev_v0s, dev_v1s, dev_f0s, dev_f1s, toi);
+    cudaMemcpyAsync(&ret, toi, sizeof(scalar), cudaMemcpyDeviceToHost, stream);
     return ret;
 }
 };

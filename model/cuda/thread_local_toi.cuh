@@ -15,5 +15,6 @@ namespace cuda{
         ~ThreadLocalToI();
 
         scalar pt_list_toi(int nvi, int nfj, int* vilist, int* fjlist, lu* viaabbs, lu* fjaabbs, vec3* v0s, vec3* v1s, Face* f0s, Face* f1s);
+        cudaStream_t stream;
     };
 };
