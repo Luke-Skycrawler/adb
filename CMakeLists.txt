@@ -2,19 +2,36 @@ cmake_minimum_required(VERSION 3.12)
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 project(abd)
-enable_language(CUDA)
+option(ENABLE_CUDA "Enable CUDA" OFF)
+option(ENABLE_MKL "Enable MKL" ON)
+set(CUDA_SOURCE "")
+if (ENABLE_CUDA)
+    enable_language(CUDA)
+    set(CUDA_SOURCE 
+        model/cuda/common.cuh
+        model/cuda/soup.cu
+        model/cuda/ipc.cu
+        model/cuda/ccd.cu
+        model/cuda/dist.cu
+        model/cuda/cubic_roots.cu
+    )
+    add_definitions(-DCUDA_ENABLED)
+endif()
 # set(IPC_TOOLKIT_BUILD_PYTHON ON)
 find_package(glad CONFIG REQUIRED)
 find_package(glm CONFIG REQUIRED)
 find_package(glfw3 CONFIG REQUIRED)
 find_package(assimp CONFIG REQUIRED)
 find_package (Eigen3 CONFIG REQUIRED)
-set(MKL_INTERFACE lp64)
-find_package(MKL CONFIG REQUIRED)
 find_package(OpenMP)
-if (MKL_FOUND)
-    message("MKL")
-    message("${MKL_INCLUDE}")
+if (ENABLE_MKL)
+    set(MKL_INTERFACE lp64)
+    find_package(MKL CONFIG REQUIRED)
+    if (MKL_FOUND)
+        message("MKL")
+        message("${MKL_INCLUDE}")
+        add_definitions(-DEIGEN_USE_MKL_ALL)
+    endif()
 endif()
 # find_package(spdlog CONFIG REQUIRED)
 find_package(nlohmann_json CONFIG REQUIRED)
@@ -30,14 +47,6 @@ FetchContent_Declare(
 FetchContent_GetProperties(ipc_toolkit)
 FetchContent_MakeAvailable(ipc_toolkit)
 
-set(CUDA_SOURCE 
-    model/cuda/common.cuh
-    model/cuda/soup.cu
-    model/cuda/ipc.cu
-    model/cuda/ccd.cu
-    model/cuda/dist.cu
-    model/cuda/cubic_roots.cu
-)
 set(HEADERS 
     cyCodeBase/cyCore.h
     cyCodeBase/cyPolynomial.h
@@ -161,25 +170,31 @@ target_include_directories(abdtk PRIVATE
 )
 
 # Now, link the ipc_toolkit to your target (replace 'your_target' with your actual target)
-target_compile_options(abd PUBLIC $<TARGET_PROPERTY:MKL::MKL,INTERFACE_COMPILE_OPTIONS>)
-target_include_directories(abd PRIVATE 
-    ${ipc_toolkit_SOURCE_DIR}/src 
-    ${MKL_INCLUDE})
 
-target_link_libraries(abd PRIVATE ipc::toolkit glfw assimp::assimp glad::glad glm::glm Eigen3::Eigen nlohmann_json::nlohmann_json $<LINK_ONLY:MKL::MKL> cnpy)
+target_include_directories(abd PRIVATE 
+${ipc_toolkit_SOURCE_DIR}/src)
+target_link_libraries(abd PRIVATE ipc::toolkit glfw assimp::assimp glad::glad glm::glm Eigen3::Eigen nlohmann_json::nlohmann_json cnpy)
+target_link_libraries(abdtk PRIVATE ipc::toolkit Eigen3::Eigen)
+
+if (ENABLE_MKL AND MKL_FOUND)
+    target_compile_options(abd PUBLIC $<TARGET_PROPERTY:MKL::MKL,INTERFACE_COMPILE_OPTIONS>)
+    target_include_directories(abd PRIVATE ${MKL_INCLUDE})
+    target_link_libraries(abd PRIVATE $<LINK_ONLY:MKL::MKL> cnpy)
+    target_link_libraries(abdtk $<LINK_ONLY:MKL::MKL>)
+endif()
 if(OpenMP_CXX_FOUND)
     target_link_libraries(abd PRIVATE OpenMP::OpenMP_CXX)
     target_link_libraries(abdtk PRIVATE OpenMP::OpenMP_CXX)
 endif()
-target_link_libraries(abdtk PRIVATE ipc::toolkit Eigen3::Eigen $<LINK_ONLY:MKL::MKL>)
 
-set(OUTPUT_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/view)
-if(MSVC) 
-    set_property(TARGET abd PROPERTY VS_DEBUGGER_WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}/view)
-
-    set_property(TARGET abd PROPERTY CUDA_SEPARABLE_COMPILATION ON)
-    set_property(TARGET abd PROPERTY CUDA_ARCHITECTURES 86)
-endif()
+# set(OUTPUT_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/view)
+# if(MSVC) 
+#     set_property(TARGET abd PROPERTY VS_DEBUGGER_WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}/view)
+#     if (ENABLED_CUDA)
+#     set_property(TARGET abd PROPERTY CUDA_SEPARABLE_COMPILATION ON)
+#     set_property(TARGET abd PROPERTY CUDA_ARCHITECTURES 86)
+#     endif()
+# endif()
 
 add_custom_target(copy_exe ALL
     COMMAND ${CMAKE_COMMAND} -E copy $<TARGET_FILE:abd> ${OUTPUT_DIRECTORY}

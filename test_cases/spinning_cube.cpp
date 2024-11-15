@@ -14,14 +14,25 @@ using json = nlohmann::json;
 Eigen::Matrix<scalar, -1, -1> load(const string& npy){
     auto phi = cnpy::npy_load(npy);
     int nc = phi.shape[1], nr = phi.shape[0];
+    if (phi.fortran_order) {
 
-    if (phi.word_size == sizeof(float)) {
-        Eigen::Map<Eigen::Matrix<float, -1, -1, Eigen::RowMajor>> Phi{phi.data<float>(), nr, nc};
-        return Phi.cast<scalar>();
-    }
-    else {
-        Eigen::Map<Eigen::Matrix<double, -1, -1, Eigen::RowMajor>> Phi{phi.data<double>(), nr, nc};
-        return Phi.cast<scalar>();
+        if (phi.word_size == sizeof(float)) {
+            Eigen::Map<Eigen::Matrix<float, -1, -1, Eigen::ColMajor>> Phi{phi.data<float>(), nr, nc};
+            return Phi.cast<scalar>();
+        }
+        else {
+            Eigen::Map<Eigen::Matrix<double, -1, -1, Eigen::ColMajor>> Phi{phi.data<double>(), nr, nc};
+            return Phi.cast<scalar>();
+        }
+    } else {
+        if (phi.word_size == sizeof(float)) {
+            Eigen::Map<Eigen::Matrix<float, -1, -1, Eigen::RowMajor>> Phi{phi.data<float>(), nr, nc};
+            return Phi.cast<scalar>();
+        }
+        else {
+            Eigen::Map<Eigen::Matrix<double, -1, -1, Eigen::RowMajor>> Phi{phi.data<double>(), nr, nc};
+            return Phi.cast<scalar>();
+        }
     }
     
 }
@@ -59,6 +70,7 @@ void customize(string file)
     std::fstream f(file);
     json data = json::parse(f);
     globals.cubes.clear();
+    globals.loaded_models.clear();
     for (auto &it: data) {
         bool isobj = it.find("obj") != it.end();
         string objfile = isobj ? it["obj"] : "";
@@ -76,23 +88,27 @@ void customize(string file)
                 assert(it.find("lambda") != it.end());
                 auto npy = it["npy"];
                 auto lam_npy = it["lambda"];
-                _a -> Phi = load(npy);
-                _a -> lam = load(lam_npy);
+                _a -> Phi = load(npy) / 10.0;
+                _a -> lam = load(lam_npy).diagonal();
                 assert(_a -> lam.rows() == _a -> Phi.cols());
                 int n_modes = _a -> lam.rows();
                 // filter out interior vertices (the npy Phi correspond to a mesh, with surface vertices are at the front)
-                _a -> Phi.conservativeResize(_a -> n_vertices, NoChange);
+                _a -> Phi.conservativeResize(_a -> n_vertices * 3, NoChange);
                 _a -> qq.resize(n_modes);
                 _a -> qq0.resize(n_modes);
                 _a -> dqqdt.resize(n_modes);
                 _a -> qqgrad.resize(n_modes);
                 _a -> excitement.resize(n_modes);
+                _a -> qqmax.resize(n_modes);
+                _a -> emax.resize(n_modes);
 
                 _a -> qq.setZero();
                 _a -> qq0.setZero();
                 _a -> dqqdt.setZero();
                 _a -> qqgrad.setZero();
                 _a -> excitement.setZero();
+                _a -> qqmax.setZero();
+                _a -> emax.setZero();
             }
             
         }

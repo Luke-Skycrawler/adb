@@ -14,6 +14,8 @@
 #include <ipc/friction/tangent_basis.hpp>
 #ifdef EIGEN_USE_MKL_ALL
 #include <Eigen/PardisoSupport>
+#else
+#include <Eigen/Sparse>
 #endif
 #include <ipc/distance/edge_edge_mollifier.hpp>
 
@@ -436,8 +438,10 @@ void ABD::vibrate(scalar dt) {
     //static const scalar kappa = 1e-3;
     scalar vib_kappa = globals.params_double["vib_kappa"];
     scalar thres_print = globals.params_double["thres_print"];
+
+    static const scalar alp = 6, beta = 1e-7;
     // compute excitement
-    for (int i = 0; i < n_g; i++) {
+    for(int i = 3; i < n_g; i++) {
         int bid = vidx[i][0], pid = vidx[i][1];
         auto &c{ *cubes[bid] };
         vec3 p = c.v_transformed[pid];
@@ -450,11 +454,10 @@ void ABD::vibrate(scalar dt) {
         }
     }
 
-
     for (int i = 0; i < n_cubes; i++){
         auto &c{ *cubes[i] };
         int n_modes = c.Phi.cols();
-        for (int j = 0; j < n_modes; j++) {
+        for(int j = 3; j < n_modes; j++) {
             scalar lj = c.lam[j];
             scalar divd = dt * dt * lj + 1.0;
             scalar a = 1.0 / divd;
@@ -462,6 +465,25 @@ void ABD::vibrate(scalar dt) {
             scalar cc = 0.5 * dt * dt / divd;
 
             c.qq[j] = a * c.qq0[j] + b * c.dqqdt[j] + cc * c.excitement[j];
+
+            scalar omega = sqrt(lj);
+            scalar xij = 0.5 * (alp / omega + beta * omega);
+
+            xij = clamp(xij, 0.0, 1.0 - 1e-4);
+            scalar odamp = omega * sqrt(1.0 - xij * xij);
+            scalar epsj = exp(-xij * omega * dt);
+            scalar theta = odamp * dt;
+            scalar gamma = asin(xij);
+            scalar a1 = 2 * epsj * cos(theta);
+            scalar a2 = -epsj * epsj;
+            scalar b1 = 2.0 / 3.0 * (epsj * cos(theta + gamma) - epsj * epsj * cos(2.0 * theta + gamma)) / (omega * odamp);
+
+            scalar q0 = c.qq0[j] - dt * c.dqqdt[j];
+
+            scalar q1 = c.qq0[j];
+
+            c.qq[j] = a1 * q1 + a2 * q0 + b1 * c.excitement[j];
+
             if (c.qq[j] > thres_print) {
                 spdlog::error("qq[{}] = {}, excitement = {}", j, c.qq[j], c.excitement[j]);
             }
@@ -469,6 +491,11 @@ void ABD::vibrate(scalar dt) {
             c.dqqdt[j] = (c.qq[j] - c.qq0[j]) / dt;
             c.qq0[j] = c.qq[j];
         }
+        c.qqmax = c.qqmax.array().max(c.qq.array().abs());
+        c.emax = c.emax.array().max(c.excitement.array().abs());
+        // if (c.emax.maxCoeff() > thres_print) {
+        //     spdlog::warn("qqmax = {}, emax = {}", c.qqmax, c.emax);
+        // }
         c.project_vib();
     }
 }
@@ -476,8 +503,28 @@ void ABD::vibrate(scalar dt) {
 vec3 AffineBody::displacement(int i, int j) {
     // displacement of vertex i in mode j
     compute_R();
-    auto &Phij {Phi.col(j)};
-    vec3 phi(Phij[i * 3], Phij[i * 3 + 1], Phij[i * 3 + 2]);
+    vec3 phi(Phi.block<3, 1>(3 * i, j));
     phi = R * phi;
     return phi;
+}
+
+void AffineBody::project_vib()
+{
+    mat3 a;
+    vec3 b = q[0];
+    a << q[1], q[2], q[3];
+    compute_R();
+    for(int i = 0; i < n_vertices; i++) {
+        int n_modes = Phi.cols();
+        v_transformed[i] = a * vertices(i) + b;
+        vec3 disp;
+        disp.setZero();
+        for(int j = 0; j < n_modes; j++) {
+            vec3 u(Phi(3 * i, j), Phi(3 * i + 1, j), Phi(3 * i + 2, j));
+            disp += R * u * qq[j];
+        }
+
+        scalar mag = disp.maxCoeff();
+        v_transformed[i] += disp;
+    }
 }

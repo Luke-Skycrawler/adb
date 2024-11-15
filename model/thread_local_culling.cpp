@@ -14,7 +14,7 @@
 //#define CUDA_ENABLED
 using namespace Eigen;
 using namespace std;
-
+#ifdef CUDA_ENABLED
 namespace cuda {
 
 scalar cuda_pt_list_toi(int nvi, int nfj, int* vilist, int* fjlist, lu* viaabbs, lu* fjaabbs, vec3* v0s, vec3* v1s, Face* f0s, Face* f1s);
@@ -25,6 +25,7 @@ scalar cuda_pt_list_toi(vector<int> vilist, vector<int> fjlist, vector<lu> viaab
 }
 
 };
+#endif
 scalar ee_col_time(
     vector<int>& eilist, vector<int>& ejlist,
     const std::vector<std::unique_ptr<AffineBody>>& cubes,

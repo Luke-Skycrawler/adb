@@ -60,13 +60,14 @@
         "c1": 1e-4,
         "max_uk": 0.0,
         "dq_tol": 0.0,
-        "vib_kappa": 1.0,
-        "thres_print": 5e-3
+        "vib_kappa": 1e4,
+        "thres_print": 0.1
     },
     "params_int": {
         "clip": 0,
         "gfk": 1,
         "hdk": 1,
-        "thres": 100
+        "thres": 100,
+        "substeps": 100
     }
 }

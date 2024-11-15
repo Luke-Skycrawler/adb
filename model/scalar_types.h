@@ -1,11 +1,14 @@
 #pragma once
 #include <Eigen/Dense>
+#ifdef CUDA_ENABLED
 #include <cuda_runtime.h>
 #include <device_launch_parameters.h>
 
 #define func __device__ __host__
 #define kernel __global__
-
+#else
+#define func
+#endif
 
 using scalar = double;
 using mat3 = Eigen::Matrix<scalar, 3, 3>;

@@ -1,10 +1,5 @@
 #pragma once
 #include <vector>
-// #include <array>
-
-#ifndef TESTING 
-#define EIGEN_USE_MKL_ALL
-#endif
 #include "../view/shader.h"
 #include "scalar_types.h"
 
@@ -24,7 +19,7 @@ struct AffineBody {
     q4 q, q0, dqdt;
     vec12 q_tile(scalar dt, const vec3 &f) const;
 
-    Eigen::Vector<scalar, -1> qq, qq0, dqqdt, qqgrad, qq_hess_diag, excitement, lam;
+    Eigen::Vector<scalar, -1> qq, qq0, dqqdt, qqgrad, qq_hess_diag, excitement, lam, qqmax, emax;
     vec3 displacement(int i, int j);
 
     Eigen::Matrix<scalar, -1, -1> Phi;
@@ -90,19 +85,7 @@ struct AffineBody {
         }
     }
 
-    inline void project_vib() {
-        mat3 a;
-        vec3  b = q[0];
-        a << q[1], q[2], q[3];
-        compute_R();
-        for (int i = 0;  i < n_vertices; i++) {
-            int n_modes = Phi.cols();
-            v_transformed[i] = a * vertices(i) + b;
-            for (int j = 0; j < n_modes; j++) {
-                v_transformed[i] += R * Phi.block<3, 1>(3 * i, j) * qq[j];
-            }
-        }
-    }
+    void project_vib();
     Face face(int triangle_id, bool use_line_search_increment = false, bool batch = false) const;
     Edge edge(int eid, bool use_line_search_increment = false, bool batch = false) const;
     AffineBody(int n_vertices, int n_faces, int n_edges, std::vector<int> indices = {}, std::vector<int> edges = {})
