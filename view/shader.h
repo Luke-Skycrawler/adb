@@ -1,4 +1,5 @@
 #ifndef SHADER_H
+#ifdef GUI
 #define SHADER_H
 /* ------------------------------------------------------------------------
 Modifications: the geometry shader will now definetly have 
@@ -207,4 +208,5 @@ private:
         }
     }
 };
+#endif
 #endif

@@ -25,6 +25,12 @@ using namespace std;
 using namespace Eigen;
 using namespace barrier;
 using namespace utils;
+const Matrix<scalar, -1, 3, RowMajor>& AffineBody::V() const {
+    return Map<Matrix<scalar, -1, 3, RowMajor>>((scalar*)v_transformed.data(), n_vertices, 3);
+}
+//const Matrix<int, -1, 3, RowMajor>& AffineBody::F() const {
+//    return Map<Matrix<int, -1, 3, RowMajor>>(indices.data(), n_faces, 3) ;
+//}
 
 mat3 RQ(const mat3 &a) {
     Eigen::HouseholderQR<mat3> qr(a.transpose()); // Decompose A^T

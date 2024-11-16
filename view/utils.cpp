@@ -1,6 +1,6 @@
 #include "env.h"
-#define STB_IMAGE_IMPLEMENTATION
 #include "stb_image.h"
+#ifdef GUI
 void renderCube(int light){
     // first, configure the cube's VAO (and VBO)
     static unsigned int VBO=-1, cubeVAO=-1, lightCubeVAO;
@@ -284,9 +284,10 @@ unsigned int Feedback_Initialize(unsigned int *_vbo, unsigned int *_xfb)
     }
     return sort_prog;
 }
-
+#endif
 #include "global_variables.h"
 #include "cube.h"
+#ifdef GUI
 void gen_preview_framebuffer()
 {
     glGenFramebuffers(1, &globals.depthMapFBO);
@@ -306,6 +307,7 @@ void gen_preview_framebuffer()
     glDrawBuffer(GL_NONE);
     glReadBuffer(GL_NONE);
 }
+#endif
 #include <string>
 using namespace std;
 unsigned int TextureFromFile(const char *path, const string &directory, bool gamma)
@@ -347,10 +349,13 @@ unsigned int TextureFromFile(const char *path, const string &directory, bool gam
 
     return textureID;
 }
+
+#ifdef GUI
 void Cube::draw(Shader& shader) const
 {
     renderCube();
 }
+#endif
 
 void Mesh::align_com()
 {

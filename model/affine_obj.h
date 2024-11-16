@@ -16,10 +16,13 @@ struct AffineObject: AffineBody {
     }
     std::vector<int> _edges;
     void extract_edges();
-    std::vector<vec3> vert_rest;
+    // std::vector<vec3> vert_rest;
     const vec3 vertices(int i) const;
     void set_vertices() const;
     // mesh.vertices <- v_transformed 
+    #ifdef GUI
     void draw(Shader &shader) const;
+
+    #endif
     void predraw();
 };

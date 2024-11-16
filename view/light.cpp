@@ -1,4 +1,5 @@
 #define LIGHT_CPP
+#ifdef GUI
 #include "env.h"
 #include "light.h"
 
@@ -64,3 +65,5 @@ void Light::Draw(Camera &camera){
         renderCube(1);
     }
 }
+
+#endif

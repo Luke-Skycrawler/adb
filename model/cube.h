@@ -36,6 +36,10 @@ struct Cube: AffineBody {
     Cube(scalar scale = 1.0f)
         : scale(scale), AffineBody(8, 12, 12, _indices, _edges){
         Ic = mass * scale * scale / 12;
+        vert_rest.resize(n_vertices);
+        for (int i = 0; i < n_vertices; i ++) {
+            vert_rest[i] = _vertices()[i] * scale;
+        }
     }
 
     static std::vector<int> _indices, _edges;
@@ -62,7 +66,9 @@ struct Cube: AffineBody {
             }
         }
     }
+    #ifdef GUI
     void draw(Shader &shader) const;
+    #endif
     inline void predraw(){
         p = q[0];
         A << q[1], q[2], q[3];

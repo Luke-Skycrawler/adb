@@ -13,9 +13,13 @@
 #include <fstream>
 #include <nlohmann/json.hpp>
 #include <omp.h>
+#include "polyscope/polyscope.h"
+#include "polyscope/surface_mesh.h"
+#include "polyscope/point_cloud.h"
 //#define FEATURE_MODEL
 using namespace std;
 using namespace Eigen;
+namespace ps = polyscope;
 //------------------ optional features ----------------------------
 // #define FEATURE_MODEL
 // #define FEATURE_EDGE
@@ -23,6 +27,7 @@ using namespace Eigen;
 //-----------------------------------------------------------------
 
 vector<int> Cube::_edges {}, Cube::_indices {};
+#ifdef GUI
 void render_cubes(Shader shader, vector<unique_ptr<AffineBody>> &cubes)
 {
     for (int i = 0; i < cubes.size(); i++)
@@ -52,9 +57,8 @@ int main()
 
     // glfw window creation
     // --------------------
-    GLFWwindow *window = glfwCreateWindow(SCR_WIDTH, SCR_HEIGHT, "adb viewer", NULL, NULL);
-    if (window == NULL)
-    {
+    GLFWwindow* window = glfwCreateWindow(SCR_WIDTH, SCR_HEIGHT, "adb viewer", NULL, NULL);
+    if(window == NULL) {
         cout << "Failed to create GLFW window" << endl;
         glfwTerminate();
         return -1;
@@ -71,8 +75,7 @@ int main()
 
     // glad: load all OpenGL function pointers
     // ---------------------------------------
-    if (!gladLoadGLLoader((GLADloadproc)glfwGetProcAddress))
-    {
+    if(!gladLoadGLLoader((GLADloadproc)glfwGetProcAddress)) {
         cout << "Failed to initialize GLAD" << endl;
         return -1;
     }
@@ -90,7 +93,7 @@ int main()
     // version 2
 
     // Shader lightingShader("shaders/1.color.vert", "shaders/1.color.frag");
-     Shader lightingShader("shaders/shadow/shadow.vert", "shaders/shadow/shadow.frag");
+    Shader lightingShader("shaders/shadow/shadow.vert", "shaders/shadow/shadow.frag");
     // shadow shader
 
     // Shader lightingShader("shaders/1.color_.vert", "shaders/1.color_.frag","shaders/pass_through.geom");
@@ -133,16 +136,17 @@ int main()
         1.0f, -1.0f, 1.0f, 0.0f,
         -1.0f, 1.0f, 0.0f, 1.0f,
         1.0f, -1.0f, 1.0f, 0.0f,
-        1.0f, 1.0f, 1.0f, 1.0f};
+        1.0f, 1.0f, 1.0f, 1.0f
+    };
     glGenVertexArrays(1, &quadVAO);
     glGenBuffers(1, &quadVBO);
 
     glBindVertexArray(quadVAO);
     glBindBuffer(GL_ARRAY_BUFFER, quadVBO);
     glBufferData(GL_ARRAY_BUFFER, sizeof(quad), &quad, GL_STATIC_DRAW);
-    glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 4 * sizeof(float), (void *)0);
+    glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 4 * sizeof(float), (void*)0);
     glEnableVertexAttribArray(0);
-    glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 4 * sizeof(float), (void *)(2 * sizeof(float)));
+    glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 4 * sizeof(float), (void*)(2 * sizeof(float)));
     glEnableVertexAttribArray(1);
 #endif
 
@@ -152,22 +156,23 @@ int main()
         1.0f, 0.5f, 1.0f, 0.0f,
         0.5f, 1.0f, 0.0f, 1.0f,
         1.0f, 0.5f, 1.0f, 0.0f,
-        1.0f, 1.0f, 1.0f, 1.0f};
+        1.0f, 1.0f, 1.0f, 1.0f
+    };
     unsigned int cornerVAO, cornerVBO;
     glGenVertexArrays(1, &cornerVAO);
     glGenBuffers(1, &cornerVBO);
     glBindVertexArray(cornerVAO);
     glBindBuffer(GL_ARRAY_BUFFER, cornerVBO);
     glBufferData(GL_ARRAY_BUFFER, sizeof(corner), &corner, GL_STATIC_DRAW);
-    glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 4 * sizeof(float), (void *)0);
+    glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 4 * sizeof(float), (void*)0);
     glEnableVertexAttribArray(0);
-    glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 4 * sizeof(float), (void *)(2 * sizeof(float)));
+    glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 4 * sizeof(float), (void*)(2 * sizeof(float)));
     glEnableVertexAttribArray(1);
 
 #ifdef FEATURE_MODEL
     // load models
     Model b_model("assets/bunny.obj");
-    auto &b_mesh = b_model.meshes[0];
+    auto& b_mesh = b_model.meshes[0];
     auto bunny = make_unique<AffineObject>(b_mesh);
     globals.cubes.push_back(move(bunny));
 #endif
@@ -184,7 +189,8 @@ int main()
         "assets/skybox/top.jpg",
         "assets/skybox/bottom.jpg",
         "assets/skybox/front.jpg",
-        "assets/skybox/back.jpg"};
+        "assets/skybox/back.jpg"
+    };
     unsigned int cubemapTexture = loadCubemap(faces);
 
     screenShader.use();
@@ -210,7 +216,7 @@ int main()
     glBindRenderbuffer(GL_RENDERBUFFER, rbo);
     glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH24_STENCIL8, SCR_WIDTH, SCR_HEIGHT);
     glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_STENCIL_ATTACHMENT, GL_RENDERBUFFER, rbo);
-    if (glCheckFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE)
+    if(glCheckFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE)
         cout << "error: framebuffer\n";
 #endif
 
@@ -231,14 +237,13 @@ int main()
     globals.edges = utils::gen_edge_list(globals.cubes, n_cubes);
     globals.points = utils::gen_point_list(globals.cubes, n_cubes);
     globals.triangles = utils::gen_triangle_list(globals.cubes, n_cubes);
-    
-    auto &lightPos{globals.light_positions[0]};
-    // be sure to call after glfw intiailzation 
+
     ABD abd(globals.cubes, globals);
+    auto& lightPos{ globals.light_positions[0] };
+    // be sure to call after glfw intiailzation
     // render loop
     // -----------
-    while (!glfwWindowShouldClose(window))
-    {
+    while(!glfwWindowShouldClose(window)) {
         // per-frame time logic
         // --------------------
         float currentFrame = glfwGetTime();
@@ -281,25 +286,24 @@ int main()
         glm::mat4 lightSpaceTrans = glm::lookAt(lightPos, glm::vec3(0.0f), globals.camera.WorldUp);
         std::string trace_folder = globals.trace_folder;
         bool init = globals.ts == 0;
-        if (!globals.player) {
-            for (int i = 0; i < 1; i++)
+        if(!globals.player) {
+            for(int i = 0; i < 1; i++)
                 abd.implicit_euler(globals.dt);
 
             int substeps = globals.params_int["substeps"];
-            for (int i = 0; i < substeps; i++)
+            for(int i = 0; i < substeps; i++)
                 abd.vibrate(globals.dt / substeps);
             // abd.vibrate(globals.dt);
             player_save(trace_folder, globals.ts, globals.cubes, init);
-            if (globals.ending_ts > 0 && globals.ts >= globals.ending_ts) 
+            if(globals.ending_ts > 0 && globals.ts >= globals.ending_ts)
                 exit_callback(window);
-                // glfwSetWindowShouldClose(window, true);
+            // glfwSetWindowShouldClose(window, true);
         }
-        else{
+        else {
             spdlog::info("timestep = {}", globals.ts);
-            player_load(trace_folder,globals.ts++, globals.cubes);
+            player_load(trace_folder, globals.ts++, globals.cubes);
         }
-        if (globals.display_corner)
-        {
+        if(globals.display_corner) {
             glBindFramebuffer(GL_FRAMEBUFFER, globals.depthMapFBO);
             glEnable(GL_DEPTH_TEST);
             glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
@@ -315,7 +319,7 @@ int main()
             depthShader.setMat4("model", model);
             depthShader.setVec3("viewPos", lightPos);
             // bind diffuse map
-            if (globals.ground)
+            if(globals.ground)
                 renderPlane();
             render_cubes(depthShader, globals.cubes);
 
@@ -331,7 +335,7 @@ int main()
         glGetIntegerv(GL_VIEWPORT, viewport);
         lightingShader.use();
         lightingShader.setVec2("pickPosition", glm::vec2(globals.lastX / viewport[2] * 2 - 1.0f, (1 - globals.lastY / viewport[3]) * 2 - 1.0f));
-        if (globals.feedback) {
+        if(globals.feedback) {
             // glEnable(GL_RASTERIZER_DISCARD);
             glUseProgram(select_program);
             glBindTransformFeedback(GL_TRANSFORM_FEEDBACK, select_xfb);
@@ -358,27 +362,25 @@ int main()
         // bind specular map
         glActiveTexture(GL_TEXTURE1);
         glBindTexture(GL_TEXTURE_2D, specularMap);
-        if (globals.display_corner) {
+        if(globals.display_corner) {
             glActiveTexture(GL_TEXTURE2);
             glBindTexture(GL_TEXTURE_2D, globals.depthMap);
         }
         // FIXME: should do the select pass in reverse order
         lightingShader.setInt("alias", 5);
         lightingShader.setVec3("objectColor", 0.0f, 0.5f, 1.0f);
-        if (globals.ground)
+        if(globals.ground)
             renderPlane();
         lightingShader.setVec3("objectColor", 1.0f, 0.5f, 0.31f);
 
         render_cubes(lightingShader, globals.cubes);
-        if (!globals.cursor_hidden && globals.objectType)
-        {
+        if(!globals.cursor_hidden && globals.objectType) {
             model = glm::mat4(glm::mat3(globals.camera.Right, globals.camera.Up, -globals.camera.Front));
             model = glm::translate(model, globals.camera.Position * glm::mat3(model) + glm::vec3(0.0, 0.0, -3.0));
             lightingShader.setMat4("model", model);
             renderCube();
         }
-        if (globals.feedback)
-        {
+        if(globals.feedback) {
             glEndTransformFeedback();
             int obj;
             // glDisable(GL_RASTERIZER_DISCARD);
@@ -394,8 +396,7 @@ int main()
 
         // also draw the lamp object
         lights.Draw(globals.camera);
-        if (globals.skybox)
-        {
+        if(globals.skybox) {
             glStencilMask(0x00);
             // globals.skybox
             // glDepthMask(GL_FALSE);
@@ -414,8 +415,7 @@ int main()
             glDepthFunc(GL_LESS);
         }
 #ifdef FEATURE_EDGE
-        if (globals.edge)
-        {
+        if(globals.edge) {
             glStencilFunc(GL_NOTEQUAL, 1, 0XFF);
             // glStencilMask(0x00);
             glDisable(GL_DEPTH_TEST);
@@ -431,8 +431,7 @@ int main()
         }
 #endif
 #ifdef FEATURE_POSTRENDER
-        if (globals.postrender)
-        {
+        if(globals.postrender) {
             glBindFramebuffer(GL_FRAMEBUFFER, 0);
             glDisable(GL_DEPTH_TEST);
             glClearColor(1.0f, 1.0f, 1.0f, 1.0f);
@@ -444,8 +443,7 @@ int main()
             glDrawArrays(GL_TRIANGLES, 0, 6);
         }
 #endif
-        if (globals.display_corner)
-        {
+        if(globals.display_corner) {
             glBindFramebuffer(GL_FRAMEBUFFER, 0);
             glDisable(GL_DEPTH_TEST);
             cornerShader.use();
@@ -474,3 +472,49 @@ int main()
     glfwTerminate();
     return 0;
 }
+#else
+int main() {
+    Cube::gen_indices();
+    int n_proc = omp_get_num_procs();
+    omp_set_num_threads(n_proc);
+    setNbThreads(n_proc);
+    initParallel();
+    reset(true);
+    int n_cubes = globals.cubes.size();
+    globals.edges = utils::gen_edge_list(globals.cubes, n_cubes);
+    globals.points = utils::gen_point_list(globals.cubes, n_cubes);
+    globals.triangles = utils::gen_triangle_list(globals.cubes, n_cubes);
+    
+    ABD abd(globals.cubes, globals);
+    ps::init();
+    // vector<ps::PointCloud *> ps_meshes;
+    vector<ps::SurfaceMesh *> ps_meshes;
+    for (int i = 0; i < n_cubes; i++)
+    {
+        auto& c{ *globals.cubes[i] };
+        // Eigen::Matrix<scalar, -1, 3, RowMajor> V(c.V());
+        //Eigen::Matrix<int, -1, 3, RowMajor> F(c.F());
+        Eigen::Matrix<int, -1, -1> F(Eigen::Map<Eigen::Matrix<int, -1, -1, RowMajor>>(c.indices.data(), c.n_faces, 3));
+        auto &V = c.vert_rest;
+        // auto *p = ps::registerPointCloud("vertices" + to_string(i), V);
+        auto *p = ps::registerSurfaceMesh("cube" + to_string(i), V, F);
+        ps_meshes.push_back(p);
+    }
+
+
+    while(!ps::windowRequestsClose()) {
+        abd.implicit_euler(globals.dt);
+        for (int i = 0; i < n_cubes; i++)
+        {
+            auto& c{ *globals.cubes[i] };
+            // c.set_vertices();
+            //Eigen::Matrix<scalar, -1, 3, RowMajor> V(c.V());
+            auto& V{ c.v_transformed };
+            // ps_meshes[i]->updatePointPositions(V);
+            ps_meshes[i]->updateVertexPositions(V);
+        }
+        ps::frameTick();
+    }
+    // ps::show();
+}
+#endif

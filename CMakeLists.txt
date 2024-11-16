@@ -157,6 +157,7 @@ target_include_directories(abd PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/test_cases
     ${CMAKE_CURRENT_SOURCE_DIR}/view
     "ext/cnpy"
+    # "ext/polyscope/include"
 )
 
 target_include_directories(abdtk PRIVATE    
@@ -170,10 +171,15 @@ target_include_directories(abdtk PRIVATE
 )
 
 # Now, link the ipc_toolkit to your target (replace 'your_target' with your actual target)
+# set(polyscope_lib ${CMAKE_SOURCE_DIR}/ext/polyscope/lib/polyscope.lib
+#     ${CMAKE_SOURCE_DIR}/ext/polyscope/lib/imgui.lib
+#     ${CMAKE_SOURCE_DIR}/ext/polyscope/lib/stb.lib
+# )
 
+add_subdirectory("ext/polyscope")
 target_include_directories(abd PRIVATE 
 ${ipc_toolkit_SOURCE_DIR}/src)
-target_link_libraries(abd PRIVATE ipc::toolkit glfw assimp::assimp glad::glad glm::glm Eigen3::Eigen nlohmann_json::nlohmann_json cnpy)
+target_link_libraries(abd PRIVATE ipc::toolkit glfw assimp::assimp glad::glad glm::glm Eigen3::Eigen nlohmann_json::nlohmann_json cnpy polyscope)
 target_link_libraries(abdtk PRIVATE ipc::toolkit Eigen3::Eigen)
 
 if (ENABLE_MKL AND MKL_FOUND)
@@ -187,14 +193,14 @@ if(OpenMP_CXX_FOUND)
     target_link_libraries(abdtk PRIVATE OpenMP::OpenMP_CXX)
 endif()
 
-# set(OUTPUT_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/view)
-# if(MSVC) 
-#     set_property(TARGET abd PROPERTY VS_DEBUGGER_WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}/view)
-#     if (ENABLED_CUDA)
-#     set_property(TARGET abd PROPERTY CUDA_SEPARABLE_COMPILATION ON)
-#     set_property(TARGET abd PROPERTY CUDA_ARCHITECTURES 86)
-#     endif()
-# endif()
+set(OUTPUT_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/view)
+if(MSVC) 
+    set_property(TARGET abd PROPERTY VS_DEBUGGER_WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}/view)
+    if (ENABLED_CUDA)
+    set_property(TARGET abd PROPERTY CUDA_SEPARABLE_COMPILATION ON)
+    set_property(TARGET abd PROPERTY CUDA_ARCHITECTURES 86)
+    endif()
+endif()
 
 add_custom_target(copy_exe ALL
     COMMAND ${CMAKE_COMMAND} -E copy $<TARGET_FILE:abd> ${OUTPUT_DIRECTORY}

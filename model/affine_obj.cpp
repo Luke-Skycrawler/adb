@@ -35,12 +35,14 @@ void AffineObject::set_vertices() const {
         
     }
 }
+#ifdef GUI
 void AffineObject::draw(Shader& shader) const
 {
     set_vertices();
     mesh.setupMesh();
     mesh.Draw(shader);
 }
+#endif
 void AffineObject::predraw() {
     p = vec3::Zero();
     A = mat3::Identity();

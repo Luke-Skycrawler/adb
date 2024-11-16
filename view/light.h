@@ -1,5 +1,6 @@
 #ifndef LIGHT_H
 #define LIGHT_H
+#ifdef GUI
 #include "shader.h"
 #include "camera.h"
 class Light
@@ -16,5 +17,5 @@ public:
 private:
     int LightNum;
 };
-
+#endif
 #endif

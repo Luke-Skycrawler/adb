@@ -48,10 +48,14 @@ public:
 
         // now that we have all the required data, set the vertex buffers and its attribute pointers.
         align_com();
+        #ifdef GUI
         setupMesh();
+        #endif
     }
 
     // render the mesh
+    double Ic[6];
+#ifdef GUI
     void Draw(Shader &shader) 
     {
         // bind appropriate textures
@@ -88,7 +92,6 @@ public:
         // always good practice to set everything back to defaults once configured.
         glActiveTexture(GL_TEXTURE0);
     }
-    double Ic[6];
     void update_vertices() const {
         glBufferData(GL_ARRAY_BUFFER, vertices.size() * sizeof(Vertex), &vertices[0], GL_STATIC_DRAW);
     }
@@ -134,7 +137,7 @@ public:
 
         glBindVertexArray(0);
     }
-
+#endif
     void align_com();
 };
 #endif

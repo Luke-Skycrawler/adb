@@ -1,6 +1,8 @@
 #pragma once
 #include <vector>
+#ifdef GUI
 #include "../view/shader.h"
+#endif
 #include "scalar_types.h"
 
 struct AffineBody {
@@ -9,10 +11,12 @@ struct AffineBody {
     scalar mass, Ic;
     std::vector<int> indices, edges;
     virtual const vec3 vertices(int i) const = 0;
+    #ifdef GUI
     virtual void draw(Shader& shader) const = 0;
+    #endif
     virtual void predraw() = 0;
     
-    std::vector<vec3> v_transformed;
+    std::vector<vec3> v_transformed, vert_rest;
     int n_edges, n_vertices, n_faces;
     vec12 dq, grad;
     mat12 hess;
@@ -88,6 +92,9 @@ struct AffineBody {
     void project_vib();
     Face face(int triangle_id, bool use_line_search_increment = false, bool batch = false) const;
     Edge edge(int eid, bool use_line_search_increment = false, bool batch = false) const;
+
+    const Eigen::Matrix<scalar, -1, 3, Eigen::RowMajor>& V() const;
+    //const Eigen::Matrix<int, -1, 3, Eigen::RowMajor>& F() const; 
     AffineBody(int n_vertices, int n_faces, int n_edges, std::vector<int> indices = {}, std::vector<int> edges = {})
         : mass(1000.0), Ic(1000.0), p(0.0f, 0.0f, 0.0f), indices(indices), edges(edges), n_vertices(n_vertices), n_edges(n_edges), n_faces(n_faces), qq(0), qq0(0), dqqdt(0), qqgrad(0), qq_hess_diag(0), lam(0), Phi(0, 0)
     {
