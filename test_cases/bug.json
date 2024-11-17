@@ -5,9 +5,9 @@
         "npy": "assets/bug/Q.npy",
         "lambda": "assets/bug/lambdas.npy",
         "omega": [0.0, 0.0, 0.0], 
-        "p": [2.1, 1.0, 0.1],
+        "p": [2.1, 0.5, 0.1],
         "p_dot": [0.0, 0.0, 0.0],
-        "euler": [0.0, 90.0, 0.0]
+        "euler": [90.0, 0.0, 0.0]
     }
 ]
 

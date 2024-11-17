@@ -486,6 +486,8 @@ int main() {
     globals.triangles = utils::gen_triangle_list(globals.cubes, n_cubes);
     
     ABD abd(globals.cubes, globals);
+    ps::options::groundPlaneHeightMode = ps::GroundPlaneHeightMode::Manual;
+    ps::options::groundPlaneHeight = -0.5;
     ps::init();
     // vector<ps::PointCloud *> ps_meshes;
     vector<ps::SurfaceMesh *> ps_meshes;
@@ -504,6 +506,9 @@ int main() {
 
     while(!ps::windowRequestsClose()) {
         abd.implicit_euler(globals.dt);
+        int substeps = globals.params_int["substeps"];
+        for(int i = 0; i < substeps; i++)
+            abd.vibrate(globals.dt / substeps);
         for (int i = 0; i < n_cubes; i++)
         {
             auto& c{ *globals.cubes[i] };

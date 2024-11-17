@@ -35,3 +35,4 @@ view/*.exe
 view/*.dll
 *.pyd
 .vscode/
+view/imgui.ini
