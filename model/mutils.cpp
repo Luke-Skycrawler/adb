@@ -247,7 +247,7 @@ vec12 AffineBody::q_tile(scalar dt, const vec3& f) const
     auto _q = cat(q0);
     auto _dqdt = cat(dqdt);
     _q = _q + dt * _dqdt;
-    _q.head(3) += dt * dt * f;
+    _q.head(3) += dt * dt * f + penalty_force;
     return _q;
 }
 

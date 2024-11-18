@@ -504,6 +504,7 @@ void ABD::vibrate(scalar dt) {
         // }
         c.project_vib();
     }
+    compute_penalty_force(dt);
 }
 
 vec3 AffineBody::displacement(int i, int j) {
@@ -532,5 +533,70 @@ void AffineBody::project_vib()
 
         scalar mag = disp.maxCoeff();
         v_transformed[i] += disp;
+    }
+}
+
+void ABD::compute_penalty_force(scalar dt)
+{
+    culling.gen_penetration_set(n_cubes, cubes, globals.aabbs, pts, idx, ees, eidx, vidx);
+    for(int i = 0; i < n_cubes; i++) {
+        cubes[i]->penalty_force.setZero();
+    }
+    for(int i = 0; i < vidx.size(); i++) {
+        int I = vidx[i][0];
+        int v = vidx[i][1];
+        auto& c{ *cubes[I] };
+
+        vec3 up(0.0, 1.0, 0.0);
+        auto d = vg_distance(c.v_transformed[v]);
+        auto k = globals.params_double["penalty_k"];
+        if(d < 0.0) {
+            c.penalty_force += up * k * (-d);
+        }
+    }
+}
+
+void IAABB::gen_penetration_set(
+    int n_cubes,
+    const std::vector<std::unique_ptr<AffineBody>>& cubes,
+    const std::vector<lu>& aabbs,
+    std::vector<q4>& pts,
+    std::vector<i4>& idx,
+    std::vector<q4>& ees,
+    std::vector<i4>& eidx,
+    std::vector<std::array<int, 2>>& vidx)
+{
+    pts.resize(0);
+    idx.resize(0);
+    ees.resize(0);
+    eidx.resize(0);
+    vidx.resize(0);
+
+    // for(int i = 0; i <= n_cubes; i++) {
+    //     auto& P{ *cubes[i] };
+    //     c.project_vib();
+    // }
+    // already projected at substep ending
+
+    if(ground)
+    // #pragma omp for schedule(static)
+    {
+        auto tid = omp_get_thread_num();
+        vidx_thread_local[tid].resize(0);
+        for(int I = 0; I < n_cubes; I++) {
+            auto& c{ *cubes[I] };
+            for(int v = 0; v < c.n_vertices; v++) {
+                auto& p{ c.v_transformed[v] };
+                // handling vertex-ground collision
+                scalar d = vg_distance(p);
+                if(d < 0.0) {
+                    vidx_thread_local[tid].push_back({ I, v });
+                }
+            }
+        }
+#pragma omp critical
+        {
+            vidx.insert(vidx.end(), vidx_thread_local[tid].begin(), vidx_thread_local[tid].end());
+        }
     }
 }

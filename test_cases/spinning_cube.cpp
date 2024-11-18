@@ -88,7 +88,7 @@ void customize(string file)
                 assert(it.find("lambda") != it.end());
                 auto npy = it["npy"];
                 auto lam_npy = it["lambda"];
-                _a -> Phi = load(npy) / 10.0;
+                _a -> Phi = load(npy);
                 _a -> lam = load(lam_npy).diagonal();
                 assert(_a -> lam.rows() == _a -> Phi.cols());
                 int n_modes = _a -> lam.rows();

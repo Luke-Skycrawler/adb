@@ -83,4 +83,14 @@ struct IAABB {
         std::vector<q4>& ees,
         std::vector<i4>& eidx,
         std::vector<std::array<int, 2>>& vidx);
+
+    void gen_penetration_set(
+        int n_cubes,
+        const std::vector<std::unique_ptr<AffineBody>>& cubes,
+        const std::vector<lu>& aabbs,
+        std::vector<q4>& pts,
+        std::vector<i4>& idx,
+        std::vector<q4>& ees,
+        std::vector<i4>& eidx,
+        std::vector<std::array<int, 2>>& vidx);
 };

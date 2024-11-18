@@ -60,8 +60,9 @@
         "c1": 1e-4,
         "max_uk": 0.0,
         "dq_tol": 0.0,
-        "vib_kappa": 1e5,
-        "thres_print": 0.1
+        "vib_kappa": 1e3,
+        "thres_print": 0.1,
+        "penalty_k": 1.0
     },
     "params_int": {
         "clip": 0,
