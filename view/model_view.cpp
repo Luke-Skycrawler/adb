@@ -505,6 +505,11 @@ int main() {
 
 
     while(!ps::windowRequestsClose()) {
+        if (ImGui::IsKeyPressed(ImGuiKey_R)){
+            reset(true);
+        }
+
+
         abd.implicit_euler(globals.dt);
         int substeps = globals.params_int["substeps"];
         for(int i = 0; i < substeps; i++)

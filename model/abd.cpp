@@ -444,8 +444,13 @@ void ABD::vibrate(scalar dt) {
     //static const scalar kappa = 1e-3;
     scalar vib_kappa = globals.params_double["vib_kappa"];
     scalar thres_print = globals.params_double["thres_print"];
+    static const scalar alp = globals.params_double["vib_alpha"], beta = globals.params_double["vib_beta"];
+    // static const scalar alp = 6, beta = 1e-7;
 
-    static const scalar alp = 6, beta = 1e-7;
+    for(int i = 0; i < n_cubes; i++) {
+        auto& c{ *cubes[i] };
+        c.excitement.setZero();
+    }
     // compute excitement
     for(int i = 3; i < n_g; i++) {
         int bid = vidx[i][0], pid = vidx[i][1];
@@ -456,7 +461,38 @@ void ABD::vibrate(scalar dt) {
         int n_modes = c.Phi.cols();
         for (int j = 0; j < n_modes; j ++) {
 
-            c.excitement[j] = F.dot( c.displacement(pid, j)) * vib_kappa;
+            c.excitement[j] += F.dot(c.displacement(pid, j)) * vib_kappa;
+        }
+    }
+
+    for(int ii = 0; ii < n_pt; ii++) {
+        auto& ij(idx[ii]);
+        int i = ij[0], j = ij[2];
+
+        auto &ci(*cubes[i]), &cj(*cubes[j]);
+        int pid = ij[1];
+        Face f{ cj.face(int(ij[3]), false, true) };
+        vec3 p{ ci.v_transformed[ij[1]] };
+        q4 pt{ p, f.t0, f.t1, f.t2 };
+        vec3 normal;
+
+        ipc::PointTriangleDistanceType pt_type;
+        auto d = vf_distance_normal(pt[0], f, pt_type, normal);
+
+        if(d < barrier::d_hat) {
+            vec3 F = normal * pt_contact_forces[ii];
+
+            for(int jj = 0; jj < ci.Phi.cols(); jj++) {
+                ci.excitement[jj] += F.dot(ci.displacement(pid, jj)) * vib_kappa;
+            }
+            for(int jj = 0; jj < cj.Phi.cols(); jj++) {
+
+                // ipc::point_triangle_distance_gradient();
+                for(int k = 0; k < 3; k++) {
+                    auto pid = cj.indices[ij[3] * 3 + k];
+                    cj.excitement[jj] += F.dot(cj.displacement(pid, jj)) * vib_kappa;
+                }
+            }
         }
     }
 

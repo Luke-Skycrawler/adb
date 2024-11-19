@@ -5,6 +5,9 @@
 
 scalar vf_distance(const vec3& v, const Face& f, ipc::PointTriangleDistanceType &pt_type);
 
+scalar vf_distance_normal(const vec3 &v, const Face &f, ipc::PointTriangleDistanceType &pt_type, vec3 &normal);
+
+scalar ee_distance_normal(const Edge &ei, const Edge &ej, vec3 & normal);
 std::tuple<scalar, ipc::PointTriangleDistanceType> vf_distance(const vec3& v, const Face& f);
 
 scalar ee_distance(const Edge& ei, const Edge& ej);

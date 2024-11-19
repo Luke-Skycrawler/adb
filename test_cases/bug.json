@@ -4,10 +4,41 @@
         "obj": "assets/bug.off",
         "npy": "assets/bug/Q.npy",
         "lambda": "assets/bug/lambdas.npy",
+        "scale": 1000.0,
         "omega": [0.0, 0.0, 0.0], 
         "p": [2.1, 0.5, 0.1],
         "p_dot": [0.0, 0.0, 0.0],
         "euler": [90.0, 0.0, 0.0]
+    },
+    {
+        "obj": "assets/bug.off",
+        "npy": "assets/bug/Q.npy",
+        "lambda": "assets/bug/lambdas.npy",
+        "scale": 1000.0,
+        "omega": [0.0, 0.0, 0.0], 
+        "p": [4.1, 1.5, 0.1],
+        "p_dot": [0.0, 0.0, 0.0],
+        "euler": [180.0, 90.0, 0.0]
+    },
+    {
+        "obj": "assets/bug.off",
+        "npy": "assets/bug/Q.npy",
+        "lambda": "assets/bug/lambdas.npy",
+        "scale": 1000.0,
+        "omega": [0.0, 0.0, 0.0], 
+        "p": [5.1, 2.5, 0.1],
+        "p_dot": [0.0, 0.0, 0.0],
+        "euler": [270.0, 0.0, 90.0]
+    },
+    {
+        "obj": "assets/bug.off",
+        "npy": "assets/bug/Q.npy",
+        "lambda": "assets/bug/lambdas.npy",
+        "scale": 1000.0,
+        "omega": [0.0, 0.0, 0.0], 
+        "p": [3.1, 4.5, 0.1],
+        "p_dot": [0.0, 0.0, 0.0],
+        "euler": [0.0, 0.0, -90.0]
     }
 ]
 

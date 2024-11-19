@@ -89,7 +89,8 @@ void customize(string file)
                 auto npy = it["npy"];
                 auto lam_npy = it["lambda"];
                 _a -> Phi = load(npy);
-                _a -> lam = load(lam_npy).diagonal();
+                auto scale = it["scale"];
+                _a -> lam = load(lam_npy).diagonal() / scale;
                 assert(_a -> lam.rows() == _a -> Phi.cols());
                 int n_modes = _a -> lam.rows();
                 // filter out interior vertices (the npy Phi correspond to a mesh, with surface vertices are at the front)
