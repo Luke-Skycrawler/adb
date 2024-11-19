@@ -47,6 +47,7 @@
     "full_ccd": true,
     "align_com": false,
     "trace_folder": "trace",
+    "video_folder": "abd/",
     "iaabb": 3,
     "evh": 1e-3,
     "vg_friction": true,
@@ -71,6 +72,6 @@
         "gfk": 1,
         "hdk": 1,
         "thres": 100,
-        "substeps": 1
+        "substeps": 0
     }
 }

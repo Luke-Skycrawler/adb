@@ -36,3 +36,4 @@ view/*.dll
 *.pyd
 .vscode/
 view/imgui.ini
+*.mp4

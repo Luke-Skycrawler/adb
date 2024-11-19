@@ -489,6 +489,7 @@ int main() {
     ps::options::groundPlaneHeightMode = ps::GroundPlaneHeightMode::Manual;
     ps::options::groundPlaneHeight = -0.5;
     ps::init();
+    ps::view::lookAt(glm::vec3(-1.0, 1.0, 0.0), glm::vec3(10.0, -0.5, 0.0));
     // vector<ps::PointCloud *> ps_meshes;
     vector<ps::SurfaceMesh *> ps_meshes;
     for (int i = 0; i < n_cubes; i++)
@@ -502,8 +503,7 @@ int main() {
         auto *p = ps::registerSurfaceMesh("cube" + to_string(i), V, F);
         ps_meshes.push_back(p);
     }
-
-
+    int frame = 0;
     while(!ps::windowRequestsClose()) {
         if (ImGui::IsKeyPressed(ImGuiKey_R)){
             reset(true);
@@ -523,6 +523,7 @@ int main() {
             // ps_meshes[i]->updatePointPositions(V);
             ps_meshes[i]->updateVertexPositions(V);
         }
+        ps::screenshot("png/" + globals.video_folder + to_string(frame++) + ".png");
         ps::frameTick();
     }
     // ps::show();

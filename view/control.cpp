@@ -39,6 +39,7 @@ void reset(bool init)
     globals.log = data["log"];
     globals.player = data["player"];
     globals.trace_folder = data["trace_folder"];
+    globals.video_folder = data["video_folder"];
     globals.iaabb = data["iaabb"];
     globals.evh = data["evh"];
     globals.kappa = data["kappa"];
