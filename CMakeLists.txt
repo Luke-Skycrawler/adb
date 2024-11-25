@@ -33,7 +33,7 @@ if (ENABLE_MKL)
         add_definitions(-DEIGEN_USE_MKL_ALL)
     endif()
 endif()
-# find_package(spdlog CONFIG REQUIRED)
+find_package(spdlog CONFIG REQUIRED)
 find_package(nlohmann_json CONFIG REQUIRED)
 find_package(pybind11 CONFIG REQUIRED)
 
@@ -143,6 +143,16 @@ add_executable(abd view/model_view.cpp
     ${HEADERS}
     ${SOURCE}
     )
+
+add_executable(fem model/fem/main.cpp
+    model/fem/fem.cpp
+    model/fem/fem.h
+    model/fem/tobj.cpp
+    model/scalar_types.h
+)
+
+target_link_libraries(fem PRIVATE Eigen3::Eigen nlohmann_json::nlohmann_json polyscope spdlog::spdlog)
+
 
 pybind11_add_module(abdtk ${PYTHON_HEADERS} ${PYTHON_SOURCE} ${CMAKE_CURRENT_SOURCE_DIR}/python/bindings.cpp)
 target_compile_definitions(abdtk PRIVATE ABDTK)

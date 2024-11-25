@@ -45,3 +45,11 @@ struct Edge {
     func Edge() {}
     // Edge(const AffineBody& c, int eid, bool use_line_search_increment = false, bool batch = false);
 };
+
+struct Tet{
+    vec3 t0, t1, t2, t3;
+    func Tet(const vec3 &t0, const vec3 &t1, const vec3 &t2, const vec3 &t3)
+        : t0(t0), t1(t1), t2(t2), t3(t3) {}
+    func Tet() {}
+};
+
