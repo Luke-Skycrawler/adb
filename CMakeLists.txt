@@ -33,7 +33,7 @@ if (ENABLE_MKL)
         add_definitions(-DEIGEN_USE_MKL_ALL)
     endif()
 endif()
-find_package(spdlog CONFIG REQUIRED)
+# find_package(spdlog CONFIG REQUIRED)
 find_package(nlohmann_json CONFIG REQUIRED)
 find_package(pybind11 CONFIG REQUIRED)
 
