@@ -265,52 +265,7 @@ scalar IAABB::primitive_brute_force(
         default: c.project_vt2();
         }
     }
-
-    if(ground)
-    // #pragma omp parallel
-    {
-        scalar toi_thread_local = 1.0;
-        auto tid = omp_get_thread_num();
-        vidx_thread_local[tid].resize(0);
-// #pragma omp for schedule(static)
-        for (int I = 0; I < n_cubes; I++) {
-            auto& c{ *cubes[I] };
-            for (int v = 0; v < c.n_vertices; v++) {
-                auto& p{ c.v_transformed[v] };
-                // handling vertex-ground collision
-                if (!cull_trajectory) {
-                    scalar d = vg_distance(p);
-                    d = d * d;
-                    if (d < barrier::d_hat) {
-                        vidx_thread_local[tid].push_back({ I, v });
-                    }
-                }
-                else {
-                    scalar t = collision_time(c, v);
-                    toi_thread_local = min(toi_thread_local, t);
-                }
-            }
-        }
-        if (cull_trajectory) {
-#pragma omp critical
-            toi_global = min(toi_global, toi_thread_local);
-        }
-        else {
-#pragma omp critical
-            vidx.insert(vidx.end(), vidx_thread_local[tid].begin(), vidx_thread_local[tid].end());
-        }
-    }
-
-    if (cull_trajectory) {
-        if (toi_global < 1e-6) {
-            spdlog::error("vertex ground toi_global = {}", toi_global);
-
-            g_cnt++;
-            if(g_cnt > 1) exit(1);
-        }
-        else
-            g_cnt = 0;
-    }
+    toi_global = ground_contact(cull_trajectory, vidx);
 
     gen_prim_lists(n_overlap, cull_trajectory);
 
@@ -558,6 +513,58 @@ void IAABB::prim_intersection_test_parallel(int n_overlap, std::vector<q4>& pts,
             eidx.insert(eidx.end(), eidx_private[tid].begin(), eidx_private[tid].end());
         }
     }
+}
+
+scalar IAABB::ground_contact(bool cull_trajectory,
+    std::vector<std::array<int, 2>>& vidx)
+{
+    scalar toi_global = 1.0;
+    if(ground)
+    // #pragma omp parallel
+    {
+        scalar toi_thread_local = 1.0;
+        auto tid = omp_get_thread_num();
+        vidx_thread_local[tid].resize(0);
+        // #pragma omp for schedule(static)
+        for(int I = 0; I < cubes.size(); I++) {
+            auto& c{ *cubes[I] };
+            for(int v = 0; v < c.n_vertices; v++) {
+                auto& p{ c.v_transformed[v] };
+                // handling vertex-ground collision
+                if(!cull_trajectory) {
+                    scalar d = vg_distance(p);
+                    d = d * d;
+                    if(d < barrier::d_hat) {
+                        vidx_thread_local[tid].push_back({ I, v });
+                    }
+                }
+                else {
+                    scalar t = collision_time(c, v);
+                    toi_thread_local = min(toi_thread_local, t);
+                }
+            }
+        }
+        if(cull_trajectory) {
+#pragma omp critical
+            toi_global = min(toi_global, toi_thread_local);
+        }
+        else {
+#pragma omp critical
+            vidx.insert(vidx.end(), vidx_thread_local[tid].begin(), vidx_thread_local[tid].end());
+        }
+    }
+
+    if(cull_trajectory) {
+        if(toi_global < 1e-6) {
+            spdlog::error("vertex ground toi_global = {}", toi_global);
+
+            g_cnt++;
+            if(g_cnt > 1) exit(1);
+        }
+        else
+            g_cnt = 0;
+    }
+    return toi_global;
 }
 
 scalar IAABB::prim_traj_intersection_test_parallel(int n_overlap)

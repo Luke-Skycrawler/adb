@@ -104,4 +104,7 @@ struct IAABB {
         std::vector<q4>& ees,
         std::vector<i4>& eidx);
     scalar prim_traj_intersection_test_parallel(int n_overlap);
+
+    scalar ground_contact(bool cull_trajectory,
+        std::vector<std::array<int, 2>>& vidx);
 };
