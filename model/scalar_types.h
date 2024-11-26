@@ -17,6 +17,7 @@ using q4 = std::array<vec3, 4>;
 // using i4 = std::array<int, 4>;
 // using q4 = Eigen::Matrix<scalar, 4, 3>;
 using i4 = Eigen::Vector4i;
+using i2 = Eigen::Vector2i;
 using vec12 = Eigen::Vector<scalar, 12>;
 using mat12 = Eigen::Matrix<scalar, 12, 12>;
 

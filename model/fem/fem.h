@@ -3,7 +3,7 @@
 #include <Eigen/Dense>
 #include <Eigen/Sparse>
 #include <string>
-
+#include <memory>
 struct Vertex
 {
   vec3 x, f, v, v_n;
@@ -59,47 +59,67 @@ struct TOBJLoader
   std::vector<Vertex> vtxs;
 };
 
+struct FEMObject : TOBJLoader {
+    Eigen::Vector<scalar, -1> dx, b;
+    Eigen::SparseMatrix<scalar> A;
+    Eigen::SimplicialLDLT<Eigen::SparseMatrix<scalar>> solver;
 
-struct Rod :
-    TOBJLoader
-{
-  int index_visible;
-  Eigen::Vector<scalar, -1> dx, b;
-  Eigen::SparseMatrix<scalar> A;
-  Eigen::SimplicialLDLT<Eigen::SparseMatrix<scalar>> solver;
+    int sys_offset;
+    FEMObject(const std::string& filename)
+        : TOBJLoader(filename), dx(3 * n_nodes), b(3 * n_nodes), A(3 * n_nodes, 3 * n_nodes)
+    {
+    }
 
-  Rod(const std::string &filename) : TOBJLoader(filename), dx(3 * n_nodes), b(3 * n_nodes), A(3 * n_nodes, 3 * n_nodes)
-  {
-  }
+    void add_dx_dv(scalar dt);
+    // void derive_and_add_dv();
 
-  void add_dx_dv(scalar dt);
-  // void derive_and_add_dv();
+    // fill A and b;
+    void build_sparse(scalar dt);
+    void compute_f();
+    std::vector<Eigen::Triplet<scalar>> triplets;
+    void stiffness_kernel();
+    inline void solve()
+    {
+        // Compute the ordering permutation vector from the structural pattern of A
+        // solver.analyzePattern(A);
+        // // Compute the numerical factorization
+        // solver.factorize(A);
 
-  // fill A and b;
-  void build_sparse(scalar dt);
-  void compute_f();
-  std::vector<Eigen::Triplet<scalar>> triplets;
-  void stiffness_kernel();
-  inline void solve()
-  {
-    // Compute the ordering permutation vector from the structural pattern of A
-    // solver.analyzePattern(A);
-    // // Compute the numerical factorization
-    // solver.factorize(A);
-
-    // Use the factors to solve the linear system
-    solver.compute(A);
-    dx = solver.solve(b);
-  }
-  void step(scalar dt);
+        // Use the factors to solve the linear system
+        solver.compute(A);
+        dx = solver.solve(b);
+    }
+    void step(scalar dt);
 };
 
-struct FEMTet: Tet {
-    mat3 Bm;
-    mat3 dPK(const mat3 &F, const mat3 &dF);
-    Eigen::Vector4i index; 
-    scalar W;
+struct FEMSimulator {
+    std::vector<std::unique_ptr<FEMObject>> objects;
+    Eigen::Vector<scalar, -1> dx, b;
+    Eigen::SparseMatrix<scalar> A;
+    Eigen::SimplicialLDLT<Eigen::SparseMatrix<scalar>> solver;
+    int n_dofs;
+
+    void step(scalar dt);
+    std::vector<Eigen::Triplet<scalar>> triplets;
+    FEMSimulator(const std::string& config_file);
+
+private:
+    void combine_triplets();
+    inline void solve()
+    {
+        solver.compute(A);
+        dx = solver.solve(b);
+    }
+
+    void add_dx_dv(scalar dt);
 };
+
+// struct FEMTet: Tet {
+//     mat3 Bm;
+//     mat3 dPK(const mat3 &F, const mat3 &dF);
+//     Eigen::Vector4i index;
+//     scalar W;
+// };
 
 // struct TetFEM: TOBJLoader {
 //     Eigen::SparseMatrix<scalar, Eigen::ColMajor> K, M; 

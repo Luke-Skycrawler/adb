@@ -1,0 +1,16 @@
+[
+    
+    {
+        "tobj": "assets/bar2.tobj",
+        "p": [0.0, 0.0, 0.0]
+    },
+    {
+        "tobj": "assets/bar2.tobj",
+        "p": [0.0, 0.0, -1.0]
+    },
+    {
+        "tobj": "assets/bar2.tobj",
+        "p": [0.0, 0.0, -2.0]
+    }
+]
+

@@ -149,6 +149,8 @@ add_executable(fem model/fem/main.cpp
     model/fem/fem.h
     model/fem/tobj.cpp
     model/scalar_types.h
+    model/fem/culling.cpp
+    model/fem/simulator.cpp
 )
 
 target_link_libraries(fem PRIVATE Eigen3::Eigen nlohmann_json::nlohmann_json polyscope spdlog::spdlog)
