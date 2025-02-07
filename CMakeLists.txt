@@ -38,6 +38,10 @@ set(CUDA_SOURCE
     model/cuda/dist.cu
     model/cuda/cubic_roots.cu
     model/cuda/thread_local_toi.cuh
+    model/cuda/buffer.h
+    model/cuda/helper_cuda.h
+    model/cuda/helper_math.h
+    model/cuda/helper_string.h
 )
 set(HEADERS 
     cyCodeBase/cyCore.h
@@ -147,6 +151,7 @@ target_include_directories(abd PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/model
     ${CMAKE_CURRENT_SOURCE_DIR}/test_cases
     ${CMAKE_CURRENT_SOURCE_DIR}/view
+    ${CMAKE_CURRENT_SOURCE_DIR}/model/cuda
     "ext/cnpy"
 )
 

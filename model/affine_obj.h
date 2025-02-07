@@ -3,6 +3,9 @@
 
 struct AffineObject: AffineBody {
     Mesh &mesh;
+    std::vector<int> _edges;
+    std::vector<vec3> vert_rest;
+    
     AffineObject(Mesh &mesh):
     mesh(mesh), 
     AffineBody(mesh.vertices.size(), mesh.indices.size() / 3, 0, mesh.indices, {}) {
@@ -14,9 +17,7 @@ struct AffineObject: AffineBody {
             vert_rest[i] = vec3(p[0], p[1], p[2]);
         }
     }
-    std::vector<int> _edges;
     void extract_edges();
-    std::vector<vec3> vert_rest;
     const vec3 vertices(int i) const;
     void set_vertices() const;
     // mesh.vertices <- v_transformed 

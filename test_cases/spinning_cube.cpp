@@ -72,16 +72,6 @@ void customize(string file)
             auto& mesh{ globals.loaded_models[objfile]->meshes[0] };
             _a = make_unique<AffineObject>(mesh);
 
-            if(it.find("npy") != it.end()) {
-                assert(it.find("lambda") != it.end());
-                auto npy = it["npy"];
-                auto lam_npy = it["lambda"];
-                _a -> Phi = load(npy);
-                _a -> lam = load(lam_npy);
-                assert(_a -> lam.rows() == _a -> Phi.cols());
-                // filter out interior vertices (the npy Phi correspond to a mesh, with surface vertices are at the front)
-                _a -> Phi.conservativeResize(_a -> n_vertices, NoChange);
-            }
             
         }
         else

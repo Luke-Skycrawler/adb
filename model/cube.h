@@ -1,10 +1,10 @@
 #pragma once
 #include "affine_body.h"
-using namespace Eigen;
 struct Cube: AffineBody {
     scalar scale, toi;
     static const int n_vertices = 8, n_faces = 12, n_edges = 12;
-    Vector<scalar, 12> barrier_gradient;
+    static std::vector<int> _indices, _edges;
+
     inline const vec3 vertices(int i) const {return _vertices()[i];}
     static const vec3* _vertices()
     {
@@ -20,7 +20,7 @@ struct Cube: AffineBody {
         };
         return v;
     }
-    static const int* faces()
+    inline static const int* faces()
     {
         static const int fs[] = {
             0, 1, 3, 2,
@@ -38,7 +38,6 @@ struct Cube: AffineBody {
         Ic = mass * scale * scale / 12;
     }
 
-    static std::vector<int> _indices, _edges;
     static void gen_indices()
     {
         _indices.resize(n_faces * 3);
