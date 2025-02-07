@@ -14,11 +14,13 @@ void AffineObject::extract_edges() {
         insert(t1, t2);
         insert(t0, t2);
     }
+    vector<int> _edges(e.size() * 2); 
     edges.reserve(e.size() * 2);
     for (auto &ei: e) {
-        edges.push_back(ei[0]);
-        edges.push_back(ei[1]);
+        _edges.push_back(ei[0]);
+        _edges.push_back(ei[1]);
     }
+    cudaMemcpy(edges, _edges.data(), _edges.size() * sizeof(int), cudaMemcpyDefault);
     n_edges = edges.size() / 2; 
 }
 

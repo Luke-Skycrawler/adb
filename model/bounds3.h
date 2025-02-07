@@ -1,6 +1,6 @@
 #pragma once
 #include "bvh/bvh.h"
-#ifndef CUDA_SOURCE
+#ifndef __CUDACC__
 #include "affine_body.h"
 using lu = bounds3;
 

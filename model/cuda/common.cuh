@@ -1,10 +1,11 @@
 #pragma once
+#ifdef __CUDACC__
+#include "helper_cuda.h"
 #include <cuda_runtime.h> 
 #include <cuda_runtime_api.h>
 #include <device_launch_parameters.h>
-#include "helper_cuda.h"
+#endif
 #include "helper_math.h"
-
 #include "scalar_types.h"
 
 #define CUDA_SOURCE

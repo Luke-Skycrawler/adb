@@ -7,22 +7,26 @@
 #endif
 #include "../view/shader.h"
 #include "scalar_types.h"
-
+#include "buffer.h"
 struct AffineBody {
     mat3 A;
     vec3 p;
     scalar mass, Ic;
-    std::vector<int> indices, edges;
-    virtual const vec3 vertices(int i) const = 0;
-    virtual void draw(Shader& shader) const = 0;
-    virtual void predraw() = 0;
+    ShayCUDA::VtBuffer<int> indices, edges; 
+    ShayCUDA::VtBuffer<vec3> v_transformed; 
+
+    // std::vector<int> indices, edges;
+    // std::vector<vec3> v_transformed;
     
-    std::vector<vec3> v_transformed;
     int n_edges, n_vertices, n_faces;
     vec12 dq, grad;
     mat12 hess;
     q4 q, q0, dqdt;
+
     vec12 q_tile(scalar dt, const vec3 &f) const;
+    virtual const vec3 vertices(int i) const = 0;
+    virtual void draw(Shader& shader) const = 0;
+    virtual void predraw() = 0;
 
     inline vec3 vt0(int i) const {
         mat3 a = q.block<3, 3>(0, 1);
@@ -78,7 +82,7 @@ struct AffineBody {
     Face face(int triangle_id, bool use_line_search_increment = false, bool batch = false) const;
     Edge edge(int eid, bool use_line_search_increment = false, bool batch = false) const;
     AffineBody(int n_vertices, int n_faces, int n_edges, std::vector<int> indices = {}, std::vector<int> edges = {})
-        : mass(1000.0), Ic(1000.0), p(0.0f, 0.0f, 0.0f), indices(indices), edges(edges), n_vertices(n_vertices), n_edges(n_edges), n_faces(n_faces)
+        : mass(1000.0), Ic(1000.0), p(0.0f, 0.0f, 0.0f), indices(indices.size()), edges(edges.size()), n_vertices(n_vertices), n_edges(n_edges), n_faces(n_faces)
     {
         v_transformed.resize(n_vertices);
         A.setIdentity(3, 3);
@@ -90,6 +94,8 @@ struct AffineBody {
         ;
         q0 = q;
         dqdt.setZero();
+        cudaMemcpy(this->indices, indices.data(), indices.size() * sizeof(int), cudaMemcpyDefault);
+        cudaMemcpy(this->edges, edges.data(), edges.size() * sizeof(int), cudaMemcpyDefault);
     }
 };
 
