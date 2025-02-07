@@ -1,9 +1,11 @@
 #define CUDA_SOURCE
 #include "bounds3.h"
 #include "thread_local_toi.cuh"
+#include "buffer.h"
 using namespace Eigen;
 namespace cuda {
 using namespace cuda;
+using namespace ShayCUDA;
 func int cubic_roots(scalar roots[3], scalar coef[4], scalar x0, scalar x1);
     
 inline func scalar area(const vec3& a, const vec3& b, const vec3& c)
@@ -264,7 +266,8 @@ func scalar ee_collision_time(
 
 __global__ void ccd_toi(int nvi, int nfj, int* vilist, int* fjlist, lu* viaabbs, lu* fjaabbs, vec3* v0s, vec3* v1s, Face* f0s, Face* f1s, scalar* toi)
 {
-    int i = threadIdx.x + blockDim.x * blockIdx.x, int j = threadIdx.y + blockDim.y * blockIdx.y;
+    TID(tid, nvi * nfj);
+    int i = tid / nfj, j = tid % nfj;
     int vi = vilist[i], fj = fjlist[j];
     if(i < nvi && j < nfj) {
 
@@ -279,21 +282,21 @@ __global__ void ccd_toi(int nvi, int nfj, int* vilist, int* fjlist, lu* viaabbs,
 
 scalar cuda_pt_list_toi(int nvi, int nfj, int* vilist, int* fjlist, lu* viaabbs, lu* fjaabbs, vec3* v0s, vec3* v1s, Face* f0s, Face* f1s)
 {
-    scalar* toi;
+    VtBuffer<int> dev_vilist, dev_fjlist; 
+    VtBuffer<lu> dev_viaabbs, dev_fjaabbs;
+    VtBuffer<vec3> dev_v0s, dev_v1s;
+    VtBuffer<Face> dev_f0s, dev_f1s;
+    VtBuffer<scalar> toi(1);
 
-    int *dev_vilist, *dev_fjlist;
-    lu *dev_viaabbs, *dev_fjaabbs;
-    vec3 *dev_v0s, *dev_v1s;
-    Face *dev_f0s, *dev_f1s;
-    cudaMalloc(&dev_vilist, sizeof(int) * nvi);
-    cudaMalloc(&dev_fjlist, sizeof(int) * nfj);
-    cudaMalloc(&dev_viaabbs, sizeof(lu) * nvi);
-    cudaMalloc(&dev_fjaabbs, sizeof(lu) * nfj);
-    cudaMalloc(&dev_v0s, sizeof(vec3) * nvi);
-    cudaMalloc(&dev_v1s, sizeof(vec3) * nvi);
-    cudaMalloc(&dev_f0s, sizeof(Face) * nfj);
-    cudaMalloc(&dev_f1s, sizeof(Face) * nfj);
-    cudaMalloc(&toi, sizeof(scalar));
+    dev_vilist.resize(nvi);
+    dev_fjlist.resize(nfj);
+    dev_viaabbs.resize(nvi);
+    dev_fjaabbs.resize(nfj);    
+    dev_v0s.resize(nvi);
+    dev_v1s.resize(nvi);
+    dev_f0s.resize(nfj);
+    dev_f1s.resize(nfj);
+
 
     cudaMemcpy(dev_vilist, vilist, sizeof(int) * nvi, cudaMemcpyHostToDevice);
     cudaMemcpy(dev_fjlist, fjlist, sizeof(int) * nfj, cudaMemcpyHostToDevice);
@@ -303,9 +306,8 @@ scalar cuda_pt_list_toi(int nvi, int nfj, int* vilist, int* fjlist, lu* viaabbs,
     cudaMemcpy(dev_v1s, v1s, sizeof(vec3) * nvi, cudaMemcpyHostToDevice);
     cudaMemcpy(dev_f0s, f0s, sizeof(Face) * nfj, cudaMemcpyHostToDevice);
     cudaMemcpy(dev_f1s, f1s, sizeof(Face) * nfj, cudaMemcpyHostToDevice);
-    scalar* ret = new scalar;
-    *ret = 1.0;
-    cudaMemcpy(toi, ret, sizeof(scalar), cudaMemcpyHostToDevice);
+    scalar ret = 1.0;
+    cudaMemcpy(toi, &ret, sizeof(scalar), cudaMemcpyHostToDevice);
     int gx, gy, bx, by;
     if(nvi > 32) {
         gx = (nvi + 31) / 32;
@@ -324,19 +326,21 @@ scalar cuda_pt_list_toi(int nvi, int nfj, int* vilist, int* fjlist, lu* viaabbs,
         by = nfj;
     }
     dim3 grid_dim(gx, gy), block_dim(bx, by);
-    ccd_toi<<<grid_dim, block_dim>>>(nvi, nfj, dev_vilist, dev_fjlist, dev_viaabbs, dev_fjaabbs, dev_v0s, dev_v1s, dev_f0s, dev_f1s, toi);
-    cudaMemcpy(ret, toi, sizeof(scalar), cudaMemcpyDeviceToHost);
+    CUDA_CALL_RET(ccd_toi, nvi * nfj)(nvi, nfj, dev_vilist, dev_fjlist, dev_viaabbs, dev_fjaabbs, dev_v0s, dev_v1s, dev_f0s, dev_f1s, toi);
 
-    cudaFree(dev_vilist);
-    cudaFree(dev_fjlist);
-    cudaFree(dev_viaabbs);
-    cudaFree(dev_fjaabbs);
-    cudaFree(dev_v0s);
-    cudaFree(dev_v1s);
-    cudaFree(dev_f0s);
-    cudaFree(dev_f1s);
-    cudaFree(toi);
-    return *ret;
+    // ccd_toi<<<grid_dim, block_dim>>>(nvi, nfj, dev_vilist, dev_fjlist, dev_viaabbs, dev_fjaabbs, dev_v0s, dev_v1s, dev_f0s, dev_f1s, toi);
+    cudaMemcpy(&ret, toi, sizeof(scalar), cudaMemcpyDeviceToHost);
+
+    // cudaFree(dev_vilist);
+    // cudaFree(dev_fjlist);
+    // cudaFree(dev_viaabbs);
+    // cudaFree(dev_fjaabbs);
+    // cudaFree(dev_v0s);
+    // cudaFree(dev_v1s);
+    // cudaFree(dev_f0s);
+    // cudaFree(dev_f1s);
+    // cudaFree(toi);
+    return ret;
 }
 
 ThreadLocalToI::ThreadLocalToI(int nx, int ny)
@@ -376,25 +380,7 @@ scalar ThreadLocalToI::pt_list_toi(int nvi, int nfj, int* vilist, int* fjlist, l
     cudaMemcpyAsync(dev_f1s, f1s, sizeof(Face) * nfj, cudaMemcpyHostToDevice, stream);
     scalar ret = 1.0;
     cudaMemcpyAsync(toi, &ret, sizeof(scalar), cudaMemcpyHostToDevice, stream);
-    int gx, gy, bx, by;
-    if(nvi > 32) {
-        gx = (nvi + 31) / 32;
-        bx = 32;
-    }
-    else {
-        gx = 1;
-        bx = nvi;
-    }
-    if(nfj > 32) {
-        gy = (nfj + 31) / 32;
-        by = 32;
-    }
-    else {
-        gy = 1;
-        by = nfj;
-    }
-    dim3 grid_dim(gx, gy), block_dim(bx, by);
-    ccd_toi<<<grid_dim, block_dim, 0, stream>>>(nvi, nfj, dev_vilist, dev_fjlist, dev_viaabbs, dev_fjaabbs, dev_v0s, dev_v1s, dev_f0s, dev_f1s, toi);
+    CUDA_CALL_RET(ccd_toi, nvi * nfj)(nvi, nfj, dev_vilist, dev_fjlist, dev_viaabbs, dev_fjaabbs, dev_v0s, dev_v1s, dev_f0s, dev_f1s, toi);
     cudaMemcpyAsync(&ret, toi, sizeof(scalar), cudaMemcpyDeviceToHost, stream);
     return ret;
 }

@@ -37,12 +37,15 @@ set(CUDA_SOURCE
     model/cuda/ccd.cu
     model/cuda/dist.cu
     model/cuda/cubic_roots.cu
+)
+
+set(CUDA_HEADERS
     model/cuda/thread_local_toi.cuh
     model/cuda/buffer.h
     model/cuda/helper_cuda.h
     model/cuda/helper_math.h
     model/cuda/helper_string.h
-)
+) 
 set(HEADERS 
     cyCodeBase/cyCore.h
     cyCodeBase/cyPolynomial.h
@@ -78,6 +81,7 @@ set(HEADERS
     view/model.h
     view/shader.h
     view/stb_image.h
+    ${CUDA_HEADERS}
 )
 
 set(SOURCE 

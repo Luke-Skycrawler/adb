@@ -27,6 +27,13 @@
 #define CUDA_CALL_V(function, ...) \
 	function <<<__VA_ARGS__>>>
 
+
+ 
+#define CUDA_CALL_RET(function, totalThreads)                                       \
+    if(totalThreads == 0) return ret;                                               \
+    uint function##_numBlocks, function##_numThreads;                           \
+    ComputeGridSize(totalThreads, function##_numBlocks, function##_numThreads); \
+    function<<<function##_numBlocks, function##_numThreads>>>
 namespace ShayCUDA
 {
 	typedef unsigned int uint;
