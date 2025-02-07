@@ -23,7 +23,7 @@ tuple<mat12, vec12> IPC::ipc_hess_pt_12x12(
 {
     int _i = ij[0], v = ij[1], _j = ij[2], f = ij[3];
 
-    auto p = pt[0], t0 = pt[1], t1 = pt[2], t2 = pt[3];
+    auto p = pt.col(0), t0 = pt.col(1), t1 = pt.col(2), t2 = pt.col(3);
 
     Vector<scalar, 12> pt_grad;
     Matrix<scalar, 12, 12> pt_hess;
@@ -51,8 +51,8 @@ tuple<mat12, vec12, scalar> IPC::ipc_hess_ee_12x12(
     int _i = ij[0], _ei = ij[1], _j = ij[2], _ej = ij[3];
 
 
-    auto ei0 = ee[0], ei1 = ee[1],
-         ej0 = ee[2], ej1 = ee[3];
+    auto ei0 = ee.col(0), ei1 = ee.col(1),
+         ej0 = ee.col(2), ej1 = ee.col(3);
     vec12 ee_grad, p_grad;
     mat12 ee_hess, p_hess;
     scalar eps_x = globals.eps_x * (ei0 - ei1).squaredNorm() * (ej0 - ej1).squaredNorm();

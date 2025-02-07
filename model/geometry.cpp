@@ -17,9 +17,8 @@ Edge AffineBody::edge(int id, bool b, bool batch) const
         ret.e1 = vt2(_1);
     }
     else {
-        mat3 a;
-        vec3 b = q[0];
-        a << q[1], q[2], q[3];
+        mat3 a = q.block<3, 3>(0, 1);
+        vec3 b = q.col(0);
         ret.e0 = a * vertices(_0) + b;
         ret.e1 = a * vertices(_1) + b;
     }
@@ -44,9 +43,8 @@ Face AffineBody::face(int id, bool b, bool batch) const
         ret.t2 = vt2(_c);
     }
     else {
-        mat3 a;
-        vec3 b = q[0];
-        a << q[1], q[2], q[3];
+        mat3 a = q.block<3, 3>(0, 1);
+        vec3 b = q.col(0);
         ret.t0 = a * vertices(_a) + b;
         ret.t1 = a * vertices(_b) + b;
         ret.t2 = a * vertices(_c) + b;

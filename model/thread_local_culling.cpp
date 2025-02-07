@@ -268,7 +268,8 @@ void vf_col_set(vector<int>& vilist, vector<int>& fjlist,
                 auto& f{ fjs[j] };
                 auto [d, pt_type] = vf_distance(v, f);
                 if (d < barrier::d_hat) {
-                    q4 pt = { v, f.t0, f.t1, f.t2 };
+                    q4 pt;
+                    pt << v, f.t0, f.t1, f.t2 ;
                     i4 ij = { I, vi, J, fj };
                     {
                         pts.push_back(pt);
@@ -334,8 +335,10 @@ void ee_col_set(vector<int>& eilist, vector<int>& ejlist,
                 int ei = eilist[i], ej = ejlist[j];
                 auto ee_type = ipc::edge_edge_distance_type(eii.e0, eii.e1, ejj.e0, ejj.e1);
                 scalar d = ipc::edge_edge_distance(eii.e0, eii.e1, ejj.e0, ejj.e1, ee_type);
-                if (d < barrier::d_hat) {
-                    q4 ee = { eii.e0, eii.e1, ejj.e0, ejj.e1 };
+                if(d < barrier::d_hat) {
+                    q4 ee;
+                    
+                    ee << eii.e0, eii.e1, ejj.e0, ejj.e1;
                     i4 ij = { I, ei, J, ej };
                     {
                         ees.push_back(ee);
@@ -365,7 +368,8 @@ void pt_col_set_task(
     if (!pt_intersects) return;
     auto [d, pt_type] = vf_distance(v, f);
     if (d < barrier::d_hat) {
-        q4 pt = { v, f.t0, f.t1, f.t2 };
+        q4 pt;
+        pt << v, f.t0, f.t1, f.t2;
         i4 ij = { I, vi, J, fj };
         {
             pts.push_back(pt);
@@ -385,7 +389,8 @@ void ee_col_set_task(
     auto ee_type = ipc::edge_edge_distance_type(eii.e0, eii.e1, ejj.e0, ejj.e1);
     scalar d = ipc::edge_edge_distance(eii.e0, eii.e1, ejj.e0, ejj.e1, ee_type);
     if (d < barrier::d_hat) {
-        q4 ee = { eii.e0, eii.e1, ejj.e0, ejj.e1 };
+        q4 ee;
+        ee << eii.e0, eii.e1, ejj.e0, ejj.e1;
         i4 ij = { I, ei, J, ej };
 
         {

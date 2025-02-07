@@ -24,7 +24,7 @@ scalar ee_uktk(
     Matrix<scalar, 2, 12>& Tk_T_ret, Vector<scalar, 2>& uk_ret, scalar d, scalar mollifier)
 {
     auto v_stack = ee_vstack(ci, cj, ij[1], ij[3]);
-    auto ei0 = ee[0], ei1 = ee[1], ej0 = ee[2], ej1 = ee[3];
+    vec3 ei0 = ee.col(0), ei1 = ee.col(1), ej0 = ee.col(2), ej1 = ee.col(3);
     auto rei = ei0 - ei1, rej = ej0 - ej1;
     auto cnorm = rei.cross(rej).squaredNorm();
     auto sin2 = cnorm / rei.squaredNorm() / rej.squaredNorm();
@@ -82,7 +82,7 @@ scalar ee_uktk(
     };
     clip(lams(0), 0.0, 1.0);
     clip(lams(1), 0.0, 1.0);
-    array<scalar, 4> lambdas = { 1 - lams(0), lams(0), 1 - lams(1), lams(1) };
+    Eigen::Vector<scalar, 4> lambdas = { 1 - lams(0), lams(0), 1 - lams(1), lams(1) };
     // if (par) {
     //     // ignore this friction, already handled in point-triangle pair
     //     lambdas = { 0.0, 0.0, 0.0, 0.0 };
@@ -149,8 +149,8 @@ void IPC::ipc_term_ee(
 
     const auto &eidxi = ci.edges, &eidxj = cj.edges;
 
-    auto ei0 = ee[0], ei1 = ee[1],
-         ej0 = ee[2], ej1 = ee[3];
+    auto ei0 = ee.col(0), ei1 = ee.col(1),
+         ej0 = ee.col(2), ej1 = ee.col(3);
 
     int ii = _i, jj = _j;
 

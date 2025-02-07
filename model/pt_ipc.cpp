@@ -27,43 +27,43 @@ scalar pt_uktk(
 {
 
     Vector<scalar, 12> v_stack = pt_vstack(ci, cj, ij[1], ij[3]);
-
-    auto lams = ::ipc::point_triangle_closest_point(pt[0], pt[1], pt[2], pt[3]);
+    vec3 pt0 = pt.col(0), pt1 = pt.col(1), pt2 = pt.col(2), pt3 = pt.col(3);
+    auto lams = ::ipc::point_triangle_closest_point(pt0, pt1, pt2, pt3);
     array<scalar, 3> tlams = { 1 - lams(0) - lams(1), lams(0), lams(1) };
-    auto Pk = ::ipc::point_triangle_tangent_basis(pt[0], pt[1], pt[2], pt[3]);
+    auto Pk = ::ipc::point_triangle_tangent_basis(pt0, pt1, pt2, pt3);
 
     if (pt_type == ::ipc::PointTriangleDistanceType::P_T)
         ; // do nothing
     else if (pt_type == ::ipc::PointTriangleDistanceType::P_T0) {
-        Pk = ::ipc::point_point_tangent_basis(pt[0], pt[1]);
+        Pk = ::ipc::point_point_tangent_basis(pt0, pt1);
         tlams = { 1.0, 0.0, 0.0 };
     }
     else if (pt_type == ::ipc::PointTriangleDistanceType::P_T1) {
-        Pk = ::ipc::point_point_tangent_basis(pt[0], pt[2]);
+        Pk = ::ipc::point_point_tangent_basis(pt0, pt2);
         tlams = { 0.0, 1.0, 0.0 };
     }
     else if (pt_type == ::ipc::PointTriangleDistanceType::P_T2) {
-        Pk = ::ipc::point_point_tangent_basis(pt[0], pt[3]);
+        Pk = ::ipc::point_point_tangent_basis(pt0, pt3);
         tlams = { 0.0, 0.0, 1.0 };
     }
     else if (pt_type == ::ipc::PointTriangleDistanceType::P_E0) {
-        auto elam = ::ipc::point_edge_closest_point(pt[0], pt[1], pt[2]);
+        auto elam = ::ipc::point_edge_closest_point(pt0, pt1, pt2);
         tlams = { 1.0f - elam, elam, 0.0f };
-        Pk = ::ipc::point_edge_tangent_basis(pt[0], pt[1], pt[2]);
+        Pk = ::ipc::point_edge_tangent_basis(pt0, pt1, pt2);
     }
     else if (pt_type == ::ipc::PointTriangleDistanceType::P_E1) {
-        auto elam = ::ipc::point_edge_closest_point(pt[0], pt[2], pt[3]);
+        auto elam = ::ipc::point_edge_closest_point(pt0, pt2, pt3);
         tlams = { 0.0f, 1.0f - elam, elam };
-        Pk = ::ipc::point_edge_tangent_basis(pt[0], pt[2], pt[3]);
+        Pk = ::ipc::point_edge_tangent_basis(pt0, pt2, pt3);
     }
     else if (pt_type == ::ipc::PointTriangleDistanceType::P_E2) {
-        auto elam = ::ipc::point_edge_closest_point(pt[0], pt[3], pt[1]);
+        auto elam = ::ipc::point_edge_closest_point(pt0, pt3, pt1);
         tlams = { elam, 0.0f, 1.0f - elam };
-        Pk = ::ipc::point_edge_tangent_basis(pt[0], pt[3], pt[1]);
+        Pk = ::ipc::point_edge_tangent_basis(pt0, pt3, pt1);
     }
 
-    auto tp = (pt[1] * tlams[0] + pt[2] * tlams[1] + pt[3] * tlams[2]);
-    auto closest = (pt[0] - tp).squaredNorm();
+    auto tp = (pt1 * tlams[0] + pt2 * tlams[1] + pt3 * tlams[2]);
+    auto closest = (pt0 - tp).squaredNorm();
     assert(abs(d - closest) < 1e-12);
     const auto to_int = [](const ::ipc::PointTriangleDistanceType& pt_type) {
         if (pt_type == ::ipc::PointTriangleDistanceType::P_T)

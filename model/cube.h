@@ -64,7 +64,7 @@ struct Cube: AffineBody {
     }
     void draw(Shader &shader) const;
     inline void predraw(){
-        p = q[0];
-        A << q[1], q[2], q[3];
+        p = q.col(0);
+        A = q.block<3, 3>(0, 1);
     }
 };

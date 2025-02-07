@@ -34,7 +34,7 @@ void ABD::implicit_euler(scalar dt) {
     for (int k = 0; k < cubes.size(); k++) {
         auto& c(*cubes[k]);
         for (int i = 0; i < 4; i++) {
-            c.q[i] = c.q0[i];
+            c.q.col(i) = c.q0.col(i);
         }
     }
     
@@ -96,7 +96,7 @@ void ABD::implicit_euler(scalar dt) {
 #pragma omp parallel for schedule(static)
         for(int i = 0; i < n_cubes; i++) {
             for(int j = 0; j < 4; j++)
-                cubes[i]->q[j] += dq.segment<3>(i * 12 + j * 3);
+                cubes[i]->q.col(j) += dq.segment<3>(i * 12 + j * 3);
         }
 
         auto iter_duration = DURATION_TO_DOUBLE(newton_iter_start);
@@ -128,13 +128,8 @@ void ABD::implicit_euler(scalar dt) {
 #pragma omp parallel for schedule(static)
     for(int k = 0; k < n_cubes; k++) {
         auto& c(*cubes[k]);
-        for(int i = 0; i < 4; i++) {
-            c.dqdt[i] = (c.q[i] - c.q0[i]) / dt;
-            c.q0[i] = c.q[i];
-        }
-        // c.p = c.q0[0];
-        // c.A << c.q0[1], c.q0[2], c.q0[3];
-        // c.project_vt1();
+        c.dqdt = (c.q - c.q0) / dt;
+        c.q0 = c.q; 
         c.predraw();
     }
 }
@@ -316,8 +311,10 @@ void ABD::ipc()
             auto &ci(*cubes[i]), &cj(*cubes[j]);
             Face f{ cj.face(int(ij[3]), false, true) };
             vec3 p{ ci.v_transformed[ij[1]] };
-            q4 pt{ p, f.t0, f.t1, f.t2 };
-            auto [d, pt_type] = vf_distance(pt[0], f);
+            q4 pt;
+             
+            pt << p, f.t0, f.t1, f.t2;
+            auto [d, pt_type] = vf_distance(p, f);
             if(d < barrier::d_hat) {
                 vec12 gradp, gradt;
                 mat12 hess_p, hess_t, off_diag;
@@ -349,9 +346,15 @@ void ABD::ipc()
             int i = ij[0], j = ij[2];
             auto &ci(*cubes[i]), &cj(*cubes[j]);
             Edge ei{ ci.edge(int(ij[1]), false, true) }, ej{ cj.edge(int(ij[3]), false, true) };
-            q4 ee{ ei.e0, ei.e1, ej.e0, ej.e1 };
-            auto ee_type = ipc::edge_edge_distance_type(ee[0], ee[1], ee[2], ee[3]);
-            scalar d = edge_edge_distance(ee[0], ee[1], ee[2], ee[3], ee_type);
+            q4 ee;
+            ee << ei.e0, ei.e1, ej.e0, ej.e1;
+            vec3 ee0, ee1, ee2, ee3; 
+            ee0 = ei.e0;
+            ee1 = ei.e1;
+            ee2 = ej.e0;
+            ee3 = ej.e1;
+            auto ee_type = ipc::edge_edge_distance_type(ee0, ee1, ee2, ee3);
+            scalar d = edge_edge_distance(ee0, ee1, ee2, ee3, ee_type);
             if(d < barrier::d_hat) {
                 mat12 hess_0, hess_1, off_diag;
                 vec12 grad_0, grad_1;

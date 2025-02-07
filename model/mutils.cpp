@@ -45,7 +45,7 @@ vec12 cat(const q4& q)
 {
     vec12 ret;
     for (int i = 0; i < 4; i++) {
-        ret.segment<3>(i * 3) = q[i];
+        ret.segment<3>(i * 3) = q.col(i);
     }
     return ret;
 }
@@ -265,12 +265,10 @@ void player_load(
 
     for (int i = 0; i < n_cubes; i++) {
         auto& c{ *cubes[i] };
-        for (int j = 0; j < 4; j++)
-            in.read((char*)c.q0[j].data(), 3 * sizeof(scalar));
-        for (int j = 0; j < 4; j++)
-            in.read((char*)c.dqdt[j].data(), 3 * sizeof(scalar));
-        c.p = c.q0[0];
-        c.A << c.q0[1], c.q0[2], c.q0[3];
+        in.read((char*)c.q0.data(), 12 * sizeof(scalar));
+        in.read((char*)c.dqdt.data(), 12 * sizeof(scalar));
+        c.p = c.q0.col(0);
+        c.A = c.q0.block<3, 3>(0, 1);
     }
     in.close();
 }
@@ -283,8 +281,7 @@ void dump_states(
     int n_cubes = cubes.size();
     for (int i = 0; i < n_cubes; i++) {
         auto& c{ *cubes[i] };
-        for (int j = 0; j < 4; j++)
-            out.write((char*)c.q[j].data(), 3 * sizeof(scalar));
+        out.write((char*)c.q.data(), 12 * sizeof(scalar));
         for (int j = 0; j < 4; j++)
             out.write((char*)c.dq.segment<3>(j * 3).data(), 3 * sizeof(scalar));
     }
@@ -320,10 +317,8 @@ void player_save(
     int n_cubes = cubes.size();
     for (int i = 0; i < n_cubes; i++) {
         auto& c{ *cubes[i] };
-        for (int j = 0; j < 4; j++)
-            out.write((char*)c.q0[j].data(), 3 * sizeof(scalar));
-        for (int j = 0; j < 4; j++)
-            out.write((char*)c.dqdt[j].data(), 3 * sizeof(scalar));
+        out.write((char*)c.q.data(), 12 * sizeof(scalar));
+        out.write((char*)c.dqdt.data(), 12 * sizeof(scalar));
     }
     out.close();
 }

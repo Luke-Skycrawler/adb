@@ -25,11 +25,13 @@ inline mat3 cross_matrix(const vec3& a)
         -a[1], a[0], 0;
     return ret;
 }
-inline q4 skew(const vec3& a)
+inline mat3 skew(const vec3& a)
 {
-    return {
+    mat3 ret; 
+    ret <<
         -vec3(0, -a[2], a[1]),
         -vec3(a[2], 0, -a[0]),
         -vec3(-a[1], a[0], 0)
-    };
+    ;
+    return ret; 
 }

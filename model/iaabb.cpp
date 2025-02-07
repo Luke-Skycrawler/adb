@@ -49,12 +49,12 @@ lu affine(const lu& aabb, q4& q)
                 _cull(1, I) = j ? u(1) : l(1);
                 _cull(2, I) = k ? u(2) : l(2);
             }
-    mat3 A;
-    A << q[1], q[2], q[3];
+    mat3 A = q.block<3, 3>(0, 1);
+    vec3 b = q.col(0);
     cull = A * _cull;
     l = cull.rowwise().minCoeff();
     u = cull.rowwise().maxCoeff();
-    return { l + q[0], u + q[0] };
+    return { l + b, u + b };
 }
 
 
@@ -63,7 +63,7 @@ lu affine(lu aabb, AffineBody& c, int vtn)
 {
     auto qi = vtn == 0 ? c.q0 : c.q;
     if (vtn >= 2)
-        for (int i = 0; i < 4; i++) qi[i] += c.dq.segment<3>(i * 3);
+        for (int i = 0; i < 4; i++) qi.col(i) += c.dq.segment<3>(i * 3);
     if (vtn == 3) {
         auto bt0{ affine(aabb, c.q) }, bt1{ affine(aabb, qi) };
         return { merge(bt0, bt1) };
@@ -459,9 +459,8 @@ scalar IAABB::primitive_brute_force(
     for (int i = 0; i < n_cubes; i++) {
         auto& c{ *cubes[i] };
         auto offset = vertex_starting_index[i];
-        mat3 a;
-        vec3 b = c.q[0];
-        a << c.q[1], c.q[2], c.q[3];
+        mat3 a = c.q.block<3, 3>(0, 1);
+        vec3 b = c.q.col(0);
         for (int j = 0; j < c.n_vertices; j++) {
             vt1_buffer[j + offset] = a * c.vertices(j) + b;
         }

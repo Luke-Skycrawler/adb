@@ -32,24 +32,21 @@ struct AffineBody {
     void compute_R0();
 
     inline vec3 vt0(int i) const {
-        mat3 a;
-        vec3 b = q0[0];
-        a << q0[1] , q0[2], q0[3];
+        mat3 a = q.block<3, 3>(0, 1);
+        vec3 b = q0.col(0);
         return a * vertices(i) + b;
     }
 
     inline vec3 vt1(int i) const {
-        mat3 a;
-        vec3 b = q[0];
-        a << q[1] , q[2], q[3];
+        mat3 a = q.block<3, 3>(0, 1);
+        vec3 b = q.col(0);
         return a * vertices(i) + b;
     }
     
     inline vec3 vt2(int i) const {
-        mat3 a;
-        vec3 b = q[0];
+        mat3 a = q.block<3, 3>(0, 1);
+        vec3 b = q.col(0);
         b += dq.segment<3>(0);
-        a << q[1] , q[2], q[3];
         for (int i = 1; i < 4; i ++){
             a.col(i - 1) += dq.segment<3>(i * 3);
         }
@@ -58,19 +55,17 @@ struct AffineBody {
 
     inline void project_vt1()
     {
-        mat3 a;
-        vec3 b = q[0];
-        a << q[1], q[2], q[3];
+        mat3 a = q.block<3, 3>(0, 1);
+        vec3 b = q.col(0);
         for (int i = 0; i < n_vertices; i++) {
             v_transformed[i] = a * vertices(i) + b;
         }
     }
     inline void project_vt2()
     {
-        mat3 a;
-        vec3 b = q[0];
+        mat3 a = q.block<3, 3>(0, 1);
+        vec3 b = q.col(0);
         b += dq.segment<3>(0);
-        a << q[1], q[2], q[3];
         for (int i = 1; i < 4; i++) {
             a.col(i - 1) += dq.segment<3>(i * 3);
         }
@@ -80,9 +75,8 @@ struct AffineBody {
     }
     inline void project_vt0()
     {
-        mat3 a;
-        vec3 b = q0[0];
-        a << q0[1], q0[2], q0[3];
+        mat3 a = q.block<3, 3>(0, 1);
+        vec3 b = q0.col(0);
         for (int i = 0; i < n_vertices; i++) {
             v_transformed[i] = a * vertices(i) + b;
         }
@@ -95,15 +89,14 @@ struct AffineBody {
     {
         v_transformed.resize(n_vertices);
         A.setIdentity(3, 3);
-        q = {
+        q <<
             p, 
             vec3(1.0, 0.0, 0.0),
             vec3(0.0, 1.0, 0.0),
             vec3(0.0, 0.0, 1.0)
-        };
+        ;
         q0 = q;
-        for (int i= 0; i < 4; i++)
-            dqdt[i].setZero(3);
+        dqdt.setZero();
     }
 };
 

@@ -137,8 +137,10 @@ void gen_collision_set(
                     int I = c.body, v = c.pid;
                     vec3 p = cubes[I]->v_transformed[v];
                     auto [d, pt_type] = vf_distance(p, _f);
-                    if (d < barrier::d_hat * (globals.safe_factor * globals.safe_factor)) {
-                        q4 pt = { p, _f.t0, _f.t1, _f.t2 };
+                    if(d < barrier::d_hat * (globals.safe_factor * globals.safe_factor)) {
+                        q4 pt;
+                        pt <<
+                        p, _f.t0, _f.t1, _f.t2;
                         i4 ij { I, v, J, f };
                         {
                             pts_private.push_back(pt);
@@ -288,8 +290,10 @@ void gen_collision_set(
                     Edge _ei{ cubes[I]->edge(ei, vt2, vt2) };
                     auto ee_type = ipc::edge_edge_distance_type(_ei.e0, _ei.e1, e.e0, e.e1);
                     scalar d = ipc::edge_edge_distance(_ei.e0, _ei.e1, e.e0, e.e1, ee_type);
-                    if (d < barrier::d_hat * (globals.safe_factor * globals.safe_factor)) {
-                        q4 ee = { _ei.e0, _ei.e1, e.e0, e.e1 };
+                    if(d < barrier::d_hat * (globals.safe_factor * globals.safe_factor)) {
+                        q4 ee;
+                        
+                        ee << _ei.e0, _ei.e1, e.e0, e.e1;
                         i4 ij = { I, ei, J, ej };
                         {
                             ees_private.push_back(ee);
