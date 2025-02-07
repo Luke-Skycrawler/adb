@@ -85,7 +85,6 @@ set(SOURCE
     model/line_search.cpp
     model/othogonal_energy.cpp
     model/barrier.cpp
-    model/euler.cpp
     model/collision.cpp
     model/sparse.cpp
     model/spatial_hashing.cpp

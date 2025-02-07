@@ -59,7 +59,7 @@ struct GlobalVariableMainCPP{
     scalar dt;
     int max_iter, tot_iter, ts, set_size, starting_ts, ending_ts;
     std::vector<unique_ptr<AffineBody>> cubes;
-        std::map<std::string, unique_ptr<Model>> loaded_models;
+    std::map<std::string, unique_ptr<Model>> loaded_models;
 
     vec3 gravity;
     scalar alpha, beta;

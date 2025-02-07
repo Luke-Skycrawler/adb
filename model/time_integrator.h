@@ -18,7 +18,6 @@ struct HessBlock {
     }
 };
 
-void implicit_euler(std::vector<std::unique_ptr<AffineBody>>& cubes, scalar dt);
 void gen_collision_set(
     bool vt2, int n_cubes,
     const std::vector<std::unique_ptr<AffineBody>>& cubes,

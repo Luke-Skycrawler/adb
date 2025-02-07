@@ -83,23 +83,10 @@ int main()
 
     // build and compile our shader zprogram
     // ------------------------------------
-    // Shader lightingShader("shaders/geom.vert","shaders/geom.frag","shaders/geom_.geom",varyings);
-    // cursor shader version 1
-
-    // Shader lightingShader("shaders/cursor.vert", "shaders/cursor.frag", "shaders/cursor.geom");
-    // version 2
-
-    // Shader lightingShader("shaders/1.color.vert", "shaders/1.color.frag");
      Shader lightingShader("shaders/shadow/shadow.vert", "shaders/shadow/shadow.frag");
-    // shadow shader
-
-    // Shader lightingShader("shaders/1.color_.vert", "shaders/1.color_.frag","shaders/pass_through.geom");
-    // depth shader? don't use this
 
     unsigned int feedback_vbo = lightingShader.vbo[0], select_xfb = lightingShader.xfb;
     unsigned int select_program = lightingShader.ID;
-    // unsigned int select_program=Feedback_Initialize(&feedback_vbo,&select_xfb);
-    // Shader lightCubeShader("shaders/1.light_cube.vs", "shaders/1.light_cube.fs");
     Shader simpleShader("shaders/1.color.vs", "shaders/simple.fs");
     Shader screenShader("shaders/view.vs", "shaders/core.fs");
     Shader skyboxShader("shaders/skycube.vs", "shaders/skycube.fs");
@@ -125,26 +112,6 @@ int main()
 // ------------------------------------------------------------------
 // set up vertex data (and buffer(s)) and configure vertex attributes
 // ------------------------------------------------------------------
-#ifdef FEATURE_POSTRENDER
-    unsigned int quadVBO, quadVAO;
-    float quad[] = {
-        -1.0f, 1.0f, 0.0f, 1.0f,
-        -1.0f, -1.0f, 0.0f, 0.0f,
-        1.0f, -1.0f, 1.0f, 0.0f,
-        -1.0f, 1.0f, 0.0f, 1.0f,
-        1.0f, -1.0f, 1.0f, 0.0f,
-        1.0f, 1.0f, 1.0f, 1.0f};
-    glGenVertexArrays(1, &quadVAO);
-    glGenBuffers(1, &quadVBO);
-
-    glBindVertexArray(quadVAO);
-    glBindBuffer(GL_ARRAY_BUFFER, quadVBO);
-    glBufferData(GL_ARRAY_BUFFER, sizeof(quad), &quad, GL_STATIC_DRAW);
-    glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 4 * sizeof(float), (void *)0);
-    glEnableVertexAttribArray(0);
-    glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 4 * sizeof(float), (void *)(2 * sizeof(float)));
-    glEnableVertexAttribArray(1);
-#endif
 
     float corner[] = {
         0.5f, 1.0f, 0.0f, 1.0f,
@@ -164,13 +131,6 @@ int main()
     glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 4 * sizeof(float), (void *)(2 * sizeof(float)));
     glEnableVertexAttribArray(1);
 
-#ifdef FEATURE_MODEL
-    // load models
-    Model b_model("assets/bunny.obj");
-    auto &b_mesh = b_model.meshes[0];
-    auto bunny = make_unique<AffineObject>(b_mesh);
-    globals.cubes.push_back(move(bunny));
-#endif
     Light lights(globals.light_positions, 4);
 
     // load textures (we now use a utility function to keep the code more organized)
@@ -190,29 +150,6 @@ int main()
     screenShader.use();
     screenShader.setInt("screenTexture", 0);
     cornerShader.setInt("screenTexture", 0);
-
-#ifdef FEATURE_POSTRENDER
-    unsigned int framebuffer;
-    glGenFramebuffers(1, &framebuffer);
-    glBindFramebuffer(GL_FRAMEBUFFER, framebuffer);
-
-    unsigned int texColorBuffer;
-    glGenTextures(1, &texColorBuffer);
-    glBindTexture(GL_TEXTURE_2D, texColorBuffer);
-    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, SCR_WIDTH, SCR_HEIGHT, 0, GL_RGB, GL_UNSIGNED_BYTE, NULL);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-    glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, texColorBuffer, 0);
-    glFramebufferTexture2D(GL_FRAMEBUFFER, GL_DEPTH_STENCIL_ATTACHMENT, GL_TEXTURE_2D, texColorBuffer, 0);
-
-    unsigned int rbo;
-    glGenRenderbuffers(1, &rbo);
-    glBindRenderbuffer(GL_RENDERBUFFER, rbo);
-    glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH24_STENCIL8, SCR_WIDTH, SCR_HEIGHT);
-    glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_STENCIL_ATTACHMENT, GL_RENDERBUFFER, rbo);
-    if (glCheckFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE)
-        cout << "error: framebuffer\n";
-#endif
 
     glBindFramebuffer(GL_FRAMEBUFFER, 0);
 
@@ -234,7 +171,7 @@ int main()
     
     auto &lightPos{globals.light_positions[0]};
     // be sure to call after glfw intiailzation 
-    ABD abd(globals.cubes, globals);
+    ABD abd(globals);
     // render loop
     // -----------
     while (!glfwWindowShouldClose(window))
@@ -314,13 +251,9 @@ int main()
                 renderPlane();
             render_cubes(depthShader, globals.cubes);
 
-#ifdef FEATURE_POSTRENDER
-            glBindFramebuffer(GL_FRAMEBUFFER, globals.postrender ? framebuffer : 0);
-#endif
             glBindFramebuffer(GL_FRAMEBUFFER, 0);
             model = glm::mat4(1.0f);
         }
-        // glm::mat4 pick=glm::pickMatrix(glm::vec2(),glm::vec2(),glViewport())
 
         int viewport[4];
         glGetIntegerv(GL_VIEWPORT, viewport);
@@ -408,37 +341,6 @@ int main()
             // glDepthMask(GL_TRUE);
             glDepthFunc(GL_LESS);
         }
-#ifdef FEATURE_EDGE
-        if (globals.edge)
-        {
-            glStencilFunc(GL_NOTEQUAL, 1, 0XFF);
-            // glStencilMask(0x00);
-            glDisable(GL_DEPTH_TEST);
-            simpleShader.use();
-            simpleShader.setMat4("projection", projection);
-            simpleShader.setMat4("view", view);
-            simpleShader.setMat4("model", tmpmodel);
-            renderCube();
-            // glDrawArrays(GL_TRIANGLES,0,36);
-            glStencilMask(0xFF);
-            glEnable(GL_DEPTH_TEST);
-            glStencilFunc(GL_ALWAYS, 1, 0XFF);
-        }
-#endif
-#ifdef FEATURE_POSTRENDER
-        if (globals.postrender)
-        {
-            glBindFramebuffer(GL_FRAMEBUFFER, 0);
-            glDisable(GL_DEPTH_TEST);
-            glClearColor(1.0f, 1.0f, 1.0f, 1.0f);
-            glClear(GL_COLOR_BUFFER_BIT);
-            screenShader.use();
-            glBindVertexArray(quadVAO);
-            glActiveTexture(GL_TEXTURE0);
-            glBindTexture(GL_TEXTURE_2D, texColorBuffer);
-            glDrawArrays(GL_TRIANGLES, 0, 6);
-        }
-#endif
         if (globals.display_corner)
         {
             glBindFramebuffer(GL_FRAMEBUFFER, 0);
@@ -454,18 +356,6 @@ int main()
         glfwSwapBuffers(window);
         glfwPollEvents();
     }
-#ifdef FEATURE_POSTRENDER
-    // optional: de-allocate all resources once they've outlived their purpose:
-    // ------------------------------------------------------------------------
-    // glDeleteVertexArrays(1, &cubeVAO);
-    // glDeleteVertexArrays(1, &lightCubeVAO);
-    glDeleteVertexArrays(1, &quadVAO);
-    glDeleteBuffers(1, &quadVBO);
-    // glDeleteBuffers(1, &VBO);
-
-    // glfw: terminate, clearing all previously allocated GLFW resources.
-    // ------------------------------------------------------------------
-#endif
     glfwTerminate();
     return 0;
 }
