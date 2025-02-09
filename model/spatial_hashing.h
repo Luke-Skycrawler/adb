@@ -83,3 +83,71 @@ struct spatial_hashing {
         element_type group_exl,
         std::vector<Primitive> &ret);
 };
+
+
+// #pragma once
+// #include "common.cuh"
+#include "bounds3.h"
+#include "affine_body.h"
+struct Culling {
+    virtual void collision_detect() = 0;
+    int n_cubes; 
+    using i2 = Eigen::Vector2i;
+    using i3 = Eigen::Vector3i;
+    scalar d_hat_sqrt;
+    //AffineBody::DOF dof;
+    const std::vector<std::unique_ptr<AffineBody>>& cubes;  
+    // std::vector<lu>& aabbs;
+    std::vector<q4> &pts; 
+    std::vector<i4> &idx; 
+    std::vector<q4> &ees;
+    std::vector<i4> &eidx;
+    std::vector<i2> &vidx;
+
+    Culling(const std::vector<std::unique_ptr<AffineBody>>& cubes, std::vector<q4>& pts, std::vector<i4>& idx, std::vector<q4>& ees, std::vector<i4>& eidx, std::vector<i2>& vidx, scalar d_hat_sqrt)
+        : cubes(cubes), pts(pts), idx(idx), ees(ees), eidx(eidx), vidx(vidx), d_hat_sqrt(d_hat_sqrt)
+    {
+        n_cubes = cubes.size();
+    }
+    
+};
+
+struct SpatialHash: Culling {
+    void collision_detect();
+    // private: 
+    static const int cap = 64;
+    static const int overflow_cap = 4096;
+    struct Entry {
+        i2 body_prim; 
+        lu bb;
+    };
+    struct TableData {
+        Entry entries[cap]; 
+        int next = -1;
+        int cnt = 0;
+    };
+    struct OverflowData {
+        int next = -1;
+        Entry data;
+    };
+    int overflow_cnt;
+    std::vector<TableData> hash_table;
+    std::vector<OverflowData> overflow_table;
+    int bound = 16;
+
+    func void register_prim(const lu& bb, const Entry &body_prim);
+    func void clear();
+    func void query(const lu & bb, const Entry &body_prim);
+    func void query(const vec3& p, const Entry &body_prim);
+    func void append_collision_pt(const Entry &bpi, const Entry &bpj);
+    func void append_collision_ee(const Entry &bpi, const Entry &bpj);
+    func void push_back(int idx, const Entry &entry);
+    func int morton(const i3 &xyz);
+
+    inline SpatialHash(const std::vector<std::unique_ptr<AffineBody>>& cubes, std::vector<q4>& pts, std::vector<i4>& idx, std::vector<q4>& ees, std::vector<i4>& eidx, std::vector<i2>& vidx, scalar d_hat_sqrt)
+        : Culling(cubes, pts, idx, ees, eidx, vidx, d_hat_sqrt)
+    {
+        hash_table.resize(1 << 15);
+        overflow_table.resize(overflow_cap);
+    }
+};

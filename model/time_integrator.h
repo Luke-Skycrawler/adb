@@ -25,7 +25,7 @@ void gen_collision_set(
     std::vector<i4>& idx,
     std::vector<q4>& ees,
     std::vector<i4>& eidx,
-    std::vector<std::array<int, 2>>& vidx);
+    std::vector<i2>& vidx);
 
 scalar step_size_upper_bound(Eigen::Vector<scalar, -1>& dq, std::vector<std::unique_ptr<AffineBody>>& cubes,
     int n_cubes, int n_pt, int n_ee, int n_g,
@@ -33,7 +33,7 @@ scalar step_size_upper_bound(Eigen::Vector<scalar, -1>& dq, std::vector<std::uni
     std::vector<i4>& idx,
     std::vector<q4>& ees,
     std::vector<i4>& eidx,
-    std::vector<std::array<int, 2>>& vidx);
+    std::vector<i2>& vidx);
 
 void player_load(
     std::string& path,

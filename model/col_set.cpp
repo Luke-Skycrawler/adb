@@ -24,7 +24,7 @@ void gen_collision_set(
     vector<i4>& idx,
     vector<q4>& ees,
     vector<i4>& eidx,
-    vector<array<int, 2>>& vidx)
+    vector<i2>& vidx)
 {
 
     pts.resize(0);

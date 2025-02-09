@@ -33,7 +33,7 @@ inline func lu compute_aabb(const Edge& e, scalar d_hat_sqrt)
     return { l, u };
 }
 
-inline func lu compute_aabb(const Face& f)
+inline func lu compute_aabb(const Face& f, scalar d_hat_sqrt = 0.0)
 {
     vec3 l, u;
     auto t0 {f.t0.array()}, 
@@ -41,6 +41,8 @@ inline func lu compute_aabb(const Face& f)
         t2 {f.t2.array()};
     l = t0.min(t1).min(t2);
     u = t0.max(t1).max(t2);
+    l.array() -= d_hat_sqrt;
+    u.array() += d_hat_sqrt;
     return { l, u };
 }
 

@@ -210,7 +210,7 @@ scalar IAABB::primitive_brute_force(
     vector<i4>& idx,
     vector<q4>& ees,
     vector<i4>& eidx,
-    vector<array<int, 2>>& vidx)
+    vector<i2>& vidx)
 {
 
     scalar toi_global = 1.0, toi_ee_pt = 1.0;
@@ -550,7 +550,7 @@ scalar IAABB::iaabb_brute_force(
     std::vector<i4>& idx,
     std::vector<q4>& ees,
     std::vector<i4>& eidx,
-    std::vector<std::array<int, 2>>& vidx)
+    std::vector<i2>& vidx)
 {
     auto start = high_resolution_clock::now();
     vector<Intersection> ret;

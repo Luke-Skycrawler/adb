@@ -20,7 +20,7 @@ scalar E_barrier_plus_inert(
     const Vector<scalar, -1>& q_plus_dq, const Vector<scalar, -1>& dq, int n_cubes, 
     const vector<i4>& idx,
     const vector<i4>& eidx,
-    const vector<array<int, 2>>& vidx,
+    const vector<i2>& vidx,
     const vector<unique_ptr<AffineBody>>& cubes,
     scalar dt)
 {
@@ -88,7 +88,7 @@ scalar E_barrier_plus_inert(
 scalar E_global(const Vector<scalar, -1>& q_plus_dq, const Vector<scalar, -1>& dq, int n_cubes, int n_pt, int n_ee, int n_g,
     const vector<i4>& idx,
     const vector<i4>& eidx,
-    const vector<array<int, 2>>& vidx,
+    const vector<i2>& vidx,
     const vector<Matrix<scalar, 2, 12>>& pt_tk,
     const vector<Matrix<scalar, 2, 12>>& ee_tk,
     const vector<unique_ptr<AffineBody>>& cubes,
@@ -197,7 +197,7 @@ scalar E_fric(
     int n_pt, int n_ee, int n_g,
     const vector<i4>& idx,
     const vector<i4>& eidx,
-    const vector<array<int, 2>>& vidx,
+    const vector<i2>& vidx,
     const vector<Matrix<scalar, 2, 12>>& pt_tk,
     const vector<Matrix<scalar, 2, 12>>& ee_tk,
     const vector<scalar>& pt_contact_forces,

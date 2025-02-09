@@ -20,7 +20,7 @@ struct ABD {
         std::vector<i4>& idx,
         std::vector<q4>& ees,
         std::vector<i4>& eidx,
-        std::vector<std::array<int, 2>>& vidx,
+        std::vector<i2>& vidx,
         const std::vector<Eigen::Matrix<scalar, 2, 12>>& pt_tk,
         const std::vector<Eigen::Matrix<scalar, 2, 12>>& ee_tk,
         const std::vector<scalar>& pt_contact_forces,
@@ -62,7 +62,7 @@ struct ABD {
     std::vector<q4> ees;
     std::vector<i4> eidx;
 
-    std::vector<std::array<int, 2>> vidx;
+    std::vector<i2> vidx;
 
     std::vector<Eigen::Matrix<scalar, 2, 12>> pt_tk;
     std::vector<Eigen::Matrix<scalar, 2, 12>> ee_tk;

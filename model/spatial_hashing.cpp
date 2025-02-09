@@ -209,3 +209,192 @@ void spatial_hashing::query_edge_trajectory(
     vec3i l = tovec3i(_l);
     query_interval(l, u, group_exl, ret);
 }
+
+
+
+func void SpatialHash::register_prim(const lu& bb, const Entry &body_prim) {
+    const i3 l = bb.lower.array().floor().cast<int>(); 
+    const i3 u = bb.upper.array().floor().cast<int>();
+    for (int ii = l[0]; ii <= u[0]; ii ++){
+        for (int jj = l[1]; jj <= u[1]; jj ++){
+            for (int kk = l[2]; kk <= u[2]; kk ++){
+                int morton_code = morton({ii, jj, kk});
+                push_back(morton_code, body_prim);
+            }
+        }
+    }
+}
+
+func void SpatialHash::clear() {
+    for (int i = 0; i < hash_table.size(); i++) {
+        hash_table[i].next = -1;
+        hash_table[i].cnt = 0;
+    }
+}
+
+func void SpatialHash::query(const lu & bb, const Entry &body_prim) {
+    const i3 l = bb.lower.array().floor().cast<int>(); 
+    const i3 u = bb.upper.array().floor().cast<int>();
+    for (int ii = l[0]; ii <= u[0]; ii ++){
+        for (int jj = l[1]; jj <= u[1]; jj ++){
+            for (int kk = l[2]; kk <= u[2]; kk ++){
+                int morton_code = morton({ii, jj, kk});
+                
+                int cnt = hash_table[morton_code].cnt;
+                for (int i = 0; i < cnt; i++) {
+                    Entry entry = hash_table[morton_code].entries[i];
+                    append_collision_ee(body_prim, entry);
+                }
+                // ignore overflow for now
+            }
+        }
+    }
+}
+
+func void SpatialHash::query(const vec3 & p, const Entry &body_prim) {
+    const i3 pi = p.array().floor().cast<int>(); 
+    int morton_code = morton(pi);
+    
+    int cnt = hash_table[morton_code].cnt;
+    for (int i = 0; i < cnt; i++) {
+        Entry entry = hash_table[morton_code].entries[i];
+        append_collision_pt(body_prim, entry);
+    }
+    // ignore overflow for now
+}
+
+func void SpatialHash::append_collision_pt(const Entry &bpi, const Entry &bpj) {
+    i4 ij; 
+    ij << bpi.body_prim, bpj.body_prim;
+    if (bpi.bb.overlaps(bpj.bb) && ij[0] != ij[2]) {
+        idx.push_back(ij);
+    }
+}
+
+func void SpatialHash::append_collision_ee(const Entry &bpi, const Entry &bpj) {
+    i4 ij; 
+    ij << bpi.body_prim, bpj.body_prim;
+    if (bpi.bb.overlaps(bpj.bb) && ij[0] != ij[2]) {
+        eidx.push_back(ij);
+    }
+}
+
+func void SpatialHash::push_back(int idx, const Entry &entry) {
+    TableData &td = hash_table[idx];
+    if (td.cnt < cap) {
+        // FIXME: concurrency
+        td.entries[td.cnt] = entry;
+        td.cnt ++;
+    } else {
+        int nxt = td.next;
+        td.next = overflow_cnt ++;
+        OverflowData &od = overflow_table[td.next];
+        od.data = entry;
+        od.next = nxt;         
+    }
+}
+
+inline func uint64_t split_by_3(unsigned int a){
+    uint64_t x = a & 0x1fffff; // we only look at the first 21 bits
+    x = (x | x << 32) & 0x1f00000000ffff; // shift left 32 bits, OR with self, and 00011111000000000000000000000000000000001111111111111111
+    x = (x | x << 16) & 0x1f0000ff0000ff; // shift left 32 bits, OR with self, and 00011111000000000000000011111111000000000000000011111111
+    x = (x | x << 8) & 0x100f00f00f00f00f; // shift left 32 bits, OR with self, and 0001000000001111000000001111000000001111000000001111000000000000
+    x = (x | x << 4) & 0x10c30c30c30c30c3; // shift left 32 bits, OR with self, and 0001000011000011000011000011000011000011000011000011000100000000
+    x = (x | x << 2) & 0x1249249249249249;
+    return x;
+}
+    
+inline func uint64_t morton_encode_magicbits(unsigned int x, unsigned int y, unsigned int z){
+    uint64_t answer = 0;
+    answer |= split_by_3(x) | split_by_3(y) << 1 | split_by_3(z) << 2;
+    return answer;
+}
+
+
+func int SpatialHash::morton(const i3 &xyz) {
+    int x = xyz[0] + bound, y = xyz[1] + bound, z = xyz[2] + bound;
+    if (x < 0) x = 0;
+    if (y < 0) y = 0;
+    if (z < 0) z = 0;
+    if (x >= bound * 2) x = bound * 2 - 1; 
+    if (y >= bound * 2) y = bound * 2 - 1;
+    if (z >= bound * 2) z = bound * 2 - 1;
+    
+    unsigned ux = static_cast<unsigned>(x);
+    unsigned uy = static_cast<unsigned>(y);
+    unsigned uz = static_cast<unsigned>(z);
+
+    auto ui = morton_encode_magicbits(ux, uy, uz);
+    return static_cast<int>(ui);
+}
+
+void SpatialHash::collision_detect() {
+    pts.resize(0);
+    idx.resize(0);
+    ees.resize(0);
+    eidx.resize(0);
+    vidx.resize(0);
+    {
+        // point-triangle
+        clear();
+        for (int b = 0; b < n_cubes; b ++) {
+            for (int t = 0; t < cubes[b]->n_faces; t ++) {
+                // Face f = cubes[b].face(dof, t);
+                Face f = cubes[b]->face(t, false, false);
+                i2 body_prim;
+                body_prim << b, t;
+                lu bb{ compute_aabb(f, d_hat_sqrt) };
+                register_prim(bb, { body_prim, bb });
+            }
+        }
+        for (int b = 0; b < n_cubes; b ++) {
+            for (int p = 0; p < cubes[b]->n_vertices; p ++) {
+                // vec3 x = cubes[b].vert(dof, p);
+                vec3 x = cubes[b]-> vt1(p);
+                i2 body_prim;
+                body_prim << b, p;
+                query(x, {body_prim, {x, x}});
+            }
+        }
+    }
+
+    {
+        // edge-edge
+        clear(); 
+
+        for (int b = 0; b < n_cubes; b ++) {
+            for (int e = 0; e < cubes[b]->n_edges; e ++) {
+                Edge edge = cubes[b] -> edge(e, false, false);
+                i2 body_prim;
+                body_prim << b, e;
+                lu bb = compute_aabb(edge, d_hat_sqrt / 2.0);
+                register_prim(bb, {body_prim, bb});
+            }
+        }
+        for (int b = 0; b < n_cubes; b ++) {
+            for (int e = 0; e < cubes[b]->n_edges; e ++) {
+                // Edge edge = cubes[b].edge(dof, e);
+                Edge edge = cubes[b]->edge(e, false, false);
+                i2 body_prim;
+                body_prim << b, e;
+                lu bb = compute_aabb(edge, d_hat_sqrt / 2.0);
+                query(bb, {body_prim, bb});
+            }
+        }
+    }
+    
+    {
+        // point-ground
+        for (int b = 0; b < n_cubes; b++) {
+            for (int p = 0; p < cubes[b]->n_vertices; p++) {
+                // vec3 x = cubes[b].vert(dof, p);
+                vec3 x = cubes[b]->vt1(p);
+                i2 body_prim;
+                body_prim << b, p;
+                if (x[1] < d_hat_sqrt) {
+                    vidx.push_back(body_prim);
+                }                
+            }
+        }
+    }
+}

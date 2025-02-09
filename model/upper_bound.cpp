@@ -19,7 +19,7 @@ scalar step_size_upper_bound(Vector<scalar, -1>& dq, vector<unique_ptr<AffineBod
     vector<i4>& idx,
     vector<q4>& ees,
     vector<i4>& eidx,
-    vector<array<int, 2>>& vidx
+    vector<i2>& vidx
 )
  {
     auto start = high_resolution_clock::now();

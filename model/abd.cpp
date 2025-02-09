@@ -11,6 +11,7 @@
 #include "geometry.h"
 #include "timer.h"
 #include "ipc_extension.h"
+#include "spatial_hashing.h"
 // #include <ipc/distance/point_triangle.hpp>
 // #include <ipc/distance/edge_edge.hpp>
 #include <ipc/friction/closest_point.hpp>
@@ -40,16 +41,19 @@ void ABD::implicit_euler(scalar dt) {
     
     if (globals.col_set) {
 
-        auto &pts_arg = pts;
-        auto &idx_arg = idx;
-        auto &ees_arg = ees;
-        auto &eidx_arg = eidx;
-        auto &vidx_arg = vidx;
-        if (globals.iaabb % 2)
-            culling.iaabb_brute_force(n_cubes, cubes, globals.aabbs, 1, pts_arg, idx_arg, ees_arg, eidx_arg, vidx_arg);
-        else {
-            gen_collision_set(false, n_cubes, cubes, pts, idx, ees, eidx, vidx);
-        }
+        // auto &pts_arg = pts;
+        // auto &idx_arg = idx;
+        // auto &ees_arg = ees;
+        // auto &eidx_arg = eidx;
+        // auto &vidx_arg = vidx;
+        // if (globals.iaabb % 2)
+        //     culling.iaabb_brute_force(n_cubes, cubes, globals.aabbs, 1, pts_arg, idx_arg, ees_arg, eidx_arg, vidx_arg);
+        // else {
+        //     gen_collision_set(false, n_cubes, cubes, pts, idx, ees, eidx, vidx);
+        // }
+        SpatialHash sh(cubes, pts, idx, ees, eidx, vidx, barrier::d_sqrt);
+        //::SpatialHash sh(cubes, pts, idx, ees, eidx, vidx, barrier::d_sqrt);
+        sh.collision_detect();
     }
 
     ////// MAIN LOOP /////////////////////

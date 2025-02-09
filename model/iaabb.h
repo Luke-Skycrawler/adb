@@ -30,7 +30,7 @@ struct BoundingBox {
 };
 
 struct IAABB {
-    std::vector<std::array<int, 2>> edges, points, triangles;
+    std::vector<std::array<int,2>> edges, points, triangles;
     int n_points, n_triangles, n_edges;
 
     int g_cnt = 0;
@@ -41,7 +41,7 @@ struct IAABB {
     std::vector<lu> affine_bb;
     std::vector<int> buckets;
     std::vector<PList> lists;
-    std::vector<std::vector<std::array<int, 2>>> vidx_thread_local;
+    std::vector<std::vector<i2>> vidx_thread_local;
     std::vector<cuda::ThreadLocalToI> cuda_toi_handlers;
     std::vector<vec3> vt1_buffer;
     std::vector<int> vertex_starting_index;
@@ -73,7 +73,7 @@ struct IAABB {
         std::vector<i4>& idx,
         std::vector<q4>& ees,
         std::vector<i4>& eidx,
-        std::vector<std::array<int, 2>>& vidx);
+        std::vector<i2>& vidx);
 
     scalar iaabb_brute_force(
         int n_cubes,
@@ -84,7 +84,7 @@ struct IAABB {
         std::vector<i4>& idx,
         std::vector<q4>& ees,
         std::vector<i4>& eidx,
-        std::vector<std::array<int, 2>>& vidx);
+        std::vector<i2>& vidx);
 
 private:
     scalar ee_col_time(
