@@ -10,6 +10,9 @@
 using scalar = double;
 using mat3 = Eigen::Matrix<scalar, 3, 3>;
 using vec3 = Eigen::Vector<scalar, 3>;
+using vec2 = Eigen::Vector<scalar, 2>;
+using mat22 = Eigen::Matrix<scalar, 2, 2>;
+using mat34 = Eigen::Matrix<scalar, 3, 4>;
 // using q4 = std::array<vec3, 4>;
 // using i4 = std::array<int, 4>;
 using q4 = Eigen::Matrix<scalar, 3, 4>;

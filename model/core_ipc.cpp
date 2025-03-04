@@ -14,7 +14,7 @@
 #include "../iAABB/pch.h"
 extern Globals globals;
 #endif
-
+#include "hl.h"
 using namespace std;
 using namespace Eigen;
 
@@ -30,6 +30,7 @@ tuple<mat12, vec12> IPC::ipc_hess_pt_12x12(
     pt_grad = ipc::point_triangle_distance_gradient(p, t0, t1, t2, pt_type);
     pt_hess = ipc::point_triangle_distance_hessian(p, t0, t1, t2, pt_type);
 
+
     scalar B_ = barrier::barrier_derivative_d(dist);
     scalar B__ = barrier::barrier_second_derivative(dist);
 
@@ -37,10 +38,16 @@ tuple<mat12, vec12> IPC::ipc_hess_pt_12x12(
     ipc_hess.setZero(12, 12);
     ipc_hess = pt_hess * B_ + pt_grad * pt_grad.transpose() * B__;
 
-    pt_grad *= B_;
 
-    if (globals.psd)
+    if (pt_type == ipc::PointTriangleDistanceType::P_T) {
+        ipc_hess = hessian_pt_eig(p, t0, t1, t2, sqrt(dist), -1) * B_ + pt_grad * pt_grad.transpose() * B__;
+        // ipc_hess = pt_hess * B_ + pt_grad * pt_grad.transpose() * B__;    
+    }
+
+    else if (globals.psd)
         ipc_hess = project_to_psd(ipc_hess);
+
+    pt_grad *= B_;
 
     return { ipc_hess, pt_grad };
 }
@@ -72,8 +79,10 @@ tuple<mat12, vec12, scalar> IPC::ipc_hess_ee_12x12(
 
     mat12 ipc_hess;
     ipc_hess.setZero(12, 12);
-    ipc_hess = p_hess * B + B_ * (p_grad * ee_grad.transpose() + ee_grad * p_grad.transpose()) + p * (B__ * ee_grad * ee_grad.transpose() + B_ * ee_hess);
 
+    ipc_hess = B__ * ee_grad * ee_grad.transpose() + B_ * ee_hess;
+
+    ipc_hess = p_hess * B + B_ * (p_grad * ee_grad.transpose() + ee_grad * p_grad.transpose()) + p * ipc_hess;
     ee_grad = p * ee_grad * B_ + p_grad * B;
 
     if (globals.psd)

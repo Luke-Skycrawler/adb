@@ -73,6 +73,7 @@ set(HEADERS
     model/bounds3.h
     model/abd.h
     model/ipc.h
+    model/psd/hl.h
     view/camera.h
     view/env.h
     view/global_variables.h
@@ -85,6 +86,9 @@ set(HEADERS
 )
 
 set(SOURCE 
+    model/psd/ee.cpp
+    model/psd/pt.cpp
+    model/psd/hl.cpp
     model/affine_obj.cpp
     model/col_set.cpp
     model/iaabb.cpp
@@ -156,6 +160,7 @@ target_include_directories(abd PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/test_cases
     ${CMAKE_CURRENT_SOURCE_DIR}/view
     ${CMAKE_CURRENT_SOURCE_DIR}/model/cuda
+    ${CMAKE_CURRENT_SOURCE_DIR}/model/psd
     "ext/cnpy"
 )
 
