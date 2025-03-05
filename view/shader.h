@@ -6,6 +6,8 @@ a transform feedback object attached;
 / ------------------------------------------------------------------------*/
 
 #include <glad/glad.h>
+#define GLM_ENABLE_EXPERIMENTAL
+
 #include <glm/glm.hpp>
 
 #include <string>

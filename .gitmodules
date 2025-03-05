@@ -1,0 +1,6 @@
+[submodule "ext/ipctk"]
+	path = ext/ipctk
+	url = https://github.com/ipc-sim/ipc-toolkit.git
+[submodule "ext/cnpy"]
+	path = ext/cnpy
+	url = https://github.com/rogersce/cnpy.git

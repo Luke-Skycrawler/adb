@@ -19,17 +19,20 @@ endif()
 # find_package(spdlog CONFIG REQUIRED)
 find_package(nlohmann_json CONFIG REQUIRED)
 find_package(pybind11 CONFIG REQUIRED)
-
+find_package(spdlog CONFIG REQUIRED)
 add_subdirectory("ext/cnpy")
-include(FetchContent)
-FetchContent_Declare(
-    ipc_toolkit
-    GIT_REPOSITORY https://github.com/ipc-sim/ipc-toolkit.git
-    GIT_TAG v1.2.1
-)
-FetchContent_GetProperties(ipc_toolkit)
-FetchContent_MakeAvailable(ipc_toolkit)
+# include(FetchContent)
+# FetchContent_Declare(
+#     ipc_toolkit
+#     GIT_REPOSITORY https://github.com/ipc-sim/ipc-toolkit.git
+#     GIT_TAG v1.2.1
+# )
+# FetchContent_GetProperties(ipc_toolkit)
+# FetchContent_MakeAvailable(ipc_toolkit)
 
+set(ipc_toolkit_SOURCE_DIR "ext/ipctk")
+# file(GLOB_RECURSE ipc_toolkit_SOURCE_FILES "${ipc_toolkit_SOURCE_DIR}/src/*.cpp")
+add_subdirectory(${ipc_toolkit_SOURCE_DIR})
 set(CUDA_SOURCE 
     model/cuda/common.cuh
     model/cuda/soup.cu
